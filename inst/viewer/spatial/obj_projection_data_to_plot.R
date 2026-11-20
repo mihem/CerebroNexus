@@ -130,6 +130,41 @@ spatial_projection_group_hulls <- reactive({
 ## of the sample, coloured as one frame so that all panels share one colour
 ## scale, and the slice, extent and image of each section's panel. It is the
 ## same shape as a single-section frame without a geometry resource.
+## The expression of each RGB channel's gene as the metadata columns
+## coexpr_r/g/b (NA for an empty channel), for the given cells.
+spatial_projection_coexpression_columns <- function(
+  metadata,
+  plot_parameters,
+  cells
+) {
+  ## Use a list, not c(): an empty channel is NULL, and c() would DROP it and
+  ## shift the remaining names, misaligning genes to channels.
+  coexpr_genes <- list(
+    coexpr_r = plot_parameters$coexpr_r,
+    coexpr_g = plot_parameters$coexpr_g,
+    coexpr_b = plot_parameters$coexpr_b
+  )
+  requested_genes <- unique(unlist(coexpr_genes, use.names = FALSE))
+  requested_genes <- requested_genes[
+    !is.na(requested_genes) &
+      nzchar(requested_genes) &
+      requested_genes %in% getGeneNames()
+  ]
+  expression_values <- if (length(requested_genes)) {
+    viewerExpressionValues(data_set(), c(cells), requested_genes)
+  } else {
+    list()
+  }
+  for (channel in names(coexpr_genes)) {
+    gene <- coexpr_genes[[channel]]
+    metadata[[channel]] <- NA_real_
+    if (!is.null(gene) && gene %in% names(expression_values)) {
+      metadata[[channel]] <- expression_values[[gene]]
+    }
+  }
+  metadata
+}
+
 spatial_projection_grid_data <- function(
   dataset_context,
   plot_parameters,
@@ -156,11 +191,21 @@ spatial_projection_grid_data <- function(
     req(!is.null(expression))
     metadata[[gene]] <- expression
   }
+  if (identical(plot_parameters$plot_type, "Co-expression (RGB)")) {
+    metadata <- spatial_projection_coexpression_columns(
+      metadata,
+      plot_parameters,
+      cells
+    )
+  }
   color_variable <- plot_parameters[["color_variable"]]
+  metadata <- spatial_with_no_gene_column(metadata, color_variable)
   numeric_color <- is.numeric(metadata[[color_variable]])
   ## One assignment over every section: a group has the same colour in each.
   color_assignments <- if (numeric_color) {
     NULL
+  } else if (identical(color_variable, spatial_no_gene_variable)) {
+    stats::setNames(spatial_no_gene_color, spatial_no_gene_label)
   } else {
     assignColorsToGroups(metadata, color_variable)
   }
@@ -291,7 +336,8 @@ spatial_projection_data_to_plot_raw <- reactive({
     (isTRUE(full_canonical_frame) || isTRUE(section_frame)) &&
     !is.numeric(full_color) &&
     isTRUE(background_geometry_ready) &&
-    !roi_rotation_needed
+    !roi_rotation_needed &&
+    !identical(color_variable, spatial_no_gene_variable)
   ## Only the resource-first path uses these; the others assign colours from
   ## the plotted frame below.
   color_assignments <- if (!resource_first_candidate) {
@@ -326,6 +372,10 @@ spatial_projection_data_to_plot_raw <- reactive({
       as.integer(codes_cells)
     )
   metadata <- if (resource_first) NULL else spatial_projection_metadata()
+  metadata <- spatial_with_no_gene_column(
+    metadata,
+    plot_parameters[["color_variable"]]
+  )
 
   ## Handle ImageFeaturePlot (add gene expression data)
   if (
@@ -348,36 +398,24 @@ spatial_projection_data_to_plot_raw <- reactive({
   ## Co-expression: pull each channel's gene expression into metadata columns
   ## keyed by a stable channel name, so the renderer can blend them onto RGB.
   if (plot_parameters$plot_type == "Co-expression (RGB)") {
-    ## Use a list, not c(): an empty channel is NULL, and c() would DROP it and
-    ## shift the remaining names, misaligning genes to channels.
-    coexpr_genes <- list(
-      coexpr_r = plot_parameters$coexpr_r,
-      coexpr_g = plot_parameters$coexpr_g,
-      coexpr_b = plot_parameters$coexpr_b
+    metadata <- spatial_projection_coexpression_columns(
+      metadata,
+      plot_parameters,
+      cells_to_extract
     )
-    requested_genes <- unique(unlist(coexpr_genes, use.names = FALSE))
-    requested_genes <- requested_genes[
-      !is.na(requested_genes) &
-        nzchar(requested_genes) &
-        requested_genes %in% getGeneNames()
-    ]
-    expression_values <- viewerExpressionValues(
-      data_set(),
-      cells_to_extract,
-      requested_genes
-    )
-    for (channel in names(coexpr_genes)) {
-      gene <- coexpr_genes[[channel]]
-      metadata[[channel]] <- NA_real_
-      if (!is.null(gene) && gene %in% names(expression_values)) {
-        metadata[[channel]] <- expression_values[[gene]]
-      }
-    }
   }
 
   ## get colors for groups (if applicable)
   ## Filtered and feature frames retain their existing per-frame palette.
-  if (!resource_first) {
+  if (
+    !resource_first &&
+      identical(plot_parameters[["color_variable"]], spatial_no_gene_variable)
+  ) {
+    color_assignments <- stats::setNames(
+      spatial_no_gene_color,
+      spatial_no_gene_label
+    )
+  } else if (!resource_first) {
     color_assignments <- if (
       plot_parameters[['color_variable']] %in%
         colnames(metadata) &&

@@ -182,11 +182,7 @@ spatial_projection_scene_shown <- reactive({
 output[["spatial_projection_scene_UI"]] <- renderUI({
   scene <- spatial_projection_scene_shown()
   grid_offered <- length(scene$grid_choices) > 1L
-  ## The grid draws Dim and Feature plots; RGB stays on one section.
-  grid_js <- paste(
-    "input.spatial_projection_layout == 'grid' &&",
-    "input.spatial_projection_plot_type != 'Co-expression (RGB)'"
-  )
+  grid_js <- "input.spatial_projection_layout == 'grid'"
   single_controls <- tagList(
     if (length(scene$sample_values) > 1L) {
       selectInput(
@@ -377,35 +373,49 @@ output[["spatial_projection_main_parameters_UI"]] <- renderUI({
         class = "spatial-rgb-controls",
         selectizeInput(
           "spatial_projection_coexpr_r",
-          label = "Red channel gene",
+          label = "Red channel",
           choices = NULL,
           options = list(
             maxOptions = 1000,
-            placeholder = 'Gene for red...',
+            placeholder = "red channel gene...",
             create = FALSE,
             loadThrottle = 300
           )
         ),
         selectizeInput(
           "spatial_projection_coexpr_g",
-          label = "Green channel gene",
+          label = "Green channel",
           choices = NULL,
           options = list(
             maxOptions = 1000,
-            placeholder = 'Gene for green...',
+            placeholder = "green channel gene...",
             create = FALSE,
             loadThrottle = 300
           )
         ),
         selectizeInput(
           "spatial_projection_coexpr_b",
-          label = "Blue channel gene",
+          label = "Blue channel",
           choices = NULL,
           options = list(
             maxOptions = 1000,
-            placeholder = 'Gene for blue...',
+            placeholder = "blue channel gene...",
             create = FALSE,
             loadThrottle = 300
+          )
+        ),
+        ## As on Gene expression. The grid draws the blend only.
+        conditionalPanel(
+          condition = "input.spatial_projection_layout != 'grid'",
+          selectInput(
+            "spatial_projection_rgb_layout",
+            "RGB layout",
+            choices = c(
+              "Composite RGB" = "composite",
+              "Separate channels" = "separate"
+            ),
+            selected = isolate(input[["spatial_projection_rgb_layout"]]) %||%
+              "composite"
           )
         )
       )

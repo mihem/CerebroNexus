@@ -53,12 +53,12 @@ section_grid_data <- function() {
   list(index = index, coordinates = coordinates)
 }
 
-test_that("the grid is offered for several sections and Dim or Feature plots", {
+test_that("the grid is offered for several sections and every plot type", {
   sections <- c("a", "b")
   expect_true(spatial_grid_active("grid", sections, "ImageDimPlot"))
   expect_true(spatial_grid_active("grid", sections, "ImageFeaturePlot"))
-  ## RGB co-expression stays a single-section view.
-  expect_false(spatial_grid_active("grid", sections, "Co-expression (RGB)"))
+  expect_true(spatial_grid_active("grid", sections, "Co-expression (RGB)"))
+  expect_false(spatial_grid_active("grid", sections, "Something else"))
   expect_false(spatial_grid_active("grid", "a", "ImageDimPlot"))
   expect_false(spatial_grid_active("single", sections, "ImageDimPlot"))
   expect_false(spatial_grid_active(NULL, sections, "ImageDimPlot"))

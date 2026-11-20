@@ -155,6 +155,7 @@ observe(
       coexpr_r = input[["spatial_projection_coexpr_r"]] %||% "",
       coexpr_g = input[["spatial_projection_coexpr_g"]] %||% "",
       coexpr_b = input[["spatial_projection_coexpr_b"]] %||% "",
+      rgb_layout = input[["spatial_projection_rgb_layout"]] %||% "composite",
       point_size = as.numeric(value_or_default(
         isolate(input[["spatial_projection_point_size"]]),
         defaults$point_size
@@ -323,10 +324,17 @@ spatial_projection_parameters_plot_current <- reactive({
     }
   } else if (plot_type == "ImageFeaturePlot") {
     feature_to_display <- controls$feature_to_display
-    ## Right after a dataset switch the picker can still hold the previous
-    ## dataset's gene; wait for one this dataset has.
-    req(feature_to_display, feature_to_display %in% getGeneNames())
-    color_variable <- feature_to_display
+    if (!length(feature_to_display) || !any(nzchar(feature_to_display))) {
+      ## No gene chosen yet: the cells turn one light grey instead of keeping
+      ## the colours of the previous plot type.
+      feature_to_display <- NULL
+      color_variable <- spatial_no_gene_variable
+    } else {
+      ## Right after a dataset switch the picker can still hold the previous
+      ## dataset's gene; wait for one this dataset has.
+      req(feature_to_display %in% getGeneNames())
+      color_variable <- feature_to_display
+    }
   } else if (plot_type == "Co-expression (RGB)") {
     ## One gene per channel; any channel may be empty. Require at least one so
     ## the render has something to colour by.
@@ -336,13 +344,18 @@ spatial_projection_parameters_plot_current <- reactive({
       b = controls$coexpr_b
     )
     blank <- function(x) is.null(x) || !nzchar(x)
-    req(
-      !(blank(coexpr_genes$r) && blank(coexpr_genes$g) && blank(coexpr_genes$b))
-    )
     ## The cell colour comes from the RGB blend, not a metadata column, but the
     ## downstream code still indexes metadata[[color_variable]] — give it a valid
-    ## placeholder column so that lookup can't fail on a NULL name.
-    color_variable <- "cell_index"
+    ## placeholder column so that lookup can't fail on a NULL name. Before any
+    ## channel has a gene, the cells are the grey "No gene selected" ones, so a
+    ## section or layout change still draws.
+    color_variable <- if (
+      blank(coexpr_genes$r) && blank(coexpr_genes$g) && blank(coexpr_genes$b)
+    ) {
+      spatial_no_gene_variable
+    } else {
+      "cell_index"
+    }
   }
 
   spatial_data <- getSpatialData(controls$projection)
@@ -576,9 +589,11 @@ spatial_projection_parameters_plot_current <- reactive({
     roi_order = separate_roi_values,
     roi_point_appearance = roi_point_appearance,
     feature_to_display = feature_to_display,
+    no_gene = identical(color_variable, spatial_no_gene_variable),
     coexpr_r = controls$coexpr_r,
     coexpr_g = controls$coexpr_g,
     coexpr_b = controls$coexpr_b,
+    rgb_layout = controls$rgb_layout,
     point_size = controls$point_size,
     point_opacity = controls$point_opacity,
     draw_border = isolate(spatial_projection_appearance$draw_border),

@@ -1409,9 +1409,32 @@ spatial_projection_default_layout <- function() {
   spatial_default_layout(display, sections)
 }
 
-## The grid colours by a metadata column or by one gene; RGB co-expression
-## stays a single-section view.
-spatial_grid_plot_types <- c("ImageDimPlot", "ImageFeaturePlot")
+## ImageFeaturePlot before a gene is chosen colours every cell by this one
+## placeholder group, in light grey (hover reads "Gene: No gene selected").
+spatial_no_gene_variable <- "Gene"
+spatial_no_gene_label <- "No gene selected"
+spatial_no_gene_color <- "#d5d9dd"
+
+## Adds the placeholder column to `metadata` when the frame colours by it.
+spatial_with_no_gene_column <- function(metadata, color_variable) {
+  if (
+    identical(color_variable, spatial_no_gene_variable) && !is.null(metadata)
+  ) {
+    metadata[[spatial_no_gene_variable]] <- factor(
+      rep(spatial_no_gene_label, nrow(metadata)),
+      levels = spatial_no_gene_label
+    )
+  }
+  metadata
+}
+
+## The grid colours by a metadata column, one gene or the RGB blend of up to
+## three genes.
+spatial_grid_plot_types <- c(
+  "ImageDimPlot",
+  "ImageFeaturePlot",
+  "Co-expression (RGB)"
+)
 
 ## Whether a frame is a grid: asked for, for a plot type the grid draws, with
 ## more than one section to show.

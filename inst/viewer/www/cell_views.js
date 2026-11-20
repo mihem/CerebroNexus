@@ -5015,7 +5015,9 @@
       var col = cssColor((g.colors && g.colors[li]) || PAL[li % PAL.length]);
       item('cv-lg' + (hidden.has(li) ? ' off' : ''),
         '<span class="cv-dot" style="background:' + col + '"></span>' +
-        esc(nm) + ' <span class="cv-lg-ct">(' + (counts[li] || 0) + ')</span>'
+        // A single group (such as "No gene selected") is every cell: no count.
+        esc(nm) + (g.levels.length > 1
+          ? ' <span class="cv-lg-ct">(' + (counts[li] || 0) + ')</span>' : '')
       ).onclick = function () {
         if (hidden.has(li)) hidden.delete(li); else hidden.add(li);
         reportSingleHiddenGroups(); renderLegend(); drawAll();
@@ -9784,13 +9786,11 @@
     });
     window.jQuery(document).on('shiny:inputchanged.cerebroSectionGrid', function (event) {
       if (event.name === 'spatial_projection_layout' && singleActive === 'spatial_projection') {
-        var plotType = document.getElementById('spatial_projection_plot_type');
         var wanted = event.value === 'grid' ? 'grid' : 'single';
         // Only a change of what is drawn waits for a frame: the input also
         // fires when its control binds (or is rendered again) with the layout
-        // already on screen. RGB co-expression draws one section either way.
-        if ((wanted === 'grid') !== sectionGridActive() &&
-            (!plotType || plotType.value !== 'Co-expression (RGB)')) {
+        // already on screen.
+        if ((wanted === 'grid') !== sectionGridActive()) {
           showGridSkeleton(wanted);
         }
         return;
@@ -9812,7 +9812,12 @@
     var positional = keysArePositional(keys);
     var cellBoundaries = singleCellBoundaries(extra);
     var spaces = [], modes = {}, mode;
-    if (meta.color_type === 'categorical') {
+    if (meta.color_type === 'rgb') {
+      // The blend of up to three genes, as a single view draws it (the
+      // Spatial grid's co-expression): grey where none is expressed.
+      D.rgb = singleRgbData(data, positional);
+      mode = RGB_MODE;
+    } else if (meta.color_type === 'categorical') {
       var levels = Array.isArray(meta.traces) ? meta.traces.map(String) : [];
       var groups;
       if (data.group_code != null) {
