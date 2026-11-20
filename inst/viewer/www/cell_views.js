@@ -6860,6 +6860,28 @@
       detail: { id: id, text: text, dataset_context: currentDatasetContext() }
     }));
   }
+  // Decoded pictures by file MD5, least recently used first, up to a total
+  // pixel count (about 400 MB decoded): enough for several data sets' sections.
+  var decodedImages = new Map();
+  var DECODED_IMAGE_PIXELS = 1e8;
+  function decodedImageKey(uri) {
+    var match = /cerebro-image-([0-9a-f]{32})/.exec(String(uri || ''));
+    return match ? match[1] : null;
+  }
+  function rememberDecodedImage(key, im) {
+    var pixels = function (el) { return (el.naturalWidth || 0) * (el.naturalHeight || 0); };
+    if (pixels(im) > DECODED_IMAGE_PIXELS) return;
+    decodedImages.delete(key);
+    decodedImages.set(key, im);
+    var total = 0;
+    decodedImages.forEach(function (el) { total += pixels(el); });
+    while (total > DECODED_IMAGE_PIXELS && decodedImages.size > 1) {
+      var oldest = decodedImages.keys().next().value;
+      total -= pixels(decodedImages.get(oldest));
+      decodedImages.delete(oldest);
+    }
+  }
+
   function loadSpaceImage(space) {
     if (!space) return;
     space._imgEl = null; space._imgReady = false;
@@ -6902,8 +6924,22 @@
         datasetContextApi().phase() === 'ready' &&
         canonicalIdentity(activeImage && (activeImage.id || activeImage.uri)) === imageIdentity;
     };
+    // A picture already decoded (the same file, by its MD5) paints at once:
+    // switching back to a data set fetched and decoded every picture again.
+    var cacheKey = decodedImageKey(img.uri);
+    var cached = cacheKey && decodedImages.get(cacheKey);
+    if (cached) {
+      decodedImages.delete(cacheKey);
+      decodedImages.set(cacheKey, cached);
+      space._imgEl = cached;
+      space._imgReady = true; drawAll();
+      viewOperation(feedbackId, feedbackId === 'linked' && !linkedBackgroundsOn
+        ? 'Background images hidden' : 'Background loaded: ' + (space.label || space.id));
+      return;
+    }
     var im = new Image();
     im.onload = function () {
+      if (cacheKey) rememberDecodedImage(cacheKey, im);
       if (!stillCurrent()) return;
       space._imgReady = true; drawAll();
       viewOperation(feedbackId, feedbackId === 'linked' && !linkedBackgroundsOn

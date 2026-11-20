@@ -526,6 +526,141 @@
   object
 }
 
+## ---- Spatial expression references ---------------------------------------- ##
+
+## A spatial section's expression stored as a reference to the columns of the
+## object's own matrix instead of a copy of them. `cells` NULL means the cells
+## of the section's coordinates, `genes` NULL every gene of the matrix.
+## getSpatialData() rebuilds the matrix from it.
+.spatialExpressionRef <- function(cells = NULL, genes = NULL) {
+  structure(
+    list(cells = cells, genes = genes),
+    class = "CerebroSpatialExpressionRef"
+  )
+}
+
+## A section's spatial record without its molecule table, its expression left
+## as the CRB stores it. The getter of an object read as it was stored (an App
+## bundle reads CRBs that way) may predate `hydrate_expression`.
+.spatialRecordWithoutExpression <- function(object, name) {
+  getter <- object$getSpatialData
+  if ("hydrate_expression" %in% names(formals(getter))) {
+    getter(name, hydrate_molecules = FALSE, hydrate_expression = FALSE)
+  } else {
+    getter(name, hydrate_molecules = FALSE)
+  }
+}
+
+## The same values, row and column names, as sparse matrices.
+.sameMatrixValues <- function(a, b) {
+  as_sparse <- function(x) {
+    if (methods::is(x, "dgCMatrix")) {
+      return(x)
+    }
+    if (is.matrix(x) || methods::is(x, "Matrix")) {
+      return(methods::as(
+        methods::as(methods::as(x, "dMatrix"), "generalMatrix"),
+        "CsparseMatrix"
+      ))
+    }
+    methods::as(x, "dgCMatrix")
+  }
+  isTRUE(tryCatch(
+    {
+      if (
+        !identical(dim(a), dim(b)) ||
+          !identical(dimnames(a), dimnames(b))
+      ) {
+        return(FALSE)
+      }
+      a <- as_sparse(a)
+      b <- as_sparse(b)
+      identical(a@p, b@p) && identical(a@i, b@i) && identical(a@x, b@x)
+    },
+    error = function(error) FALSE
+  ))
+}
+
+## Replaces each section's copy of the expression with a reference where the
+## copy is exactly the object's matrix for the section's cells, as every
+## exporter writes it. A Visium CRB was twice as large with the copies and took
+## three times as long to read. Any other section matrix is kept. `expression`
+## is the matrix, or a function that returns it (NULL: keep every copy), called
+## only when a section has a matrix.
+.referenceSpatialExpression <- function(spatial, expression) {
+  copies <- is.list(spatial) &&
+    any(vapply(
+      spatial,
+      function(entry) {
+        is.list(entry) &&
+          !is.null(entry[["expression"]]) &&
+          !inherits(entry[["expression"]], "CerebroSpatialExpressionRef")
+      },
+      logical(1)
+    ))
+  if (!copies) {
+    return(spatial)
+  }
+  if (is.function(expression)) {
+    expression <- tryCatch(expression(), error = function(error) NULL)
+  }
+  if (is.null(expression)) {
+    return(spatial)
+  }
+  .loadMatrixFor(expression)
+  genes <- rownames(expression)
+  all_cells <- colnames(expression)
+  if (is.null(genes) || is.null(all_cells)) {
+    return(spatial)
+  }
+  for (index in seq_along(spatial)) {
+    entry <- spatial[[index]]
+    section <- if (is.list(entry)) entry[["expression"]]
+    if (is.null(section) || inherits(section, "CerebroSpatialExpressionRef")) {
+      next
+    }
+    cells <- colnames(section)
+    rows <- rownames(section)
+    if (
+      !is.character(cells) ||
+        !is.character(rows) ||
+        !length(cells) ||
+        anyNA(cells) ||
+        anyDuplicated(cells) ||
+        anyDuplicated(rows) ||
+        !all(cells %in% all_cells) ||
+        !all(rows %in% genes)
+    ) {
+      next
+    }
+    all_genes <- identical(rows, genes)
+    columns <- tryCatch(
+      if (all_genes) {
+        expression[, cells, drop = FALSE]
+      } else {
+        expression[rows, cells, drop = FALSE]
+      },
+      error = function(error) NULL
+    )
+    if (is.null(columns) || !.sameMatrixValues(section, columns)) {
+      next
+    }
+    coordinates <- entry[["coordinates"]]
+    entry[["expression"]] <- .spatialExpressionRef(
+      cells = if (
+        is.data.frame(coordinates) && identical(rownames(coordinates), cells)
+      ) {
+        NULL
+      } else {
+        cells
+      },
+      genes = if (all_genes) NULL else rows
+    )
+    spatial[[index]] <- entry
+  }
+  spatial
+}
+
 ## ---- Immune repertoire sidecar -------------------------------------------- ##
 
 .immuneRepertoireSidecarName <- function(file, codec) {
@@ -634,6 +769,14 @@
   payload <- .currentCerebroCopy(object)
   payload$crb_schema <- NULL
   payload$expression_backend <- backend
+  payload$spatial <- .referenceSpatialExpression(payload$spatial, function() {
+    ## An H5-backed object may hold no matrix when it is saved.
+    if (!is.null(payload$expression) || !identical(backend$type, "h5")) {
+      return(payload$expression)
+    }
+    location <- sidecar %||% .cerebroSidecar(file, backend)
+    t(HDF5Array::TENxMatrix(location, group = "expression"))
+  })
   immune_backend <- .immuneRepertoireBackend(object, file)
   if (!is.null(immune_backend)) {
     payload$immune_repertoire <- list()

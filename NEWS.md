@@ -29,9 +29,30 @@
   the Viewer's Panel shape switch does. With 1.2 million cells in 12 sections (Windows, Chrome, WebGPU),
   the grid opens in 1.2 to 1.8 s, recolouring by a gene takes 1.4 to 2.1 s,
   and a synced zoom 13 to 31 ms; with the 800,000 cells of the 8 sections of
-  CosMx NSCLC, 0.9 s to open and to recolour. Exports and CRB files are
-  unchanged. RGB co-expression, ROIs and region outlines stay single-section
-  views.
+  CosMx NSCLC, 0.9 s to open and to recolour. Exports are unchanged. RGB
+  co-expression, ROIs and region outlines stay single-section views.
+- **A CRB no longer stores each spatial section's expression twice.** Every
+  section kept a copy of the expression matrix's columns for its cells. A CRB
+  now stores a reference to those columns instead, and
+  `getSpatialData()` rebuilds the section's matrix from the object's matrix
+  (`hydrate_expression = FALSE` leaves the reference, as the Viewer, the
+  Builder and `createShinyApp()` do). A section matrix that differs from the
+  object's matrix is still stored. For the Visium demos below, the CRBs are
+  half as large and are read in a third to a quarter of the time (DLPFC, 12
+  sections: 314 to 156 MB, 1.5 to 0.47 s). CRBs written before keep their
+  copies and read as before.
+- **Switching data sets no longer fetches the histology pictures again.** The
+  Viewer keeps decoded pictures by file (up to about 100 million pixels), so
+  returning to a data set shows its sections' pictures with its cells, and the
+  App sends pictures without gzip, which took 110 ms for a 6.7 MB PNG and made
+  it larger.
+- **Multi-section Visium demos for the Builder.** `Rscript run-demo.R
+  --data=dlpfc,mouse_brain,breast,prostate` downloads four public 10x Visium
+  data sets with the H&E picture of every section (human DLPFC, 12 sections;
+  mouse brain, 4; breast cancer, 2; prostate cancer and normal, 2), checks
+  each file's size and MD5, writes one SingleCellExperiment file per data set
+  and opens the Builder, which attaches every picture to its section. Sources
+  and licences are in `data-raw/large-demo/visium.ATTRIBUTION.md`.
 
 # CerebroNexus 8.4.3
 

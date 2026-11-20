@@ -5159,9 +5159,22 @@ viewerReadSpatialData <- function(ds, name) {
     name
   )
   tryCatch(
-    ds$getSpatialData(name, hydrate_molecules = FALSE),
+    viewerGetSpatialData(ds, name),
     error = function(e) NULL
   )
+}
+
+## A section's spatial record as the Viewer reads it: no molecule table, and
+## the expression left as the CRB's reference to the object's matrix (the
+## Viewer reads genes from that matrix). A CRB written before the reference
+## existed has a getter without `hydrate_expression`.
+viewerGetSpatialData <- function(ds, name) {
+  getter <- ds$getSpatialData
+  if ("hydrate_expression" %in% names(formals(getter))) {
+    getter(name, hydrate_molecules = FALSE, hydrate_expression = FALSE)
+  } else {
+    getter(name, hydrate_molecules = FALSE)
+  }
 }
 
 ## Coordinate-only Spatial consumers run after spatial_projection_parameters_plot
@@ -6453,6 +6466,9 @@ viewerPrivateImageUrl <- function(path, session = NULL, expected_md5 = NULL) {
           "Cache-Control" = "private, max-age=31536000, immutable",
           "ETag" = paste0('"', data$md5, '"'),
           "X-Content-Type-Options" = "nosniff",
+          ## httpuv would gzip every response: 110 ms for a 6.7 MB PNG that
+          ## comes out larger, 8 ms without.
+          "Content-Encoding" = "identity",
           ## An SVG opened as a document must not run script, whatever its
           ## markup; as an image it is unaffected.
           "Content-Security-Policy" = paste(
