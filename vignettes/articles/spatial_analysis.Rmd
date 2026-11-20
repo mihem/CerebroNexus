@@ -128,6 +128,10 @@ all of them. The grid needs no change to the data or the export.
 - **Panel shape** (top right of the page): *Fit tissue* shapes each panel to
   its section and packs them to fill the window; *Square* draws equal square
   panels.
+- **Opening in the grid**: in the Builder, the Spatial card of the Viewer
+  display settings has *Open Spatial as: Grid of all sections*, which makes a
+  data set with several sections open Spatial in the grid. Readers can still
+  switch back.
 
 Each panel zooms and pans on its own and shows the usual tooltips. RGB
 co-expression, the ROI controls and region outlines apply to a single section

@@ -20,7 +20,13 @@
   share one copy of the cells' positions instead of one per panel.
   Like the UMAP pages, Spatial has a switch at the top right, **Panel shape**:
   *Fit tissue* (the default) shapes the plot to the tissue, and *Square* draws
-  every panel as a square. With 1.2 million cells in 12 sections (Windows, Chrome, WebGPU),
+  every panel as a square.
+- **The Builder chooses how Spatial opens.** Its Viewer display settings have
+  *Open Spatial as: One section | Grid of all sections* in the Spatial card,
+  stored as `spatial_layout` with the other page defaults; a data set with one
+  section always opens as one section, and Apps and projects without the
+  setting open as before. The card's square option reads *Square panels*, as
+  the Viewer's Panel shape switch does. With 1.2 million cells in 12 sections (Windows, Chrome, WebGPU),
   the grid opens in 1.2 to 1.8 s, recolouring by a gene takes 1.4 to 2.1 s,
   and a synced zoom 13 to 31 ms; with the 800,000 cells of the 8 sections of
   CosMx NSCLC, 0.9 s to open and to recolour. Exports and CRB files are
