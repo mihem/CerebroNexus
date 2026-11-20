@@ -266,6 +266,9 @@ source("report.R", local = TRUE)
 source("coordinator.R", local = TRUE)
 
 ## runApp() sets the working directory to the app directory.
+source("access.R", local = TRUE)
+## Read once: the page and every session are checked against this token.
+.builder_access_token <- builder_access_token()
 source("notify.R", local = TRUE)
 source("io.R", local = TRUE)
 source("project.R", local = TRUE)
@@ -763,6 +766,15 @@ ui <- shiny::bootstrapPage(
   )
 )
 
+## Without the access token the page is not served (see access.R).
+.builder_page <- ui
+ui <- function(req) {
+  if (!builder_access_allowed(req$QUERY_STRING, .builder_access_token)) {
+    return(builder_access_denied_response())
+  }
+  .builder_page
+}
+
 .builder_server_sources <- c(
   "server/foundation.R",
   "server/imports.R",
@@ -846,6 +858,16 @@ suppressWarnings(rm(
 ))
 
 server <- function(input, output, session) {
+  ## A connection without the access token gets no session (see access.R).
+  if (
+    !builder_access_allowed(
+      shiny::isolate(session$clientData$url_search),
+      .builder_access_token
+    )
+  ) {
+    session$close()
+    return(invisible(NULL))
+  }
   server_environment <- environment()
   for (program in .builder_server_programs) {
     eval(program, envir = server_environment)

@@ -1,3 +1,14 @@
+# CerebroNexus 8.4.4
+
+- **The Builder needs an access token.** `launchCerebroBuilder()` now
+  makes a random token for each run and opens the page at an address that
+  carries it (`?token=...`, also printed in the R console). Without the token
+  the page is refused and no session starts. Shiny checks neither the
+  Origin nor the Host of a connection, so before this a web page open in the
+  same browser (through a cross-site WebSocket or DNS rebinding), or another
+  user of a shared machine, could connect to the Builder's port and drive it:
+  browse the home folder, open files and run the code inside an `.rds`.
+
 # CerebroNexus 8.4.3
 
 - **CI formatting uses the latest official Air binary.** The formatting workflow
