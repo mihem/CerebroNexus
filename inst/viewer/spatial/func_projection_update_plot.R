@@ -251,10 +251,9 @@ spatial_projection_update_plot <- function(input) {
       background_meta,
       list(
         color_type = "rgb",
-        ## The grid draws the blend; separate channels are one section's view.
+        ## Separate channels: one panel per channel (and section, in the grid).
         rgb_layout = if (
-          !is.list(grid) &&
-            identical(plot_parameters[["rgb_layout"]], "separate")
+          identical(plot_parameters[["rgb_layout"]], "separate")
         ) {
           "separate"
         } else {

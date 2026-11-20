@@ -9615,14 +9615,17 @@
   // every section was removed) shows them all, in frame order: a grid without
   // sections would leave the page blank.
   function gridShownSpaces() {
+    // A section is one panel, or one per RGB channel.
     var bySection = {};
     singleGridSpaces.forEach(function (spaceId) {
-      bySection[spaceById[spaceId]._gridSection] = spaceId;
+      var name = spaceById[spaceId]._gridSection;
+      (bySection[name] = bySection[name] || []).push(spaceId);
     });
     var out = [];
     (gridSectionChoice() || []).forEach(function (name) {
-      var spaceId = bySection[name];
-      if (spaceId && out.indexOf(spaceId) < 0) out.push(spaceId);
+      (bySection[name] || []).forEach(function (spaceId) {
+        if (out.indexOf(spaceId) < 0) out.push(spaceId);
+      });
     });
     return singleGridExtras.concat(out.length ? out : singleGridSpaces);
   }
@@ -9804,6 +9807,27 @@
     });
   }
 
+  // One RGB channel drawn on its own: the same 8-bit intensities and
+  // low-expression threshold as the composite, with only this channel
+  // enabled. Raw values stay for hover and selection summaries. Returns the
+  // field's colour mode; D.rgb is the frame's (singleRgbData()).
+  var RGB_CHANNEL_NAMES = ['Red', 'Green', 'Blue'];
+  function rgbChannelMode(id, channel, index, data, aligned) {
+    var gene = D.rgb.genes[index], maximum = D.rgb.maxima[channel];
+    var field = quantisedField(channel.toUpperCase() + ' · ' + gene, data.rgb[channel] || [],
+      data.selection_key || [], {color_range: [0, maximum], paint_order: data.paint_order},
+      null, aligned);
+    field.v = D.rgb[channel]; field.scale = 255;
+    field.min = 0; field.max = maximum; field.rgbChannel = channel;
+    field.palette = Array.from({length: 256}, function (_, value) {
+      var color = rgbGpuColor(channel === 'r' ? value : 0,
+        channel === 'g' ? value : 0, channel === 'b' ? value : 0);
+      return 'rgb(' + (color & 255) + ',' + ((color >> 8) & 255) + ',' + ((color >> 16) & 255) + ')';
+    });
+    var fieldName = 'single:' + id + ':rgb:' + channel;
+    D.fields[fieldName] = field;
+    return FIELD_PREFIX + fieldName;
+  }
   function buildSpecialistPanels(id, payload) {
     var meta = payload.meta || {}, data = payload.data || {},
       extra = payload.extra || {};
@@ -9812,11 +9836,21 @@
     var positional = keysArePositional(keys);
     var cellBoundaries = singleCellBoundaries(extra);
     var spaces = [], modes = {}, mode;
+    var channelModes = null;
     if (meta.color_type === 'rgb') {
       // The blend of up to three genes, as a single view draws it (the
-      // Spatial grid's co-expression): grey where none is expressed.
+      // Spatial grid's co-expression): grey where none is expressed. With
+      // separate channels each section becomes one panel per channel.
       D.rgb = singleRgbData(data, positional);
       mode = RGB_MODE;
+      if (meta.rgb_layout === 'separate' && D.rgb.genes.some(Boolean)) {
+        channelModes = [];
+        ['r', 'g', 'b'].forEach(function (channel, index) {
+          if (!D.rgb.genes[index]) return;
+          channelModes.push({ channel: channel, name: RGB_CHANNEL_NAMES[index],
+            mode: rgbChannelMode(id, channel, index, data, positional) });
+        });
+      }
     } else if (meta.color_type === 'categorical') {
       var levels = Array.isArray(meta.traces) ? meta.traces.map(String) : [];
       var groups;
@@ -9988,6 +10022,19 @@
         }];
         space._customImageId = space.images[0].id;
       }
+      if (channelModes && panel.section != null) {
+        // "Section01 Red", "Section01 Green", ...: copies over the same cells.
+        channelModes.forEach(function (channel) {
+          var copy = Object.assign({}, space, {
+            id: spaceId + ':' + channel.channel,
+            label: space.label + ' ' + channel.name
+          });
+          spaceById[copy.id] = copy;
+          spaces.push(copy.id);
+          modes[copy.id] = channel.mode;
+        });
+        return;
+      }
       spaceById[spaceId] = space;
       spaces.push(spaceId);
       modes[spaceId] = mode;
@@ -10096,24 +10143,9 @@
         ['r', 'g', 'b'].forEach(function (channel, index) {
           var gene = D.rgb.genes[index];
           if (!gene) return;
-          var label = channel.toUpperCase() + ' · ' + gene;
-          var maximum = D.rgb.maxima[channel];
-          var field = quantisedField(label, data.rgb[channel] || [], data.selection_key || [],
-            {color_range: [0, maximum], paint_order: data.paint_order});
-          // Use the same 8-bit intensities and low-expression threshold as
-          // the composite, with only this channel enabled. Keep raw values
-          // for hover and selection summaries.
-          field.v = D.rgb[channel]; field.scale = 255;
-          field.min = 0; field.max = maximum; field.rgbChannel = channel;
-          field.palette = Array.from({length: 256}, function (_, value) {
-            var color = rgbGpuColor(channel === 'r' ? value : 0,
-              channel === 'g' ? value : 0, channel === 'b' ? value : 0);
-            return 'rgb(' + (color & 255) + ',' + ((color >> 8) & 255) + ',' + ((color >> 16) & 255) + ')';
-          });
-          var fieldName = 'single:' + id + ':rgb:' + channel;
           var spaceId = baseId + ':rgb:' + channel;
-          D.fields[fieldName] = field;
-          makeSpace(spaceId, label); modes[spaceId] = FIELD_PREFIX + fieldName;
+          makeSpace(spaceId, channel.toUpperCase() + ' · ' + gene);
+          modes[spaceId] = rgbChannelMode(id, channel, index, data, false);
         });
       } else {
         makeSpace(baseId, meta.space_label || id);

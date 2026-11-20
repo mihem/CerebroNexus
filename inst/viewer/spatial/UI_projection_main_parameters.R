@@ -404,19 +404,16 @@ output[["spatial_projection_main_parameters_UI"]] <- renderUI({
             loadThrottle = 300
           )
         ),
-        ## As on Gene expression. The grid draws the blend only.
-        conditionalPanel(
-          condition = "input.spatial_projection_layout != 'grid'",
-          selectInput(
-            "spatial_projection_rgb_layout",
-            "RGB layout",
-            choices = c(
-              "Composite RGB" = "composite",
-              "Separate channels" = "separate"
-            ),
-            selected = isolate(input[["spatial_projection_rgb_layout"]]) %||%
-              "composite"
-          )
+        ## As on Gene expression; in the grid, every section splits.
+        selectInput(
+          "spatial_projection_rgb_layout",
+          "RGB layout",
+          choices = c(
+            "Composite RGB" = "composite",
+            "Separate channels" = "separate"
+          ),
+          selected = isolate(input[["spatial_projection_rgb_layout"]]) %||%
+            "composite"
         )
       )
     )
