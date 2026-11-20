@@ -3056,6 +3056,39 @@ body .shiny-bound-output.cerebro-output-waiting {
 .cerebro-viz-toolbar .spatial-image-dim-controls .form-group {
   flex: 1 1 180px;
 }
+/* Section grid: the layout switch, then either the single section's scene
+   controls or the grid's own controls, each group on one wrapping row. */
+.cerebro-viz-toolbar .spatial-layout-control { flex: 0 0 auto; }
+.cerebro-viz-toolbar .spatial-layout-control .form-group {
+  flex: 0 0 auto; width: auto; min-width: 0;
+}
+.cerebro-viz-toolbar .spatial-layout-control .shiny-options-group {
+  display: flex; align-items: center; gap: 14px;
+  height: var(--c-toolbar-control-height);
+}
+.cerebro-viz-toolbar .spatial-layout-control .radio-inline { margin: 0; padding-top: 0; }
+.cerebro-viz-toolbar .shiny-panel-conditional:has(> .spatial-single-controls) {
+  flex: 2 1 380px;
+}
+.cerebro-viz-toolbar .shiny-panel-conditional:has(> .spatial-grid-controls) {
+  flex: 4 1 620px;
+}
+.cerebro-viz-toolbar .spatial-single-controls,
+.cerebro-viz-toolbar .spatial-grid-controls {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px;
+}
+.cerebro-viz-toolbar .spatial-single-controls .form-group { flex: 1 1 180px; }
+.cerebro-viz-toolbar .spatial-grid-controls .form-group {
+  flex: 0 1 150px; min-width: 110px;
+}
+.cerebro-viz-toolbar .spatial-grid-controls .form-group:has(select[multiple]) {
+  flex: 3 1 320px;
+}
+.cerebro-viz-toolbar .spatial-grid-controls .form-group:has(.checkbox) {
+  flex: 0 0 auto; min-width: 0; width: auto;
+  display: flex; align-items: center; height: var(--c-toolbar-control-height);
+}
+.cerebro-viz-toolbar .spatial-grid-controls .checkbox { margin: 0; }
 .cerebro-viz-toolbar .spatial-roi-background-picker {
   flex: 0 1 var(--c-control-width);
   width: var(--c-control-width);

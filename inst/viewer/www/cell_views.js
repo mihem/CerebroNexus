@@ -50,6 +50,11 @@
   // delivered one names it in data.aux_reuse, so it is not downloaded again.
   var singleAuxCache = {};
   var singleSpaceIds = [];      // one space, or one per gene in multi-panel mode
+  // Every section panel of a Spatial grid frame, in frame order; empty for
+  // any other view. singleSpaceIds holds the ones shown, in the order shown.
+  var singleGridSpaces = [];
+  var singleGridExtras = [];    // the grid frame's other panels (its embedding)
+  var gridSyncing = false;      // a synced zoom is being copied to the others
   var singleSpaceModes = {};    // space id -> categorical/continuous colour mode
   var singleColorCache = new Map();
   var SINGLE_COLOR_CACHE_LIMIT = 4;
@@ -3309,6 +3314,7 @@
       project(p);
     }
     drawPanel(p);
+    syncGridView(p);
   }
   function zoomStep(p, factor) {
     if (!p._SX || !p._SY) return;
@@ -3874,7 +3880,11 @@
       'cerebro-selection-composition-slot');
     var serial = ++clientSummarySerial, rows = clientSelectedRows();
     var summaryConfig = CLIENT_SUMMARY_VIEWS[id];
-    var source = summaryConfig.source || (view.meta && view.meta.space_label);
+    // A grid names the panel the cells were selected in: a section or its
+    // embedding, not the frame.
+    var source = summaryConfig.source ||
+      (singleActive === id && singleGridSpaces.length && selectionSource) ||
+      (view.meta && view.meta.space_label);
     renderClientCount(countEl, spec, rows, null, source);
     // The groups the server summarised by (cerebroSelectionSummary()).
     var groups = spec.groups || [];
@@ -5784,6 +5794,7 @@
         // not the points. Pan and orbit move the points.
         if (p.panning || p.orbiting || !p.interactionCtx) draw(p);
         else drawHoverOverlay(p);
+        if (p.panning) syncGridView(p);
       });
     };
     var settleDragFrame = function () {
@@ -6498,7 +6509,12 @@
   }
   function spatialMoran(space, values) {
     var valid = [], i;
-    for (i = 0; i < D.n; i++) {
+    // A section of a grid shares its position arrays with the others and
+    // names its own cells.
+    var cells = space._cells && space._cells.length <= D.n ? space._cells : null;
+    var visits = cells ? cells.length : D.n;
+    for (var at = 0; at < visits; at++) {
+      i = cells ? cells[at] : at;
       var x = space.x[i], y = space.y[i], v = values[i];
       if (x == null || y == null || v == null || isNaN(x) || isNaN(y) || isNaN(v)) continue;
       valid.push(i);
@@ -7557,6 +7573,9 @@
   // 300px wide when possible and extra spaces flow onto later rows.
   var MIN_SIDE = 300;
   var MIN_SIDE_HARD = 240;
+  // Sections of the Spatial grid are compared side by side, so they may be
+  // smaller than a linked lens before the page scrolls.
+  var GRID_MIN_SIDE = 160;
   // Width a classic scrollbar will take from `host` once it shows. Overlay
   // scrollbars (and one already showing, which clientWidth excludes) reserve 0.
   // The probe forces a layout, and the width only changes with the zoom level
@@ -7647,7 +7666,8 @@
       Math.round(window.innerHeight),
       panels.filter(function (p) { return p.spaceId; }).length,
       focusPanel || '',
-      keepPlotsSquare ? 'square' : 'fluid'
+      keepPlotsSquare ? 'square' : 'fluid',
+      gridColumnsChoice() || ''
     ].join('|');
   }
 
@@ -7655,9 +7675,11 @@
   // close to the largest feasible panel size, then prefer complete rows, fewer
   // rows, and no one-panel orphan row. This remains independent of panel order:
   // adding a linked space changes only the packing, never visual geometry.
-  function bestOverviewGrid(panelCount, availW, availH, chromeX, chromeY, gap) {
+  function bestOverviewGrid(panelCount, availW, availH, chromeX, chromeY, gap,
+                            minSide, fixedCols) {
+    minSide = minSide || MIN_SIDE;
     var candidates = [];
-    for (var cols = 1; cols <= panelCount; cols++) {
+    for (var cols = fixedCols || 1; cols <= (fixedCols || panelCount); cols++) {
       var rows = Math.ceil(panelCount / cols);
       var widthSide = Math.floor(
         (availW - (cols - 1) * gap) / cols - chromeX
@@ -7676,7 +7698,7 @@
       });
     }
     var feasible = candidates.filter(function (candidate) {
-      return candidate.side >= MIN_SIDE;
+      return candidate.side >= minSide;
     });
     var pool = feasible.length ? feasible : candidates;
     var maxSide = pool.reduce(function (largest, candidate) {
@@ -7759,15 +7781,18 @@
     // count and choose the one that maximises a balanced cell. If there are so
     // many panels that the result would be unreadable, retain the 300px floor
     // and let the workspace scroll instead of reducing plots to thumbnails.
+    var minSide = sectionGridActive() ? GRID_MIN_SIDE : MIN_SIDE;
+    var minSideHard = Math.min(minSide, MIN_SIDE_HARD);
     var overview = !focusPanel
-      ? bestOverviewGrid(k, usableW, Math.max(1, availH), chromeX, overhead, gap)
+      ? bestOverviewGrid(k, usableW, Math.max(1, availH), chromeX, overhead, gap,
+        minSide, gridColumnsChoice(k))
       : null;
     // When even the best grid is below the usual floor, take its columns down
     // to a hard floor instead of splitting the panels over rows the page has
     // no height for: a third plot below the fold is worse than a narrow one.
     var columnFloor = focusPanel ? FOCUS_CONTEXT_SIDE
-      : (overview && overview.side < MIN_SIDE
-        ? Math.max(MIN_SIDE_HARD, overview.side) : MIN_SIDE);
+      : (overview && overview.side < minSide
+        ? Math.max(minSideHard, overview.side) : minSide);
     var availableCols = Math.max(1,
       Math.floor((usableW + gap) / (columnFloor + chromeX + gap)));
     var cols = focusPanel
@@ -7783,7 +7808,7 @@
     var colExtra = rowW - colW * cols;
     var side = focusPanel
       ? Math.max(FOCUS_CONTEXT_SIDE, Math.floor(colW - chromeX))
-      : Math.max(MIN_SIDE, overview ? overview.side : 0);
+      : Math.max(minSide, overview ? overview.side : 0);
     if (single && side + chromeX > usableW) {
       side = Math.max(150, usableW - chromeX);
     }
@@ -7821,7 +7846,7 @@
               Math.round(side * 1.4))
           );
         } else {
-          side = Math.min(side, Math.max(MIN_SIDE, availH - overhead));
+          side = Math.min(side, Math.max(minSide, availH - overhead));
         }
       }
     }
@@ -7830,7 +7855,7 @@
     // constrains both dimensions to the shorter side.
     var rows = Math.ceil(k / cols);
     var panelHeight = Math.max(
-      MIN_SIDE,
+      minSide,
       Math.floor((availH - (rows - 1) * gap) / rows - overhead)
     );
     var panelWidth = Math.max(150, Math.floor(colW - chromeX));
@@ -8086,7 +8111,7 @@
     });
     singleViews = {}; singleActive = null;
     singleRequests.clear();
-    singleSpaceIds = []; singleSpaceModes = {};
+    singleSpaceIds = []; singleSpaceModes = {}; singleGridSpaces = []; singleGridExtras = [];
     singleIndexCells = null; singleIndexMap = null;
     linkedState = null;
     singleTiming = Object.create(null);
@@ -9436,11 +9461,153 @@
       return at == null ? null : at;
     });
   }
+  // True when `keys` are the frame's own keys, which name the view's cells in
+  // order (singlePayloadCells() builds the cells from them): a key's position
+  // is then its cell, and the barcode Map (a second of work for a million
+  // cells) is not needed. Ends are compared, not every key.
+  function keysArePositional(keys) {
+    var cells = D && D.cells, n = keys ? keys.length : 0;
+    return !!(n && Array.isArray(cells) && cells.length === n && D.n === n &&
+      String(keys[0]) === cells[0] && String(keys[n - 1]) === cells[n - 1]);
+  }
+  // Slice panels whose slices name different cells (the sections of the
+  // Spatial grid) share ONE pair of position arrays over the view's cells:
+  // each panel draws only its own `_cells`, so the positions of the others
+  // are never read through it. A panel with positions of its own (the grid's
+  // embedding) keeps them; `cells` is null for it. Null when fewer than two
+  // panels are slices, or when two slices name the same cell; each panel then
+  // keeps arrays of its own.
+  function sharedSliceGeometry(data, keys) {
+    var panels = data.panels || [], n = D && D.n || 0;
+    var isSlice = function (panel) { return panel.start != null && panel.count != null; };
+    if (panels.filter(isSlice).length < 2 || !data.x || !data.y || !n) return null;
+    var rows = keysArePositional(keys) ? null : alignedRows(keys);
+    var Vector = data.x instanceof Float32Array ? Float32Array : Float64Array;
+    var x = new Vector(n).fill(NaN), y = new Vector(n).fill(NaN);
+    var seen = new Uint8Array(n), cells = [];
+    for (var p = 0; p < panels.length; p++) {
+      if (!isSlice(panels[p])) { cells.push(null); continue; }
+      var start = Number(panels[p].start), count = Number(panels[p].count);
+      var own = new Int32Array(count), found = 0;
+      for (var j = start; j < start + count; j++) {
+        var at = rows ? rows[j] : j;
+        if (at == null || at < 0 || at >= n) continue;
+        if (seen[at]) return null;
+        seen[at] = 1; own[found++] = at;
+        x[at] = data.x[j]; y[at] = data.y[j];
+      }
+      // Canonical order, as unitOf() and buildGpuData() visit them.
+      cells.push(own.subarray(0, found).sort());
+    }
+    return { x: x, y: y, cells: cells };
+  }
+  // ---- Spatial section grid ------------------------------------------------
+  // The server sends every section of the sample as one frame with a panel per
+  // section (spatial_grid_panels() in R). Which sections are shown, in what
+  // order and in how many columns is the browser's: changing them arranges
+  // the panels already drawn and asks the server for nothing.
+  function sectionGridActive() {
+    return singleActive === 'spatial_projection' && singleGridSpaces.length > 0;
+  }
+  function gridSectionChoice() {
+    var el = document.getElementById('spatial_projection_grid_sections');
+    if (!el) return null;
+    if (el.selectize) return el.selectize.items.slice();
+    return Array.prototype.map.call(el.selectedOptions || [], function (option) {
+      return option.value;
+    });
+  }
+  // The panels to show: the frame's embedding, if it has one, then the
+  // sections in the order chosen. No choice (the control is not bound yet, or
+  // every section was removed) shows them all, in frame order: a grid without
+  // sections would leave the page blank.
+  function gridShownSpaces() {
+    var bySection = {};
+    singleGridSpaces.forEach(function (spaceId) {
+      bySection[spaceById[spaceId]._gridSection] = spaceId;
+    });
+    var out = [];
+    (gridSectionChoice() || []).forEach(function (name) {
+      var spaceId = bySection[name];
+      if (spaceId && out.indexOf(spaceId) < 0) out.push(spaceId);
+    });
+    return singleGridExtras.concat(out.length ? out : singleGridSpaces);
+  }
+  // Columns asked for, or null for the automatic packing.
+  function gridColumnsChoice(count) {
+    if (!sectionGridActive()) return null;
+    var el = document.getElementById('spatial_projection_grid_columns');
+    var cols = el ? parseInt(el.value, 10) : NaN;
+    return cols > 0 ? Math.max(1, Math.min(cols, count || cols)) : null;
+  }
+  function gridSyncZoom() {
+    var el = document.getElementById('spatial_projection_grid_sync_zoom');
+    return sectionGridActive() && !!(el && el.checked);
+  }
+  function applySectionGrid() {
+    if (!sectionGridActive() || !D) return;
+    var next = gridShownSpaces();
+    if (next.join('|') !== singleSpaceIds.join('|')) {
+      singleSpaceIds = next;
+      // A section shown for the first time loads its own image now.
+      next.forEach(function (spaceId) {
+        var space = spaceById[spaceId];
+        if (space && space._imgToken == null && isSpatialSpace(space)) {
+          loadSpaceImage(space);
+        }
+      });
+      ensurePanelSlots(next.length); buildPanels(); layoutPanels();
+    }
+    _layoutKey = null;
+    resizeAll();
+    drawAll();
+    if (gridSyncZoom()) {
+      var first = panels.filter(function (p) {
+        return singleGridSpaces.indexOf(p.spaceId) >= 0;
+      })[0];
+      if (first) syncGridView(first);
+    }
+  }
+  // With Sync zoom on, the other sections follow a panel's camera. A view is
+  // a fraction of the panel's own section, so each section shows the same
+  // relative region at the same magnification.
+  function syncGridView(source) {
+    if (gridSyncing || !source || !gridSyncZoom() ||
+        singleGridSpaces.indexOf(source.spaceId) < 0 ||
+        singleSpaceIds.indexOf(source.spaceId) < 0) return;
+    gridSyncing = true;
+    try {
+      panels.forEach(function (p) {
+        if (p === source || singleGridSpaces.indexOf(p.spaceId) < 0 ||
+            singleSpaceIds.indexOf(p.spaceId) < 0) return;
+        p.view = source.view ? clampView(p, {
+          cx: source.view.cx, cy: source.view.cy, span: source.view.span
+        }) : null;
+        project(p);
+        drawPanel(p);
+      });
+    } finally {
+      gridSyncing = false;
+    }
+  }
+  function wireSectionGrid() {
+    if (!window.jQuery) return;
+    window.jQuery(document).on('shiny:inputchanged.cerebroSectionGrid', function (event) {
+      if (event.name === 'spatial_projection_grid_sections' ||
+          event.name === 'spatial_projection_grid_columns' ||
+          event.name === 'spatial_projection_grid_sync_zoom') {
+        // The input's new value is in the DOM once the event has run.
+        setTimeout(applySectionGrid, 0);
+      }
+    });
+  }
+
   function buildSpecialistPanels(id, payload) {
     var meta = payload.meta || {}, data = payload.data || {},
       extra = payload.extra || {};
     if (!Array.isArray(data.panels) || !data.panels.length) return null;
     var keys = Array.isArray(data.selection_key) ? data.selection_key : [];
+    var positional = keysArePositional(keys);
     var cellBoundaries = singleCellBoundaries(extra);
     var spaces = [], modes = {}, mode;
     if (meta.color_type === 'categorical') {
@@ -9449,10 +9616,15 @@
       if (data.group_code != null) {
         // Codes index the traces directly, in the frame's cell order.
         groups = emptyVector(-1);
-        alignedRows(keys).forEach(function (at, i) {
+        var codeAt = function (at, i) {
           var code = Number(data.group_code[i]);
           if (at != null) groups[at] = code >= 0 && code < levels.length ? code : -1;
-        });
+        };
+        if (positional) {
+          for (var codeRow = 0; codeRow < keys.length; codeRow++) codeAt(codeRow, codeRow);
+        } else {
+          alignedRows(keys).forEach(codeAt);
+        }
       } else {
         var rawGroups = alignFlatValues(keys, data.group || [], null);
         groups = rawGroups.map(function (value) {
@@ -9474,15 +9646,29 @@
         (Array.isArray(data.color) || ArrayBuffer.isView(data.color))
           ? data.color : [],
         keys,
-        data
+        data,
+        null,
+        positional
       );
       mode = FIELD_PREFIX + fieldName;
     }
     var frameRows = null;
+    // A panel that draws every row of the frame in its order (the grid's
+    // embedding) takes its positions as they are.
+    var ownValues = function (panelKeys, values, fallback) {
+      if (positional && panelKeys === keys && values && values.length === keys.length) {
+        return ArrayBuffer.isView(values) ? values : Float64Array.from(values, function (value) {
+          return value == null ? NaN : Number(value);
+        });
+      }
+      return alignFlatValues(panelKeys, values, fallback);
+    };
+    var shared = sharedSliceGeometry(data, keys);
     data.panels.forEach(function (panel, panelIndex) {
       // A slice panel draws rows [start, start + count) of the frame's x, y
       // and keys instead of carrying its own copies.
       var slice = panel.start != null && panel.count != null;
+      var sharedSlice = slice && shared ? shared.cells[panelIndex] : null;
       var start = slice ? Number(panel.start) : 0, count = slice ? Number(panel.count) : 0;
       var panelKeys = slice ? keys.slice(start, start + count)
         : Array.isArray(panel.selection_key) ? panel.selection_key : keys;
@@ -9528,13 +9714,17 @@
         id: spaceId,
         _role: panel.id || null,
         label: panel.label || panel.id || id,
-        x: slice ? sliceValues(data.x) : alignFlatValues(panelKeys, xs, null),
-        y: slice ? sliceValues(data.y) : alignFlatValues(panelKeys, ys, null),
-        _hover: slice ? null : alignFlatValues(panelKeys, panel.hover || [], ''),
+        x: sharedSlice ? shared.x
+          : slice ? sliceValues(data.x) : ownValues(panelKeys, xs, null),
+        y: sharedSlice ? shared.y
+          : slice ? sliceValues(data.y) : ownValues(panelKeys, ys, null),
+        _hover: slice || !panel.hover ? null : alignFlatValues(panelKeys, panel.hover, ''),
         _hoverEnabled: true,
         _hoverMask: null
       };
-      if (slice) space._cells = sliceCells();
+      if (slice) space._cells = sharedSlice || sliceCells();
+      // A section of the Spatial grid: the browser orders and hides these.
+      if (panel.section != null) space._gridSection = String(panel.section);
       if (cellBoundaries.length) {
         var panelCells = new Set(panelKeys.map(String));
         space.cellBoundaries = cellBoundaries.filter(function (boundary) {
@@ -9870,7 +10060,7 @@
     var previousSpaces = reuseSurface ? spaceById : null;
     var previousFocus = reuseSurface ? focusPanel : null;
     if (!reuseSurface) restoreLinkedSurface();
-    singleActive = id; singleSpaceIds = []; singleSpaceModes = {};
+    singleActive = id; singleSpaceIds = []; singleSpaceModes = {}; singleGridSpaces = []; singleGridExtras = [];
     if (!reuseSurface && !mountSingleSurface(id)) { singleActive = null; return false; }
     var base = singlePayloadBundle(id, payload);
     D = Object.assign({}, base, {
@@ -9891,6 +10081,15 @@
     }
     payload.data.reset_axes = false;
     singleSpaceIds = built.spaces; singleSpaceModes = built.modes;
+    singleGridSpaces = id === 'spatial_projection'
+      ? built.spaces.filter(function (spaceId) {
+        return spaceById[spaceId] && spaceById[spaceId]._gridSection != null;
+      }) : [];
+    singleGridExtras = singleGridSpaces.length
+      ? built.spaces.filter(function (spaceId) {
+        return singleGridSpaces.indexOf(spaceId) < 0;
+      }) : [];
+    if (singleGridSpaces.length) singleSpaceIds = gridShownSpaces();
     sanitiseColors(D);
     singleSpaceIds.forEach(function (spaceId) {
       var space = spaceById[spaceId], old = previousSpaces && previousSpaces[spaceId];
@@ -10058,7 +10257,7 @@
   // Hands the shared surface back to Linked views, keeping the specialist state.
   function leaveSingle() {
     stashSingleState(); restoreLinkedSurface();
-    singleActive = null; singleSpaceIds = []; singleSpaceModes = {};
+    singleActive = null; singleSpaceIds = []; singleSpaceModes = {}; singleGridSpaces = []; singleGridExtras = [];
   }
 
   function activateLinked() {
@@ -10383,7 +10582,70 @@
         return canonicalIdentity(panel.image_identity);
       }).filter(Boolean) : [],
       wireToken: ready && view.data.wire_token != null
-        ? view.data.wire_token : null
+        ? view.data.wire_token : null,
+      grid: ready && singleActive === id ? gridSummary() : null
+    });
+  }
+  // The section grid as drawn: the sections and their order, each shown
+  // panel's cell count and whether its image is on screen.
+  function gridSummary() {
+    if (!sectionGridActive()) return null;
+    var label = function (spaceId) {
+      var space = spaceById[spaceId];
+      return space ? (space._gridSection != null ? space._gridSection : space.label) : null;
+    };
+    var first = spaceById[singleGridSpaces[0]];
+    return Object.freeze({
+      sections: singleGridSpaces.map(label),
+      shown: singleSpaceIds.map(label),
+      cells: singleSpaceIds.map(function (spaceId) {
+        var space = spaceById[spaceId];
+        return space && space._cells ? space._cells.length : D.n;
+      }),
+      images: singleSpaceIds.map(function (spaceId) {
+        var space = spaceById[spaceId];
+        return !!(space && space._imgReady && currentImage(space));
+      }),
+      sharedGeometry: singleGridSpaces.every(function (spaceId) {
+        return spaceById[spaceId].x === first.x;
+      }),
+      columns: gridColumnsChoice(singleSpaceIds.length),
+      syncZoom: gridSyncZoom(),
+      // Selected cells in each shown panel: a selection spans the sections.
+      selected: singleSpaceIds.map(function (spaceId) {
+        var space = spaceById[spaceId], count = 0;
+        if (!sel || !space) return 0;
+        if (!space._cells) return sel.size;
+        for (var at = 0; at < space._cells.length; at++) {
+          if (sel.has(space._cells[at])) count++;
+        }
+        return count;
+      }),
+      // The colour scale every panel reads, and the values each panel holds.
+      colorRange: (function () {
+        var shown = panels.filter(function (p) { return p.spaceId; })[0];
+        var field = shown && fieldOf(shown);
+        return field ? [field.min, field.max] : null;
+      })(),
+      valueRanges: singleSpaceIds.map(function (spaceId) {
+        var space = spaceById[spaceId], panel = panels.filter(function (p) {
+          return p.spaceId === spaceId;
+        })[0];
+        var field = panel && fieldOf(panel), values = field && field.raw;
+        if (!values || !space || !space._cells) return null;
+        var low = Infinity, high = -Infinity;
+        for (var at = 0; at < space._cells.length; at++) {
+          var value = values[space._cells[at]];
+          if (value == null || !isFinite(value)) continue;
+          if (value < low) low = value;
+          if (value > high) high = value;
+        }
+        return isFinite(low) ? [low, high] : null;
+      }),
+      views: singleSpaceIds.map(function (spaceId) {
+        var panel = panels.filter(function (p) { return p.spaceId === spaceId; })[0];
+        return panel && panel.view ? Object.assign({}, panel.view) : null;
+      })
     });
   }
 
@@ -11125,7 +11387,10 @@
           traceMask[maskAt] = traceMode != null && traceMode !== 'skip' ? 1 : 0;
         }
       }
-      singleSpaceIds.forEach(function (spaceId) {
+      // Hidden sections of a grid take the columns too, for when they show.
+      singleSpaceIds.concat(singleGridSpaces.filter(function (spaceId) {
+        return singleSpaceIds.indexOf(spaceId) < 0;
+      })).forEach(function (spaceId) {
         var space = spaceById[spaceId];
         if (!space) return;
         space._hover = ArrayBuffer.isView(canonicalGroups)
@@ -11143,7 +11408,9 @@
         space._hoverEnabled = enabled;
         space._hoverMask = traceMask;
       });
-      if (singleSpaceIds.length && view.meta && view.meta.space_label) {
+      // Panels hold some of the frame's cells each (activateSingle()).
+      if (singleSpaceIds.length && view.meta && view.meta.space_label &&
+          !Array.isArray(view.data && view.data.panels)) {
         cacheSharedProjection(
           String(view.meta.space_label),
           spaceById[singleSpaceIds[0]],
@@ -12140,6 +12407,7 @@
       applySingleAppearance({ id: id, dataset_context: view.dataset_context, values: values,
         dataset_fingerprint: (view.datasetIdentity || {}).cell_fingerprint });
     });
+    wireSectionGrid();
     window.jQuery(document).on('shiny:inputchanged.cerebroScatter', function (event) {
       var edit = scatterUserEdit, field = scatterControlFields[event.name];
       if (!edit || !field || event.name.indexOf('cv-') === 0 || edit.id !== event.name ||
@@ -12698,6 +12966,7 @@
             if (pp.view) { pp.view = null; project(pp); }
             pp.focusFrom = null; syncFocusButtons();
             drawPanel(pp);
+            syncGridView(pp);
           }
         }
         return;

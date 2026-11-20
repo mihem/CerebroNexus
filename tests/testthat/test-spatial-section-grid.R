@@ -359,3 +359,11 @@ test_that("a grid frame colours a group the same in every section", {
   expect_length(frame$data$y, 9L)
   expect_null(frame$data$canonical_group)
 })
+
+test_that("the browser shares, arranges and zooms the section grid", {
+  expect_node_fixture(
+    "spatial-section-grid.js",
+    viewer_test_path("www", "cell_views.js"),
+    pass = "PASS synced zoom gives every shown section the same relative view"
+  )
+})
