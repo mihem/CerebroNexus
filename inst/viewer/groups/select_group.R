@@ -16,7 +16,13 @@ groups_default_second_group <- function(groups = getGroups()) {
   others <- groups_other_groups(groups, groups_default_group(groups))
   if (length(others)) others[[1L]]
 }
-groups_default_show_as_percent <- FALSE
+## The bars' measure. The values are the keys of the composition plot's
+## views ("Bar chart|TRUE"), so the browser switches without a round trip.
+groups_show_as_percent_choices <- c(
+  "Number of cells" = "FALSE",
+  "Percent of cells" = "TRUE"
+)
+groups_default_show_as_percent <- "FALSE"
 
 ##----------------------------------------------------------------------------##
 ## UI element to select which group should be shown.
@@ -50,30 +56,31 @@ output[["groups_controls_UI"]] <- renderUI({
     primary,
     selectInput(
       "groups_by_other_group_second_group",
-      label = "Group to compare to:",
+      label = "Group to compare to",
       choices = groups_other_groups(groups, selected_group),
       selected = groups_default_second_group(groups)
     ),
-    ## Flat, so the toolbar lays these out with the selectors.
-    shinyWidgets::radioGroupButtons(
-      inputId = "groups_by_other_group_plot_type",
+    selectInput(
+      "groups_by_other_group_plot_type",
       label = "Plot type",
       choices = c("Bar chart", "Sankey plot"),
-      status = "primary",
-      size = "sm"
+      selected = "Bar chart"
+    ),
+    ## What the bars measure; a Sankey plot always shows cell numbers.
+    conditionalPanel(
+      condition = "input.groups_by_other_group_plot_type !== 'Sankey plot'",
+      selectInput(
+        "groups_by_other_group_show_as_percent",
+        label = "Bars show",
+        choices = groups_show_as_percent_choices,
+        selected = groups_default_show_as_percent
+      )
     ),
     div(
       class = "cerebro-groups-switches",
       shinyWidgets::materialSwitch(
-        inputId = "groups_by_other_group_show_as_percent",
-        label = "Show composition as percent [%] (not in Sankey plot):",
-        value = groups_default_show_as_percent,
-        status = "primary",
-        inline = TRUE
-      ),
-      shinyWidgets::materialSwitch(
         inputId = "groups_by_other_group_show_table",
-        label = "Show table:",
+        label = "Show table",
         status = "primary",
         inline = TRUE
       )

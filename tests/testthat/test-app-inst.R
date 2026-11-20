@@ -707,7 +707,7 @@ test_that("{shinytest2} recording: groups", {
   expect_equal(app$get_js(hidden_legend), 0)
 
   ## switch to percent view
-  app$set_inputs(groups_by_other_group_show_as_percent = TRUE)
+  app$set_inputs(groups_by_other_group_show_as_percent = "TRUE")
   app$wait_for_idle(timeout = 10000)
   ## The browser switches to the percentages without a new value.
   app$wait_for_js(
@@ -729,17 +729,12 @@ test_that("{shinytest2} recording: groups", {
       )
     )$input,
     list(
-      groups_by_other_group_show_as_percent = TRUE,
+      groups_by_other_group_show_as_percent = "TRUE",
       groups_by_other_group_show_table = TRUE
     )
   )
 
-  app$run_js(paste0(
-    "document.querySelector(",
-    "'input[name=\"groups_by_other_group_plot_type\"]",
-    "[value=\"Sankey plot\"]'",
-    ").parentElement.click();"
-  ))
+  app$set_inputs(groups_by_other_group_plot_type = "Sankey plot", wait_ = FALSE)
   app$wait_for_js(
     paste0(
       "document.querySelectorAll(",

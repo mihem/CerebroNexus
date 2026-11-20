@@ -3692,3 +3692,11 @@ body .cerebro-viz-toolbar .cerebro-groups-switches .form-group { min-width: 0 !i
 body .cerebro-viz-toolbar .shiny-input-radiogroup > br { display: none; }
 /* A filled result toolbar is as low as its fields. */
 .cerebro-result-controls.cerebro-viz-toolbar:not(:empty) { min-height: 0; }
+/* The toolbar fields in a row of a box (Trajectory: States by group). */
+body .cerebro-viz-toolbar.cerebro-box-toolbar {
+  min-height: 0;
+  margin-bottom: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
