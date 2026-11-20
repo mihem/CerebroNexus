@@ -3145,11 +3145,6 @@ body .shiny-bound-output.cerebro-output-waiting {
 @media (prefers-reduced-motion: reduce) {
   .cv-grid-skeleton, .cv-grid-skeleton-plot, .cv-panes.cv-panes-enter { animation: none; }
 }
-/* Without its background picker (the grid), the actions row ends row one. */
-.cerebro-viz-toolbar:has(input[name="spatial_projection_layout"][value="grid"]:checked)
-  .cerebro-spatial-background-row {
-  flex: 0 0 auto; margin-left: auto;
-}
 .cerebro-viz-toolbar .spatial-roi-background-picker {
   flex: 0 1 var(--c-control-width);
   width: var(--c-control-width);
@@ -3631,3 +3626,7 @@ body .cerebro-viz-toolbar .cerebro-toolbar-actions {
 body .content-wrapper, body .right-side { padding-top: 8px !important; }
 body section.content { padding-top: 0 !important; }
 .cerebro-viz-page-heading { margin-bottom: 6px; }
+
+/* A grid panel's title shows only its section (cell_views.js). */
+.cv-ptitle.cv-ptitle-link { cursor: pointer; }
+.cv-ptitle.cv-ptitle-link:hover { color: var(--c-amber-700); text-decoration: underline; }

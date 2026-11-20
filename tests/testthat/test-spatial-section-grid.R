@@ -415,7 +415,7 @@ test_that("the Builder offers the Spatial layout with the author's choice", {
   }
   html <- render("grid")
   expect_match(html, 'data-display-field="spatial_layout"', fixed = TRUE)
-  expect_match(html, "Open Spatial as", fixed = TRUE)
+  expect_match(html, "Open Spatial with", fixed = TRUE)
   expect_match(html, '<option value="grid" selected="selected">', fixed = TRUE)
   expect_match(html, "Square panels", fixed = TRUE)
   expect_match(

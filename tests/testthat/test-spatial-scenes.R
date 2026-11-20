@@ -104,7 +104,7 @@ test_that("Spatial controls offer split-by, reset choices and per-ROI images", {
     session$flushReact()
     scene <- output$spatial_projection_scene_UI$html
     expect_false(grepl("spatial_projection_sample", scene, fixed = TRUE))
-    expect_match(scene, 'id="spatial_projection_to_display"', fixed = TRUE)
+    expect_match(scene, 'id="spatial_projection_sections"', fixed = TRUE)
   })
 })
 

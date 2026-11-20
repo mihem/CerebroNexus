@@ -89,12 +89,12 @@ console.log('PASS grid sections share one pair of position arrays');
   singleGridSpaces.push(id);
 });
 assert.deepStrictEqual(gridShownSpaces(), singleGridSpaces, 'unbound control shows all');
-elements.spatial_projection_grid_sections = { selectize: { items: ['B1', 'A1'] } };
+elements.spatial_projection_sections = { selectize: { items: ['B1', 'A1'] } };
 assert.deepStrictEqual(gridShownSpaces(), [singleGridSpaces[2], singleGridSpaces[0]]);
 // A name the frame does not have is ignored; an empty choice shows all.
-elements.spatial_projection_grid_sections.selectize.items = ['X', 'A2'];
+elements.spatial_projection_sections.selectize.items = ['X', 'A2'];
 assert.deepStrictEqual(gridShownSpaces(), [singleGridSpaces[1]]);
-elements.spatial_projection_grid_sections.selectize.items = [];
+elements.spatial_projection_sections.selectize.items = [];
 assert.deepStrictEqual(gridShownSpaces(), singleGridSpaces);
 // The embedding is always shown, first.
 singleGridExtras = ['single::spatial_projection::projection'];
@@ -112,7 +112,7 @@ singleActive = 'spatial_projection';
 panels = [{ key: 'A' }, { key: 'B' }, { key: 'C' }];
 singleSpaceIds = singleGridSpaces.slice(0, 1);
 spaceById[singleGridSpaces[0]]._imgToken = 1;
-elements.spatial_projection_grid_sections.selectize.items = ['B1', 'A1'];
+elements.spatial_projection_sections.selectize.items = ['B1', 'A1'];
 calls = [];
 applySectionGrid();
 assert.deepStrictEqual(singleSpaceIds, [singleGridSpaces[2], singleGridSpaces[0]]);

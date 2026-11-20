@@ -1,14 +1,15 @@
 # CerebroNexus 8.5.0
 
 - **Spatial shows all sections side by side.** A data set with more than one
-  spatial entry (tissue sections, FOVs, capture areas) gets a **Layout**
-  switch on the Spatial page: *Single section* as before, or *Grid* with one
-  panel per section. All sections are coloured by the same metadata column or
+  spatial entry (tissue sections, FOVs, capture areas) can show several of
+  them at once: the Spatial page's **Sections** field takes one section (the
+  single view as before) or several (a grid with one panel per section;
+  clicking a panel's title shows only that section). All sections are coloured by the same metadata column or
   gene. A group has one colour in every section, and a gene has one colour
   scale whose range covers all sections, so a value has the same colour in
   each section. Each section shows the first histology image bound to it, and
-  a section without one shows its cells without an image. **Sections** picks
-  which sections are shown and their order, **Columns** fixes the number of
+  a section without one shows its cells without an image. The order of
+  **Sections** is the order of the panels, **Columns** fixes the number of
   columns, and **Sync zoom** moves the other sections with the one being
   zoomed or panned; none of them reloads data. **Embedding** adds a UMAP (or
   another projection) panel: selecting cells in it highlights them in every
@@ -27,7 +28,7 @@
   Share and Settings end the last row, so the controls take fewer rows and the
   plot more of the window. Page titles sit closer to the top of the window.
 - **The Builder chooses how Spatial opens.** Its Viewer display settings have
-  *Open Spatial as: One section | Grid of all sections* in the Spatial card,
+  *Open Spatial with: The first section | All sections* in the Spatial card,
   stored as `spatial_layout` with the other page defaults; a data set with one
   section always opens as one section, and Apps and projects without the
   setting open as before. The card's square option reads *Square panels*, as

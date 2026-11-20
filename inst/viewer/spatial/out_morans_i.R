@@ -56,7 +56,7 @@ output[["spatial_projection_morans_i"]] <- renderText({
     req(identical(input[["sidebar"]], "spatial"))
     req(identical(input[["spatial_projection_plot_type"]], "ImageFeaturePlot"))
     list(
-      input[["spatial_projection_to_display"]],
+      spatial_projection_single_section(input, availableSpatial()),
       input[["spatial_projection_feature_to_display"]],
       viewerDatasetContextToken(viewer_loaded_dataset_context())
     )

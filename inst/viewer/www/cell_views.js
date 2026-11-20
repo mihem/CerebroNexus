@@ -9660,7 +9660,7 @@
     return singleActive === 'spatial_projection' && singleGridSpaces.length > 0;
   }
   function gridSectionChoice() {
-    var el = document.getElementById('spatial_projection_grid_sections');
+    var el = document.getElementById('spatial_projection_sections');
     if (!el) return null;
     if (el.selectize) return el.selectize.items.slice();
     return Array.prototype.map.call(el.selectedOptions || [], function (option) {
@@ -9783,17 +9783,13 @@
     if (!host || !page || !page.classList.contains('active')) return;
     var labels;
     if (layout === 'grid') {
-      labels = selectLabels('spatial_projection_grid_sections');
-      if (!labels.length) {
-        var all = document.getElementById('spatial_projection_grid_sections');
-        labels = all && all.selectize ? Object.keys(all.selectize.options) : [];
-      }
+      labels = selectLabels('spatial_projection_sections');
       var embedding = document.getElementById('spatial_projection_grid_projection');
       if (embedding && embedding.value && embedding.value !== '__none__') {
         labels = [embedding.value].concat(labels);
       }
     } else {
-      labels = selectLabels('spatial_projection_to_display').slice(0, 1);
+      labels = selectLabels('spatial_projection_sections').slice(0, 1);
     }
     if (!labels.length) return;
     hideGridSkeleton();
@@ -9837,6 +9833,23 @@
   }
   function wireSectionGrid() {
     if (!window.jQuery) return;
+    // A grid panel's title shows only its section (the single view).
+    document.addEventListener('click', function (event) {
+      var title = event.target.closest && event.target.closest('.cv-ptitle');
+      if (!title || !sectionGridActive()) return;
+      var pane = title.closest('.cv-pane');
+      var panel = panels.filter(function (p) { return p.pane === pane; })[0];
+      var space = panel && spaceById[panel.spaceId];
+      var el = document.getElementById('spatial_projection_sections');
+      if (!space || space._gridSection == null || !el || !el.selectize) return;
+      el.selectize.setValue([space._gridSection]);
+    });
+    document.addEventListener('mouseover', function (event) {
+      var title = event.target.closest && event.target.closest('.cv-ptitle');
+      if (!title) return;
+      title.title = sectionGridActive() ? 'Show only this section' : '';
+      title.classList.toggle('cv-ptitle-link', sectionGridActive());
+    });
     window.addEventListener('cerebro:cell-view-ready', function (event) {
       if (!gridSkeleton || !event.detail || event.detail.id !== 'spatial_projection') return;
       // Only the frame of the layout asked for ends the wait.
@@ -9845,18 +9858,22 @@
       hideGridSkeleton();
     });
     window.jQuery(document).on('shiny:inputchanged.cerebroSectionGrid', function (event) {
-      if (event.name === 'spatial_projection_layout' && singleActive === 'spatial_projection') {
-        var wanted = event.value === 'grid' ? 'grid' : 'single';
-        // Only a change of what is drawn waits for a frame: the input also
-        // fires when its control binds (or is rendered again) with the layout
-        // already on screen.
+      // Sections: one is the single view, several the grid. Only a change
+      // between the two waits for a frame (the input also fires when its
+      // control binds with what is on screen); a change among several only
+      // rearranges the drawn panels.
+      if (event.name === 'spatial_projection_sections' && singleActive === 'spatial_projection') {
+        var count = Array.isArray(event.value) ? event.value.length : (event.value ? 1 : 0);
+        if (!count) return;
+        var wanted = count > 1 ? 'grid' : 'single';
         if ((wanted === 'grid') !== sectionGridActive()) {
-          showGridSkeleton(wanted);
+          setTimeout(function () { showGridSkeleton(wanted); }, 0);
+        } else if (wanted === 'grid') {
+          setTimeout(applySectionGrid, 0);
         }
         return;
       }
-      if (event.name === 'spatial_projection_grid_sections' ||
-          event.name === 'spatial_projection_grid_columns' ||
+      if (event.name === 'spatial_projection_grid_columns' ||
           event.name === 'spatial_projection_grid_sync_zoom') {
         // The input's new value is in the DOM once the event has run.
         setTimeout(applySectionGrid, 0);

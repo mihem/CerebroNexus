@@ -515,12 +515,12 @@ builder_viewer_display_ui <- function(id, entry, epoch) {
           "spatial_region_outlines",
           "Outline group regions (convex hull)"
         ),
-        ## Only a data set with several sections opens as a grid; one with a
-        ## single section ignores it.
+        ## Which sections the Spatial page starts with: all of them draw the
+        ## grid. A data set with one section ignores it.
         select(
           "spatial_layout",
-          "Open Spatial as (data sets with several sections)",
-          c("One section" = "single", "Grid of all sections" = "grid")
+          "Open Spatial with (data sets with several sections)",
+          c("The first section" = "single", "All sections" = "grid")
         )
       )
     ),

@@ -1388,14 +1388,39 @@ authorized_spatial_image_path <- function(
 ## without a session.
 ##----------------------------------------------------------------------------##
 
-spatial_grid_layouts <- c("Single section" = "single", "Grid" = "grid")
-
 ## The layout Spatial opens with: the author's (Builder's display setting
 ## `spatial_layout`, read here without its page prefix), and the grid only
 ## for a data set with more than one section.
 spatial_default_layout <- function(display, sections) {
   layout <- if (is.list(display)) display[["layout"]] else NULL
   if (identical(layout, "grid") && length(sections) > 1L) "grid" else "single"
+}
+
+## The sections the Sections field names, in its order: one is the single
+## view, several the grid. `input` is the session's, `sections` the data
+## set's. Before the field binds, the single section the older FOV input
+## names (still set by saved views and test harnesses), or the author's
+## default (spatial_projection_default_layout()).
+spatial_projection_chosen_sections <- function(input, sections) {
+  chosen <- input[["spatial_projection_sections"]]
+  if (is.null(chosen)) {
+    chosen <- input[["spatial_projection_to_display"]]
+  }
+  chosen <- as.character(chosen %||% character())
+  chosen <- chosen[chosen %in% sections]
+  if (
+    !length(chosen) &&
+      !"spatial_projection_sections" %in% shiny::isolate(names(input)) &&
+      identical(spatial_projection_default_layout(), "grid")
+  ) {
+    chosen <- as.character(sections)
+  }
+  chosen
+}
+## The section of the single view (the first chosen), or NULL.
+spatial_projection_single_section <- function(input, sections) {
+  chosen <- spatial_projection_chosen_sections(input, sections)
+  if (length(chosen)) chosen[[1L]] else NULL
 }
 
 ## The layout the author chose for the session's data set. A Viewer without

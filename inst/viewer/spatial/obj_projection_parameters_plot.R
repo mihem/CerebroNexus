@@ -71,14 +71,16 @@ observe(
     req(length(spatial_names) > 0L)
 
     defaults <- current_spatial_scatter_defaults()
-    ## A new sample shows its own sections: take the one its FOV control will
-    ## select instead of waiting for that control to come back.
-    shown <- spatial_sample_sections(
-      spatial_projection_selected_sample()
-    )$sections
-    projection <- input[["spatial_projection_to_display"]]
-    if (is.null(projection) || !(projection %in% shown)) {
-      projection <- shown[1L]
+    ## The Sections field: one section is the single view, several the grid.
+    chosen <- spatial_projection_chosen_sections(input, availableSpatial())
+    ## A field emptied on its way to another section keeps what is drawn.
+    req(length(chosen) || !spatial_input_bound("spatial_projection_sections"))
+    projection <- if (length(chosen)) chosen[[1L]] else NULL
+    if (is.null(projection)) {
+      ## Nothing chosen yet: the first section of the shown sample.
+      projection <- spatial_sample_sections(
+        spatial_projection_selected_sample()
+      )$sections[1L]
     }
     if (is.null(projection) || !(projection %in% spatial_names)) {
       projection <- spatial_names[[1L]]
@@ -115,21 +117,20 @@ observe(
         value[[1L]]
       }
     }
-    ## The grid shows every section of the data set, whatever their samples;
-    ## which of them and in what order is the browser's choice (cell_views.js),
-    ## so it is not a control.
-    ## Until the Layout control binds, the layout it will bind with.
-    layout <- input[["spatial_projection_layout"]]
-    if (is.null(layout) && !spatial_input_bound("spatial_projection_layout")) {
-      layout <- spatial_projection_default_layout()
-    }
-    layout <- layout %||% "single"
+    ## Several chosen sections draw the grid. Its frame holds every section
+    ## of the data set, whatever their samples; which of them show and in
+    ## what order is the browser's (cell_views.js), so a change among several
+    ## sections asks for no frame, and the frame's own section stays put.
+    layout <- if (length(chosen) > 1L) "grid" else "single"
     grid_sections <- if (
       spatial_grid_active(layout, spatial_names, plot_type[[1L]])
     ) {
       as.character(spatial_names)
     } else {
       character()
+    }
+    if (length(grid_sections)) {
+      projection <- spatial_names[[1L]]
     }
     ## An embedding beside the sections, drawn from the same frame.
     grid_projection <- input[["spatial_projection_grid_projection"]] %||% ""
@@ -215,7 +216,7 @@ observeEvent(
     key <- as.character(jsonlite::toJSON(
       list(
         viewer_loaded_dataset_context(),
-        input[["spatial_projection_to_display"]],
+        spatial_projection_single_section(input, availableSpatial()),
         input[["spatial_projection_roi"]]
       ),
       auto_unbox = TRUE
@@ -651,6 +652,6 @@ spatial_projection_parameters_other <- reactiveValues(
 )
 
 ##
-observeEvent(input[['spatial_projection_to_display']], {
+observeEvent(spatial_projection_single_section(input, availableSpatial()), {
   spatial_projection_parameters_other[['reset_axes']] <- TRUE
 })

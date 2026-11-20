@@ -55,7 +55,20 @@ spatial_projection_scene <- reactive({
       logical(1)
     )]
   }
-  requested_spatial <- input[["spatial_projection_to_display"]]
+  ## The single view's section. In the grid the scene keeps the one it had:
+  ## changing among several sections only rearranges the drawn panels.
+  chosen_sections <- spatial_projection_chosen_sections(
+    input,
+    availableSpatial()
+  )
+  requested_spatial <- if (length(chosen_sections) > 1L) {
+    isolate(spatial_projection_scene_state())$current_spatial %||%
+      chosen_sections[[1L]]
+  } else if (length(chosen_sections)) {
+    chosen_sections[[1L]]
+  } else {
+    NULL
+  }
   current_spatial <- if (dataset_changed) {
     NULL
   } else {
@@ -108,24 +121,16 @@ spatial_projection_scene <- reactive({
   if (!selected_split %in% c(spatial_split_none_value, split_columns)) {
     selected_split <- spatial_split_none_value
   }
-  ## The grid's sections (all of the data set's, whatever the sample), order
-  ## and columns are the browser's to arrange; a new data set starts again
-  ## with all of its sections.
+  ## The Sections field: one section is the single view, several the grid
+  ## (all of the data set's sections, whatever the sample). A new data set
+  ## starts as its author chose: its first section, or all of them.
   all_sections <- availableSpatial()
-  layout <- if (dataset_changed) {
-    spatial_projection_default_layout()
+  sections_default <- if (
+    identical(spatial_projection_default_layout(), "grid")
+  ) {
+    all_sections
   } else {
-    isolate(input[["spatial_projection_layout"]]) %||%
-      spatial_projection_default_layout()
-  }
-  grid_selected <- if (dataset_changed) {
-    NULL
-  } else {
-    isolate(input[["spatial_projection_grid_sections"]])
-  }
-  grid_selected <- intersect(grid_selected %||% character(), all_sections)
-  if (!length(grid_selected)) {
-    grid_selected <- all_sections
+    current_spatial
   }
   list(
     dataset_changed = dataset_changed,
@@ -133,8 +138,8 @@ spatial_projection_scene <- reactive({
     sample_values = sample_values,
     selected_sample = selected_sample,
     spatial_choices = spatial_choices,
-    layout = if (length(all_sections) > 1L) layout else "single",
     grid_choices = stats::setNames(all_sections, all_sections),
+    sections_default = sections_default,
     ## Without a projection list the grid simply offers no embedding.
     grid_projections = if (length(all_sections) > 1L) {
       tryCatch(
@@ -144,7 +149,6 @@ spatial_projection_scene <- reactive({
     } else {
       character()
     },
-    grid_selected = grid_selected,
     current_spatial = current_spatial,
     roi_values = roi_values,
     selected_roi = selected_roi,
@@ -181,8 +185,35 @@ spatial_projection_scene_shown <- reactive({
 
 output[["spatial_projection_scene_UI"]] <- renderUI({
   scene <- spatial_projection_scene_shown()
-  grid_offered <- length(scene$grid_choices) > 1L
-  grid_js <- "input.spatial_projection_layout == 'grid'"
+  ## Several sections draw the grid; one draws the single view, with its
+  ## sample and ROI controls.
+  grid_js <- paste(
+    "input.spatial_projection_sections &&",
+    "input.spatial_projection_sections.length > 1"
+  )
+  ## What the field holds, in its order (a re-render must not reorder it):
+  ## the chosen sections first, as selectize lists the selected options in
+  ## the order of the choices.
+  selected <- intersect(
+    as.character(isolate(input[["spatial_projection_sections"]]) %||% ""),
+    scene$grid_choices
+  )
+  if (!length(selected)) {
+    selected <- scene$sections_default
+  }
+  ordered <- c(selected, setdiff(scene$grid_choices, selected))
+  sections <- selectizeInput(
+    "spatial_projection_sections",
+    label = "Sections",
+    choices = stats::setNames(ordered, ordered),
+    selected = selected,
+    multiple = TRUE,
+    options = list(
+      plugins = list("remove_button"),
+      closeAfterSelect = FALSE,
+      placeholder = "Pick one or more sections"
+    )
+  )
   single_controls <- tagList(
     if (length(scene$sample_values) > 1L) {
       selectInput(
@@ -192,12 +223,6 @@ output[["spatial_projection_scene_UI"]] <- renderUI({
         selected = scene$selected_sample
       )
     },
-    selectInput(
-      "spatial_projection_to_display",
-      label = "FOV / section",
-      choices = scene$spatial_choices,
-      selected = scene$current_spatial
-    ),
     if (length(scene$roi_values)) {
       selectizeInput(
         "spatial_projection_roi",
@@ -213,80 +238,49 @@ output[["spatial_projection_scene_UI"]] <- renderUI({
       )
     }
   )
+  if (length(scene$grid_choices) < 2L) {
+    return(tagList(sections, single_controls))
+  }
   tagList(
-    if (grid_offered) {
+    sections,
+    conditionalPanel(
+      condition = paste0("!(", grid_js, ")"),
+      div(class = "spatial-single-controls", single_controls)
+    ),
+    conditionalPanel(
+      condition = grid_js,
       div(
-        class = "spatial-layout-control",
-        radioButtons(
-          "spatial_projection_layout",
-          label = "Layout",
-          choices = spatial_grid_layouts,
-          selected = scene$layout,
-          inline = TRUE
-        )
-      )
-    },
-    if (grid_offered) {
-      tagList(
-        conditionalPanel(
-          condition = paste0("!(", grid_js, ")"),
-          div(class = "spatial-single-controls", single_controls)
-        ),
-        conditionalPanel(
-          condition = grid_js,
-          div(
-            class = "spatial-grid-controls",
-            selectizeInput(
-              "spatial_projection_grid_sections",
-              label = "Sections",
-              choices = scene$grid_choices,
-              selected = scene$grid_selected,
-              multiple = TRUE,
-              options = list(
-                plugins = list("remove_button"),
-                closeAfterSelect = FALSE
-              )
-            ),
-            selectInput(
-              "spatial_projection_grid_columns",
-              label = "Columns",
-              choices = c(
-                "Auto" = "auto",
-                stats::setNames(
-                  seq_len(min(8L, length(scene$grid_choices))),
-                  seq_len(min(8L, length(scene$grid_choices)))
-                )
-              ),
-              selected = isolate(
-                input[["spatial_projection_grid_columns"]]
-              ) %||%
-                "auto"
-            ),
-            selectInput(
-              "spatial_projection_grid_projection",
-              label = "Embedding",
-              choices = c(
-                "None" = "__none__",
-                stats::setNames(scene$grid_projections, scene$grid_projections)
-              ),
-              selected = isolate(
-                input[["spatial_projection_grid_projection"]]
-              ) %||%
-                "__none__"
-            ),
-            checkboxInput(
-              "spatial_projection_grid_sync_zoom",
-              label = "Sync zoom",
-              value = isTRUE(isolate(
-                input[["spatial_projection_grid_sync_zoom"]]
-              ))
+        class = "spatial-grid-controls",
+        selectInput(
+          "spatial_projection_grid_columns",
+          label = "Columns",
+          choices = c(
+            "Auto" = "auto",
+            stats::setNames(
+              seq_len(min(8L, length(scene$grid_choices))),
+              seq_len(min(8L, length(scene$grid_choices)))
             )
-          )
+          ),
+          selected = isolate(input[["spatial_projection_grid_columns"]]) %||%
+            "auto"
+        ),
+        selectInput(
+          "spatial_projection_grid_projection",
+          label = "Embedding",
+          choices = c(
+            "None" = "__none__",
+            stats::setNames(scene$grid_projections, scene$grid_projections)
+          ),
+          selected = isolate(input[["spatial_projection_grid_projection"]]) %||%
+            "__none__"
+        ),
+        checkboxInput(
+          "spatial_projection_grid_sync_zoom",
+          label = "Sync zoom",
+          value = isTRUE(isolate(input[["spatial_projection_grid_sync_zoom"]]))
         )
       )
-    } else {
-      single_controls
-    }
+    )
   )
 })
 
@@ -340,7 +334,7 @@ output[["spatial_projection_main_parameters_UI"]] <- renderUI({
           selected = colour_groups$selected
         ),
         conditionalPanel(
-          condition = "input.spatial_projection_layout != 'grid'",
+          condition = "!(input.spatial_projection_sections && input.spatial_projection_sections.length > 1)",
           selectizeInput(
             "spatial_projection_split_by",
             label = "Split by",
@@ -443,7 +437,10 @@ spatial_background_scope <- reactive({
     selected_sample <- if (length(samples) > 1L) samples[[1L]] else ""
   }
   selected_sample <- selected_sample %||% ""
-  current_spatial <- input[["spatial_projection_to_display"]]
+  current_spatial <- spatial_projection_single_section(
+    input,
+    availableSpatial()
+  )
   if (is.null(current_spatial) || !(current_spatial %in% spatial_names)) {
     shown <- tryCatch(
       spatial_sample_sections(selected_sample)$sections,

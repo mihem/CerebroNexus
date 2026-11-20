@@ -9,7 +9,7 @@ output[["spatial_projection_scatter_parameters_UI"]] <- renderUI({
   section_appearance <- spatialPointAppearance(
     Cerebro.options,
     viewer_current_dataset_key(),
-    input[["spatial_projection_to_display"]]
+    spatial_projection_single_section(input, availableSpatial())
   )
   if (!is.null(section_appearance)) {
     appearance$point_size <- section_appearance$point_size
@@ -18,7 +18,7 @@ output[["spatial_projection_scatter_parameters_UI"]] <- renderUI({
   roi_appearance <- spatialRoiSetting(
     Cerebro.options,
     viewer_current_dataset_key(),
-    input[["spatial_projection_to_display"]],
+    spatial_projection_single_section(input, availableSpatial()),
     spatial_roi_value(input[["spatial_projection_roi"]] %||% "")
   )
   if (!is.null(roi_appearance)) {
@@ -72,10 +72,14 @@ output[["spatial_projection_background_parameters_UI"]] <- renderUI({
   tryCatch(
     {
       req(
-        !is.null(input[["spatial_projection_to_display"]]),
-        input[["spatial_projection_to_display"]] %in% availableSpatial()
+        !is.null(spatial_projection_single_section(input, availableSpatial())),
+        spatial_projection_single_section(input, availableSpatial()) %in%
+          availableSpatial()
       )
-      sp <- getSpatialData(input[["spatial_projection_to_display"]])
+      sp <- getSpatialData(spatial_projection_single_section(
+        input,
+        availableSpatial()
+      ))
       co <- sp$coordinates
       x <- co[[1]][is.finite(co[[1]])]
       y <- co[[2]][is.finite(co[[2]])]
