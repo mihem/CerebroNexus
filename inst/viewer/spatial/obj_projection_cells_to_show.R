@@ -44,6 +44,51 @@ spatial_grid_section_index <- function(spatial_name) {
   spatial_section_rows(spatial_name, coordinates)
 }
 
+## While one section is shown and the session is quiet, read what a switch to
+## the grid needs of every other section (its coordinates, its rows, its
+## image's descriptor), one section per event-loop turn, so the switch builds
+## its frame from memory. Each section is read once per data set.
+observe({
+  req(identical(input[["sidebar"]], "spatial"))
+  controls <- spatial_projection_controls()
+  req(controls, !length(controls$grid_sections))
+  sections <- availableSpatial()
+  req(length(sections) > 1L, exists("viewerIdleRun", mode = "function"))
+  dataset <- viewer_current_dataset_key()
+  options <- if (exists("Cerebro.options")) Cerebro.options else NULL
+  tasks <- lapply(sections, function(section) {
+    function() {
+      shiny::withReactiveDomain(
+        session,
+        shiny::isolate({
+          viewerSpatialCoordinates(section)
+          spatial_grid_section_index(section)
+          spatial_grid_section_background(
+            options,
+            dataset,
+            section,
+            tryCatch(getSpatialData(section), error = function(error) NULL)
+          )
+        })
+      )
+    }
+  })
+  names(tasks) <- paste0(
+    "spatial-grid:",
+    viewerDatasetContextToken(viewer_loaded_dataset_context()),
+    ":",
+    sections
+  )
+  isolate(viewerIdleRun(
+    tasks,
+    function() {
+      !session$isClosed() &&
+        identical(shiny::isolate(input[["sidebar"]]), "spatial")
+    },
+    delay = 1.5
+  ))
+})
+
 ## Group filter and ROI controls bind after the first frame, usually keeping
 ## every cell; with a Viewer Pack the browser applies the group filters to the
 ## drawn section.
