@@ -2656,12 +2656,14 @@ cerebroSelectionSummary <- function(
         ),
         shiny::tags$span(
           class = "cerebro-selection-composition-value",
-          paste0(
-            formatC(count, format = "f", big.mark = ",", digits = 0),
-            " · ",
-            round(percent),
-            "%"
-          )
+          shiny::tags$span(
+            class = "cerebro-selection-composition-count",
+            paste0(
+              formatC(count, format = "f", big.mark = ",", digits = 0),
+              " · "
+            )
+          ),
+          paste0(round(percent), "%")
         )
       )
     })
@@ -2686,7 +2688,13 @@ cerebroSelectionSummary <- function(
           formatC(n_selected, format = "f", big.mark = ",", digits = 0),
           " / ",
           formatC(total, format = "f", big.mark = ",", digits = 0)
-        ))
+        )),
+        shiny::tags$button(
+          type = "button",
+          class = "cerebro-selection-composition-toggle",
+          `aria-label` = "Collapse or expand the composition card",
+          title = "Collapse / expand"
+        )
       ),
       shiny::tags$div(
         class = "cerebro-selection-composition-sub",

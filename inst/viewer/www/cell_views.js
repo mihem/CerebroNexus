@@ -3881,8 +3881,9 @@
         '"></i><span>' + esc(item.label) + '</span></span>' +
         '<span class="cerebro-selection-composition-track"><i style="width:' +
         percent.toFixed(1) + '%;background:' + color + '"></i></span>' +
-        '<span class="cerebro-selection-composition-value">' + fmt(item.count) +
-        ' · ' + Math.round(percent) + '%</span></div>';
+        '<span class="cerebro-selection-composition-value">' +
+        '<span class="cerebro-selection-composition-count">' + fmt(item.count) +
+        ' · </span>' + Math.round(percent) + '%</span></div>';
     }).join('');
     el.innerHTML = '<div class="cerebro-selection-composition-card" role="status" aria-live="polite">' +
       '<div class="cerebro-selection-composition-head">' +
@@ -3890,7 +3891,9 @@
       'aria-label="Move composition card; use arrow keys" title="Drag to move">' +
       '<span aria-hidden="true">&#10247;</span></button>' +
       '<strong>Composition</strong><span>' + fmt(rows.length) + ' / ' + fmt(spec.total) +
-      '</span></div><div class="cerebro-selection-composition-sub">Selected ' +
+      '</span><button type="button" class="cerebro-selection-composition-toggle" ' +
+      'aria-label="Collapse or expand the composition card" title="Collapse / expand">' +
+      '</button></div><div class="cerebro-selection-composition-sub">Selected ' +
       esc(spec.unit || 'cells') + ' · by ' + esc(column.name) +
       '</div><div class="cerebro-selection-composition-rows">' + rowsHtml + '</div></div>';
   }

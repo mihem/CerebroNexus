@@ -3013,6 +3013,77 @@ body .shiny-bound-output.cerebro-output-waiting {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+/* Collapse / expand: a small chevron at the end of the card's header. */
+.cerebro-selection-composition-head {
+  grid-template-columns: 16px auto minmax(0, 1fr) 18px;
+}
+.cerebro-selection-composition-toggle {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #a4a8af;
+  cursor: pointer;
+}
+.cerebro-selection-composition-toggle::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 5px;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform .15s ease, top .15s ease;
+}
+.cerebro-selection-composition-toggle:hover {
+  background: var(--c-surface-2);
+  color: var(--c-text-2);
+}
+.cerebro-selection-composition-toggle:focus-visible {
+  outline: 2px solid var(--c-amber);
+  outline-offset: 1px;
+}
+/* Collapsed: a narrow strip, one dot, name and percent per group. */
+body.cerebro-composition-collapsed .cerebro-selection-composition-slot {
+  width: max-content;
+  max-width: calc(100% - 24px);
+}
+body.cerebro-composition-collapsed .cerebro-selection-composition-card {
+  padding: 7px 9px 8px;
+}
+body.cerebro-composition-collapsed .cerebro-selection-composition-head {
+  grid-template-columns: 16px minmax(0, 1fr) 18px;
+  margin-bottom: 5px;
+}
+body.cerebro-composition-collapsed .cerebro-selection-composition-head strong,
+body.cerebro-composition-collapsed .cerebro-selection-composition-head > span,
+body.cerebro-composition-collapsed .cerebro-selection-composition-sub,
+body.cerebro-composition-collapsed .cerebro-selection-composition-track,
+body.cerebro-composition-collapsed .cerebro-selection-composition-count {
+  display: none;
+}
+body.cerebro-composition-collapsed .cerebro-selection-composition-toggle {
+  grid-column: 3;
+}
+body.cerebro-composition-collapsed .cerebro-selection-composition-toggle::before {
+  top: 7px;
+  transform: rotate(-135deg);
+}
+body.cerebro-composition-collapsed .cerebro-selection-composition-rows {
+  gap: 4px;
+}
+body.cerebro-composition-collapsed .cerebro-selection-composition-row {
+  grid-template-columns: minmax(0, auto) auto;
+  gap: 10px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cerebro-selection-composition-toggle::before { transition: none; }
+}
 @media (max-width: 700px) {
   .cerebro-selection-composition-slot {
     position: static;

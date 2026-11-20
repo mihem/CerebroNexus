@@ -993,7 +993,29 @@
     var HANDLE = ".cerebro-selection-composition-drag";
     var HEADER = ".cerebro-selection-composition-head";
     var SLOT = ".cerebro-selection-composition-slot";
+    var TOGGLE = ".cerebro-selection-composition-toggle";
     var MOBILE = "(max-width: 700px)";
+    // Collapsed, every Composition card is a strip of colour dots, names and
+    // percents. One choice for all pages, kept for the next visit; the cards
+    // are drawn again with each selection, so the body carries it.
+    var COLLAPSED_KEY = "cerebro.composition.collapsed";
+    function setCollapsed(collapsed) {
+      document.body.classList.toggle("cerebro-composition-collapsed", collapsed);
+      try {
+        window.localStorage.setItem(COLLAPSED_KEY, collapsed ? "1" : "0");
+      } catch (ignore) {}
+      scheduleClamp();
+    }
+    try {
+      if (window.localStorage.getItem(COLLAPSED_KEY) === "1") {
+        document.body.classList.add("cerebro-composition-collapsed");
+      }
+    } catch (ignore) {}
+    document.addEventListener("click", function (event) {
+      if (!(event.target.closest && event.target.closest(TOGGLE))) return;
+      event.preventDefault();
+      setCollapsed(!document.body.classList.contains("cerebro-composition-collapsed"));
+    });
     var EDGE = 8;
     var drag = null;
     var clampPending = false;
@@ -1057,6 +1079,7 @@
     document.addEventListener("pointerdown", function (event) {
       var header = event.target.closest && event.target.closest(HEADER);
       if (!header || event.button !== 0 || isMobile()) return;
+      if (event.target.closest(TOGGLE)) return;
       var slot = header.closest(SLOT);
       if (!slot || !slot.getClientRects().length) return;
       pin(slot);
