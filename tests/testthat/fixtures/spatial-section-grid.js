@@ -136,20 +136,37 @@ assert.ok(auto.cols >= 1 && auto.cols <= 6);
 // The grid's lower floor admits layouts the linked lenses' 300px would not.
 var narrow = bestOverviewGrid(8, 1200, 500, 18, 40, 8, 160, null);
 assert.ok(narrow.side >= 160, 'eight sections fit above the grid floor');
-// Panels are shaped like their sections and packed for the most tissue.
+// Panels are shaped like their sections, and their rows fill the window.
+var rowsHeight = function (pack) {
+  return pack.rowSizes.reduce(function (sum, row) { return sum + row.height + 58; }, 0) +
+    (pack.rowSizes.length - 1) * 8;
+};
 var fit = sectionGridPacking(12, 1600, 800, 18, 58, 8, 1.3, null);
-assert.ok(fit.rows * (fit.height + 58) + (fit.rows - 1) * 8 <= 800, 'twelve sections fit the window');
-assert.ok(fit.height <= Math.round(fit.width / 1.3) + 1, 'no taller than the section needs');
-assert.ok(fit.height >= 120);
+assert.ok(rowsHeight(fit) <= 800, 'twelve sections fit the window');
+assert.ok(fit.rowSizes.every(function (row) {
+  return row.height <= Math.round(row.width / 1.3) + 1 && row.height >= 120;
+}), 'no taller than the section needs, and readable');
+assert.strictEqual(fit.rowSizes.reduce(function (n, row) { return n + row.count; }, 0), 12);
+// Five sections: a short row gets wider panels instead of an empty slot.
+var five = sectionGridPacking(5, 1600, 1200, 18, 58, 8, 1.5, null);
+assert.ok(five.rowSizes.length > 1 && five.rowSizes.every(function (row, i, rows) {
+  return row.count * (row.width + 18) + (row.count - 1) * 8 >= 1600 - row.count - 8;
+}), 'every row is as wide as the window: ' + JSON.stringify(five.rowSizes));
+assert.ok(five.rowSizes[five.rowSizes.length - 1].width > five.rowSizes[0].width ||
+  five.rowSizes[0].count === five.rowSizes[five.rowSizes.length - 1].count);
 // Wide sections take fewer columns than tall ones in the same window.
 var wide = sectionGridPacking(6, 1600, 900, 18, 58, 8, 3, null);
 var tall = sectionGridPacking(6, 1600, 900, 18, 58, 8, 0.4, null);
 assert.ok(wide.cols < tall.cols, 'wide ' + wide.cols + ' vs tall ' + tall.cols);
-// The columns asked for are kept, even when they scroll.
-assert.strictEqual(sectionGridPacking(12, 1600, 800, 18, 58, 8, 1.3, 2).cols, 2);
+// The columns asked for are kept, every panel one column wide.
+var two = sectionGridPacking(12, 1600, 800, 18, 58, 8, 1.3, 2);
+assert.strictEqual(two.cols, 2);
+assert.ok(two.rowSizes.every(function (row) { return row.width === two.width; }));
 // A window too small for every section scrolls rather than shrinking them away.
 var crowded = sectionGridPacking(40, 1200, 500, 18, 58, 8, 1, null);
 assert.ok(crowded.height >= 120 && crowded.width >= 120, JSON.stringify(crowded));
+assert.strictEqual(sectionGridRowOf(five, 0), five.rowSizes[0]);
+assert.strictEqual(sectionGridRowOf(five, 4), five.rowSizes[five.rowSizes.length - 1]);
 // The sections' shape is the median of their extents.
 var keptShown = singleSpaceIds;
 singleSpaceIds = ['s1', 's2', 's3'];

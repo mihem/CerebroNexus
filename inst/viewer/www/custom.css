@@ -3098,11 +3098,7 @@ body .shiny-bound-output.cerebro-output-waiting {
 }
 .cerebro-viz-toolbar .spatial-single-controls .form-group { flex: 1 1 180px; }
 .cerebro-viz-toolbar .shiny-panel-conditional:has(> .spatial-grid-controls) {
-  flex: 1 0 100%; order: 50; min-width: 0;
-}
-.cerebro-viz-toolbar .spatial-grid-controls {
-  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px;
-  padding-top: 10px; border-top: 1px dashed var(--c-border-2);
+  order: 50;
 }
 .cerebro-viz-toolbar .spatial-grid-controls .form-group {
   flex: 0 0 140px; width: auto; min-width: 0;
@@ -3562,3 +3558,76 @@ body .shiny-bound-output.cerebro-output-waiting {
   list-style: none;
   padding-left: 0;
 }
+
+
+/* =========================================================================
+   Toolbar fields on every page, one rule set.
+   A single choice is as wide as its value needs and never narrower than
+   --c-field-min; a multiple choice starts at --c-multi-min and grows with its
+   chips up to the row. Fields keep that width instead of stretching to fill
+   a row, groups of fields (conditional panels, channel rows) shrink-wrap and
+   flow with the rest, and the page actions (Share, Settings) end the last
+   row. The toolbar is then as low as its fields allow and the plot gets the
+   rest of the window.
+   ========================================================================= */
+:root { --c-field-min: 168px; --c-multi-min: 220px; }
+body .cerebro-viz-toolbar .form-group,
+body .cerebro-viz-toolbar .shiny-conditional--shown:has(> .form-group),
+body .cerebro-viz-primary .ir-flow-control-item {
+  flex: 0 1 auto !important;
+  width: max-content !important;
+  min-width: min(var(--c-field-min), 100%) !important;
+  max-width: 100% !important;
+  margin-bottom: 0;
+}
+body .cerebro-viz-toolbar .form-group:has(select[multiple]),
+body .cerebro-viz-toolbar .form-group:has(.selectize-control.multi) {
+  min-width: min(var(--c-multi-min), 100%) !important;
+}
+body .cerebro-viz-toolbar .form-group .selectize-control,
+body .cerebro-viz-toolbar .form-group > .form-control,
+body .cerebro-viz-toolbar .form-group select {
+  width: 100% !important;
+}
+/* A field as wide as its value keeps room for the dropdown arrow. */
+body .cerebro-viz-toolbar .selectize-control.single .selectize-input {
+  padding-right: 32px !important;
+}
+body .cerebro-viz-toolbar select.form-control { padding-right: 28px !important; }
+/* A checkbox or radio group is as wide as its labels. */
+body .cerebro-viz-toolbar .form-group:has(> .checkbox),
+body .cerebro-viz-toolbar .form-group.shiny-input-checkboxgroup,
+body .cerebro-viz-toolbar .form-group.shiny-input-radiogroup {
+  min-width: 0 !important;
+}
+/* Groups of fields (shown conditional panels, channel rows) are not boxes of
+   their own: their fields join the toolbar's one row flow, so rows pack the
+   same however the page groups its controls. Shiny shows a conditional panel
+   by its class; a hidden one stays hidden. */
+body .cerebro-viz-toolbar .shiny-panel-conditional.shiny-conditional--shown,
+body .cerebro-viz-toolbar .spatial-image-dim-controls,
+body .cerebro-viz-toolbar .spatial-rgb-controls,
+body .cerebro-viz-toolbar .spatial-single-controls,
+body .cerebro-viz-toolbar .spatial-grid-controls,
+body .cerebro-viz-toolbar .cerebro-gene-rgb-row,
+body .cerebro-viz-toolbar .cerebro-gene-rgb-channel,
+body .cerebro-viz-primary .ir-flow-controls {
+  display: contents;
+}
+/* Spatial: the grid's fields after the plot's, before the actions. */
+body .cerebro-viz-toolbar .spatial-grid-controls > .form-group { order: 50; }
+body .cerebro-viz-toolbar [data-display-if]:not(.shiny-conditional--shown) {
+  display: none !important;
+}
+/* The Spatial background picker joins the fields; the actions end the row. */
+body .cerebro-viz-toolbar .cerebro-spatial-background-row { display: contents; }
+body .cerebro-viz-toolbar .cerebro-toolbar-actions {
+  margin-left: auto;
+  order: 98;
+}
+
+/* Page titles sit at the top of the content area: the title row starts 8px
+   below the window edge (was 18px plus AdminLTE's 15px). */
+body .content-wrapper, body .right-side { padding-top: 8px !important; }
+body section.content { padding-top: 0 !important; }
+.cerebro-viz-page-heading { margin-bottom: 6px; }

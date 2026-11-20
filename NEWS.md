@@ -21,6 +21,11 @@
   Like the UMAP pages, Spatial has a switch at the top right, **Panel shape**:
   *Fit tissue* (the default) shapes the plot to the tissue, and *Square* draws
   every panel as a square.
+- **Toolbars pack tighter on every page.** A single-choice field is as wide
+  as its value needs (at least 168 px), a multiple choice starts at 220 px and
+  grows with its selections, fields no longer stretch to fill a row, and
+  Share and Settings end the last row, so the controls take fewer rows and the
+  plot more of the window. Page titles sit closer to the top of the window.
 - **The Builder chooses how Spatial opens.** Its Viewer display settings have
   *Open Spatial as: One section | Grid of all sections* in the Spatial card,
   stored as `spatial_layout` with the other page defaults; a data set with one

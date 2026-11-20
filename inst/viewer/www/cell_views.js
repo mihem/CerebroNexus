@@ -4934,9 +4934,13 @@
     if (fld && fld.rgbChannel) {
       renderColorbar(false);
       renderPanelScales(true);
+      // One entry per channel: the Spatial grid draws each channel once per
+      // section, all on that channel's one range.
+      var listed = {};
       panels.forEach(function (panel) {
         var field = fieldOf(panel);
-        if (!panel.spaceId || !field || !field.rgbChannel) return;
+        if (!panel.spaceId || !field || !field.rgbChannel || listed[field.label]) return;
+        listed[field.label] = true;
         var range = document.createElement('span');
         range.className = 'cv-lg';
         range.textContent = field.label + ': 0–' + Number(field.max).toPrecision(3);
@@ -7770,41 +7774,88 @@
     return ratios.length ? Math.max(0.25, Math.min(4, ratios[Math.floor(ratios.length / 2)])) : 1;
   }
   // Panels of a Spatial grid are as tall as their sections are wide for
-  // their width, not as tall as the row: a square-ish canvas around a wide
-  // section is mostly empty. Try every column count and keep the one that
-  // draws the most tissue while every row stays in the window; a panel too
-  // small to read (or a count the window cannot hold) lets the page scroll
-  // instead. `fixedCols` is the user's choice.
+  // their width, and the rows fill the window: the panels of a row share its
+  // width (rows with fewer panels get wider ones, so 5 sections are 3 + 2,
+  // not 3 + 2 and an empty slot), and the rows share its height, scaled down
+  // together when they would not fit. Every row count is tried and the one
+  // that draws the most tissue kept; a window too small for readable panels
+  // lets the page scroll instead. `fixedCols` (the user's Columns) keeps every
+  // panel one column wide.
   var GRID_MIN_DRAWN = 120;
   function sectionGridPacking(k, availW, availH, chromeX, chromeY, gap, aspect, fixedCols) {
-    var best = null, fallback = null;
-    for (var cols = fixedCols || 1; cols <= (fixedCols || k); cols++) {
-      var rows = Math.ceil(k / cols);
-      var width = Math.floor((availW - (cols - 1) * gap) / cols - chromeX);
-      if (width < 60) break;
-      var natural = Math.round(width / aspect);
-      var fitHeight = Math.floor((availH - (rows - 1) * gap) / rows - chromeY);
-      var height = Math.min(natural, fitHeight);
-      var drawnWidth = Math.min(width, height * aspect);
-      var candidate = {
-        cols: cols, rows: rows, width: width, height: height,
-        area: drawnWidth * height,
-        orphan: rows > 1 && cols > 1 && k - (rows - 1) * cols === 1
+    var widthOf = function (cols) {
+      return Math.floor((availW - (cols - 1) * gap) / cols - chromeX);
+    };
+    // Rows of `counts` panels: their sizes, scaled to the window if needed.
+    var layout = function (counts, uniformWidth) {
+      var rows = counts.map(function (count) {
+        var width = uniformWidth || widthOf(count);
+        return { count: count, width: width, height: width / aspect };
+      });
+      var room = availH - rows.length * chromeY - (rows.length - 1) * gap;
+      var natural = rows.reduce(function (sum, row) { return sum + row.height; }, 0);
+      var scale = natural > room ? room / natural : 1;
+      var area = 0, smallest = Infinity;
+      rows.forEach(function (row) {
+        row.height = Math.floor(row.height * scale);
+        smallest = Math.min(smallest, row.height, row.width);
+        area += row.count * Math.min(row.width, row.height * aspect) * row.height;
+      });
+      return { rows: rows, area: area, fits: smallest >= GRID_MIN_DRAWN };
+    };
+    var finish = function (choice) {
+      var rows = choice.rows;
+      return {
+        cols: Math.max.apply(null, rows.map(function (row) { return row.count; })),
+        rows: rows.length,
+        width: rows[0].width,
+        height: rows[0].height,
+        rowSizes: rows
       };
-      if (height >= GRID_MIN_DRAWN && drawnWidth >= GRID_MIN_DRAWN) {
-        if (!best || candidate.area > best.area * 1.08 ||
-            (candidate.area > best.area * 0.92 && best.orphan && !candidate.orphan)) {
-          best = candidate;
-        }
-      }
-      // Scrolling: the widest panels that still put two sections side by side.
-      if (!fallback || (width >= 260 && cols > fallback.cols) || fixedCols) {
-        fallback = { cols: cols, rows: rows, width: width,
-          height: Math.max(GRID_MIN_DRAWN, natural), area: 0, orphan: false };
+    };
+    // Natural heights and a scrolling page, when nothing fits the window.
+    var scrolling = function (cols) {
+      var counts = [];
+      for (var left = k; left > 0; left -= cols) counts.push(Math.min(cols, left));
+      var width = widthOf(cols);
+      return finish({ rows: counts.map(function (count) {
+        return { count: count, width: width,
+          height: Math.max(GRID_MIN_DRAWN, Math.round(width / aspect)) };
+      }) });
+    };
+    if (fixedCols) {
+      var cols = Math.max(1, Math.min(fixedCols, k)), counts = [];
+      for (var left = k; left > 0; left -= cols) counts.push(Math.min(cols, left));
+      var fixed = layout(counts, widthOf(cols));
+      return fixed.fits ? finish(fixed) : scrolling(cols);
+    }
+    var best = null;
+    for (var rowsCount = 1; rowsCount <= k; rowsCount++) {
+      var base = Math.floor(k / rowsCount), extra = k % rowsCount, split = [];
+      for (var r = 0; r < rowsCount; r++) split.push(base + (r < extra ? 1 : 0));
+      if (widthOf(split[0]) < 60) continue;
+      var candidate = layout(split);
+      if (!candidate.fits) continue;
+      // Within a few percent, rows of one size read better than mixed ones.
+      if (!best || candidate.area > best.area * 1.04 ||
+          (candidate.area > best.area * 0.96 && !extra && best.extra)) {
+        best = candidate; best.extra = extra;
       }
     }
-    return best || fallback || { cols: 1, rows: k, width: availW - chromeX,
-      height: Math.max(GRID_MIN_DRAWN, Math.round((availW - chromeX) / aspect)) };
+    if (best) return finish(best);
+    // Scrolling: the widest panels that still put two sections side by side.
+    var scrollCols = 1;
+    for (var c = 1; c <= k; c++) if (widthOf(c) >= 260) scrollCols = c;
+    return scrolling(scrollCols);
+  }
+  function sectionGridRowOf(pack, index) {
+    var rows = pack && pack.rowSizes;
+    if (!rows) return null;
+    for (var r = 0, seen = 0; r < rows.length; r++) {
+      seen += rows[r].count;
+      if (index < seen) return rows[r];
+    }
+    return rows[rows.length - 1];
   }
 
   // `ifChanged` (the ResizeObserver): leave canvases untouched, and do not
@@ -7961,6 +8012,12 @@
       var width = primary ? primaryWidth : panelWidth + extra;
       var height = primary ? focusSide : (focusPanel ? side : panelHeight);
       var paneWidth = primary ? primaryWidth + chromeX : colW + extra;
+      // A Spatial grid row sizes its own panels (sectionGridPacking()).
+      var gridRow = !primary && sectionGridRowOf(gridPack, index);
+      if (gridRow) {
+        width = gridRow.width; height = gridRow.height;
+        paneWidth = gridRow.width + chromeX;
+      }
       if (keepPlotsSquare) {
         var squareSide = Math.min(width, height);
         width = squareSide;
