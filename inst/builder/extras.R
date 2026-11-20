@@ -880,35 +880,28 @@ builder_alignment_reset <- function(record) {
 #'
 #' The Builder preview (builder-spatial-canvas.js) flips and scales the image
 #' in its own frame, rotates it about its own centre c, then moves it by
-#' (dx, dy). The Viewer (cell_views.js) rotates the image bounds about the
-#' data origin, so a rotated image follows cells rotated by
-#' spatial_plot_rotation, and flips after rotating. Both are kept; only the
-#' parameters handed to the Viewer are converted. With R the rotation:
+#' (dx, dy). The Viewer (cell_views.js) flips, scales and offsets the image in
+#' its own unrotated frame too, but rotates it last about the data origin, so a
+#' rotated image follows cells rotated by spatial_plot_rotation. Both are kept;
+#' only the offset handed to the Viewer is converted. With R the rotation:
 #'   Builder: c + d + R(t) F s (p - c)
-#'   Viewer:  R(t') c + o + s F R(t') (p - c)
-#' F R(t') equals R(t) F when t' = t for no or both flips and t' = -t for one
-#' flip, and the centres agree when o = c + d - R(t') c.
+#'   Viewer:  R(t) (c + o + F s (p - c))
+#' These agree when o = R(-t) (c + d) - c.
 builder_alignment_viewer_setting <- function(record) {
   bounds <- record$base_bounds
   centre_x <- (bounds$xmin + bounds$xmax) / 2
   centre_y <- (bounds$ymin + bounds$ymax) / 2
-  rotation <- record$rotation
-  if (xor(isTRUE(record$flip_x), isTRUE(record$flip_y))) {
-    rotation <- -rotation
-  }
-  angle <- rotation * pi / 180
+  angle <- record$rotation * pi / 180
+  target_x <- centre_x + record$dx
+  target_y <- centre_y + record$dy
   list(
     flip_x = record$flip_x,
     flip_y = record$flip_y,
     scale_x = record$scale,
     scale_y = record$scale,
-    offset_x = centre_x +
-      record$dx -
-      (cos(angle) * centre_x - sin(angle) * centre_y),
-    offset_y = centre_y +
-      record$dy -
-      (sin(angle) * centre_x + cos(angle) * centre_y),
-    rotation = rotation,
+    offset_x = cos(angle) * target_x + sin(angle) * target_y - centre_x,
+    offset_y = -sin(angle) * target_x + cos(angle) * target_y - centre_y,
+    rotation = record$rotation,
     image_opacity = record$image_opacity,
     point_opacity = record$point_opacity,
     point_size = record$point_size

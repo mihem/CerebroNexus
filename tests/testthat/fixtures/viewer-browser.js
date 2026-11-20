@@ -9,7 +9,8 @@ window.viewerTest = (() => {
   for (const method of ['arc','fill','fillRect','moveTo','lineTo','drawImage','fillText','clearRect','scale']) {
     const original = CanvasRenderingContext2D.prototype[method];
     CanvasRenderingContext2D.prototype[method] = function (...args) {
-      paints.push({canvas:this.canvas, method, args, fill:this.fillStyle, alpha:this.globalAlpha});
+      paints.push({canvas:this.canvas, method, args, fill:this.fillStyle, alpha:this.globalAlpha,
+        matrix:method==='drawImage'?this.getTransform():undefined});
       return original.apply(this, args);
     };
   }

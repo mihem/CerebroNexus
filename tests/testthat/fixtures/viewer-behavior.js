@@ -307,11 +307,19 @@ window.viewerScenarios = {
     t.equal(picker.value,'one','Background choice retained after download');
     t.resetPaint();t.change('cv-bg-image-select',none);await t.settle();
     t.check(!t.paints.some(p=>p.method==='drawImage'&&p.args[0] instanceof HTMLImageElement),'None removes background');
+    const drawn=canvas=>t.paints.findLast(p=>p.method==='drawImage'&&p.args[0] instanceof HTMLImageElement&&(!canvas||p.canvas===canvas));
     t.change('cv-bg-image-select','two');await t.settle();
+    const plain=drawn();
     t.change('cv-bg-image-select','one');await t.settle();
     t.equal(requests().length,1,'Loaded image reused');
-    t.check(t.paints.some(p=>p.method==='drawImage'&&p.args[0] instanceof HTMLImageElement),'Decoded image is drawn');
-    t.check(t.paints.some(p=>p.method==='scale'&&p.args[0]===2&&p.args[1]===3),'Nonuniform preset scale survives image switching');
+    t.check(plain&&drawn(plain.canvas)!==plain,'Decoded image is drawn');
+    // The unit square drawImage() fills, read back in data units through the
+    // unadjusted 20 x 10 image: scaled 2 x 3, then turned by 32 degrees. The
+    // canvas keeps its matrix in single precision.
+    const k=plain.matrix,m=drawn(plain.canvas).matrix,kx=k.a/20,ky=k.d/10;
+    const u=[m.a/kx,-m.b/ky],v=[m.c/kx,-m.d/ky],near=(a,b)=>Math.abs(a-b)<1e-3;
+    t.check(near(Math.hypot(...u),40)&&near(Math.hypot(...v),30)&&near(u[0]*v[0]+u[1]*v[1],0)&&
+      near(Math.abs(Math.atan2(u[1],u[0]))*180/Math.PI,32),'Nonuniform preset scale survives image switching');
     for(const [key,generation] of [['B',2],['A',3]]) {
       t.dataset(key,generation);t.resetPaint();t.linked({spaces:[space()]});await t.settle();
       t.equal(requests().length,generation,'New generation requests its own image');

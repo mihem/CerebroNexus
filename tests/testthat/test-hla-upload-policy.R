@@ -80,7 +80,11 @@ test_that("closed and unspecified modes hide HLA override controls, not stored d
       }
       expect_true(hla_has_typing())
       expect_identical(hla_active_typing(), stored_typing)
-      expect_match(output$hla_active_source_ui$html, "stored .crb", fixed = TRUE)
+      expect_match(
+        output$hla_active_source_ui$html,
+        "stored .crb",
+        fixed = TRUE
+      )
       downloaded <- utils::read.csv(
         output$hla_download_normalized,
         na.strings = ""
@@ -219,9 +223,17 @@ test_that("HLA empty states suggest uploads only in explicit open mode", {
         )
         for (message in text) {
           if (identical(Cerebro.options[["mode"]], "open")) {
-            expect_match(message, "Upload HLA typing in Data & QC", fixed = TRUE)
+            expect_match(
+              message,
+              "Upload HLA typing in Data & QC",
+              fixed = TRUE
+            )
           } else {
-            expect_no_match(message, "upload|Data & QC|open mode", ignore.case = TRUE)
+            expect_no_match(
+              message,
+              "upload|Data & QC|open mode",
+              ignore.case = TRUE
+            )
             expect_match(
               message,
               "No HLA typing is stored in this data set.",

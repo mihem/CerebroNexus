@@ -1,3 +1,28 @@
+# CerebroNexus 8.4.2
+
+- **A rotated, flipped background image is no longer mirrored against its
+  cells.** In `spatial_image_settings`, `offset_x`/`offset_y`, `scale_x`/
+  `scale_y` and `flip_x`/`flip_y` now act in the image's own unrotated frame,
+  and `rotation` is applied last, about the coordinate origin, as
+  `spatial_plot_rotation` rotates the cells. Settings found for the unrotated
+  section therefore stay aligned when the same `rotation` is added to the image
+  and to the plot. Before, flips and offsets were read after the rotation, so
+  `flip_y` acted as `flip_x` at 90 degrees. Settings with a rotation and no
+  offset, flip or uneven scale (such as the MERFISH demo) draw as before;
+  hand-written settings that combine a rotation with them need re-checking.
+  The Builder writes settings in the new form. Linked views files are now
+  saved as version 2; a version-1 file is converted on import, so its
+  backgrounds open where they were saved. A version-1 background with an
+  uneven scale at an angle that is not a multiple of 90 degrees (drawn sheared
+  before) has no equivalent, and such a file is refused with a message.
+- **The bundled demo data sets draw their cells at size 5 and full opacity.**
+  The app gave HLA & TCR points of size 1 at opacity 0.3, so its 2,000 cells
+  of one cell type (light yellow) were close to invisible on the Projection
+  page. All demos in `inst/app.R` (PBMC was at size 6, Trekker at 4.4 and
+  opacity 0.85) now start at the defaults of `launchCerebro()`; the settings
+  drawer still changes them. The large demos of about a million cells keep
+  their small points (size 1).
+
 # CerebroNexus 8.4.1
 
 - **Closed Viewers also block HLA typing uploads.** The Data & QC tab hides

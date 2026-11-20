@@ -79,7 +79,7 @@ for (const space of [{samples:[{images:[{id:'embedded'}]}]}, {images:[{id:'exter
 layers.spaceById.s = {images:[]};
 assert.equal(layers.needsUnderlay({spaceId:'s'}), false);
 assert.equal(layers.needsUnderlay({spaceId:'missing'}), false);
-vm.runInContext(extract('exportPanelLayers', 'rotateDataPoint'), layers);
+vm.runInContext(extract('exportPanelLayers', 'drawImage'), layers);
 const order=[];
 const panel={underlayCanvas:'image',gpuCanvas:{style:{display:'block'}},canvas:'labels',interactionCanvas:'hover'};
 layers.exportPanelLayers({drawImage(c){order.push(c);}},panel,0,0,10,10);

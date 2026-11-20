@@ -81,6 +81,24 @@ test_that("current Linked views state round-trips through the JSON validator", {
   expect_identical(restored$view$focus_space, "projection::umap")
   expect_identical(restored$view$hidden_levels[[1]]$levels, "T cells")
   expect_match(prepared$json, '"genes": ["CD3D"]', fixed = TRUE)
+
+  # Version 1 reaches the browser as version 1, which converts its background
+  # alignments; version 2 is current; later versions are refused.
+  expect_identical(restored$version, 1L)
+  config$view$display$background_images <- TRUE
+  config$version <- 2L
+  expect_identical(
+    helpers$cv_config_decode(
+      helpers$cv_config_prepare(config, cells = cells)$json,
+      cells = cells
+    )$version,
+    2L
+  )
+  config$version <- 3L
+  expect_error(
+    helpers$cv_config_prepare(config, cells = cells),
+    "version is not supported"
+  )
 })
 
 test_that("Linked views round-trip without a selection geometry", {
