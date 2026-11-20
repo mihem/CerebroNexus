@@ -96,6 +96,104 @@ test_that("run-demo rejects unknown options and data sets", {
   }
 })
 
+test_that("run-demo prepares the Visium sets for the Builder and opens it", {
+  testthat::local_mocked_bindings(
+    load_all = function(path, ...) NULL,
+    .package = "pkgload"
+  )
+  runs <- list(
+    list(options = "--data=dlpfc,breast", launches = 1L),
+    list(options = c("--data=prostate", "--prepare-only"), launches = 0L)
+  )
+  for (run in runs) {
+    prepared <- character()
+    launches <- 0L
+    viewer <- FALSE
+    scope <- new.env(parent = globalenv())
+    scope$source <- function(file, local) {
+      scope$prepareBuilderVisiumDemoData <- function(id) {
+        prepared <<- c(prepared, id)
+        file.path(tempdir(), paste0("visium_", id, "_sce.rds"))
+      }
+    }
+    scope$launchCerebroBuilder <- function(launch_browser) {
+      expect_true(launch_browser)
+      launches <<- launches + 1L
+    }
+    testthat::local_mocked_bindings(
+      runApp = function(...) viewer <<- TRUE,
+      .package = "shiny"
+    )
+    label <- paste(c("run-demo", run$options), collapse = " ")
+    expect_message(
+      run_demo(run$options, scope),
+      "Builder input",
+      label = label
+    )
+    expect_identical(
+      prepared,
+      strsplit(sub("^--data=", "", run$options[[1L]]), ",")[[1L]],
+      label = label
+    )
+    expect_identical(launches, run$launches, label = label)
+    expect_false(viewer, label = label)
+  }
+})
+
+test_that("run-demo keeps Builder and Viewer data sets to separate runs", {
+  expect_error(
+    run_demo("--data=1m,dlpfc"),
+    "separate runs"
+  )
+})
+
+test_that("Visium demo sections name complete, sized downloads", {
+  helper <- testthat::test_path(
+    "..",
+    "..",
+    "data-raw",
+    "large-demo",
+    "prepare_builder_visium_data.R"
+  )
+  skip_if_not(file.exists(helper))
+  env <- new.env(parent = globalenv())
+  sys.source(helper, env)
+  datasets <- env$.builderVisiumDatasets()
+  expect_setequal(
+    names(datasets),
+    c("dlpfc", "mouse_brain", "breast", "prostate")
+  )
+  for (id in names(datasets)) {
+    sections <- datasets[[id]]$sections
+    expect_gt(nrow(sections), 1L)
+    expect_false(anyDuplicated(sections$section) > 0L, label = id)
+    for (index in seq_len(nrow(sections))) {
+      files <- env$.builderVisiumSectionFiles(
+        id,
+        sections[index, , drop = FALSE]
+      )
+      expect_true(
+        all(vapply(
+          files,
+          function(file) {
+            is.character(file$url) &&
+              startsWith(file$url, "https://") &&
+              is.numeric(file$size) &&
+              file$size > 0
+          },
+          logical(1)
+        )),
+        label = paste(id, sections$section[[index]])
+      )
+      ## Every section brings a photograph: its own file or the 10x archive.
+      expect_true(
+        any(c("image", "spatial") %in% names(files)),
+        label = paste(id, sections$section[[index]])
+      )
+    }
+  }
+})
+
 test_that("demo preparation reuses valid packs and rebuilds missing or stale first frames", {
   helper <- testthat::test_path(
     "..",
@@ -149,4 +247,80 @@ test_that("demo preparation reuses valid packs and rebuilds missing or stale fir
   result$manifest$hla_chains <- character()
   expect_identical(env$prepareDemoViewerPack("fixture.crb"), "fixture.viewer")
   expect_identical(builds, 2L)
+})
+
+test_that("a Visium section keeps its spots, picture extent and orientation", {
+  skip_if_not_installed("rhdf5")
+  skip_if_not_installed("png")
+  helper <- testthat::test_path(
+    "..",
+    "..",
+    "data-raw",
+    "large-demo",
+    "prepare_builder_visium_data.R"
+  )
+  skip_if_not(file.exists(helper))
+  env <- new.env(parent = globalenv())
+  sys.source(helper, env)
+  root <- withr::local_tempdir()
+  ## A 10x feature-barcode matrix of 3 genes x 3 barcodes.
+  matrix <- file.path(root, "filtered_feature_bc_matrix.h5")
+  rhdf5::h5createFile(matrix)
+  rhdf5::h5createGroup(matrix, "matrix")
+  rhdf5::h5createGroup(matrix, "matrix/features")
+  rhdf5::h5write(c(1L, 2L, 5L, 3L), matrix, "matrix/data")
+  rhdf5::h5write(c(0L, 2L, 1L, 0L), matrix, "matrix/indices")
+  rhdf5::h5write(c(0L, 2L, 3L, 4L), matrix, "matrix/indptr")
+  rhdf5::h5write(c(3L, 3L), matrix, "matrix/shape")
+  rhdf5::h5write(c("AAA-1", "CCC-1", "GGG-1"), matrix, "matrix/barcodes")
+  rhdf5::h5write(c("Gfap", "Snap25", "Gfap"), matrix, "matrix/features/name")
+  rhdf5::h5closeAll()
+  ## Space Ranger 1 positions: no header; GGG-1 is outside the tissue.
+  positions <- file.path(root, "tissue_positions_list.csv")
+  writeLines(
+    c("AAA-1,1,0,0,100,40", "CCC-1,1,0,2,300,80", "GGG-1,0,1,1,500,90"),
+    positions
+  )
+  scalefactors <- file.path(root, "scalefactors_json.json")
+  writeLines('{"tissue_hires_scalef": 0.5}', scalefactors)
+  image <- file.path(root, "tissue_hires_image.png")
+  png::writePNG(array(0.5, c(60, 80, 3)), image)
+  expect_identical(
+    env$.builderVisiumPngSize(image),
+    c(height = 60, width = 80)
+  )
+  ## Space Ranger 2 writes the same table with a header.
+  headed <- file.path(root, "tissue_positions.csv")
+  writeLines(
+    c(
+      "barcode,in_tissue,array_row,array_col,pxl_row_in_fullres,pxl_col_in_fullres",
+      readLines(positions)
+    ),
+    headed
+  )
+  expect_identical(
+    env$.builderVisiumReadPositions(headed),
+    env$.builderVisiumReadPositions(positions)
+  )
+  section <- env$.builderVisiumSection(
+    list(
+      matrix = matrix,
+      positions = positions,
+      scalefactors = scalefactors,
+      image = image
+    ),
+    "S1"
+  )
+  expect_identical(colnames(section$counts), c("S1_AAA-1", "S1_CCC-1"))
+  expect_identical(rownames(section$counts), c("Gfap", "Snap25", "Gfap.1"))
+  expect_equal(as.numeric(section$counts[, "S1_AAA-1"]), c(1, 0, 2))
+  ## x is the pixel column, y the pixel row: the picture's orientation,
+  ## which the Builder flips together with its picture.
+  expect_equal(unname(section$coordinates[, "x"]), c(40, 80))
+  expect_equal(unname(section$coordinates[, "y"]), c(100, 300))
+  expect_equal(
+    section$picture$histology_image_bounds,
+    c(xmin = 0, xmax = 160, ymin = 0, ymax = 120)
+  )
+  expect_match(section$picture$histology_image, "^data:image/png;base64,")
 })
