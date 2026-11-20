@@ -526,14 +526,8 @@
   position: relative; margin: auto 0; align-self: center;
   background: var(--c-surface); border-radius: 6px;
 }
-/* Square-mode mat reveals the actual canvas without changing its dimensions,
-   pointer coordinates or exported pixels. Fluid mode uses the normal surface. */
-.coordviews-page .cv-pane.cv-square-plot {
-  background: var(--c-bg);
-}
-.coordviews-page .cv-square-plot .cv-canvas-wrap {
-  outline: 1px solid var(--c-border);
-}
+/* Square mode keeps the canvas at the panel's size; the plot is drawn in a
+   centred square that the canvas outlines (drawSquareFrame()). */
 .coordviews-page canvas {
   /* JS fits the canvas inside its panel without distorting spatial geometry. */
   display: block; background: var(--c-surface);

@@ -39,6 +39,10 @@
   views use the same toolbar. The composition plots of Groups and of
   Trajectory's States by group pick *Plot type* and *Bars show* (number or
   percent of cells) in fields instead of a button group and a switch.
+- **Square keeps the canvas.** The *Square* layout of the cell views draws
+  the plot in the largest centred square of a canvas that keeps the panel's
+  size, outlined by a light grey frame, instead of shrinking the canvas to a
+  square on a grey mat.
 - **Linked views fills the window.** Its panels have one size and their rows
   share the window's height, so the views end at the window's bottom edge
   instead of leaving it empty.

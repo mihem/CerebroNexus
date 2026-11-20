@@ -1095,6 +1095,16 @@
     var SX = Math.max(1, p.W - padL - padR);
     var SY = Math.max(1, p.H - padT - padB);
     var ox = padL, oy = padT;
+    // Square draws the plot in the largest centred square of a canvas that
+    // keeps the panel's size; drawSquareFrame() outlines that square.
+    p._squareFrame = null;
+    if (keepPlotsSquare && !axed && SX !== SY) {
+      var squareSide = Math.min(SX, SY);
+      ox += (SX - squareSide) / 2;
+      oy += (SY - squareSide) / 2;
+      SX = SY = squareSide;
+    }
+    if (keepPlotsSquare && !axed) p._squareFrame = { x: ox, y: oy, size: SX };
     if (isSpatialSpace(sp) && !u.nz) {
       var aspect = Number(u.aspect), panelAspect = SX / SY;
       if (isFinite(aspect) && aspect > 0) {
@@ -2581,6 +2591,20 @@
       fill:p.ctx.fillStyle,stroke:p.ctx.strokeStyle,lineWidth:p.ctx.lineWidth};
   }
 
+  // Square mode's frame: a light grey line just outside the plot's square,
+  // in the padding the projection leaves around it.
+  function drawSquareFrame(p, c) {
+    var frame = p._squareFrame;
+    if (!frame || !c) return;
+    var inset = 6;
+    var x = Math.round(frame.x - inset) + 0.5, y = Math.round(frame.y - inset) + 0.5;
+    var side = Math.round(frame.size + 2 * inset) - 1;
+    c.save();
+    c.strokeStyle = 'rgba(148, 163, 184, 0.55)';
+    c.lineWidth = 1;
+    c.strokeRect(x, y, side, side);
+    c.restore();
+  }
   function draw(p, shownMask, shownCount) {
     p._resizedUndrawn = false;
     var c = p.ctx; clearPanelLayers(p);
@@ -2592,6 +2616,7 @@
     var panelPointOpacity = pointOpacityOf(p);
     var cloneState = cloneBaseState(p), cachedBase = restoreCloneBase(p, cloneState);
     if (!cachedBase) {
+      drawSquareFrame(p, underlay);
       drawImage(p, underlay);
       drawHulls(p, underlay);
       drawTrajectory(p, underlay);
@@ -8061,11 +8086,6 @@
       if (gridRow) {
         width = gridRow.width; height = gridRow.height;
         paneWidth = gridRow.width + chromeX;
-      }
-      if (keepPlotsSquare) {
-        var squareSide = Math.min(width, height);
-        width = squareSide;
-        height = squareSide;
       }
       if (p.pane) {
         p.pane.style.flexBasis = paneWidth + 'px';
