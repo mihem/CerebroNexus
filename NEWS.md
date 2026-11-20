@@ -42,9 +42,9 @@
 - **Linked views fills the window.** Its panels have one size and their rows
   share the window's height, so the views end at the window's bottom edge
   instead of leaving it empty.
-- **Expression on top in Preferences, on by default.** The sidebar's
-  Preferences have an *Expression on top* switch, the same setting as Gene
-  expression's *Highest expression on top*: changing either changes the other.
+- **Highest expression on top in Preferences, on by default.** The sidebar's
+  Preferences have a *Highest expression on top* switch, the same setting as
+  the one in Gene expression's settings: changing either changes the other.
   Gene expression now draws the highest values on top by default; authors who
   want the input order choose it in the Builder (*Input order*), as before.
   Each Preferences switch has a small *i* that shows a short help on hover or

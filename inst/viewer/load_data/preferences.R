@@ -57,7 +57,7 @@ output[["preferences_options"]] <- renderUI({
     ),
     preference(
       "expression_on_top_checkbox",
-      "Expression on top",
+      "Highest expression on top",
       ## On unless the author's Gene expression default keeps the input order.
       !identical(
         tryCatch(
@@ -72,7 +72,7 @@ output[["preferences_options"]] <- renderUI({
 })
 
 ##----------------------------------------------------------------------------##
-## "Expression on top" and Gene expression's "Highest expression on top" are one
+## The sidebar's and Gene expression's "Highest expression on top" are one
 ## setting: each follows the other. The page's control may not exist yet; it
 ## then opens with this value (expression_projection_default_plotting_order()).
 ##----------------------------------------------------------------------------##
