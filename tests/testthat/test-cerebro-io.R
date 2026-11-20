@@ -1916,7 +1916,10 @@ test_that("a saved CRB keeps a section's expression as a reference", {
   expect_null(read$spatial$a$expression$genes)
   expect_identical(read$spatial$b$expression$cells, cells[c(4L, 2L)])
   expect_identical(read$spatial$b$expression$genes, rownames(expected$b))
-  expect_false(inherits(read$spatial$c$expression, "CerebroSpatialExpressionRef"))
+  expect_false(inherits(
+    read$spatial$c$expression,
+    "CerebroSpatialExpressionRef"
+  ))
 
   for (name in names(expected)) {
     expect_identical(read$getSpatialData(name)$expression, expected[[name]])
