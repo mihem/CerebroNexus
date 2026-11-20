@@ -10,7 +10,10 @@ run_demo <- function(options, scope = new.env(parent = globalenv())) {
 test_that("run-demo prepares the data sets --data names and opens the Viewer", {
   keys <- c("1m", "ren", "cosmx", "tcell")
   variables <- paste0("CEREBRO_", toupper(keys), "_DEMO_CRB")
-  withr::local_envvar(stats::setNames(rep(NA, 5), c(variables, "CEREBRO_VISIUM_DEMOS")))
+  withr::local_envvar(stats::setNames(
+    rep(NA, 5),
+    c(variables, "CEREBRO_VISIUM_DEMOS")
+  ))
   datasets <- stats::setNames(tempfile(paste0(keys, "-")), keys)
   file.create(datasets)
   withr::defer(unlink(datasets))
@@ -131,7 +134,10 @@ test_that("run-demo builds the Visium sets with the Builder beside the others", 
         file.path(root, paste0("visium_", id, "_sce.rds"))
       }
       scope$prepareViewerVisiumDemoData <- function(id, repo_root) {
-        expect_identical(repo_root, normalizePath(testthat::test_path("..", "..")))
+        expect_identical(
+          repo_root,
+          normalizePath(testthat::test_path("..", ".."))
+        )
         built <<- c(built, id)
         demo <- file.path(root, paste0(id, ".rds"))
         file.create(demo)
@@ -185,13 +191,21 @@ test_that("a Builder-built Visium App is kept as a Viewer data set", {
   saveRDS(
     list(
       crb_file_to_load = c(visium = "private-data/01-dlpfc-visium.crb"),
-      spatial_images = list(visium = list(
-        A = list(hires = list(path = "spatial-assets/u1.png", bounds = bounds))
-      )),
-      spatial_image_settings = list(visium = list(
-        A = list(hires = list(flip_y = TRUE))
-      )),
-      viewer_content = list(visium = list(display = list(spatial_layout = "grid"))),
+      spatial_images = list(
+        visium = list(
+          A = list(
+            hires = list(path = "spatial-assets/u1.png", bounds = bounds)
+          )
+        )
+      ),
+      spatial_image_settings = list(
+        visium = list(
+          A = list(hires = list(flip_y = TRUE))
+        )
+      ),
+      viewer_content = list(
+        visium = list(display = list(spatial_layout = "grid"))
+      ),
       point_size = c(visium = 5),
       point_opacity = c(visium = 1)
     ),
