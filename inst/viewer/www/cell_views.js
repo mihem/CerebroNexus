@@ -8096,9 +8096,10 @@
     var cols = focusPanel
       ? Math.max(1, Math.min(k + 1, availableCols))
       : Math.max(1, Math.min(overview ? overview.cols : 1, availableCols));
-    // Several panels without a primary one (the Spatial grid, Linked views)
-    // fill the window by rows (sectionGridPacking()).
-    var gridPack = !focusPanel && k > 1 && (sectionGridActive() || !singleActive)
+    // Several panels without a primary one (the Spatial grid, Linked views,
+    // Gene expression's separate panels and channels) fill the window by rows
+    // (sectionGridPacking()); in Square they are squares.
+    var gridPack = !focusPanel && k > 1
       ? sectionGridPacking(k, usableW, Math.max(1, availH), chromeX, overhead, gap,
         sectionGridActive() ? sectionGridAspect() : panelsAspect(vis),
         gridColumnsChoice(k), !sectionGridActive(),
