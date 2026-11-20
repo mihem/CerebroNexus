@@ -952,12 +952,12 @@ test_that("{shinytest2} recording: gene_expression", {
     wait_ = FALSE
   )
   app$wait_for_js(
-    "document.querySelectorAll('.cerebro-gene-rgb-channel').length === 3",
+    "document.querySelectorAll('#shiny-tab-geneExpression .cerebro-rgb-select').length === 3",
     timeout = 10000
   )
   rgb_animations <- app$get_js(
     paste0(
-      "Array.from(document.querySelectorAll('.cerebro-gene-rgb-channel'))",
+      "Array.from(document.querySelectorAll('#shiny-tab-geneExpression .cerebro-rgb-select'))",
       ".map(e=>getComputedStyle(e).animationName)"
     )
   )

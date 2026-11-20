@@ -867,21 +867,8 @@
 }
 
 /* ---- RGB co-expression channel row -------------------------------------- */
-.coordviews-page .cv-filters > #cv-rgb-ctl {
-  flex: 0 1 408px; width: 408px; min-width: min(408px, 100%);
-}
-.coordviews-page .cv-rgb-ctl .cv-rgb-row {
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px;
-}
-/* Each channel is sized to hold a gene symbol, not stretched to fill — three
-   full-width pickers would hog the bar and push the selection buttons to a new
-   row. Fixed width, no flex-grow. */
-.coordviews-page .cv-rgb-ctl .cv-rgb-row .form-group {
-  margin-bottom: 0; width: auto; min-width: 0;
-}
-.coordviews-page .cv-rgb-ctl .cv-rgb-row .selectize-control {
-  width: 100%; min-width: 0;
-}
+/* The three gene boxes are the shared RGB field (cerebroRgbGeneFields(),
+   custom.css). */
 /* keep the mode-specific gene pickers compact in the top bar */
 .coordviews-page #cv-gene-ctl .form-group,
 .coordviews-page #cv-rgb-ctl .form-group { margin-bottom: 0; }

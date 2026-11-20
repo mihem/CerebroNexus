@@ -365,38 +365,8 @@ output[["spatial_projection_main_parameters_UI"]] <- renderUI({
       condition = "input.spatial_projection_plot_type == 'Co-expression (RGB)'",
       div(
         class = "spatial-rgb-controls",
-        selectizeInput(
-          "spatial_projection_coexpr_r",
-          label = "Red channel",
-          choices = NULL,
-          options = list(
-            maxOptions = 1000,
-            placeholder = "red channel gene...",
-            create = FALSE,
-            loadThrottle = 300
-          )
-        ),
-        selectizeInput(
-          "spatial_projection_coexpr_g",
-          label = "Green channel",
-          choices = NULL,
-          options = list(
-            maxOptions = 1000,
-            placeholder = "green channel gene...",
-            create = FALSE,
-            loadThrottle = 300
-          )
-        ),
-        selectizeInput(
-          "spatial_projection_coexpr_b",
-          label = "Blue channel",
-          choices = NULL,
-          options = list(
-            maxOptions = 1000,
-            placeholder = "blue channel gene...",
-            create = FALSE,
-            loadThrottle = 300
-          )
+        cerebroRgbGeneFields(
+          paste0("spatial_projection_coexpr_", c("r", "g", "b"))
         ),
         ## As on Gene expression; in the grid, every section splits.
         selectInput(

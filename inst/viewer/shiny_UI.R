@@ -1,6 +1,12 @@
 ##----------------------------------------------------------------------------##
 ## Custom functions.
 ##----------------------------------------------------------------------------##
+## Shared by the page and the server's controls (and the tests' runtime).
+source(
+  file.path(Cerebro.options[["cerebro_root"]], "viewer/ui_rgb_fields.R"),
+  local = TRUE
+)
+
 cerebroIcon <- function(name) {
   result <- icon(name)
   result$attribs[["aria-label"]] <- NULL

@@ -5053,12 +5053,11 @@
       var listed = {};
       panels.forEach(function (panel) {
         var field = fieldOf(panel);
-        if (!panel.spaceId || !field || !field.rgbChannel || listed[field.label]) return;
-        listed[field.label] = true;
-        var range = document.createElement('span');
-        range.className = 'cv-lg';
-        range.textContent = field.label + ': 0–' + Number(field.max).toPrecision(3);
-        L.appendChild(range);
+        if (!panel.spaceId || !field || !field.rgbChannel || listed[field.rgbChannel]) return;
+        listed[field.rgbChannel] = true;
+        item('cv-lg cv-rgb-lg', '<span class="cv-dot" style="background:' +
+          RGB_CHANNELS[field.rgbChannel] + '"></span>' + esc(field.label) +
+          ' <span class="cv-rgb-range">0–' + esc(Number(field.max).toPrecision(3)) + '</span>');
       });
       return;
     }
@@ -7700,7 +7699,7 @@
         }
         var title = $('cv-title-' + p.key.toLowerCase());
         shownSpace = spaceById[p.spaceId];
-        if (title) title.textContent = shownSpace ? shownSpace.label : p.spaceId;
+        setPaneTitle(title, shownSpace, p.spaceId);
       } else {
         p.spaceId = null;
         p.colorBy = null;
@@ -10047,9 +10046,22 @@
   // enabled. Raw values stay for hover and selection summaries. Returns the
   // field's colour mode; D.rgb is the frame's (singleRgbData()).
   var RGB_CHANNEL_NAMES = ['Red', 'Green', 'Blue'];
+  // A panel's title; an RGB channel's panel gets its channel's colour dot.
+  function setPaneTitle(title, space, fallback) {
+    if (!title) return;
+    title.textContent = space ? space.label : fallback;
+    var channel = space && space._rgbChannel;
+    if (channel && RGB_CHANNELS[channel]) {
+      var dot = document.createElement('span');
+      dot.className = 'cv-title-dot';
+      dot.style.background = RGB_CHANNELS[channel];
+      dot.setAttribute('aria-hidden', 'true');
+      title.insertBefore(dot, title.firstChild);
+    }
+  }
   function rgbChannelMode(id, channel, index, data, aligned) {
     var gene = D.rgb.genes[index], maximum = D.rgb.maxima[channel];
-    var field = quantisedField(channel.toUpperCase() + ' · ' + gene, data.rgb[channel] || [],
+    var field = quantisedField(gene, data.rgb[channel] || [],
       data.selection_key || [], {color_range: [0, maximum], paint_order: data.paint_order},
       null, aligned);
     field.v = D.rgb[channel]; field.scale = 255;
@@ -10262,7 +10274,8 @@
         channelModes.forEach(function (channel) {
           var copy = Object.assign({}, space, {
             id: spaceId + ':' + channel.channel,
-            label: space.label + ' ' + channel.name
+            label: space.label + ' ' + channel.name,
+            _rgbChannel: channel.channel
           });
           spaceById[copy.id] = copy;
           spaces.push(copy.id);
@@ -10379,7 +10392,8 @@
           var gene = D.rgb.genes[index];
           if (!gene) return;
           var spaceId = baseId + ':rgb:' + channel;
-          makeSpace(spaceId, channel.toUpperCase() + ' · ' + gene);
+          makeSpace(spaceId, gene);
+          spaceById[spaceId]._rgbChannel = channel;
           modes[spaceId] = rgbChannelMode(id, channel, index, data, false);
         });
       } else {
@@ -10934,7 +10948,7 @@
     activePanels.forEach(function (p) {
       p.colorBy = mode; p.miniBg = null;
       var title = $('cv-title-' + p.key.toLowerCase());
-      if (title) title.textContent = space.label;
+      setPaneTitle(title, space, p.spaceId);
 
     });
     pick = null; unpinTip(); closeCard(); cardMeta = null;
@@ -13170,7 +13184,7 @@
           var space = spaceById[panel.spaceId];
           panel.colorBy = space && space._panelColorMode || null;
           var title = $('cv-title-' + panel.key.toLowerCase());
-          if (title) title.textContent = space ? space.label : panel.spaceId;
+          setPaneTitle(title, space, panel.spaceId);
         });
       }
       renderLegend(); if (!resizeAll()) drawAll();
