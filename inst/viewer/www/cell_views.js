@@ -7773,21 +7773,23 @@
     }).filter(Boolean).sort(function (a, b) { return a - b; });
     return ratios.length ? Math.max(0.25, Math.min(4, ratios[Math.floor(ratios.length / 2)])) : 1;
   }
-  // The shape of the shown spatial panels of Linked views (the median of
-  // their extents); embeddings take any shape, so without a section 1.
+  // The shape of each shown panel of Linked views: a section's extent, and
+  // 1 for an embedding, which fills any shape but reads best near square.
   function panelsAspect(vis) {
-    var ratios = vis.map(function (p) {
+    return vis.map(function (p) {
       var space = spaceById[p.spaceId];
-      if (!isSpatialSpace(space)) return null;
-      var xr = space.xRange, yr = space.yRange;
-      if (xr && yr) {
-        var w = Math.abs(Number(xr[1]) - Number(xr[0])), h = Math.abs(Number(yr[1]) - Number(yr[0]));
-        if (w > 0 && h > 0) return w / h;
+      var ratio = null;
+      if (isSpatialSpace(space)) {
+        var xr = space.xRange, yr = space.yRange;
+        if (xr && yr) {
+          var w = Math.abs(Number(xr[1]) - Number(xr[0])), h = Math.abs(Number(yr[1]) - Number(yr[0]));
+          if (w > 0 && h > 0) ratio = w / h;
+        }
+        var unit = space._unit;
+        if (!ratio && unit && unit.aspect > 0 && isFinite(unit.aspect)) ratio = unit.aspect;
       }
-      var unit = space._unit;
-      return unit && unit.aspect > 0 && isFinite(unit.aspect) ? unit.aspect : null;
-    }).filter(Boolean).sort(function (a, b) { return a - b; });
-    return ratios.length ? Math.max(0.25, Math.min(4, ratios[Math.floor(ratios.length / 2)])) : 1;
+      return ratio ? Math.max(0.25, Math.min(4, ratio)) : 1;
+    });
   }
   // Panels of a Spatial grid are as tall as their sections are wide for
   // their width, and the rows fill the window: the panels of a row share its
@@ -7796,26 +7798,54 @@
   // together when they would not fit. Every row count is tried and the one
   // that draws the most tissue kept; a window too small for readable panels
   // lets the page scroll instead. `fixedCols` (the user's Columns) keeps every
-  // panel one column wide.
+  // panel one column wide. `aspect` is one width/height for every panel or
+  // one per panel (Linked views); a row is as tall as its tallest drawing
+  // needs. `fill` gives the rows the height none of them needs as well, so
+  // the panels end at the window's bottom edge.
   var GRID_MIN_DRAWN = 120;
-  function sectionGridPacking(k, availW, availH, chromeX, chromeY, gap, aspect, fixedCols) {
+  function sectionGridPacking(k, availW, availH, chromeX, chromeY, gap, aspect, fixedCols, fill) {
+    var aspectAt = function (i) {
+      return typeof aspect === 'number' ? aspect : (aspect && aspect[i]) || 1;
+    };
     var widthOf = function (cols) {
       return Math.floor((availW - (cols - 1) * gap) / cols - chromeX);
     };
-    // Rows of `counts` panels: their sizes, scaled to the window if needed.
+    // Rows of `counts` panels and their sizes. The rows share the window's
+    // height evenly; a row that needs less keeps what it needs and the rest
+    // is shared again among the others.
     var layout = function (counts, uniformWidth) {
+      var start = 0;
       var rows = counts.map(function (count) {
-        var width = uniformWidth || widthOf(count);
-        return { count: count, width: width, height: width / aspect };
+        var width = uniformWidth || widthOf(count), cap = 0;
+        for (var i = start; i < start + count; i++) cap = Math.max(cap, width / aspectAt(i));
+        var row = { count: count, width: width, cap: cap, start: start, height: 0 };
+        start += count;
+        return row;
       });
       var room = availH - rows.length * chromeY - (rows.length - 1) * gap;
-      var natural = rows.reduce(function (sum, row) { return sum + row.height; }, 0);
-      var scale = natural > room ? room / natural : 1;
+      var open = rows, left = room;
+      while (open.length) {
+        var share = left / open.length;
+        var capped = open.filter(function (row) { return row.cap <= share; });
+        if (!capped.length) {
+          open.forEach(function (row) { row.height = share; });
+          break;
+        }
+        capped.forEach(function (row) { row.height = row.cap; left -= row.cap; });
+        open = open.filter(function (row) { return row.cap > share; });
+      }
+      var spare = room - rows.reduce(function (sum, row) { return sum + row.height; }, 0);
       var area = 0, smallest = Infinity;
       rows.forEach(function (row) {
-        row.height = Math.floor(row.height * scale);
-        smallest = Math.min(smallest, row.height, row.width);
-        area += row.count * Math.min(row.width, row.height * aspect) * row.height;
+        if (fill && spare > 0) row.height += spare / rows.length;
+        row.height = Math.floor(row.height);
+        for (var i = row.start; i < row.start + row.count; i++) {
+          var a = aspectAt(i);
+          var drawnW = Math.min(row.width, row.height * a), drawnH = Math.min(row.height, row.width / a);
+          smallest = Math.min(smallest, drawnW, drawnH);
+          area += drawnW * drawnH;
+        }
+        delete row.cap; delete row.start;
       });
       return { rows: rows, area: area, fits: smallest >= GRID_MIN_DRAWN };
     };
@@ -7957,7 +7987,7 @@
     var gridPack = !focusPanel && k > 1 && (sectionGridActive() || !singleActive)
       ? sectionGridPacking(k, usableW, Math.max(1, availH), chromeX, overhead, gap,
         keepPlotsSquare ? 1 : (sectionGridActive() ? sectionGridAspect() : panelsAspect(vis)),
-        gridColumnsChoice(k))
+        gridColumnsChoice(k), !sectionGridActive())
       : null;
     if (gridPack) cols = gridPack.cols;
     var single = cols === 1;
