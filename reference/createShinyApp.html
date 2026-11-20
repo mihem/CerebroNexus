@@ -15,7 +15,7 @@ run with shiny::runApp(result_dir)."><meta property="og:image" content="https://
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -262,6 +262,12 @@ may contain only <code>flip_x</code>, <code>flip_y</code>, <code>scale_x</code>,
 <code>scale_y</code>, <code>offset_x</code>, <code>offset_y</code>, and <code>rotation</code>.
 <code>image_opacity</code> may additionally set the initial image opacity from
 0 through 1 (default 1).
+Offsets, scales and flips act in the image's own unrotated frame, about
+the centre of its bounds; <code>rotation</code> (degrees, counter-clockwise) is
+applied last, about the coordinate origin, as
+<code>spatial_plot_rotation</code> rotates the cells. Settings found for the
+unrotated section therefore stay aligned when the same <code>rotation</code> is
+added to the image and to <code>spatial_plot_rotation</code>.
 A leaf may target an embedded or external image available under that exact
 dataset and spatial entry. The image label must exist in the union of the
 CRB's embedded images and this call's <code>spatial_images</code>; unknown
@@ -271,9 +277,10 @@ identities are rejected. Labels are user-facing names, not protocol names.</p></
 <dt id="arg-spatial-plot-rotation">spatial_plot_rotation<a class="anchor" aria-label="anchor" href="#arg-spatial-plot-rotation"></a></dt>
 <dd><p>Optional nested rotations in
 <code>dataset -&gt; spatial entry -&gt; degrees</code> form, applied only to spatial
-cell coordinates. Dataset names must match <code>cerebro_data</code>; spatial
-names must match the corresponding CRB's <code>availableSpatial()</code>. A
-per-dataset numeric vector is rejected.</p></dd>
+cell coordinates; background images follow only through their own
+<code>rotation</code> in <code>spatial_image_settings</code>. Dataset names must
+match <code>cerebro_data</code>; spatial names must match the corresponding
+CRB's <code>availableSpatial()</code>. A per-dataset numeric vector is rejected.</p></dd>
 
 
 <dt id="arg-auth">auth<a class="anchor" aria-label="anchor" href="#arg-auth"></a></dt>
@@ -445,7 +452,7 @@ while the build is running; the target build lock does not protect inputs.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> ========================================</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Shiny app successfully created!</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> ========================================</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> App directory: /tmp/nix-shell-4496-1091596191/Rtmpn1GkJd/my_app</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> App directory: /tmp/nix-shell-4483-181510197/RtmpoQGT1K/my_app</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Data file(s):</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   - PBMC example : example.crb</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Port: 8080</span>
@@ -453,7 +460,7 @@ while the build is running; the target build lock does not protect inputs.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Launch browser: TRUE</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> To launch the app, run:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   shiny::runApp('/tmp/nix-shell-4496-1091596191/Rtmpn1GkJd/my_app')</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   shiny::runApp('/tmp/nix-shell-4483-181510197/RtmpoQGT1K/my_app')</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> ========================================</span>
 <span class="r-in"><span><span class="co"># Run with shiny::runApp(app_dir) or deploy the directory to Shiny Server.</span></span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>

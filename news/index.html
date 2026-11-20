@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -77,6 +77,13 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="8.4.2" id="cerebronexus-842">CerebroNexus 8.4.2<a class="anchor" aria-label="anchor" href="#cerebronexus-842"></a></h2>
+<ul><li>
+<strong>A rotated, flipped background image is no longer mirrored against its cells.</strong> In <code>spatial_image_settings</code>, <code>offset_x</code>/<code>offset_y</code>, <code>scale_x</code>/ <code>scale_y</code> and <code>flip_x</code>/<code>flip_y</code> now act in the image’s own unrotated frame, and <code>rotation</code> is applied last, about the coordinate origin, as <code>spatial_plot_rotation</code> rotates the cells. Settings found for the unrotated section therefore stay aligned when the same <code>rotation</code> is added to the image and to the plot. Before, flips and offsets were read after the rotation, so <code>flip_y</code> acted as <code>flip_x</code> at 90 degrees. Settings with a rotation and no offset, flip or uneven scale (such as the MERFISH demo) draw as before; hand-written settings that combine a rotation with them need re-checking. The Builder writes settings in the new form. Linked views files are now saved as version 2; a version-1 file is converted on import, so its backgrounds open where they were saved. A version-1 background with an uneven scale at an angle that is not a multiple of 90 degrees (drawn sheared before) has no equivalent, and such a file is refused with a message.</li>
+<li>
+<strong>The bundled demo data sets draw their cells at size 5 and full opacity.</strong> The app gave HLA &amp; TCR points of size 1 at opacity 0.3, so its 2,000 cells of one cell type (light yellow) were close to invisible on the Projection page. All demos in <code>inst/app.R</code> (PBMC was at size 6, Trekker at 4.4 and opacity 0.85) now start at the defaults of <code><a href="../reference/launchCerebro.html">launchCerebro()</a></code>; the settings drawer still changes them. The large demos of about a million cells keep their small points (size 1).</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="8.4.1" id="cerebronexus-841">CerebroNexus 8.4.1<a class="anchor" aria-label="anchor" href="#cerebronexus-841"></a></h2>
 <ul><li>

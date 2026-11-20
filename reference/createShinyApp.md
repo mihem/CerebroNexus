@@ -173,18 +173,26 @@ createShinyApp(
   `dataset -> spatial entry -> image label -> settings` form. Settings
   may contain only `flip_x`, `flip_y`, `scale_x`, `scale_y`, `offset_x`,
   `offset_y`, and `rotation`. `image_opacity` may additionally set the
-  initial image opacity from 0 through 1 (default 1). A leaf may target
-  an embedded or external image available under that exact dataset and
-  spatial entry. The image label must exist in the union of the CRB's
-  embedded images and this call's `spatial_images`; unknown identities
-  are rejected. Labels are user-facing names, not protocol names.
+  initial image opacity from 0 through 1 (default 1). Offsets, scales
+  and flips act in the image's own unrotated frame, about the centre of
+  its bounds; `rotation` (degrees, counter-clockwise) is applied last,
+  about the coordinate origin, as `spatial_plot_rotation` rotates the
+  cells. Settings found for the unrotated section therefore stay aligned
+  when the same `rotation` is added to the image and to
+  `spatial_plot_rotation`. A leaf may target an embedded or external
+  image available under that exact dataset and spatial entry. The image
+  label must exist in the union of the CRB's embedded images and this
+  call's `spatial_images`; unknown identities are rejected. Labels are
+  user-facing names, not protocol names.
 
 - spatial_plot_rotation:
 
   Optional nested rotations in `dataset -> spatial entry -> degrees`
-  form, applied only to spatial cell coordinates. Dataset names must
-  match `cerebro_data`; spatial names must match the corresponding CRB's
-  `availableSpatial()`. A per-dataset numeric vector is rejected.
+  form, applied only to spatial cell coordinates; background images
+  follow only through their own `rotation` in `spatial_image_settings`.
+  Dataset names must match `cerebro_data`; spatial names must match the
+  corresponding CRB's `availableSpatial()`. A per-dataset numeric vector
+  is rejected.
 
 - auth:
 
@@ -355,7 +363,7 @@ app_dir <- createShinyApp(
 #> ========================================
 #> Shiny app successfully created!
 #> ========================================
-#> App directory: /tmp/nix-shell-4496-1091596191/Rtmpn1GkJd/my_app
+#> App directory: /tmp/nix-shell-4483-181510197/RtmpoQGT1K/my_app
 #> Data file(s):
 #>   - PBMC example : example.crb
 #> Port: 8080
@@ -363,7 +371,7 @@ app_dir <- createShinyApp(
 #> Launch browser: TRUE
 #> 
 #> To launch the app, run:
-#>   shiny::runApp('/tmp/nix-shell-4496-1091596191/Rtmpn1GkJd/my_app')
+#>   shiny::runApp('/tmp/nix-shell-4483-181510197/RtmpoQGT1K/my_app')
 #> ========================================
 # Run with shiny::runApp(app_dir) or deploy the directory to Shiny Server.
 # }

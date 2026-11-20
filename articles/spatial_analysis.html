@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -400,7 +400,10 @@ its coordinate system. Every dataset name must match a name of
 with <code>flip_x</code>, <code>flip_y</code> (<code>TRUE</code> mirrors
 the image), <code>scale_x</code>, <code>scale_y</code> (1.0 = no
 scaling), <code>offset_x</code>, <code>offset_y</code>,
-<code>rotation</code>, and <code>image_opacity</code>.</td>
+<code>rotation</code>, and <code>image_opacity</code>. Offsets, scales
+and flips act in the image’s own unrotated frame; <code>rotation</code>
+is applied last, about the coordinate origin, like
+<code>spatial_plot_rotation</code>.</td>
 </tr>
 <tr class="odd">
 <td><code>spatial_plot_rotation</code></td>
@@ -409,7 +412,9 @@ scaling), <code>offset_x</code>, <code>offset_y</code>,
 <td>
 <code>dataset -&gt; spatial entry -&gt; degrees</code>: rotation of
 cell coordinates (e.g. -90 to 270), for when capture-area and image
-orientation differ.</td>
+orientation differ. A background image does not follow it on its own:
+give the image the same <code>rotation</code>, and keep its offsets and
+flips as found on the unrotated section.</td>
 </tr>
 </tbody>
 </table>
