@@ -136,6 +136,32 @@ assert.ok(auto.cols >= 1 && auto.cols <= 6);
 // The grid's lower floor admits layouts the linked lenses' 300px would not.
 var narrow = bestOverviewGrid(8, 1200, 500, 18, 40, 8, 160, null);
 assert.ok(narrow.side >= 160, 'eight sections fit above the grid floor');
+// Panels are shaped like their sections and packed for the most tissue.
+var fit = sectionGridPacking(12, 1600, 800, 18, 58, 8, 1.3, null);
+assert.ok(fit.rows * (fit.height + 58) + (fit.rows - 1) * 8 <= 800, 'twelve sections fit the window');
+assert.ok(fit.height <= Math.round(fit.width / 1.3) + 1, 'no taller than the section needs');
+assert.ok(fit.height >= 120);
+// Wide sections take fewer columns than tall ones in the same window.
+var wide = sectionGridPacking(6, 1600, 900, 18, 58, 8, 3, null);
+var tall = sectionGridPacking(6, 1600, 900, 18, 58, 8, 0.4, null);
+assert.ok(wide.cols < tall.cols, 'wide ' + wide.cols + ' vs tall ' + tall.cols);
+// The columns asked for are kept, even when they scroll.
+assert.strictEqual(sectionGridPacking(12, 1600, 800, 18, 58, 8, 1.3, 2).cols, 2);
+// A window too small for every section scrolls rather than shrinking them away.
+var crowded = sectionGridPacking(40, 1200, 500, 18, 58, 8, 1, null);
+assert.ok(crowded.height >= 120 && crowded.width >= 120, JSON.stringify(crowded));
+// The sections' shape is the median of their extents.
+var keptShown = singleSpaceIds;
+singleSpaceIds = ['s1', 's2', 's3'];
+spaceById.s1 = { _gridSection: 'a', xRange: [0, 200], yRange: [0, 100] };
+spaceById.s2 = { _gridSection: 'b', xRange: [0, 300], yRange: [0, 100] };
+spaceById.s3 = { _gridSection: 'c', xRange: [0, 100], yRange: [0, 100] };
+assert.strictEqual(sectionGridAspect(), 2);
+singleSpaceIds = ['umap'];
+spaceById.umap = { id: 'umap' };
+assert.strictEqual(sectionGridAspect(), 1, 'no section: square');
+singleSpaceIds = keptShown;
+delete spaceById.umap;
 console.log('PASS the grid takes the columns asked for');
 
 // ---- synced zoom -----------------------------------------------------------------

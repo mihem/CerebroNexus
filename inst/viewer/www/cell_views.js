@@ -7540,7 +7540,7 @@
         clearPanelView(p);
         if (p.pane) {
           p.pane.classList.remove('cv-hidden');
-          if (reappearing && !singleActive) fadeInPane(p.pane);
+          if (reappearing && (!singleActive || singleGridSpaces.length)) fadeInPane(p.pane);
         }
         var title = $('cv-title-' + p.key.toLowerCase());
         shownSpace = spaceById[p.spaceId];
@@ -7720,6 +7720,55 @@
     return balanced[0];
   }
 
+  // The shape (width / height) of the shown sections of a Spatial grid: the
+  // median of their extents, which the server sends with each panel.
+  function sectionGridAspect() {
+    var ratios = singleSpaceIds.map(function (spaceId) {
+      var space = spaceById[spaceId], xr = space && space.xRange, yr = space && space.yRange;
+      if (!space || space._gridSection == null || !xr || !yr) return null;
+      var w = Math.abs(Number(xr[1]) - Number(xr[0])), h = Math.abs(Number(yr[1]) - Number(yr[0]));
+      return w > 0 && h > 0 ? w / h : null;
+    }).filter(Boolean).sort(function (a, b) { return a - b; });
+    return ratios.length ? Math.max(0.25, Math.min(4, ratios[Math.floor(ratios.length / 2)])) : 1;
+  }
+  // Panels of a Spatial grid are as tall as their sections are wide for
+  // their width, not as tall as the row: a square-ish canvas around a wide
+  // section is mostly empty. Try every column count and keep the one that
+  // draws the most tissue while every row stays in the window; a panel too
+  // small to read (or a count the window cannot hold) lets the page scroll
+  // instead. `fixedCols` is the user's choice.
+  var GRID_MIN_DRAWN = 120;
+  function sectionGridPacking(k, availW, availH, chromeX, chromeY, gap, aspect, fixedCols) {
+    var best = null, fallback = null;
+    for (var cols = fixedCols || 1; cols <= (fixedCols || k); cols++) {
+      var rows = Math.ceil(k / cols);
+      var width = Math.floor((availW - (cols - 1) * gap) / cols - chromeX);
+      if (width < 60) break;
+      var natural = Math.round(width / aspect);
+      var fitHeight = Math.floor((availH - (rows - 1) * gap) / rows - chromeY);
+      var height = Math.min(natural, fitHeight);
+      var drawnWidth = Math.min(width, height * aspect);
+      var candidate = {
+        cols: cols, rows: rows, width: width, height: height,
+        area: drawnWidth * height,
+        orphan: rows > 1 && cols > 1 && k - (rows - 1) * cols === 1
+      };
+      if (height >= GRID_MIN_DRAWN && drawnWidth >= GRID_MIN_DRAWN) {
+        if (!best || candidate.area > best.area * 1.08 ||
+            (candidate.area > best.area * 0.92 && best.orphan && !candidate.orphan)) {
+          best = candidate;
+        }
+      }
+      // Scrolling: the widest panels that still put two sections side by side.
+      if (!fallback || (width >= 260 && cols > fallback.cols) || fixedCols) {
+        fallback = { cols: cols, rows: rows, width: width,
+          height: Math.max(GRID_MIN_DRAWN, natural), area: 0, orphan: false };
+      }
+    }
+    return best || fallback || { cols: 1, rows: k, width: availW - chromeX,
+      height: Math.max(GRID_MIN_DRAWN, Math.round((availW - chromeX) / aspect)) };
+  }
+
   // `ifChanged` (the ResizeObserver): leave canvases untouched, and do not
   // draw, when no panel's size changes. Assigning a canvas size clears it.
   function resizeAll(ifChanged) {
@@ -7798,6 +7847,11 @@
     var cols = focusPanel
       ? Math.max(1, Math.min(k + 1, availableCols))
       : Math.max(1, Math.min(overview ? overview.cols : 1, availableCols));
+    var gridPack = sectionGridActive() && !focusPanel
+      ? sectionGridPacking(k, usableW, Math.max(1, availH), chromeX, overhead, gap,
+        sectionGridAspect(), gridColumnsChoice(k))
+      : null;
+    if (gridPack) cols = gridPack.cols;
     var single = cols === 1;
     // Whole pixels that never add up to more than the container: a row filled
     // to the last fraction of a pixel wraps its final pane when the container
@@ -7854,7 +7908,7 @@
     // canvases also consume their row's share of available height. Square mode
     // constrains both dimensions to the shorter side.
     var rows = Math.ceil(k / cols);
-    var panelHeight = Math.max(
+    var panelHeight = gridPack ? gridPack.height : Math.max(
       minSide,
       Math.floor((availH - (rows - 1) * gap) / rows - overhead)
     );
@@ -9590,9 +9644,120 @@
       gridSyncing = false;
     }
   }
+  // Switching between one section and the grid needs a new frame from the
+  // server. Until it is drawn, a skeleton of the coming layout (one card per
+  // panel, titled) covers the old panels at once, so the click is answered
+  // where it was made; the drawn frame then fades in under it.
+  var gridSkeleton = null, gridSkeletonTimer = 0, lastGridAspect = 1.3;
+  var gridSkeletonLayout = null;
+  function selectLabels(id) {
+    var el = document.getElementById(id);
+    if (!el) return [];
+    if (el.selectize) {
+      return el.selectize.items.map(function (value) {
+        var option = el.selectize.options[value];
+        return option ? String(option.label || option.text || value) : String(value);
+      });
+    }
+    return Array.prototype.map.call(el.selectedOptions || [], function (option) {
+      return option.text || option.value;
+    });
+  }
+  function hideGridSkeleton() {
+    clearTimeout(gridSkeletonTimer);
+    var skeleton = gridSkeleton;
+    gridSkeleton = null;
+    gridSkeletonLayout = null;
+    var host = document.querySelector('.coordviews-page .cv-panes');
+    if (host && host.classList.contains('cv-panes-pending')) {
+      host.classList.remove('cv-panes-pending');
+      host.classList.add('cv-panes-enter');
+      setTimeout(function () { host.classList.remove('cv-panes-enter'); }, 300);
+    }
+    if (!skeleton) return;
+    skeleton.classList.add('cv-grid-skeleton-out');
+    setTimeout(function () { if (skeleton.parentNode) skeleton.parentNode.removeChild(skeleton); }, 260);
+  }
+  function showGridSkeleton(layout) {
+    var host = document.querySelector('.coordviews-page .cv-panes');
+    var page = host && host.closest('.tab-pane');
+    if (!host || !page || !page.classList.contains('active')) return;
+    var labels;
+    if (layout === 'grid') {
+      labels = selectLabels('spatial_projection_grid_sections');
+      if (!labels.length) {
+        var all = document.getElementById('spatial_projection_grid_sections');
+        labels = all && all.selectize ? Object.keys(all.selectize.options) : [];
+      }
+      var embedding = document.getElementById('spatial_projection_grid_projection');
+      if (embedding && embedding.value && embedding.value !== '__none__') {
+        labels = [embedding.value].concat(labels);
+      }
+    } else {
+      labels = selectLabels('spatial_projection_to_display').slice(0, 1);
+    }
+    if (!labels.length) return;
+    hideGridSkeleton();
+    var rect = host.getBoundingClientRect();
+    var gap = parseFloat(getComputedStyle(host).columnGap) || 8;
+    var scrollHost = host.closest('.content-wrapper');
+    var availH = Math.max(240, visibleHeight(scrollHost) - Math.max(0, rect.top) - 2 * VIEWPORT_GUTTER);
+    var pack = layout === 'grid'
+      ? sectionGridPacking(labels.length, rect.width, availH, 18, 58, gap, lastGridAspect,
+        (function () {
+          var el = document.getElementById('spatial_projection_grid_columns');
+          var n = el ? parseInt(el.value, 10) : NaN;
+          return n > 0 ? Math.min(n, labels.length) : null;
+        })())
+      : { cols: 1, height: Math.max(240, availH - 58) };
+    var skeleton = document.createElement('div');
+    skeleton.className = 'cv-grid-skeleton';
+    // Over the panels, which keep their size underneath (the engine measures
+    // them), cut to the window.
+    var parent = host.parentNode;
+    if (getComputedStyle(parent).position === 'static') parent.style.position = 'relative';
+    skeleton.style.top = host.offsetTop + 'px';
+    skeleton.style.left = host.offsetLeft + 'px';
+    skeleton.style.width = host.offsetWidth + 'px';
+    skeleton.style.maxHeight = Math.round(availH) + 'px';
+    skeleton.setAttribute('aria-hidden', 'true');
+    skeleton.style.gridTemplateColumns = 'repeat(' + pack.cols + ', minmax(0, 1fr))';
+    skeleton.style.gap = gap + 'px';
+    skeleton.innerHTML = labels.map(function (label) {
+      return '<div class="cv-grid-skeleton-card"><div class="cv-grid-skeleton-title">' +
+        esc(label) + '</div><div class="cv-grid-skeleton-plot" style="height:' +
+        Math.round(pack.height) + 'px"></div></div>';
+    }).join('');
+    host.parentNode.insertBefore(skeleton, host);
+    host.classList.add('cv-panes-pending');
+    gridSkeleton = skeleton;
+    gridSkeletonLayout = layout;
+    // A frame that never comes (an error, a data set switch) must not leave
+    // the page covered.
+    gridSkeletonTimer = setTimeout(hideGridSkeleton, 30000);
+  }
   function wireSectionGrid() {
     if (!window.jQuery) return;
+    window.addEventListener('cerebro:cell-view-ready', function (event) {
+      if (!gridSkeleton || !event.detail || event.detail.id !== 'spatial_projection') return;
+      // Only the frame of the layout asked for ends the wait.
+      if (sectionGridActive() !== (gridSkeletonLayout === 'grid')) return;
+      if (sectionGridActive()) lastGridAspect = sectionGridAspect();
+      hideGridSkeleton();
+    });
     window.jQuery(document).on('shiny:inputchanged.cerebroSectionGrid', function (event) {
+      if (event.name === 'spatial_projection_layout' && singleActive === 'spatial_projection') {
+        var plotType = document.getElementById('spatial_projection_plot_type');
+        var wanted = event.value === 'grid' ? 'grid' : 'single';
+        // Only a change of what is drawn waits for a frame: the input also
+        // fires when its control binds (or is rendered again) with the layout
+        // already on screen. RGB co-expression draws one section either way.
+        if ((wanted === 'grid') !== sectionGridActive() &&
+            (!plotType || plotType.value !== 'Co-expression (RGB)')) {
+          showGridSkeleton(wanted);
+        }
+        return;
+      }
       if (event.name === 'spatial_projection_grid_sections' ||
           event.name === 'spatial_projection_grid_columns' ||
           event.name === 'spatial_projection_grid_sync_zoom') {
@@ -10605,6 +10770,22 @@
       images: singleSpaceIds.map(function (spaceId) {
         var space = spaceById[spaceId];
         return !!(space && space._imgReady && currentImage(space));
+      }),
+      // Points each shown panel put on screen (the GPU's count, else the
+      // panel's positioned cells): a panel left blank reads 0.
+      drawn: singleSpaceIds.map(function (spaceId) {
+        var panel = panels.filter(function (p) { return p.spaceId === spaceId; })[0];
+        if (!panel) return 0;
+        if (panel.gpuCanvas && panel.gpuCanvas.style.display !== 'none' &&
+            panel.gpuCanvas.dataset.pointCount != null) {
+          return Number(panel.gpuCanvas.dataset.pointCount);
+        }
+        var space = spaceById[spaceId], unit = space && space._unit, count = 0;
+        if (!unit || !unit.ok) return 0;
+        var cells = space._cells;
+        if (!cells) { for (var i = 0; i < unit.ok.length; i++) count += unit.ok[i]; return count; }
+        for (var at = 0; at < cells.length; at++) count += unit.ok[cells[at]];
+        return count;
       }),
       sharedGeometry: singleGridSpaces.every(function (spaceId) {
         return spaceById[spaceId].x === first.x;
