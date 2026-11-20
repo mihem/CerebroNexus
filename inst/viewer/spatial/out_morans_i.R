@@ -55,8 +55,10 @@ output[["spatial_projection_morans_i"]] <- renderText({
     ## Cache keys run before the render body, so gate both paths.
     req(identical(input[["sidebar"]], "spatial"))
     req(identical(input[["spatial_projection_plot_type"]], "ImageFeaturePlot"))
+    ## The raw choice is key enough and reads no data set.
     list(
-      spatial_projection_single_section(input, availableSpatial()),
+      input[["spatial_projection_sections"]] %||%
+        input[["spatial_projection_to_display"]],
       input[["spatial_projection_feature_to_display"]],
       viewerDatasetContextToken(viewer_loaded_dataset_context())
     )
