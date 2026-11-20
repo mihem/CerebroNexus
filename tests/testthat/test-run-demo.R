@@ -10,7 +10,7 @@ run_demo <- function(options, scope = new.env(parent = globalenv())) {
 test_that("run-demo prepares the data sets --data names and opens the Viewer", {
   keys <- c("1m", "ren", "cosmx", "tcell")
   variables <- paste0("CEREBRO_", toupper(keys), "_DEMO_CRB")
-  withr::local_envvar(stats::setNames(rep(NA, 4), variables))
+  withr::local_envvar(stats::setNames(rep(NA, 5), c(variables, "CEREBRO_VISIUM_DEMOS")))
   datasets <- stats::setNames(tempfile(paste0(keys, "-")), keys)
   file.create(datasets)
   withr::defer(unlink(datasets))
@@ -90,61 +90,127 @@ test_that("run-demo rejects unknown options and data sets", {
   for (options in list("--everything", "--data=mouse", "--data=")) {
     expect_error(
       run_demo(options),
-      "Usage: Rscript run-demo.R [--data=1m,ren,cosmx,tcell] [--prepare-only]",
+      paste0(
+        "Usage: Rscript run-demo.R [--data=1m,ren,cosmx,tcell,",
+        "dlpfc,mouse_brain,breast,prostate] [--prepare-only]"
+      ),
       fixed = TRUE
     )
   }
 })
 
-test_that("run-demo prepares the Visium sets for the Builder and opens it", {
+test_that("run-demo builds the Visium sets with the Builder beside the others", {
+  withr::local_envvar(c(
+    CEREBRO_1M_DEMO_CRB = NA,
+    CEREBRO_REN_DEMO_CRB = NA,
+    CEREBRO_COSMX_DEMO_CRB = NA,
+    CEREBRO_TCELL_DEMO_CRB = NA,
+    CEREBRO_VISIUM_DEMOS = NA
+  ))
   testthat::local_mocked_bindings(
     load_all = function(path, ...) NULL,
     .package = "pkgload"
   )
+  root <- withr::local_tempdir()
+  crb <- file.path(root, "1m.crb")
+  file.create(crb)
   runs <- list(
-    list(options = "--data=dlpfc,breast", launches = 1L),
+    list(options = "--data=1m,dlpfc,breast", launches = 1L),
     list(options = c("--data=prostate", "--prepare-only"), launches = 0L)
   )
   for (run in runs) {
-    prepared <- character()
+    built <- character()
     launches <- 0L
-    viewer <- FALSE
     scope <- new.env(parent = globalenv())
     scope$source <- function(file, local) {
+      scope$prepareViewer1mBenchmarkData <- function() crb
+      scope$.viewer1mVersion <- 1L
+      scope$prepareDemoViewerPack <- function(crb) NULL
+      scope$prepareCompressedDemoVariant <- function(crb) crb
       scope$prepareBuilderVisiumDemoData <- function(id) {
-        prepared <<- c(prepared, id)
-        file.path(tempdir(), paste0("visium_", id, "_sce.rds"))
+        file.path(root, paste0("visium_", id, "_sce.rds"))
+      }
+      scope$prepareViewerVisiumDemoData <- function(id, repo_root) {
+        expect_identical(repo_root, normalizePath(testthat::test_path("..", "..")))
+        built <<- c(built, id)
+        demo <- file.path(root, paste0(id, ".rds"))
+        file.create(demo)
+        demo
       }
     }
-    scope$launchCerebroBuilder <- function(launch_browser) {
-      expect_true(launch_browser)
-      launches <<- launches + 1L
-    }
     testthat::local_mocked_bindings(
-      runApp = function(...) viewer <<- TRUE,
+      runApp = function(...) launches <<- launches + 1L,
       .package = "shiny"
     )
     label <- paste(c("run-demo", run$options), collapse = " ")
     expect_message(
       run_demo(run$options, scope),
-      "Builder input",
+      "built by the Builder from",
+      label = label
+    )
+    selected <- strsplit(sub("^--data=", "", run$options[[1L]]), ",")[[1L]]
+    visium <- intersect(selected, c("dlpfc", "breast", "prostate"))
+    expect_identical(built, visium, label = label)
+    expect_identical(
+      strsplit(Sys.getenv("CEREBRO_VISIUM_DEMOS"), .Platform$path.sep)[[1L]],
+      normalizePath(file.path(root, paste0(visium, ".rds")), winslash = "/"),
       label = label
     )
     expect_identical(
-      prepared,
-      strsplit(sub("^--data=", "", run$options[[1L]]), ",")[[1L]],
+      nzchar(Sys.getenv("CEREBRO_1M_DEMO_CRB")),
+      "1m" %in% selected,
       label = label
     )
     expect_identical(launches, run$launches, label = label)
-    expect_false(viewer, label = label)
   }
 })
 
-test_that("run-demo keeps Builder and Viewer data sets to separate runs", {
-  expect_error(
-    run_demo("--data=1m,dlpfc"),
-    "separate runs"
+test_that("a Builder-built Visium App is kept as a Viewer data set", {
+  helper <- testthat::test_path(
+    "..",
+    "..",
+    "data-raw",
+    "large-demo",
+    "prepare_builder_visium_data.R"
   )
+  skip_if_not(file.exists(helper))
+  env <- new.env(parent = globalenv())
+  sys.source(helper, env)
+  app <- withr::local_tempdir()
+  dir.create(file.path(app, "private-data"))
+  dir.create(file.path(app, "spatial-assets"))
+  writeLines("crb", file.path(app, "private-data", "01-dlpfc-visium.crb"))
+  writeLines("png", file.path(app, "spatial-assets", "u1.png"))
+  bounds <- c(xmin = 0, xmax = 10, ymin = 0, ymax = 10)
+  saveRDS(
+    list(
+      crb_file_to_load = c(visium = "private-data/01-dlpfc-visium.crb"),
+      spatial_images = list(visium = list(
+        A = list(hires = list(path = "spatial-assets/u1.png", bounds = bounds))
+      )),
+      spatial_image_settings = list(visium = list(
+        A = list(hires = list(flip_y = TRUE))
+      )),
+      viewer_content = list(visium = list(display = list(spatial_layout = "grid"))),
+      point_size = c(visium = 5),
+      point_opacity = c(visium = 1)
+    ),
+    file.path(app, "cerebro_config.rds")
+  )
+  stage <- withr::local_tempdir()
+  env$.viewerVisiumKeepApp(app, stage, "Human DLPFC")
+  expect_setequal(
+    list.files(stage, recursive = TRUE),
+    c("01-dlpfc-visium.crb", "demo.rds", "pictures/u1.png")
+  )
+  demo <- readRDS(file.path(stage, "demo.rds"))
+  expect_identical(demo$label, "Human DLPFC")
+  expect_identical(demo$crb, "01-dlpfc-visium.crb")
+  expect_identical(demo$spatial_images$A$hires$path, "pictures/u1.png")
+  expect_identical(demo$spatial_images$A$hires$bounds, bounds)
+  expect_true(demo$spatial_image_settings$A$hires$flip_y)
+  expect_identical(demo$viewer_content$display$spatial_layout, "grid")
+  expect_identical(demo$point_size, 5)
 })
 
 test_that("Visium demo sections name complete, sized downloads", {

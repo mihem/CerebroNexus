@@ -50,9 +50,12 @@
   --data=dlpfc,mouse_brain,breast,prostate` downloads four public 10x Visium
   data sets with the H&E picture of every section (human DLPFC, 12 sections;
   mouse brain, 4; breast cancer, 2; prostate cancer and normal, 2), checks
-  each file's size and MD5, writes one SingleCellExperiment file per data set
-  and opens the Builder, which attaches every picture to its section. Sources
-  and licences are in `data-raw/large-demo/visium.ATTRIBUTION.md`.
+  each file's size and MD5, and writes one SingleCellExperiment file per data
+  set. The Builder's own build steps then turn each file into a CRB, every
+  section with its own picture and Spatial opening as the grid. The data sets
+  open in the same Viewer as the other large demos (`--data=1m,dlpfc` works),
+  and the file can still be imported in the Builder. Sources and licences are
+  in `data-raw/large-demo/visium.ATTRIBUTION.md`.
 
 # CerebroNexus 8.4.3
 

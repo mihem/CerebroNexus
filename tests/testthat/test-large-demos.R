@@ -188,6 +188,69 @@ test_that("the CosMx and T-cell demos and their compressed twins join the menu",
   )
 })
 
+test_that("the Builder-built Visium demos join the menu with their pictures", {
+  env <- new.env(parent = baseenv())
+  sys.source(viewer_test_path("million_cell_demo.R"), envir = env)
+  original <- list(
+    crb_file_to_load = c(Small = "small.crb"),
+    point_size = 5,
+    point_opacity = c(Small = 1),
+    percentage_cells_to_show = 100,
+    cerebro_root = withr::local_tempdir()
+  )
+  expect_identical(env$viewerAddVisiumDemos(original, ""), original)
+  root <- withr::local_tempdir()
+  demo <- function(name, label) {
+    dir.create(file.path(root, name, "pictures"), recursive = TRUE)
+    writeLines(name, file.path(root, name, "pictures", "a.png"))
+    file <- file.path(root, name, "demo.rds")
+    saveRDS(
+      list(
+        label = label,
+        crb = paste0(name, ".crb"),
+        spatial_images = list(
+          A = list(hires = list(path = "pictures/a.png", label = "hires"))
+        ),
+        spatial_image_settings = list(A = list(hires = list(flip_y = TRUE))),
+        viewer_content = list(display = list(spatial_layout = "grid")),
+        point_size = 4,
+        point_opacity = 0.8
+      ),
+      file
+    )
+    file
+  }
+  files <- c(demo("dlpfc", "Human DLPFC"), demo("breast", "Human breast"))
+  options <- env$viewerAddVisiumDemos(
+    original,
+    paste(files, collapse = .Platform$path.sep)
+  )
+  labels <- c("Human DLPFC", "Human breast")
+  expect_identical(names(options$crb_file_to_load), c("Small", labels))
+  expect_identical(
+    unname(options$crb_file_to_load[labels]),
+    file.path(dirname(normalizePath(files)), c("dlpfc.crb", "breast.crb"))
+  )
+  expect_identical(
+    options$point_size,
+    c(Small = 5, "Human DLPFC" = 4, "Human breast" = 4)
+  )
+  ## The picture is served from the Viewer's own spatial-assets folder.
+  picture <- options$spatial_images[["Human DLPFC"]]$A$hires$path
+  expect_identical(picture, "spatial-assets/demo-visium/dlpfc/a.png")
+  expect_identical(
+    readLines(file.path(original$cerebro_root, picture)),
+    "dlpfc"
+  )
+  expect_true(
+    options$spatial_image_settings[["Human breast"]]$A$hires$flip_y
+  )
+  expect_identical(
+    options$viewer_content[["Human DLPFC"]]$display$spatial_layout,
+    "grid"
+  )
+})
+
 test_that("a preparation keeps the previous data set until a new one is complete", {
   for (demo in c("CosMx", "Tcell")) {
     env <- large_demo_env(sprintf("prepare_viewer_%s_data.R", tolower(demo)))

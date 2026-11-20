@@ -664,3 +664,188 @@ prepareBuilderVisiumDemoData <- function(id, cache_dir = NULL) {
   .demoPublishStage(stage, dirname(paths$rds), paths$root, paste("Visium", id))
   paths$rds
 }
+
+## ---- The Viewer data set, built by the Builder ------------------------------
+
+## The Builder's build of a data set: bumped when what it writes changes.
+.viewerVisiumVersion <- 1L
+
+.viewerVisiumPaths <- function(id, cache_dir = NULL) {
+  root <- .builderVisiumPaths(id, cache_dir)$root
+  built <- file.path(
+    root,
+    paste0("viewer-v", .builderVisiumVersion, ".", .viewerVisiumVersion)
+  )
+  list(
+    root = root,
+    built = built,
+    demo = file.path(built, "demo.rds"),
+    stamp = file.path(built, "demo-version")
+  )
+}
+
+## The Builder's server code without its pages, as its end-to-end tests load
+## it (tests/testthat/helper-builder-end-to-end.R), so the demo is built by the
+## same steps as a click on Build.
+.viewerVisiumBuilderRuntime <- function(repo_root) {
+  .demoRequire(c("testthat", "withr"), "the Builder run of the Visium demos")
+  helpers <- new.env(parent = asNamespace("CerebroNexus"))
+  for (file in list.files(
+    file.path(repo_root, "tests", "testthat"),
+    "^helper-.*[.]R$",
+    full.names = TRUE
+  )) {
+    sys.source(file, envir = helpers)
+  }
+  runtime <- new.env(parent = helpers)
+  withr::with_dir(repo_root, helpers$builder_e2e_source_runtime(runtime))
+  runtime
+}
+
+## What the Builder does when the file is imported and built: inspect it, take
+## its default settings and the pictures it brought, tick the data set's groups
+## besides the ones the Builder preselects, open Spatial as the grid and build
+## the CRB and its Viewer App into `work`. Returns the App's directory.
+.viewerVisiumBuildApp <- function(runtime, rds, name, ticked, work) {
+  build <- function() {
+    inspected <- builder_adapter_inspect(builder_seurat_file_adapter(rds))
+    profile <- inspected$legacy_profile
+    settings <- builder_default_settings(
+      profile,
+      name,
+      dataset_profile = inspected$profile
+    )
+    metadata <- builder_recommend_metadata(inspected$profile)
+    settings$recommendations <- list(metadata = metadata)
+    groups <- intersect(
+      unique(c(ticked, profile$group_preselect)),
+      profile$group_candidates
+    )
+    settings$metadata_policy <- builder_e2e_review_metadata_policy(
+      metadata,
+      groups
+    )
+    settings$groups <- groups
+    settings$included_groups <- groups
+    settings$default_group <- groups[[1L]]
+    settings$expression_backend <- "embedded"
+    settings$viewer_display$spatial_layout <- "grid"
+    settings$images <- utils::modifyList(
+      settings$images %||% list(),
+      builder_source_image_settings(
+        inspected$source_images,
+        file.path(work, "source-images")
+      )
+    )
+    snapshot <- builder_snapshot_seurat(
+      inspected$object,
+      file.path(work, "snapshot"),
+      available_bytes = 2^40
+    )
+    entry <- list(
+      id = "visium",
+      source_id = "visium",
+      output_id = "visium",
+      path = rds,
+      filename = basename(rds),
+      source_origin = "upload",
+      format = inspected$format,
+      profile = profile,
+      dataset_profile = inspected$profile,
+      snapshot = snapshot,
+      revision = 1L,
+      levels = inspected$levels %||% list(),
+      settings = settings
+    )
+    plan <- builder_freeze_plan(
+      list(entry),
+      file.path(work, "release"),
+      make_app = TRUE
+    )
+    if (!is.null(plan$error)) {
+      stop(paste(unlist(plan$error), collapse = " "), call. = FALSE)
+    }
+    stage <- file.path(work, "stage")
+    dir.create(stage)
+    result <- builder_execute_plan(plan, stage, list(visium = snapshot))
+    if (!identical(result$state, "success")) {
+      stop(result$error %||% "The Builder could not build it.", call. = FALSE)
+    }
+    file.path(stage, "cerebro_app")
+  }
+  ## The Builder's functions, then this call's arguments.
+  environment(build) <- list2env(
+    list(rds = rds, name = name, ticked = ticked, work = work),
+    parent = runtime
+  )
+  build()
+}
+
+## The Builder's Viewer App reduced to what the source Viewer needs: the CRB,
+## the section pictures and, in demo.rds, the label, the picture and display
+## settings the Builder chose (paths relative to the demo.rds directory).
+.viewerVisiumKeepApp <- function(app, stage, label) {
+  config <- readRDS(file.path(app, "cerebro_config.rds"))
+  crb <- config$crb_file_to_load[[1L]]
+  private <- list.files(file.path(app, dirname(crb)), full.names = TRUE)
+  stopifnot(file.copy(private, stage))
+  dir.create(file.path(stage, "pictures"))
+  images <- lapply(config$spatial_images[[1L]], function(section) {
+    lapply(section, function(image) {
+      stopifnot(file.copy(
+        file.path(app, image$path),
+        file.path(stage, "pictures")
+      ))
+      image$path <- file.path("pictures", basename(image$path))
+      image
+    })
+  })
+  first <- function(value) if (length(value)) unname(value[[1L]])
+  saveRDS(
+    list(
+      label = label,
+      crb = basename(crb),
+      spatial_images = images,
+      spatial_image_settings = config$spatial_image_settings[[1L]],
+      viewer_content = config$viewer_content[[1L]],
+      point_size = first(config$point_size),
+      point_opacity = first(config$point_opacity)
+    ),
+    file.path(stage, "demo.rds")
+  )
+}
+
+## A Visium demo as a Viewer data set: the Builder input file
+## (prepareBuilderVisiumDemoData()) built by the Builder's own steps. Returns
+## the path of its demo.rds, which viewerAddVisiumDemos() reads
+## (inst/viewer/million_cell_demo.R).
+prepareViewerVisiumDemoData <- function(id, repo_root, cache_dir = NULL) {
+  rds <- prepareBuilderVisiumDemoData(id, cache_dir)
+  paths <- .viewerVisiumPaths(id, cache_dir)
+  version <- paste(.builderVisiumVersion, .viewerVisiumVersion, sep = ".")
+  if (
+    file.exists(paths$demo) &&
+      file.exists(paths$stamp) &&
+      identical(readLines(paths$stamp, warn = FALSE), version)
+  ) {
+    return(paths$demo)
+  }
+  spec <- .builderVisiumDatasets()[[id]]
+  message("Building ", spec$label, " (", id, ") with the Builder")
+  work <- tempfile("builder-", paths$root)
+  stage <- tempfile("viewer-visium-", paths$root)
+  dir.create(work)
+  dir.create(stage)
+  on.exit(unlink(c(work, stage), recursive = TRUE), add = TRUE)
+  app <- .viewerVisiumBuildApp(
+    .viewerVisiumBuilderRuntime(repo_root),
+    normalizePath(rds, winslash = "/"),
+    id,
+    spec$groups,
+    work
+  )
+  .viewerVisiumKeepApp(app, stage, spec$label)
+  writeLines(version, file.path(stage, "demo-version"))
+  .demoPublishStage(stage, paths$built, paths$root, paste("Visium", id))
+  paths$demo
+}
