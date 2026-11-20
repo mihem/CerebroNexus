@@ -15,7 +15,7 @@ run with shiny::runApp(result_dir)."><meta property="og:image" content="https://
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -207,7 +207,10 @@ directory is rejected before any files are written.</p></dd>
 
 <dt id="arg-show-upload-ui">show_upload_ui<a class="anchor" aria-label="anchor" href="#arg-show-upload-ui"></a></dt>
 <dd><p>One non-missing logical controlling whether users may
-upload their own data; defaults to <code>FALSE</code>.</p></dd>
+upload their own data sets and session-only HLA typing; defaults to
+<code>FALSE</code>. When <code>FALSE</code>, both upload handlers reject uploads and
+their controls are hidden. Stored HLA analyses and view-configuration JSON
+imports remain available.</p></dd>
 
 
 <dt id="arg-welcome-message">welcome_message<a class="anchor" aria-label="anchor" href="#arg-welcome-message"></a></dt>
@@ -442,7 +445,7 @@ while the build is running; the target build lock does not protect inputs.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> ========================================</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Shiny app successfully created!</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> ========================================</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> App directory: /tmp/nix-shell-4527-980447843/RtmpGlheD1/my_app</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> App directory: /tmp/nix-shell-4496-1091596191/Rtmpn1GkJd/my_app</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Data file(s):</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   - PBMC example : example.crb</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Port: 8080</span>
@@ -450,7 +453,7 @@ while the build is running; the target build lock does not protect inputs.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Launch browser: TRUE</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> To launch the app, run:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   shiny::runApp('/tmp/nix-shell-4527-980447843/RtmpGlheD1/my_app')</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   shiny::runApp('/tmp/nix-shell-4496-1091596191/Rtmpn1GkJd/my_app')</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> ========================================</span>
 <span class="r-in"><span><span class="co"># Run with shiny::runApp(app_dir) or deploy the directory to Shiny Server.</span></span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>

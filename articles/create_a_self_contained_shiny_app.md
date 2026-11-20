@@ -96,7 +96,7 @@ real service account, then start the service normally. See
 | `colors` | optional `dataset -> variable -> named level colours` list |
 | `cerebro_options` | extra entries merged into `Cerebro.options` |
 | `crb_pick_smallest_file` | forwarded into `Cerebro.options` |
-| `show_upload_ui` | allow users to upload their own data; defaults to `FALSE` for generated apps |
+| `show_upload_ui` | allow dataset and session-only HLA typing uploads; defaults to `FALSE` for generated apps |
 | `initial_page` | stable Viewer page ID used once when the first dataset loads; Data info by default |
 | `point_size`, `point_opacity`, `percentage_cells_to_show` | scalar or named per-dataset scatter defaults |
 | `variable_to_compare` | forwarded into `Cerebro.options` |
@@ -106,7 +106,10 @@ When `show_upload_ui = FALSE`, the generated Viewer limits the effective
 request size to the smaller of `max_request_size` and 6 MiB. This keeps
 a closed deployment from accepting large request bodies even though no
 upload control is displayed. Open Viewers use the supplied
-`max_request_size`.
+`max_request_size`. Closed mode also rejects HLA typing uploads
+server-side and hides the HLA override controls. Stored HLA typing, its
+analyses and downloads, and view-configuration JSON imports remain
+available.
 
 ## Bundling multiple datasets (available since 2.0.0)
 

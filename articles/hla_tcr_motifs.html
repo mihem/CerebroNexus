@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -102,7 +102,7 @@
                         <h4 data-toc-skip class="author">Xuesong
 Wang</h4>
             
-            <h4 data-toc-skip class="date">16 November, 2026</h4>
+            <h4 data-toc-skip class="date">20 November, 2026</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/articles/hla_tcr_motifs.Rmd" class="external-link"><code>vignettes/articles/hla_tcr_motifs.Rmd</code></a></small>
       <div class="d-none name"><code>hla_tcr_motifs.Rmd</code></div>
@@ -649,11 +649,17 @@ stored HLA typing.</div>
 </div>
 <p>This tab shows what the app actually parsed: how many alleles each
 donor has, the normalized long typing table, and the sample →
-analysis-unit mapping. You can also <strong>upload your own</strong> HLA
-typing here (CSV or TSV, long or wide) to override the stored genotypes
-for the session — handy when a <code>.crb</code> shipped without typing.
-Uploads never modify the <code>.crb</code>, and “Download CSV template”
-gives you the exact expected shape.</p>
+analysis-unit mapping. In <strong>open mode</strong>, you can also
+<strong>upload your own</strong> HLA typing here (CSV or TSV, long or
+wide) to override the stored genotypes for the session — handy when a
+<code>.crb</code> shipped without typing. Uploads never modify the
+<code>.crb</code>, and “Download CSV template” gives you the exact
+expected shape. In <strong>closed mode</strong>
+(<code>launchCerebro(mode = "closed")</code> or
+<code>createShinyApp(show_upload_ui = FALSE)</code>), HLA uploads are
+rejected server-side and override controls are hidden. Coverage, QC,
+downloads and analyses of the stored typing remain available, as do
+view-configuration JSON imports.</p>
 </div>
 </div>
 <div class="section level2">
@@ -864,8 +870,8 @@ or wrap a shareable bundle with <code><a href="../reference/createShinyApp.html"
 carries a TRA/TRB chain; HLA typing is optional.</p>
 <div style="border-left: 4px solid #2b7bb9; background: #eef5fb; padding: 0.6em 1em; margin: 1em 0;">
 <p><strong>No genotypes yet?</strong> Ship the <code>.crb</code> with
-just the receptors. The page still draws the motif network, and a
-collaborator can upload an HLA CSV/TSV in the <strong>Data &amp;
+just the receptors. The page still draws the motif network, and in open
+mode a collaborator can upload an HLA CSV/TSV in the <strong>Data &amp;
 QC</strong> tab for their session — no rebuild, and the
 <code>.crb</code> is never modified.</p>
 </div>
@@ -883,9 +889,10 @@ cells.</p>
 <p><strong>Can I use my own HLA genotypes?</strong> Yes.
 <code>addHLATyping()</code> (or <code>object@misc$hla_typing</code>)
 accepts a wide table (<code>sample</code> + <code>HLA-*_1/_2</code>), a
-canonical long table, or a named list. You can also upload a CSV/TSV in
-the <strong>Data &amp; QC</strong> tab to override the stored typing for
-one session.</p>
+canonical long table, or a named list. In open mode, you can also upload
+a CSV/TSV in the <strong>Data &amp; QC</strong> tab to override the
+stored typing for one session. For a closed deployment, add the typing
+before exporting the <code>.crb</code>.</p>
 <p><strong>I have TRA, not TRB.</strong> Set <strong>Chain</strong> to
 TRA in the parameter column; the page offers whichever chains it detects
 in the data.</p>

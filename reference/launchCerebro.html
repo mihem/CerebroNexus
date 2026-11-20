@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -102,10 +102,11 @@
 
 
 <dl><dt id="arg-mode">mode<a class="anchor" aria-label="anchor" href="#arg-mode"></a></dt>
-<dd><p>Cerebro can be ran in <code>open</code> or <code>closed</code> mode, allowing
-the user to load their own data set (<code>open</code>) or only show a pre-loaded
-data set (<code>closed</code>, removes the "Load data" element); defaults to
-<code>open</code>.</p></dd>
+<dd><p>Cerebro can run in <code>open</code> or <code>closed</code> mode. Open mode
+allows users to load their own data sets and session-only HLA typing.
+Closed mode shows only pre-loaded data sets and their stored HLA typing;
+dataset and HLA upload controls are hidden and their handlers reject uploads.
+View-configuration JSON imports remain available. Defaults to <code>open</code>.</p></dd>
 
 
 <dt id="arg-maxfilesize">maxFileSize<a class="anchor" aria-label="anchor" href="#arg-maxfilesize"></a></dt>

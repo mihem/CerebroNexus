@@ -22,9 +22,11 @@ launchCerebro(
 
 - mode:
 
-  Cerebro can be ran in `open` or `closed` mode, allowing the user to
-  load their own data set (`open`) or only show a pre-loaded data set
-  (`closed`, removes the "Load data" element); defaults to `open`.
+  Cerebro can run in `open` or `closed` mode. Open mode allows users to
+  load their own data sets and session-only HLA typing. Closed mode
+  shows only pre-loaded data sets and their stored HLA typing; dataset
+  and HLA upload controls are hidden and their handlers reject uploads.
+  View-configuration JSON imports remain available. Defaults to `open`.
 
 - maxFileSize:
 

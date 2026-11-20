@@ -120,7 +120,10 @@ createShinyApp(
 - show_upload_ui:
 
   One non-missing logical controlling whether users may upload their own
-  data; defaults to `FALSE`.
+  data sets and session-only HLA typing; defaults to `FALSE`. When
+  `FALSE`, both upload handlers reject uploads and their controls are
+  hidden. Stored HLA analyses and view-configuration JSON imports remain
+  available.
 
 - welcome_message:
 
@@ -352,7 +355,7 @@ app_dir <- createShinyApp(
 #> ========================================
 #> Shiny app successfully created!
 #> ========================================
-#> App directory: /tmp/nix-shell-4527-980447843/RtmpGlheD1/my_app
+#> App directory: /tmp/nix-shell-4496-1091596191/Rtmpn1GkJd/my_app
 #> Data file(s):
 #>   - PBMC example : example.crb
 #> Port: 8080
@@ -360,7 +363,7 @@ app_dir <- createShinyApp(
 #> Launch browser: TRUE
 #> 
 #> To launch the app, run:
-#>   shiny::runApp('/tmp/nix-shell-4527-980447843/RtmpGlheD1/my_app')
+#>   shiny::runApp('/tmp/nix-shell-4496-1091596191/Rtmpn1GkJd/my_app')
 #> ========================================
 # Run with shiny::runApp(app_dir) or deploy the directory to Shiny Server.
 # }

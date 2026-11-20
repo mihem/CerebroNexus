@@ -1,5 +1,16 @@
 # Changelog
 
+## CerebroNexus 8.4.1
+
+- **Closed Viewers also block HLA typing uploads.** The Data & QC tab
+  hides session-override controls, and the server rejects HLA uploads
+  and clear-override events unless the Viewer is explicitly in open
+  mode. Stored HLA typing, analyses and downloads remain available, as
+  do view-configuration JSON imports. Coverage uses the full row in
+  closed mode, without an empty upload panel. When stored typing is
+  absent, closed-mode messages explain the limitation without suggesting
+  an unavailable upload.
+
 ## CerebroNexus 8.4.0
 
 - **The Projection is prepared while Data info is read.** Data info

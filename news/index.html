@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -77,6 +77,11 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="8.4.1" id="cerebronexus-841">CerebroNexus 8.4.1<a class="anchor" aria-label="anchor" href="#cerebronexus-841"></a></h2>
+<ul><li>
+<strong>Closed Viewers also block HLA typing uploads.</strong> The Data &amp; QC tab hides session-override controls, and the server rejects HLA uploads and clear-override events unless the Viewer is explicitly in open mode. Stored HLA typing, analyses and downloads remain available, as do view-configuration JSON imports. Coverage uses the full row in closed mode, without an empty upload panel. When stored typing is absent, closed-mode messages explain the limitation without suggesting an unavailable upload.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="8.4.0" id="cerebronexus-840">CerebroNexus 8.4.0<a class="anchor" aria-label="anchor" href="#cerebronexus-840"></a></h2>
 <ul><li><p><strong>The Projection is prepared while Data info is read.</strong> Data info stays the start page, and a click on Projection no longer waits for the session to build the plot: as soon as the data set is read and Data info sent, the session sends the Projection’s first frame, which the browser keeps and draws when the page is first shown. The browser has also fetched the Viewer Pack files of the plot’s preview by then, and draws that preview at once if the click comes before the frame. With 1.3 million cells (WSL, software WebGL, medians of 5), a click 10 s after Data info appeared shows the plot in 0.49 s (8.3.5: 0.74 s), and a click before the data set is read shows the preview after 0.08 s. <code>initial_page</code> in <code><a href="../reference/createShinyApp.html">createShinyApp()</a></code> still chooses another start page (<code>"projection"</code> opens on the plot, with its preview while the session starts).</p></li>
