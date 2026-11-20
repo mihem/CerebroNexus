@@ -2960,6 +2960,8 @@
     if (!source) return '';
     if (typeof source === 'string') return source;
     var sp = source.spaceId && spaceById[source.spaceId];
+    // A Spatial grid panel is named by its section.
+    if (sp && sp._gridSection != null) return sp._gridSection;
     return (sp && sp.label) || source.spaceId || '';
   }
   // `options.keepPending`: a change the data or the controls make (a filter, a
@@ -4386,11 +4388,14 @@
         client_summary: clientSummary,
         client_table: clientTable,
         client_expression: clientExpression,
+        source: selectionSource || null,
         dataset_context: activeView && activeView.dataset_context
       } : {
         x: pendingStableSelection || !arr ? [] : x,
         y: pendingStableSelection || !arr ? [] : y,
         ids: pendingStableSelection || !arr ? [] : arr,
+        // The panel the cells were selected in (a Spatial grid's section).
+        source: selectionSource || null,
         dataset_context: activeView && activeView.dataset_context
       });
       if (eventKind === 'primary' && renderKey != null) {
@@ -7824,9 +7829,11 @@
   // Columns) fixes the columns. `aspect` is one width/height for every panel
   // or one per panel (Linked views); a row is as tall as its tallest drawing
   // needs. `fill` (Linked views) gives every row the same share of the
-  // window's height, so the panels end at its bottom edge.
+  // window's height, so the panels end at its bottom edge. `square` (Panel
+  // shape: Square) makes every panel a square; `aspect` is then still the
+  // shape of what is drawn in it, so the columns that draw the most win.
   var GRID_MIN_DRAWN = 120;
-  function sectionGridPacking(k, availW, availH, chromeX, chromeY, gap, aspect, fixedCols, fill, minSide) {
+  function sectionGridPacking(k, availW, availH, chromeX, chromeY, gap, aspect, fixedCols, fill, minSide, square) {
     // The smallest panel side that still reads; Linked views keeps its own floor.
     var floor = minSide || GRID_MIN_DRAWN;
     var aspectAt = function (i) {
@@ -7841,8 +7848,10 @@
     var layout = function (counts, uniformWidth) {
       var start = 0;
       var rows = counts.map(function (count) {
-        var width = uniformWidth || widthOf(count), cap = 0;
-        for (var i = start; i < start + count; i++) cap = Math.max(cap, width / aspectAt(i));
+        var width = uniformWidth || widthOf(count), cap = square ? width : 0;
+        if (!square) {
+          for (var i = start; i < start + count; i++) cap = Math.max(cap, width / aspectAt(i));
+        }
         var row = { count: count, width: width, cap: cap, start: start, height: 0 };
         start += count;
         return row;
@@ -7855,6 +7864,7 @@
       var area = 0, smallest = Infinity;
       rows.forEach(function (row) {
         row.height = Math.floor(height);
+        if (square) row.width = row.height = Math.min(row.width, row.height);
         for (var i = row.start; i < row.start + row.count; i++) {
           var a = aspectAt(i);
           var drawnW = Math.min(row.width, row.height * a), drawnH = Math.min(row.height, row.width / a);
@@ -7882,7 +7892,7 @@
       var width = widthOf(cols);
       return finish({ rows: counts.map(function (count) {
         return { count: count, width: width,
-          height: Math.max(floor, Math.round(width / aspectAt(0))) };
+          height: square ? width : Math.max(floor, Math.round(width / aspectAt(0))) };
       }) });
     };
     if (fixedCols) {
@@ -8005,9 +8015,9 @@
     // fill the window by rows (sectionGridPacking()).
     var gridPack = !focusPanel && k > 1 && (sectionGridActive() || !singleActive)
       ? sectionGridPacking(k, usableW, Math.max(1, availH), chromeX, overhead, gap,
-        keepPlotsSquare ? 1 : (sectionGridActive() ? sectionGridAspect() : panelsAspect(vis)),
+        sectionGridActive() ? sectionGridAspect() : panelsAspect(vis),
         gridColumnsChoice(k), !sectionGridActive(),
-        sectionGridActive() ? null : MIN_SIDE_HARD)
+        sectionGridActive() ? null : MIN_SIDE_HARD, keepPlotsSquare)
       : null;
     if (gridPack) cols = gridPack.cols;
     var single = cols === 1;
