@@ -7773,6 +7773,22 @@
     }).filter(Boolean).sort(function (a, b) { return a - b; });
     return ratios.length ? Math.max(0.25, Math.min(4, ratios[Math.floor(ratios.length / 2)])) : 1;
   }
+  // The shape of the shown spatial panels of Linked views (the median of
+  // their extents); embeddings take any shape, so without a section 1.
+  function panelsAspect(vis) {
+    var ratios = vis.map(function (p) {
+      var space = spaceById[p.spaceId];
+      if (!isSpatialSpace(space)) return null;
+      var xr = space.xRange, yr = space.yRange;
+      if (xr && yr) {
+        var w = Math.abs(Number(xr[1]) - Number(xr[0])), h = Math.abs(Number(yr[1]) - Number(yr[0]));
+        if (w > 0 && h > 0) return w / h;
+      }
+      var unit = space._unit;
+      return unit && unit.aspect > 0 && isFinite(unit.aspect) ? unit.aspect : null;
+    }).filter(Boolean).sort(function (a, b) { return a - b; });
+    return ratios.length ? Math.max(0.25, Math.min(4, ratios[Math.floor(ratios.length / 2)])) : 1;
+  }
   // Panels of a Spatial grid are as tall as their sections are wide for
   // their width, and the rows fill the window: the panels of a row share its
   // width (rows with fewer panels get wider ones, so 5 sections are 3 + 2,
@@ -7936,9 +7952,12 @@
     var cols = focusPanel
       ? Math.max(1, Math.min(k + 1, availableCols))
       : Math.max(1, Math.min(overview ? overview.cols : 1, availableCols));
-    var gridPack = sectionGridActive() && !focusPanel
+    // Several panels without a primary one (the Spatial grid, Linked views)
+    // fill the window by rows (sectionGridPacking()).
+    var gridPack = !focusPanel && k > 1 && (sectionGridActive() || !singleActive)
       ? sectionGridPacking(k, usableW, Math.max(1, availH), chromeX, overhead, gap,
-        keepPlotsSquare ? 1 : sectionGridAspect(), gridColumnsChoice(k))
+        keepPlotsSquare ? 1 : (sectionGridActive() ? sectionGridAspect() : panelsAspect(vis)),
+        gridColumnsChoice(k))
       : null;
     if (gridPack) cols = gridPack.cols;
     var single = cols === 1;

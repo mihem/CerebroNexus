@@ -3630,3 +3630,38 @@ body section.content { padding-top: 0 !important; }
 /* A grid panel's title shows only its section (cell_views.js). */
 .cv-ptitle.cv-ptitle-link { cursor: pointer; }
 .cv-ptitle.cv-ptitle-link:hover { color: var(--c-amber-700); text-decoration: underline; }
+
+/* Linked views: the same field rules. Its filters and actions rows pass
+   their controls into the bar's one flow; the switches sit on the field
+   baseline and Share/Settings end the last row. */
+body .coordviews-page .cv-topbar .cv-filters,
+body .coordviews-page .cv-topbar .cv-actions-row {
+  display: contents;
+}
+body .coordviews-page .cv-topbar .cv-ctl {
+  flex: 0 1 auto !important;
+  width: max-content !important;
+  min-width: min(var(--c-field-min), 100%) !important;
+  max-width: 100% !important;
+  margin: 0;
+}
+body .coordviews-page .cv-topbar .cv-multiselect-ctl {
+  min-width: min(var(--c-multi-min), 100%) !important;
+}
+body .coordviews-page .cv-topbar .cv-ctl > .selectize-control,
+body .coordviews-page .cv-topbar .cv-ctl > select { width: 100% !important; }
+body .coordviews-page .cv-topbar .selectize-control.single .selectize-input {
+  padding-right: 32px !important;
+}
+body .coordviews-page .cv-topbar .cv-linked-hover {
+  flex: 0 0 auto;
+  align-self: flex-end;
+  display: flex;
+  align-items: center;
+  height: var(--c-toolbar-control-height);
+}
+body .coordviews-page .cv-topbar .cerebro-toolbar-actions {
+  margin-left: auto;
+  order: 98;
+  align-self: flex-end;
+}
