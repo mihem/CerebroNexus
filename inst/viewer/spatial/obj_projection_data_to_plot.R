@@ -80,9 +80,11 @@ spatial_projection_full_ranges <- reactive({
 })
 
 spatial_projection_group_hulls <- reactive({
+  ## A grid draws no region outlines: they belong to one section's plane.
   if (
     !isTRUE(spatial_projection_region_outlines()) ||
-      !identical(input[["spatial_projection_plot_type"]], "ImageDimPlot")
+      !identical(input[["spatial_projection_plot_type"]], "ImageDimPlot") ||
+      length(spatial_projection_controls()$grid_sections)
   ) {
     return(list())
   }
@@ -124,6 +126,74 @@ spatial_projection_group_hulls <- reactive({
   )
 })
 
+## The data of a grid frame (func_spatial_helpers.R): the cells of every section
+## of the sample, coloured as one frame so that all panels share one colour
+## scale, and the slice, extent and image of each section's panel. It is the
+## same shape as a single-section frame without a geometry resource.
+spatial_projection_grid_data <- function(
+  dataset_context,
+  plot_parameters,
+  cells_to_extract
+) {
+  dataset <- dataset_context$dataset_key
+  options <- if (exists("Cerebro.options")) Cerebro.options else NULL
+  layout <- spatial_grid_coordinates(
+    cells_to_extract,
+    viewerSpatialCoordinates,
+    spatial_grid_section_index,
+    function(section) spatialPlotRotation(options, dataset, section)
+  )
+  cells <- c(cells_to_extract)
+  metadata <- spatial_projection_metadata()
+  if (
+    identical(plot_parameters$plot_type, "ImageFeaturePlot") &&
+      !is.null(plot_parameters$feature_to_display)
+  ) {
+    gene <- plot_parameters$feature_to_display
+    expression <- if (gene %in% getGeneNames()) {
+      viewerExpressionRow(data_set(), cells, gene)
+    }
+    req(!is.null(expression))
+    metadata[[gene]] <- expression
+  }
+  color_variable <- plot_parameters[["color_variable"]]
+  numeric_color <- is.numeric(metadata[[color_variable]])
+  ## One assignment over every section: a group has the same colour in each.
+  color_assignments <- if (numeric_color) {
+    NULL
+  } else {
+    assignColorsToGroups(metadata, color_variable)
+  }
+  plot_parameters[["grid"]] <- layout[setdiff(names(layout), "coordinates")]
+  ## The embedding panel draws the same cells, in frame order.
+  projection_name <- plot_parameters[["grid_projection"]] %||% ""
+  if (nzchar(projection_name)) {
+    embedding <- getProjection(projection_name)
+    req(is.data.frame(embedding) || is.matrix(embedding))
+    plot_parameters[["grid"]][["projection"]] <- list(
+      label = projection_name,
+      x = as.numeric(embedding[cells, 1L]),
+      y = as.numeric(embedding[cells, 2L])
+    )
+  }
+  plot_parameters[["x_range"]] <- spatial_grid_range(layout$coordinates$x)
+  plot_parameters[["y_range"]] <- spatial_grid_range(layout$coordinates$y)
+  list(
+    dataset_context = dataset_context,
+    cells_df = metadata,
+    coordinates = layout$coordinates,
+    reset_axes = FALSE,
+    plot_parameters = plot_parameters,
+    color_assignments = color_assignments,
+    group_hulls = list(),
+    geometry_resource = NULL,
+    categorical_resource = NULL,
+    resource_first = FALSE,
+    cell_count = length(cells),
+    cell_indices = cells
+  )
+}
+
 spatial_projection_data_to_plot_raw <- reactive({
   dataset_context <- viewer_loaded_dataset_context()
   req(
@@ -132,6 +202,13 @@ spatial_projection_data_to_plot_raw <- reactive({
   )
   plot_parameters <- spatial_projection_parameters_plot()
   cells_to_extract <- spatial_projection_cells_to_show()
+  if (identical(plot_parameters[["layout"]], "grid")) {
+    return(spatial_projection_grid_data(
+      dataset_context,
+      plot_parameters,
+      cells_to_extract
+    ))
+  }
 
   ## Resolve the canonical geometry contract before materializing the displayed
   ## metadata and coordinates. The common full, unrotated ImageDimPlot frame can

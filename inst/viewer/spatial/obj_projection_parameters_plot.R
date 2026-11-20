@@ -115,8 +115,30 @@ observe(
         value[[1L]]
       }
     }
+    ## The grid shows every section of the data set, whatever their samples;
+    ## which of them and in what order is the browser's choice (cell_views.js),
+    ## so it is not a control.
+    layout <- input[["spatial_projection_layout"]] %||% "single"
+    grid_sections <- if (
+      spatial_grid_active(layout, spatial_names, plot_type[[1L]])
+    ) {
+      as.character(spatial_names)
+    } else {
+      character()
+    }
+    ## An embedding beside the sections, drawn from the same frame.
+    grid_projection <- input[["spatial_projection_grid_projection"]] %||% ""
+    if (
+      !length(grid_sections) ||
+        !isTRUE(grid_projection %in% availableProjections())
+    ) {
+      grid_projection <- ""
+    }
     controls <- list(
       projection = as.character(projection[[1L]]),
+      layout = if (length(grid_sections)) "grid" else "single",
+      grid_sections = grid_sections,
+      grid_projection = as.character(grid_projection[[1L]]),
       plot_type = as.character(plot_type[[1L]]),
       color_variable = as.character(color_variable[[1L]]),
       split_by = as.character(
@@ -276,6 +298,8 @@ spatial_projection_parameters_plot_current <- reactive({
   color_variable <- NULL
   feature_to_display <- NULL
   split_by <- ""
+  grid_sections <- controls$grid_sections %||% character()
+  grid <- length(grid_sections) > 0L
 
   if (plot_type == "ImageDimPlot") {
     color_variable <- controls$color_variable
@@ -283,9 +307,11 @@ spatial_projection_parameters_plot_current <- reactive({
       color_variable,
       color_variable %in% colnames(viewerProjectionFirstFrameMetadata())
     )
-    ## "__none__" (or a column this data set lacks) is no split.
+    ## "__none__" (or a column this data set lacks) is no split. The grid
+    ## already gives each section its own panel.
     if (
-      length(controls$split_by) == 1L &&
+      !grid &&
+        length(controls$split_by) == 1L &&
         controls$split_by %in% colnames(viewerProjectionFirstFrameMetadata())
     ) {
       split_by <- controls$split_by
@@ -341,6 +367,10 @@ spatial_projection_parameters_plot_current <- reactive({
   roi_modes <- c("__all__", if (length(roi_values) > 1L) "__separate__")
   if (!selected_roi %in% c(roi_modes, roi_values)) {
     selected_roi <- spatial_default_roi_selection(roi_values)
+  }
+  ## A grid panel is a whole section; the ROI control belongs to one section.
+  if (grid) {
+    selected_roi <- "__all__"
   }
   roi_value <- spatial_roi_value(selected_roi)
   separate_roi_values <- character()
@@ -481,6 +511,29 @@ spatial_projection_parameters_plot_current <- reactive({
       configured_background_images
     )
   }
+  ## Each grid panel shows the first image of its own section, and a section
+  ## without one shows none. The frame itself carries no image.
+  grid_backgrounds <- list()
+  if (grid) {
+    options <- if (exists("Cerebro.options")) Cerebro.options else NULL
+    grid_backgrounds <- stats::setNames(
+      lapply(grid_sections, function(section) {
+        spatial_grid_section_background(
+          options,
+          dataset,
+          section,
+          tryCatch(getSpatialData(section), error = function(error) NULL)
+        )
+      }),
+      grid_sections
+    )
+    grid_backgrounds <- grid_backgrounds[
+      !vapply(grid_backgrounds, is.null, logical(1))
+    ]
+    background_image <- "none"
+    background_descriptor <- NULL
+    configured_background_images <- list()
+  }
   background_identity <- spatial_background_identity(
     dataset,
     spatial_name,
@@ -499,6 +552,10 @@ spatial_projection_parameters_plot_current <- reactive({
 
   parameters <- list(
     projection = controls$projection,
+    layout = if (grid) "grid" else "single",
+    grid_sections = grid_sections,
+    grid_projection = controls$grid_projection %||% "",
+    grid_backgrounds = grid_backgrounds,
     n_dimensions = n_dimensions,
     color_variable = color_variable,
     plot_type = plot_type,

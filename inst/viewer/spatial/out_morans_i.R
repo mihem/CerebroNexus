@@ -15,6 +15,8 @@ output[["spatial_projection_morans_i"]] <- renderText({
   req(identical(input[["spatial_projection_plot_type"]], "ImageFeaturePlot"))
   plot_parameters <- spatial_projection_parameters_plot()
   req(identical(plot_parameters[["plot_type"]], "ImageFeaturePlot"))
+  ## Moran's I is a statistic of one section's plane, not of a grid.
+  req(!identical(plot_parameters[["layout"]], "grid"))
   gene <- plot_parameters[["feature_to_display"]]
   req(gene, gene %in% getGeneNames())
 

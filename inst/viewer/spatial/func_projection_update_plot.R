@@ -369,8 +369,53 @@ spatial_projection_update_plot <- function(input) {
     payload[["data"]] <- attach_geometry_resource(payload[["data"]])
   }
 
+  ## A grid: one panel per section over its slice of this frame. The frame's
+  ## single colour vector and range serve every panel.
+  grid <- plot_parameters[["grid"]]
+  if (is.list(grid)) {
+    grid$coordinates <- coordinates
+    payload$data$panels <- c(
+      spatial_grid_projection_panel(grid$projection),
+      spatial_grid_panels(
+        grid,
+        plot_parameters[["grid_backgrounds"]] %||% list(),
+        if (exists("Cerebro.options")) {
+          Cerebro.options[["cerebro_root"]]
+        } else {
+          NULL
+        }
+      )
+    )
+    ## Slices index the frame's rows, so x, y and keys are flat in frame order
+    ## (a small categorical payload nests them by group).
+    payload$data$x <- as.numeric(coordinates[[1L]])
+    payload$data$y <- as.numeric(coordinates[[2L]])
+    payload$data$selection_key <- selection_keys
+    if (is.numeric(color_input)) {
+      payload$data$color_range <- spatial_grid_color_range(color_input)
+    } else {
+      grid_groups <- as.character(color_input)
+      grid_groups[is.na(grid_groups)] <- "(missing)"
+      trace_names <- unlist(payload$meta$traces, use.names = FALSE)
+      payload$data$group_code <- as.integer(
+        match(grid_groups, trace_names) - 1L
+      )
+      payload$data$canonical_group <- NULL
+      payload$data$color <- NULL
+      ## The payload adds "(missing)" with this colour when a cell has none.
+      grid_colors <- unname(color_assignments[trace_names])
+      grid_colors[is.na(grid_colors)] <- "#7b8794"
+      payload$meta$group_colors <- grid_colors
+    }
+    payload$meta$space_label <- "Section grid"
+  }
+
   split_by <- plot_parameters[["split_by"]] %||% ""
-  if (nzchar(split_by) && split_by %in% colnames(metadata)) {
+  if (
+    !is.list(grid) &&
+      nzchar(split_by) &&
+      split_by %in% colnames(metadata)
+  ) {
     cell_index <- if ("cell_index" %in% colnames(metadata)) {
       metadata[["cell_index"]]
     } else {

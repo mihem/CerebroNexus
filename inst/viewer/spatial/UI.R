@@ -41,7 +41,14 @@ tab_spatial <- tabItem(
           uiOutput("spatial_projection_main_parameters_UI"),
           div(
             class = "cerebro-spatial-background-row",
-            uiOutput("spatial_projection_background_selector_UI"),
+            ## A grid panel shows its own section's image (func_spatial_helpers.R).
+            conditionalPanel(
+              condition = paste(
+                "input.spatial_projection_layout != 'grid' ||",
+                "input.spatial_projection_plot_type == 'Co-expression (RGB)'"
+              ),
+              uiOutput("spatial_projection_background_selector_UI")
+            ),
             cerebroToolbarActions(
               cerebroSettingsButton(
                 "spatial_projection_more_button",
@@ -97,7 +104,10 @@ tab_spatial <- tabItem(
       div(
         class = "spatial-viz-surface",
         conditionalPanel(
-          condition = "input.spatial_projection_plot_type == 'ImageFeaturePlot'",
+          condition = paste(
+            "input.spatial_projection_plot_type == 'ImageFeaturePlot' &&",
+            "input.spatial_projection_layout != 'grid'"
+          ),
           tags$div(
             class = "spatial-moran-overlay",
             tags$strong("Moran's I:"),

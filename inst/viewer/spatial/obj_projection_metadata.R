@@ -20,12 +20,14 @@ spatial_projection_metadata <- reactive({
   ))
   full_metadata <- viewerProjectionFirstFrameMetadata()
   req(all(columns %in% colnames(full_metadata)))
+  ## A grid's cells carry their sections as an attribute; the column does not.
+  cells <- c(spatial_projection_cells_to_show())
   metadata <- viewerProjectionSubsetRows(
     full_metadata,
-    spatial_projection_cells_to_show(),
+    cells,
     columns
   )
-  metadata[["cell_index"]] <- spatial_projection_cells_to_show()
+  metadata[["cell_index"]] <- cells
 
   return(metadata)
 })
