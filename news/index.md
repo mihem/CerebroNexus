@@ -1,5 +1,14 @@
 # Changelog
 
+## CerebroNexus 8.4.3
+
+- **CI formatting uses the latest official Air binary.** The formatting
+  workflow downloads the latest published release with
+  `posit-dev/setup-air`, instead of installing Air through Nix. This
+  avoids Nix packaging failures and compiling the formatter from source.
+  R tests, package checks and pkgdown continue to use their existing
+  environments.
+
 ## CerebroNexus 8.4.2
 
 - **A rotated, flipped background image is no longer mirrored against
