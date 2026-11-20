@@ -401,7 +401,10 @@ test_that("the author's Spatial layout is a display setting, grid only with sect
 
 test_that("the Builder offers the Spatial layout with the author's choice", {
   skip_if_not_installed("shiny")
-  runtime <- new.env(parent = globalenv())
+  ## The package's internal functions (builderViewerDisplayDefaults()) are
+  ## reachable from the test environment, not from the global one, when the
+  ## package is installed rather than loaded with load_all().
+  runtime <- new.env(parent = environment())
   builder_stage_contract_source_runtime(runtime)
   render <- function(layout) {
     entry <- list(
