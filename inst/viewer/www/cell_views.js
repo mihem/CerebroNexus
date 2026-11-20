@@ -2600,7 +2600,7 @@
     var x = Math.round(frame.x - inset) + 0.5, y = Math.round(frame.y - inset) + 0.5;
     var side = Math.round(frame.size + 2 * inset) - 1;
     c.save();
-    c.strokeStyle = 'rgba(148, 163, 184, 0.55)';
+    c.strokeStyle = 'rgba(203, 213, 225, 0.6)';
     c.lineWidth = 1;
     c.strokeRect(x, y, side, side);
     c.restore();
