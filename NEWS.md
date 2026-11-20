@@ -17,7 +17,11 @@
   `flip_y` acted as `flip_x` at 90 degrees. Settings with a rotation and no
   offset, flip or uneven scale (such as the MERFISH demo) draw as before;
   hand-written settings that combine a rotation with them need re-checking.
-  The Builder writes settings in the new form.
+  The Builder writes settings in the new form. Linked views files are now
+  saved as version 2; a version-1 file is converted on import, so its
+  backgrounds open where they were saved. A version-1 background with an
+  uneven scale at an angle that is not a multiple of 90 degrees (drawn sheared
+  before) has no equivalent, and such a file is refused with a message.
 - **The bundled demo data sets draw their cells at size 5 and full opacity.**
   The app gave HLA & TCR points of size 1 at opacity 0.3, so its 2,000 cells
   of one cell type (light yellow) were close to invisible on the Projection

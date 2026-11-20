@@ -11547,7 +11547,9 @@
     });
     return {
       schema: 'cerebronexus-linked-view',
-      version: 1,
+      // Version 2: background offsets and flips are read in the image's own
+      // unrotated frame (backgrounds.corners); version 1 is converted on load.
+      version: 2,
       created_at: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
       dataset: {
         cell_count: D.n,
@@ -11610,6 +11612,45 @@
     return Math.max(min, Math.min(max, value));
   }
 
+  function savedAlignmentState(saved) {
+    var alignment = saved.alignment;
+    return {
+      show: alignment.show !== false,
+      opacity: finiteNumber(saved.opacity, .6, 0, 1),
+      offsetX: finiteNumber(alignment.offset_x, 0, -1e9, 1e9),
+      offsetY: finiteNumber(alignment.offset_y, 0, -1e9, 1e9),
+      scaleX: finiteNumber(alignment.scale_x, 1, .000001, 1e6),
+      scaleY: finiteNumber(alignment.scale_y, 1, .000001, 1e6),
+      rotate: finiteNumber(alignment.rotation, 0, -1e6, 1e6),
+      flipX: !!alignment.flip_x,
+      flipY: !!alignment.flip_y,
+      lock: alignment.lock_aspect !== false
+    };
+  }
+
+  // A version-1 file kept its background alignments in the old geometry.
+  // Convert each one so the image lands where it was saved, and refuse the
+  // file rather than restore a background that no longer matches its cells.
+  function legacyBackgroundStates(config, samples) {
+    var states = {};
+    if (config.version !== 1) return states;
+    (config.view.spatial_backgrounds || []).forEach(function (saved) {
+      if (!saved.alignment || saved.mode === 'none') return;
+      var sample = samples.filter(function (s) { return s.name === saved.section; })[0];
+      var images = (sample && sample.images) || [];
+      if (!images.length) return;
+      var wanted = saved.image_id || images[0].id;
+      var image = images.filter(function (img) { return img.id === wanted; })[0] || images[0];
+      var state = backgrounds.legacyState(image, savedAlignmentState(saved));
+      if (!state) {
+        configError('The background of ' + saved.section + ' was saved with an ' +
+          'uneven scale at an angle that this version cannot redraw. Save the view again.');
+      }
+      states[saved.section] = state;
+    });
+    return states;
+  }
+
   function validateWorkspace(config) {
     if (!D) configError('Load a data set before opening a linked view.');
     if (!config || !config.dataset ||
@@ -11657,7 +11698,7 @@
     if (!indices || indices.some(function (index) {
       return !Number.isInteger(index) || index < 0 || index >= D.n;
     })) configError('The file selects cells that are unavailable here.');
-    return { indices: indices };
+    return { indices: indices, legacy: legacyBackgroundStates(config, samples) };
   }
 
   function restoreWorkspace(config) {
@@ -11675,21 +11716,11 @@
         ? IMG_NONE
         : (saved.image_id || ((images[0] && images[0].id) || IMG_NONE));
       imgChoice[backgroundStateKey(space)] = space._customImageId;
-      var alignment = saved.alignment;
-      if (alignment) {
+      if (saved.alignment) {
         var image = currentImage(space), key = imgKey(space, image);
-        if (key) imgStates[key] = {
-          show: alignment.show !== false,
-          opacity: finiteNumber(saved.opacity, .6, 0, 1),
-          offsetX: finiteNumber(alignment.offset_x, 0, -1e9, 1e9),
-          offsetY: finiteNumber(alignment.offset_y, 0, -1e9, 1e9),
-          scaleX: finiteNumber(alignment.scale_x, 1, .000001, 1e6),
-          scaleY: finiteNumber(alignment.scale_y, 1, .000001, 1e6),
-          rotate: finiteNumber(alignment.rotation, 0, -1e6, 1e6),
-          flipX: !!alignment.flip_x,
-          flipY: !!alignment.flip_y,
-          lock: alignment.lock_aspect !== false
-        };
+        if (key) {
+          imgStates[key] = validated.legacy[saved.section] || savedAlignmentState(saved);
+        }
       }
       loadSpaceImage(space);
     });

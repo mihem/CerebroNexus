@@ -101,6 +101,57 @@
     return [place(bounds.xmin, bounds.ymax), place(bounds.xmax, bounds.ymax),
       place(bounds.xmin, bounds.ymin)];
   }
+  // Linked views saved as version 1 placed a rotated image differently:
+  // p = R c + o + F S R (u - c), with the offset in data axes and the flips and
+  // scales applied after the rotation. Returns the alignment that imageCorners
+  // draws in exactly the same place, or null when there is none: an uneven
+  // scale at an angle that is not a multiple of 90 degrees sheared the image.
+  function legacyState(img, state) {
+    var r = imageRenderState(img, state);
+    var t = Number(r.rotate) || 0;
+    var sx = Number(r.scaleX) || 1, sy = Number(r.scaleY) || 1;
+    var fx = !!r.flipX, fy = !!r.flipY, turn = t;
+    var quarters = t / 90, right = Math.abs(quarters - Math.round(quarters)) < 1e-9;
+    if (right) {
+      // R^-1 diag(a, b) R swaps the axes at odd quarter turns.
+      if (Math.abs(Math.round(quarters)) % 2 === 1) {
+        var s = sx; sx = sy; sy = s;
+        var f = fx; fx = fy; fy = f;
+      }
+    } else if (Math.abs(sx - sy) > 1e-9 * Math.max(sx, sy)) {
+      return null;
+    } else if (fx !== fy) {
+      // A single mirror after R(t) equals the same mirror before R(-t).
+      turn = -t;
+    }
+    function rotate(x, y, degrees) {
+      var q = degrees / 90, exact = Math.abs(q - Math.round(q)) < 1e-9;
+      var k = ((Math.round(q) % 4) + 4) % 4, a = degrees * Math.PI / 180;
+      var cos = exact ? [1, 0, -1, 0][k] : Math.cos(a);
+      var sin = exact ? [0, 1, 0, -1][k] : Math.sin(a);
+      return [x * cos - y * sin, x * sin + y * cos];
+    }
+    // Same linear part, so only the centre must match: R(turn) (c + o') =
+    // R(t) c + o.
+    var b = (img && img.bounds) || {};
+    var cx = ((Number(b.xmin) + Number(b.xmax)) / 2) || 0;
+    var cy = ((Number(b.ymin) + Number(b.ymax)) / 2) || 0;
+    var centre = rotate(cx, cy, t);
+    var o = rotate(centre[0] + (Number(r.offsetX) || 0),
+      centre[1] + (Number(r.offsetY) || 0), -turn);
+    // Back from the drawn deltas to the saved state of a baked image.
+    var pr = (img && img.preset) || {}, baked = !!pr.geometryBaked;
+    var baseX = baked ? (Number(pr.scaleX) || 1) : 1;
+    var baseY = baked ? (Number(pr.scaleY) || baseX) : 1;
+    return {
+      show: state.show, opacity: state.opacity, lock: state.lock,
+      offsetX: o[0] - cx + (baked ? Number(pr.offsetX) || 0 : 0),
+      offsetY: o[1] - cy + (baked ? Number(pr.offsetY) || 0 : 0),
+      scaleX: sx * baseX, scaleY: sy * baseY,
+      flipX: fx !== (baked && !!pr.flipX), flipY: fy !== (baked && !!pr.flipY),
+      rotate: turn + (baked ? Number(pr.rotation) || 0 : 0)
+    };
+  }
   // Order-independent text for a background identity, so two equal identities
   // compare equal however their object keys were ordered.
   function canonicalIdentity(value) {
@@ -122,6 +173,7 @@
     imageKey: imgKey,
     presetState: presetState,
     renderState: imageRenderState,
-    corners: imageCorners
+    corners: imageCorners,
+    legacyState: legacyState
   });
 })();

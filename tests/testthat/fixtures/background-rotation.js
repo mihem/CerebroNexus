@@ -118,4 +118,94 @@ near(drawn.tl, toScreen(10, 0), 'screen top-left');
 near(drawn.tr, toScreen(10, 4), 'screen top-right');
 near(drawn.bl, toScreen(8, 0), 'screen bottom-left');
 assert.strictEqual(context.globalAlpha, 1, 'opacity restored');
-console.log('PASS background image: flips and offsets in the image frame, rotation last about the origin');
+// Linked views saved as version 1 keep their old geometry: the image centre
+// rotated with the cells, the offset in data axes, then flips and scales after
+// the rotation. legacyState must give the alignment that draws there now.
+const oldCorners = (bounds, s) => {
+  const c = [(bounds.xmin + bounds.xmax) / 2, (bounds.ymin + bounds.ymax) / 2];
+  const rc = rotate(c, s.rotate);
+  const fx = s.scaleX * (s.flipX ? -1 : 1), fy = s.scaleY * (s.flipY ? -1 : 1);
+  const place = (x, y) => {
+    const ru = rotate([x, y], s.rotate);
+    return [rc[0] + s.offsetX + fx * (ru[0] - rc[0]),
+      rc[1] + s.offsetY + fy * (ru[1] - rc[1])];
+  };
+  return [place(bounds.xmin, bounds.ymax), place(bounds.xmax, bounds.ymax),
+    place(bounds.xmin, bounds.ymin)];
+};
+// The reviewer's case: the same version-1 state drew these corners before.
+const reviewed = align({offsetY: -10, flipY: true, rotate: 90});
+const legacyXenium = backgrounds.legacyState({bounds: wide}, reviewed);
+const migrated = backgrounds.corners(wide, legacyXenium);
+near(migrated[0], [-2, -6], 'version-1 top-left');
+near(migrated[1], [-2, -10], 'version-1 top-right');
+near(migrated[2], [0, -6], 'version-1 bottom-left');
+assert.strictEqual(legacyXenium.offsetX, -10, 'right angles convert exactly');
+assert.strictEqual(legacyXenium.offsetY, 0, 'right angles convert exactly');
+const legacyCombos = combos.concat([
+  {scaleX: 2, scaleY: 0.5}, {scaleX: 1.5, scaleY: 1.5, flipX: true, offsetX: 4}
+]);
+const baked = {geometryBaked: true, offsetX: 3, offsetY: -2, scaleX: 2,
+  scaleY: 0.5, flipX: true, rotation: 40};
+for (const combo of legacyCombos) {
+  for (const degrees of [0, 90, 180, 270, -90, 450, -30, 28]) {
+    for (const bounds of [wide, far]) {
+      const uneven = combo.scaleX && combo.scaleY && combo.scaleX !== combo.scaleY;
+      const right = degrees % 90 === 0;
+      for (const preset of [{}, baked]) {
+        const img = {bounds, preset};
+        const saved = align(Object.assign({rotate: degrees}, combo));
+        if (preset.geometryBaked) {
+          // A baked image stores its preset plus the user's change.
+          saved.offsetX += preset.offsetX; saved.offsetY += preset.offsetY;
+          saved.scaleX *= preset.scaleX; saved.scaleY *= preset.scaleY;
+          saved.flipX = saved.flipX !== preset.flipX;
+          saved.rotate += preset.rotation;
+        }
+        const what = JSON.stringify(combo) + ' at ' + degrees +
+          (preset.geometryBaked ? ' baked' : '');
+        const state = backgrounds.legacyState(img, saved);
+        if (uneven && !right) {
+          assert.strictEqual(state, null, what + ': a sheared image has no equivalent');
+          continue;
+        }
+        assert(state, what + ': no conversion');
+        const before = oldCorners(bounds, backgrounds.renderState(img, saved));
+        const after = backgrounds.corners(bounds, backgrounds.renderState(img, state));
+        for (let k = 0; k < 3; k++) {
+          assert(Math.hypot(before[k][0] - after[k][0], before[k][1] - after[k][1]) < 1e-7,
+            what + ' corner ' + k + ': ' + after[k] + ' != ' + before[k]);
+        }
+      }
+    }
+  }
+}
+
+// Restoring a version-1 file converts each saved alignment, leaves a
+// version-2 file alone, and refuses a sheared one instead of moving it.
+const restore = {
+  backgrounds,
+  configError: (message) => { throw new Error(message); },
+  finiteNumber: (value, fallback, min, max) => {
+    value = Number(value);
+    return isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
+  }
+};
+vm.createContext(restore);
+vm.runInContext(fn('savedAlignmentState') + '\n' + fn('legacyBackgroundStates'), restore);
+const samples = [{name: 'fov', images: [{id: 'tissue', bounds: wide}]}];
+const savedView = (version, alignment) => ({version, view: {spatial_backgrounds: [{
+  section: 'fov', mode: 'image', image_id: 'tissue', opacity: 0.4,
+  alignment: Object.assign({show: true, offset_x: 0, offset_y: -10, scale_x: 1,
+    scale_y: 1, rotation: 90, flip_x: false, flip_y: true, lock_aspect: true},
+  alignment)}]}});
+const restored = restore.legacyBackgroundStates(savedView(1, {}), samples).fov;
+near(backgrounds.corners(wide, restored)[0], [-2, -6], 'restored version-1 top-left');
+assert.strictEqual(restored.opacity, 0.4, 'opacity kept');
+assert.strictEqual(Object.keys(
+  restore.legacyBackgroundStates(savedView(2, {}), samples)).length, 0,
+'version 2 is restored as saved');
+assert.throws(() => restore.legacyBackgroundStates(
+  savedView(1, {scale_x: 2, rotation: 30}), samples), /uneven scale/);
+
+console.log('PASS background image: flips and offsets in the image frame, rotation last about the origin; version-1 views converted');

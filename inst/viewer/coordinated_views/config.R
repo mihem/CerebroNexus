@@ -6,7 +6,10 @@
 ##----------------------------------------------------------------------------##
 
 CV_CONFIG_SCHEMA <- "cerebronexus-linked-view"
-CV_CONFIG_VERSION <- 1L
+CV_CONFIG_VERSION <- 2L
+## Version 1 kept a rotated background's offset and flips in data axes; the
+## browser converts such alignments when it restores the view.
+CV_CONFIG_VERSIONS <- c(1L, CV_CONFIG_VERSION)
 CV_SPECIALIST_CONFIG_SCHEMA <- "cerebronexus-specialist-view"
 CV_SPECIALIST_CONFIG_VERSION <- 1L
 CV_CONFIG_MAX_BYTES <- 5L * 1024L * 1024L
@@ -600,7 +603,7 @@ cv_config_normalize <- function(config, cells, fingerprint = NULL) {
     )
   }
   version <- cv_config_integer(config$version, "$.version", 1L)
-  if (!identical(version, CV_CONFIG_VERSION)) {
+  if (!version %in% CV_CONFIG_VERSIONS) {
     cv_config_abort(
       "unsupported_version",
       "This configuration version is not supported."

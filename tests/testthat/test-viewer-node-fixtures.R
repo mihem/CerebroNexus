@@ -12,7 +12,7 @@ test_that("Indexed point picking matches the full scan across views and filters"
   expect_node_fixture("point-grid.js", viewer_test_path("www", "cv-geom.js"))
 })
 
-test_that("background image flips in its own frame and rotates with the cells", {
+test_that("background image flips in its own frame, rotates with the cells and converts version-1 views", {
   expect_node_fixture(
     "background-rotation.js",
     viewer_test_path("www", "cell_views.js")
