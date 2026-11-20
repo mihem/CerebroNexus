@@ -7849,7 +7849,7 @@
       : Math.max(1, Math.min(overview ? overview.cols : 1, availableCols));
     var gridPack = sectionGridActive() && !focusPanel
       ? sectionGridPacking(k, usableW, Math.max(1, availH), chromeX, overhead, gap,
-        sectionGridAspect(), gridColumnsChoice(k))
+        keepPlotsSquare ? 1 : sectionGridAspect(), gridColumnsChoice(k))
       : null;
     if (gridPack) cols = gridPack.cols;
     var single = cols === 1;
@@ -7959,6 +7959,7 @@
       var space = spaceById[p.spaceId];
       var name = hintView ? hintView.meta && hintView.meta.space_label : space && space._projectionName;
       return space && !space.z && (hintId === 'trajectory_projection' ||
+          (hintId === 'spatial_projection' && isSpatialSpace(space)) ||
           /umap/i.test(String(name || '')));
     });
     window.dispatchEvent(new CustomEvent('cerebro:plot-layout', { detail: {

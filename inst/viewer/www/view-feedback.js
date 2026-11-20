@@ -16,6 +16,7 @@
     overview_projection: ['overview_projection_more_button', 'overview_projection_keep_square'],
     expression_projection: ['expression_projection_more_button', 'expression_projection_keep_square'],
     trajectory_projection: ['trajectory_projection_more_button', 'trajectory_projection_keep_square'],
+    spatial_projection: ['spatial_projection_more_button', 'spatial_projection_keep_square'],
     ir_clonalUMAP_projection: ['ir_more_button', 'ir_clonalUMAP_keep_square'],
     linked: ['cv-more-btn', 'cv-square-plots']
   };
@@ -43,7 +44,11 @@
     var label = document.createElement('span');
     label.className = 'cerebro-layout-label';
     label.id = id + '_layout_label';
-    label.textContent = id === 'trajectory_projection' ? 'Trajectory layout' : 'UMAP layout';
+    // Tissue keeps its proportions, so Spatial offers the panel's shape: fitted
+    // to the section(s), or square. ("Layout" there is one section or a grid.)
+    var spatial = id === 'spatial_projection';
+    label.textContent = spatial ? 'Panel shape'
+      : id === 'trajectory_projection' ? 'Trajectory layout' : 'UMAP layout';
     group.setAttribute('aria-labelledby', label.id);
     group.appendChild(label);
     var segments = document.createElement('span');
@@ -53,9 +58,11 @@
       button.type = 'button';
       button.setAttribute('data-layout-id', id);
       button.setAttribute('data-layout-shape', shape);
-      button.title = shape === 'wide' ? 'Use the available plot width' : 'Use equal plot width and height';
+      button.title = spatial
+        ? (shape === 'wide' ? 'Shape each panel to its tissue section' : 'Draw every panel as a square')
+        : (shape === 'wide' ? 'Use the available plot width' : 'Use equal plot width and height');
       button.innerHTML = '<i class="cerebro-layout-icon is-' + shape + '" aria-hidden="true"></i>' +
-        (shape === 'wide' ? 'Wide' : 'Square');
+        (shape === 'wide' ? (spatial ? 'Fit tissue' : 'Wide') : 'Square');
       segments.appendChild(button);
       return button;
     });
