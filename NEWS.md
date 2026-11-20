@@ -4,39 +4,50 @@
   spatial entry (tissue sections, FOVs, capture areas) can show several of
   them at once: the Spatial page's **Sections** field takes one section (the
   single view as before) or several (a grid with one panel per section;
-  clicking a panel's title shows only that section). All sections are coloured by the same metadata column or
-  gene. A group has one colour in every section, and a gene has one colour
-  scale whose range covers all sections, so a value has the same colour in
-  each section. Each section shows the first histology image bound to it, and
-  a section without one shows its cells without an image. The order of
-  **Sections** is the order of the panels, **Columns** fixes the number of
-  columns, and **Sync zoom** moves the other sections with the one being
-  zoomed or panned; none of them reloads data. **Embedding** adds a UMAP (or
-  another projection) panel: selecting cells in it highlights them in every
-  section, and the selected-cells plot and table list the cells of all
-  sections. The panels take the shape of their sections and are packed to
-  show as much tissue as the window holds. A switch between the layouts shows
-  the coming panels at once, titled, while the server prepares them, and the
-  sections the grid will need are read while the session is quiet. The panels
-  share one copy of the cells' positions instead of one per panel.
-  Like the UMAP pages, Spatial has a switch at the top right, **Panel shape**:
-  *Fit tissue* (the default) shapes the plot to the tissue, and *Square* draws
-  every panel as a square.
+  clicking a panel's title shows only that section). All sections are
+  coloured by the same metadata column or gene. A group has one colour in
+  every section, and a gene has one colour scale whose range covers all
+  sections, so a value has the same colour in each section. RGB
+  co-expression works in the grid too, as one composite panel per section or,
+  with *RGB layout: Separate channels*, one panel per section and channel.
+  Each section shows the first histology image bound to it, and a section
+  without one shows its cells without an image. The order of **Sections** is
+  the order of the panels, **Columns** fixes the number of columns, and
+  **Sync zoom** moves the other sections with the one being zoomed or panned;
+  none of them reloads data. **Embedding** adds a UMAP (or another
+  projection) panel: selecting cells in it highlights them in every section,
+  and the selected-cells plot and table list the cells of all sections. All
+  panels have one size, so the sections are drawn at one scale, and the
+  number of columns is chosen to show as much tissue as the window holds. A
+  switch between one section and several shows the coming panels at once,
+  titled, while the server prepares them, and the sections the grid will need
+  are read while the session is quiet. The panels share one copy of the
+  cells' positions instead of one per panel. Like the UMAP pages, Spatial has
+  a switch at the top right, **Panel shape**: *Fit tissue* (the default)
+  shapes the plot to the tissue, and *Square* draws every panel as a square.
+  With 1.2 million cells in 12 sections (Windows, Chrome, WebGPU), the grid
+  opens in 1.2 to 1.8 s, recolouring by a gene takes 1.4 to 2.1 s, and a
+  synced zoom 13 to 31 ms; with the 800,000 cells of the 8 sections of CosMx
+  NSCLC, 0.9 s to open and to recolour. Exports are unchanged. ROIs and region
+  outlines stay single-section views.
 - **Toolbars pack tighter on every page.** A single-choice field is as wide
   as its value needs (at least 168 px), a multiple choice starts at 220 px and
   grows with its selections, fields no longer stretch to fill a row, and
   Share and Settings end the last row, so the controls take fewer rows and the
   plot more of the window. Page titles sit closer to the top of the window.
+  Groups, Marker genes, Most expressed genes, Enriched pathways and Linked
+  views use the same toolbar. The composition plots of Groups and of
+  Trajectory's States by group pick *Plot type* and *Bars show* (number or
+  percent of cells) in fields instead of a button group and a switch.
+- **Linked views fills the window.** Its panels have one size and their rows
+  share the window's height, so the views end at the window's bottom edge
+  instead of leaving it empty.
 - **The Builder chooses how Spatial opens.** Its Viewer display settings have
   *Open Spatial with: The first section | All sections* in the Spatial card,
   stored as `spatial_layout` with the other page defaults; a data set with one
   section always opens as one section, and Apps and projects without the
   setting open as before. The card's square option reads *Square panels*, as
-  the Viewer's Panel shape switch does. With 1.2 million cells in 12 sections (Windows, Chrome, WebGPU),
-  the grid opens in 1.2 to 1.8 s, recolouring by a gene takes 1.4 to 2.1 s,
-  and a synced zoom 13 to 31 ms; with the 800,000 cells of the 8 sections of
-  CosMx NSCLC, 0.9 s to open and to recolour. Exports are unchanged. RGB
-  co-expression, ROIs and region outlines stay single-section views.
+  the Viewer's Panel shape switch does.
 - **A CRB no longer stores each spatial section's expression twice.** Every
   section kept a copy of the expression matrix's columns for its cells. A CRB
   now stores a reference to those columns instead, and

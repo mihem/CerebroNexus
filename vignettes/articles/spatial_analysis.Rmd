@@ -128,17 +128,20 @@ or the export.
   cells of all sections.
 - **Sync zoom**: zooming or panning one section moves the others to the same
   relative region.
-- **Panel shape** (top right of the page): *Fit tissue* shapes each panel to
-  its section and packs them to fill the window; *Square* draws equal square
-  panels.
+- **Panel shape** (top right of the page): *Fit tissue* shapes the panels to
+  the sections and picks the columns that show the most tissue; *Square* draws
+  square panels. Every panel has the same size, so all sections are drawn at
+  one scale.
 - **Opening in the grid**: in the Builder, the Spatial card of the Viewer
   display settings has *Open Spatial with: All sections*, which makes a data
   set with several sections open Spatial in the grid. Readers can still pick
   one section.
 
 Each panel zooms and pans on its own and shows the usual tooltips. RGB
-co-expression, the ROI controls and region outlines apply to a single section
-and are not available in the grid.
+co-expression works in the grid: *RGB layout* shows one composite panel per
+section, or with *Separate channels* one panel per section and channel. The
+ROI controls and region outlines apply to a single section and are not
+available in the grid.
 
 # Data preparation
 
