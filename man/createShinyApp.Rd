@@ -84,7 +84,10 @@ directory is rejected before any files are written.}
 \item{crb_pick_smallest_file}{Forwarded to \code{Cerebro.options}.}
 
 \item{show_upload_ui}{One non-missing logical controlling whether users may
-upload their own data; defaults to \code{FALSE}.}
+upload their own data sets and session-only HLA typing; defaults to
+\code{FALSE}. When \code{FALSE}, both upload handlers reject uploads and
+their controls are hidden. Stored HLA analyses and view-configuration JSON
+imports remain available.}
 
 \item{welcome_message}{Welcome message shown in the Load Data tab.}
 

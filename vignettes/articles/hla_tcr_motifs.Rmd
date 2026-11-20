@@ -471,8 +471,12 @@ The blue banner reminds you that counts are donor-level (when donor mapping is c
 ![The Data & QC tab: per-donor coverage, the normalized typing table, and a session-only upload to override the stored HLA typing.](img/hla_data_qc.png)
 
 This tab shows what the app actually parsed: how many alleles each donor has, the normalized long typing table, and the sample → analysis-unit mapping.
-You can also **upload your own** HLA typing here (CSV or TSV, long or wide) to override the stored genotypes for the session — handy when a `.crb` shipped without typing.
+In **open mode**, you can also **upload your own** HLA typing here (CSV or TSV, long or wide) to override the stored genotypes for the session — handy when a `.crb` shipped without typing.
 Uploads never modify the `.crb`, and "Download CSV template" gives you the exact expected shape.
+In **closed mode** (`launchCerebro(mode = "closed")` or
+`createShinyApp(show_upload_ui = FALSE)`), HLA uploads are rejected server-side
+and override controls are hidden. Coverage, QC, downloads and analyses of the
+stored typing remain available, as do view-configuration JSON imports.
 
 # Parameters reference
 
@@ -596,7 +600,7 @@ The **HLA & TCR Motifs** item appears whenever the object carries a TRA/TRB chai
 <div style="border-left: 4px solid #2b7bb9; background: #eef5fb; padding: 0.6em 1em; margin: 1em 0;">
 **No genotypes yet?**
 Ship the `.crb` with just the receptors.
-The page still draws the motif network, and a collaborator can upload an HLA CSV/TSV in the **Data & QC** tab for their session — no rebuild, and the `.crb` is never modified.
+The page still draws the motif network, and in open mode a collaborator can upload an HLA CSV/TSV in the **Data & QC** tab for their session — no rebuild, and the `.crb` is never modified.
 </div>
 
 # Common questions
@@ -609,7 +613,7 @@ Dense motifs come from antigen-driven *selection*, not from having more cells.
 **Can I use my own HLA genotypes?**
 Yes.
 `addHLATyping()` (or `object@misc$hla_typing`) accepts a wide table (`sample` + `HLA-*_1/_2`), a canonical long table, or a named list.
-You can also upload a CSV/TSV in the **Data & QC** tab to override the stored typing for one session.
+In open mode, you can also upload a CSV/TSV in the **Data & QC** tab to override the stored typing for one session. For a closed deployment, add the typing before exporting the `.crb`.
 
 **I have TRA, not TRB.**
 Set **Chain** to TRA in the parameter column; the page offers whichever chains it detects in the data.

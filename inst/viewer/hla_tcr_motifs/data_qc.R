@@ -2,13 +2,18 @@
 ## HLA & TCR Motifs — Data & QC tab
 ##
 ## The trust centre: shows the active HLA source and its provenance, per-sample
-## coverage, and lets the user upload a CSV/TSV HLA table as a SESSION-ONLY
-## override (never written back to the .crb). Sample matching is exact only;
-## unmatched samples are reported, never fuzzy-guessed.
+## coverage, and in open mode lets the user upload a CSV/TSV HLA table as a
+## SESSION-ONLY override (never written back to the .crb). Sample matching is
+## exact only; unmatched samples are reported, never fuzzy-guessed.
 ##----------------------------------------------------------------------------##
 
 ## ---- Upload handler: normalize into a session override ---------------- ##
 observeEvent(input$hla_upload, {
+  # Enforce the same server-side policy as dataset uploads, even if a client
+  # sends an upload event without the corresponding UI control.
+  if (!viewerUploadsEnabled(Cerebro.options)) {
+    return()
+  }
   f <- input$hla_upload
   if (is.null(f)) {
     return()
@@ -63,6 +68,9 @@ observeEvent(input$hla_upload, {
 
 ## ---- Clear the session override --------------------------------------- ##
 observeEvent(input$hla_clear_session, {
+  if (!viewerUploadsEnabled(Cerebro.options)) {
+    return()
+  }
   hla_session_typing(NULL)
   showNotification("Session HLA override cleared.", type = "message")
 })
@@ -79,42 +87,45 @@ hla_qc_table <- reactive({
 
 ## ---- The Data & QC tab body ------------------------------------------- ##
 output$hla_data_qc_ui <- renderUI({
+  uploads_enabled <- viewerUploadsEnabled(Cerebro.options)
   tagList(
     fluidRow(
-      column(
-        width = 6,
-        tags$h4("Provide HLA typing"),
-        tags$p(
-          class = "text-muted",
-          style = "font-size: 12px;",
-          paste(
-            "Upload a CSV/TSV. Accepted shapes: a long table (sample, locus,",
-            "allele) or a wide table (a 'sample' column plus HLA-*_1 / HLA-*_2",
-            "columns). Uploads are session-only and never modify the .crb."
-          )
-        ),
-        selectInput(
-          "hla_upload_source_type",
-          "Data provenance:",
-          choices = c(
-            "Directly genotyped" = "genotyped",
-            "Imputed" = "imputed",
-            "Synthetic (demo)" = "synthetic",
-            "Unknown" = "unknown"
+      if (uploads_enabled) {
+        column(
+          width = 6,
+          tags$h4("Provide HLA typing"),
+          tags$p(
+            class = "text-muted",
+            style = "font-size: 12px;",
+            paste(
+              "Upload a CSV/TSV. Accepted shapes: a long table (sample, locus,",
+              "allele) or a wide table (a 'sample' column plus HLA-*_1 / HLA-*_2",
+              "columns). Uploads are session-only and never modify the .crb."
+            )
           ),
-          selected = "unknown"
-        ),
-        fileInput(
-          "hla_upload",
-          NULL,
-          accept = c(".csv", ".tsv", "text/csv", "text/tab-separated-values")
-        ),
-        actionButton("hla_clear_session", "Clear session override"),
-        tags$hr(),
-        downloadButton("hla_download_template", "Download CSV template")
-      ),
+          selectInput(
+            "hla_upload_source_type",
+            "Data provenance:",
+            choices = c(
+              "Directly genotyped" = "genotyped",
+              "Imputed" = "imputed",
+              "Synthetic (demo)" = "synthetic",
+              "Unknown" = "unknown"
+            ),
+            selected = "unknown"
+          ),
+          fileInput(
+            "hla_upload",
+            NULL,
+            accept = c(".csv", ".tsv", "text/csv", "text/tab-separated-values")
+          ),
+          actionButton("hla_clear_session", "Clear session override"),
+          tags$hr(),
+          downloadButton("hla_download_template", "Download CSV template")
+        )
+      },
       column(
-        width = 6,
+        width = if (uploads_enabled) 6 else 12,
         tags$h4("Coverage"),
         uiOutput("hla_active_source_ui"),
         tags$p(

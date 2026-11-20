@@ -4,10 +4,11 @@
 #' @description
 #' Launch the CerebroNexus Shiny application.
 #'
-#' @param mode Cerebro can be ran in \code{open} or \code{closed} mode, allowing
-#' the user to load their own data set (\code{open}) or only show a pre-loaded
-#' data set (\code{closed}, removes the "Load data" element); defaults to
-#' \code{open}.
+#' @param mode Cerebro can run in \code{open} or \code{closed} mode. Open mode
+#' allows users to load their own data sets and session-only HLA typing.
+#' Closed mode shows only pre-loaded data sets and their stored HLA typing;
+#' dataset and HLA upload controls are hidden and their handlers reject uploads.
+#' View-configuration JSON imports remain available. Defaults to \code{open}.
 #' @param maxFileSize Maximum size of input file; defaults to \code{800}
 #' (800 MB).
 #' @param crb_file_to_load Path to \code{.crb} file to load on launch of
