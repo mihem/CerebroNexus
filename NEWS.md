@@ -1,12 +1,5 @@
-# CerebroNexus 8.4.1
+# CerebroNexus 8.4.2
 
-- **Closed Viewers also block HLA typing uploads.** The Data & QC tab hides
-  session-override controls, and the server rejects HLA uploads and
-  clear-override events unless the Viewer is explicitly in open mode.
-  Stored HLA typing, analyses and downloads remain available, as do
-  view-configuration JSON imports. Coverage uses the full row in closed mode,
-  without an empty upload panel. When stored typing is absent, closed-mode
-  messages explain the limitation without suggesting an unavailable upload.
 - **A rotated, flipped background image is no longer mirrored against its
   cells.** In `spatial_image_settings`, `offset_x`/`offset_y`, `scale_x`/
   `scale_y` and `flip_x`/`flip_y` now act in the image's own unrotated frame,
@@ -29,6 +22,16 @@
   opacity 0.85) now start at the defaults of `launchCerebro()`; the settings
   drawer still changes them. The large demos of about a million cells keep
   their small points (size 1).
+
+# CerebroNexus 8.4.1
+
+- **Closed Viewers also block HLA typing uploads.** The Data & QC tab hides
+  session-override controls, and the server rejects HLA uploads and
+  clear-override events unless the Viewer is explicitly in open mode.
+  Stored HLA typing, analyses and downloads remain available, as do
+  view-configuration JSON imports. Coverage uses the full row in closed mode,
+  without an empty upload panel. When stored typing is absent, closed-mode
+  messages explain the limitation without suggesting an unavailable upload.
 
 # CerebroNexus 8.4.0
 
