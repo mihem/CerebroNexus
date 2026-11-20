@@ -6,7 +6,7 @@
     overview_projection: ['overview', 'Overview', /^overview_projection_(to_display|point_color|point_size|point_opacity|point_border|group_labels|keep_square|percentage_cells_to_show|group_filter_.+)$/],
     expression_projection: ['geneExpression', 'Gene expression', /^expression_projection_(to_display|point_size|point_opacity|point_border|group_labels|keep_square|percentage_cells_to_show|group_filter_.+)$/],
     trajectory_projection: ['trajectory', 'Trajectory', /^trajectory_(selected_method|selected_name|point_color|point_size|point_opacity|projection_group_labels|projection_point_border|projection_keep_square|percentage_cells_to_show|projection_group_filter_.+)$/],
-    spatial_projection: ['spatial', 'Spatial', /^spatial_projection_(to_display|sections|plot_type|point_color|point_size|point_opacity|group_labels|point_border|keep_square|percentage_cells_to_show|feature_to_display|coexpr_[rgb]|rgb_layout|show_region_outlines|background_image|group_filter_.+)$/],
+    spatial_projection: ['spatial', 'Spatial', /^spatial_projection_(to_display|plot_type|point_color|point_size|point_opacity|group_labels|point_border|keep_square|percentage_cells_to_show|feature_to_display|coexpr_[rgb]|rgb_layout|show_region_outlines|background_image|group_filter_.+)$/],
     hla_motif_network: ['hla_tcr_motifs', 'HLA / TCR motifs', /^hla_(chain|scope|color_by|color_allele|pair_allele_i|pair_allele_ii|min_nodes|by_v|show_isolated|node_scale|legend_mode|group_filter_.+)$/],
     ir_clonalUMAP_projection: ['immune_repertoire', 'Clonal projection', /^$/],
     linked: ['coordinated_views', 'Linked views', /^$/]
