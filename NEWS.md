@@ -13,8 +13,14 @@
   zoomed or panned; none of them reloads data. **Embedding** adds a UMAP (or
   another projection) panel: selecting cells in it highlights them in every
   section, and the selected-cells plot and table list the cells of all
-  sections. The panels share one copy of the cells' positions instead of one
-  per panel. With 1.2 million cells in 12 sections (Windows, Chrome, WebGPU),
+  sections. The panels take the shape of their sections and are packed to
+  show as much tissue as the window holds. A switch between the layouts shows
+  the coming panels at once, titled, while the server prepares them, and the
+  sections the grid will need are read while the session is quiet. The panels
+  share one copy of the cells' positions instead of one per panel.
+  Like the UMAP pages, Spatial has a switch at the top right, **Panel shape**:
+  *Fit tissue* (the default) shapes the plot to the tissue, and *Square* draws
+  every panel as a square. With 1.2 million cells in 12 sections (Windows, Chrome, WebGPU),
   the grid opens in 1.2 to 1.8 s, recolouring by a gene takes 1.4 to 2.1 s,
   and a synced zoom 13 to 31 ms; with the 800,000 cells of the 8 sections of
   CosMx NSCLC, 0.9 s to open and to recolour. Exports and CRB files are

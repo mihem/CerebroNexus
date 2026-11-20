@@ -125,6 +125,9 @@ all of them. The grid needs no change to the data or the export.
   cells of all sections.
 - **Sync zoom**: zooming or panning one section moves the others to the same
   relative region.
+- **Panel shape** (top right of the page): *Fit tissue* shapes each panel to
+  its section and packs them to fill the window; *Square* draws equal square
+  panels.
 
 Each panel zooms and pans on its own and shows the usual tooltips. RGB
 co-expression, the ROI controls and region outlines apply to a single section
