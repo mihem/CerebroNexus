@@ -414,6 +414,7 @@ if (continueButton) continueButton.focus();
 
 function resetTimer() {
 clearTimers();
+if (document.documentElement.classList.contains('cerebro-access-is-denied')) return;
 closeWarning(true);
 warningTimer = setTimeout(showWarning, %s);
 logoutTimer = setTimeout(logout, %s);
@@ -423,6 +424,10 @@ if (continueButton) continueButton.addEventListener('click', resetTimer);
 if (warning) warning.addEventListener('cancel', function(event) {
 event.preventDefault();
 resetTimer();
+});
+window.addEventListener('cerebro:access-denied', function() {
+clearTimers();
+closeWarning(false);
 });
 ['mousemove', 'mousedown', 'click', 'scroll', 'keydown'].forEach(function(name) {
 window.addEventListener(name, resetTimer, { passive: name !== 'keydown' });

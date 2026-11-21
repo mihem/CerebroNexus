@@ -225,6 +225,20 @@ local({
       ir_tab_body_wanted[[tab]](TRUE)
     }
     prefetch$destroy()
+    ## The clone-size histogram of the Abundance tab (0.2 s on 1.46 million
+    ## cells), counted after the bodies' turn: kept by its cache, it is drawn
+    ## at once when the tab is opened (ir_abundance_counts(), ir_bindCache()).
+    later::later(
+      function() {
+        if (!session$isClosed()) {
+          try(
+            shiny::withReactiveDomain(session, isolate(ir_abundance_counts())),
+            silent = TRUE
+          )
+        }
+      },
+      0.05
+    )
   })
 })
 

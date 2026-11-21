@@ -247,7 +247,71 @@
 }
 
 .cerebroCellNamesHash <- function(cells) {
-  rlang::hash(enc2utf8(as.character(cells)))
+  .crbContract()$.runtimeCellNamesHash(cells)
+}
+
+## Only convertCerebro() uses historical object-hash formats. Keep these out
+## of the standalone Viewer and ordinary readers: an old thin CRB must fail
+## fast with migration advice, not incur format retries at every app restart.
+.legacyCerebroCellNamesHash <- function(cells, format) {
+  path <- tempfile("cerebro-legacy-cell-order-")
+  on.exit(unlink(path), add = TRUE)
+  connection <- file(path, "wb")
+  tryCatch(
+    {
+      if (identical(format, "serialized")) {
+        bytes <- serialize(
+          cells,
+          NULL,
+          ascii = FALSE,
+          xdr = FALSE,
+          version = 3L
+        )
+        ## rlang 1.1.7 skips the native serialization header: magic (2),
+        ## version/R versions (12), encoding length (4), encoding bytes.
+        encoding_length <- readBin(bytes[15:18], "integer", n = 1L)
+        writeBin(bytes[-seq_len(18L + encoding_length)], connection)
+      } else {
+        ## rlang 1.3.0's character walker: type, S4 flag, 64-bit length;
+        ## per string: NA flag, encoding, byte length, UTF-8 bytes.
+        size <- length(cells)
+        size_words <- if (.Platform$endian == "little") {
+          c(as.integer(size), 0L)
+        } else {
+          c(0L, as.integer(size))
+        }
+        writeBin(c(16L, 0L, size_words), connection)
+        for (start in seq.int(1L, max(1L, size), by = 65536L)) {
+          if (!size) {
+            break
+          }
+          block <- cells[seq.int(start, min(size, start + 65535L))]
+          lengths <- nchar(block, type = "bytes")
+          encoding <- as.integer(Encoding(block) == "UTF-8")
+          headers <- writeBin(as.vector(rbind(0L, encoding, lengths)), raw())
+          widths <- lengths + 12L
+          offsets <- cumsum(widths) - widths
+          positions <- rep(offsets, each = 12L) + rep(1:12, length(block))
+          bytes <- raw(sum(widths))
+          bytes[positions] <- headers
+          bytes[-positions] <- charToRaw(paste0(block, collapse = ""))
+          writeBin(bytes, connection)
+        }
+      }
+    },
+    finally = close(connection)
+  )
+  unname(rlang::hash_file(path))
+}
+
+.legacyCerebroCellNamesMatch <- function(cells, expected) {
+  cells <- enc2utf8(as.character(cells))
+  if (anyNA(cells) || !grepl("^[[:xdigit:]]{32}$", expected)) {
+    return(FALSE)
+  }
+  identical(rlang::hash(cells), expected) ||
+    identical(.legacyCerebroCellNamesHash(cells, "serialized"), expected) ||
+    identical(.legacyCerebroCellNamesHash(cells, "walker"), expected)
 }
 
 .validCellNames <- function(cells) {
@@ -837,17 +901,12 @@
   payload$cell_fingerprint <- .cerebroCellFingerprint(cells)
   indexed <- .indexThinPayloadByCell(payload, cells)
   payload$crb_schema <- list(
-    version = 3L,
+    version = 5L,
     cell_names_hash = .cerebroCellNamesHash(cells),
     projection_rownames = compact_projections,
-    n_cells = length(cells)
+    n_cells = length(cells),
+    cell_indexed = indexed
   )
-  ## Version 4 only when something is stored by cell index, so that a release
-  ## that reads version 3 refuses it instead of showing rows without names.
-  if (length(indexed)) {
-    payload$crb_schema$version <- 4L
-    payload$crb_schema$cell_indexed <- indexed
-  }
   payload
 }
 
@@ -871,7 +930,13 @@
   object
 }
 
-.hydrateThinCerebro <- function(object, file, backend, schema) {
+.hydrateThinCerebro <- function(
+  object,
+  file,
+  backend,
+  schema,
+  allow_legacy = FALSE
+) {
   if (is.null(schema)) {
     return(object)
   }
@@ -881,13 +946,15 @@
   ## The H5 file's cell names, read with rhdf5 so that the expression matrix
   ## stays unattached.
   cells <- .h5CellNames(.cerebroSidecar(file, backend))
-  if (!identical(.cerebroCellNamesHash(cells), schema$cell_names_hash)) {
-    stop(
-      "The H5 cell names do not match CRB '",
-      basename(file),
-      "'.",
-      call. = FALSE
-    )
+  if (isTRUE(allow_legacy) && schema$version %in% c(3L, 4L)) {
+    if (!.legacyCerebroCellNamesMatch(cells, schema$cell_names_hash)) {
+      stop(errorCondition(
+        paste0("The H5 cell names do not match CRB '", basename(file), "'."),
+        class = "cerebro_cell_names_mismatch"
+      ))
+    }
+  } else {
+    .crbContract()$.runtimeCheckCellNames(cells, schema, file)
   }
   if (!identical(length(cells), schema$n_cells)) {
     stop(
@@ -1525,6 +1592,8 @@ saveCerebro <- function(
 #' longer reads (for example one without an expression-backend descriptor,
 #' or one with a singular spatial image or an embedded spatial molecule table)
 #' is rejected with a pointer to \code{\link{convertCerebro}}.
+#' Thin H5-backed CRBs require schema 5. Convert schema-3/4 files once with
+#' \code{convertCerebro()}; historical checksum retries are not performed here.
 #'
 #' @param file Input \code{.crb} path.
 #' @return A current Cerebro object.
@@ -1625,7 +1694,8 @@ readCerebro <- function(file) {
     (is.list(schema) &&
       !(is.integer(schema$version) &&
         length(schema$version) == 1L &&
-        schema$version %in% .crbContract()$.runtimeThinSchemaVersions)) ||
+        schema$version %in%
+          .crbContract()$.runtimeConvertibleThinSchemaVersions)) ||
     (is.list(immune) && !identical(immune$type, "file"))
   if (unrepairable) {
     stop(
@@ -1663,7 +1733,8 @@ readCerebro <- function(file) {
     object,
     file,
     backend,
-    .crbContract()$.readRuntimeCrbSchema(serialized, file)
+    .crbContract()$.readRuntimeCrbSchema(serialized, file, allow_legacy = TRUE),
+    allow_legacy = TRUE
   )
   object <- .attachCerebroSpatialMolecules(object, file)
   .attachCerebroImmuneRepertoire(object, file)
@@ -1676,6 +1747,9 @@ readCerebro <- function(file) {
 #' expression-backend descriptor is set to embedded, receptor data in the retired
 #' \code{bcr_data} / \code{tcr_data} fields is merged into the unified immune
 #' repertoire, and an H5-backed CRB written without a thin schema is thinned.
+#' Thin schema-3/4 CRBs are checked using their historical ordered-name
+#' checksum and rewritten as schema 5 with a portable checksum. This one-time
+#' conversion reuses the H5 matrix; ordinary readers require schema 5.
 #' An object written before spatial, HLA typing, Trekker or enriched-pathways
 #' support is rebuilt on the current class, so the accessors it lacked exist.
 #' A spatial entry with the singular \code{histology_image} fields becomes

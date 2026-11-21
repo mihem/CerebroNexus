@@ -398,7 +398,7 @@
   // so everything interpolated into innerHTML goes through here.
   function esc(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
   // Colours reach a `style` attribute rather than a text node, and they are as
   // data-driven as the labels are: the group colours are seeded from the object

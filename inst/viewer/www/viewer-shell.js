@@ -12,6 +12,42 @@
   }
   document.addEventListener("transitionend", guardSidebarTransition, true);
 
+  // Shiny fades a closed progress notification out over 250 ms (jQuery
+  // fadeOut, which writes the card's inline opacity), its spinner turning all
+  // the while: the work is done, but the screen keeps changing. A progress card
+  // leaves at once instead. Shiny never fades one in, so an inline opacity
+  // means it is closing. The panel is made with the first card, on <body>.
+  function watchNotificationPanel(panel) {
+    if (panel.__cerebroWatched) return;
+    panel.__cerebroWatched = true;
+    new MutationObserver(function (records) {
+      records.forEach(function (record) {
+        var card = record.target;
+        if (card.classList && card.classList.contains("shiny-notification") &&
+            card.style.opacity !== "" &&
+            card.querySelector(".shiny-progress-notification")) {
+          card.classList.add("cerebro-notification-leaving");
+        }
+      });
+    }).observe(panel, { attributes: true, attributeFilter: ["style"], subtree: true });
+  }
+  function watchNotifications() {
+    new MutationObserver(function (records) {
+      records.forEach(function (record) {
+        record.addedNodes.forEach(function (node) {
+          if (node.id === "shiny-notification-panel") watchNotificationPanel(node);
+        });
+      });
+    }).observe(document.body, { childList: true });
+  }
+
+  // How long work runs before the page shows any sign of it: a result that
+  // is ready sooner never flashes a card, a dimmed output or a spinner. One
+  // number for the page's loading card and for a single output's updating
+  // state; --wait-delay in custom.css has the same value for the progress card
+  // and the plot spinners.
+  var WAIT_SHOW_MS = 400;
+
   var MOBILE_QUERY = "(max-width: 767px)";
   function ready(fn) {
     if (document.readyState === "loading") {
@@ -37,6 +73,40 @@
     function install() {
       if (installed || !window.Shiny || !window.Shiny.addCustomMessageHandler) return;
       installed = true;
+      window.Shiny.addCustomMessageHandler("cerebro_access_denied", function (message) {
+        if (!message || typeof message.message !== "string") return;
+        var alert = document.getElementById("cerebro-access-denied");
+        if (!alert) {
+          alert = document.createElement("dialog");
+          alert.id = "cerebro-access-denied";
+          alert.className = "cerebro-session-dialog";
+          alert.setAttribute("role", "alertdialog");
+          alert.setAttribute("aria-modal", "true");
+          alert.setAttribute("aria-labelledby", "cerebro-access-denied-title");
+          alert.setAttribute("aria-describedby", "cerebro-access-denied-message");
+          alert.tabIndex = -1;
+          var title = document.createElement("h2");
+          title.id = "cerebro-access-denied-title";
+          var detail = document.createElement("p");
+          detail.id = "cerebro-access-denied-message";
+          alert.appendChild(title);
+          alert.appendChild(detail);
+          alert.addEventListener("cancel", function (event) { event.preventDefault(); });
+          document.body.appendChild(alert);
+        }
+        alert.querySelector("h2").textContent = message.title || "Access token required";
+        alert.querySelector("p").textContent = message.message;
+        document.documentElement.classList.add("cerebro-access-is-denied");
+        document.dispatchEvent(new CustomEvent("cerebro:overlay-opening", {
+          detail: { owner: "viewer-access" }
+        }));
+        window.dispatchEvent(new CustomEvent("cerebro:access-denied"));
+        document.documentElement.classList.remove("cerebro-starting");
+        var startup = document.getElementById("cerebro-startup");
+        if (startup) startup.remove();
+        if (!alert.open) alert.showModal();
+        alert.focus();
+      });
       // Keep ?page= and ?dataset= in the address bar (other query parameters
       // stay) without adding history entries. The query wins over a /name path
       // on reload, so switching data sets never rewrites the path, which may be
@@ -82,6 +152,7 @@
     install();
   }
   ready(installInitialNavigation);
+  ready(watchNotifications);
 
   // A page's outputs are reported visible with the page change itself. Shiny
   // reports an output's visibility from an IntersectionObserver, after the next
@@ -538,7 +609,7 @@
             updateAnnounced = true;
             announce("Updating content");
           }
-        }, 120);
+        }, WAIT_SHOW_MS);
       })
       .on("shiny:value.cerebroMotion shiny:error.cerebroMotion", function (event) {
         finish(event.target);
@@ -786,7 +857,7 @@
         loader.hidden = false;
         loader.classList.add("is-visible");
       };
-      showTimer = window.setTimeout(showWhenStillLoading, 400);
+      showTimer = window.setTimeout(showWhenStillLoading, WAIT_SHOW_MS);
       slowTimer = window.setTimeout(function () {
         if (pane === activePane) {
           showDetail("Still loading " + pageLabel(pane) + "…");

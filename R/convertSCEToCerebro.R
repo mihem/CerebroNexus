@@ -143,6 +143,9 @@
 #' @param .source_name Internal. Base name used for the output file and the
 #'   default experiment name when \code{sce_file} is an object that was read
 #'   from a file by a caller (see \code{\link{convertH5adToCerebro}}).
+#' @param .x_stream Internal. Description of an h5ad matrix with more than
+#'   2^31 - 1 non-zero values that is streamed into the h5 expression file
+#'   instead of being held in \code{sce} (see \code{\link{convertH5adToCerebro}}).
 #'
 #' @return The path of the written \code{.crb}, invisibly.
 #'
@@ -179,7 +182,7 @@ convertSCEToCerebro <- function(
   nGene = "nGene",
   add_all_meta_data = TRUE,
   use_delayed_array = FALSE,
-  expression_matrix_mode = c("embedded", "h5"),
+  expression_matrix_mode = c("auto", "embedded", "h5"),
   codec = c("qs2", "rds"),
   viewer_binary = c("auto", "always", "never"),
   viewer_binary_threshold = 100000L,
@@ -193,7 +196,8 @@ convertSCEToCerebro <- function(
   most_expressed_genes = NULL,
   spatial_split_by = NULL,
   extra_features = NULL,
-  .source_name = NULL
+  .source_name = NULL,
+  .x_stream = NULL
 ) {
   expression_matrix_mode <- match.arg(expression_matrix_mode)
   codec <- match.arg(codec)
@@ -251,6 +255,43 @@ convertSCEToCerebro <- function(
     )
   }
 
+  if (!is.null(.x_stream)) {
+    ## The matrix of the object is an empty stand-in; the real one is streamed.
+    if (!all(c(nUMI, nGene) %in% names(SummarizedExperiment::colData(sce)))) {
+      stop(
+        "The matrix has more than 2^31 - 1 non-zero values: its QC columns ",
+        "`",
+        nUMI,
+        "` and `",
+        nGene,
+        "` must be in the file, they cannot be computed from it.",
+        call. = FALSE
+      )
+    }
+    if (!is.null(extra_features) && !isFALSE(extra_features)) {
+      stop(
+        "Extra modalities cannot be added to a matrix with more than ",
+        "2^31 - 1 non-zero values.",
+        call. = FALSE
+      )
+    }
+    ## The block files of the one read of the matrix (R/h5ad_stream.R) wait
+    ## from the group summaries to the expression file next to the result.
+    old_options <- options(
+      cerebro.expression_stream = .x_stream,
+      cerebro.h5ad_stream_scratch = getOption(
+        "cerebro.h5ad_stream_scratch",
+        result_dir
+      )
+    )
+    on.exit(
+      {
+        .h5adStreamDrop(.x_stream)
+        options(old_options)
+      },
+      add = TRUE
+    )
+  }
   sce <- .sceEnsureQcColumns(sce, nUMI, nGene, assay, verbose)
   if (!is.null(extra_features) && !isFALSE(extra_features)) {
     sce <- .sceAppendAltExps(sce, assay, extra_features, verbose)
@@ -329,19 +370,22 @@ convertSCEToCerebro <- function(
         "] Calculating most expressed genes and mean expression for each group..."
       ))
     }
-    expr_matrix <- .validate_expression_cells(
-      expression_data = SummarizedExperiment::assay(sce, assay),
-      object_cells = colnames(sce),
-      assay = assay,
-      requested_layer = assay,
-      resolved_layer = assay
-    )
+    expr_matrix <- if (is.null(.x_stream)) {
+      .validate_expression_cells(
+        expression_data = SummarizedExperiment::assay(sce, assay),
+        object_cells = colnames(sce),
+        assay = assay,
+        requested_layer = assay,
+        resolved_layer = assay
+      )
+    }
     sce@metadata <- .convertComputeGroupSummaries(
       sce@metadata,
       SummarizedExperiment::colData(sce),
       expr_matrix,
       groups,
-      verbose
+      verbose,
+      stream = .x_stream
     )
     rm(expr_matrix)
   }

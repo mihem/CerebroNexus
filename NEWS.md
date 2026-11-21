@@ -116,6 +116,175 @@
   and the file can still be imported in the Builder. Sources and licences are
   in `data-raw/large-demo/visium.ATTRIBUTION.md`.
 
+# CerebroNexus 8.4.8
+
+- **A short wait shows no progress card.** A progress notification of the
+  Viewer (a gene, a spatial section, a result table) appears only once its
+  work has taken 400 ms, and goes the moment the work is done instead of
+  fading out over 250 ms with its spinner still turning. Choosing another
+  table on Enriched pathways (example data set; Windows, Chrome on the GPU,
+  medians of 7 alternating rounds) leaves the screen still after 7 ms instead
+  of 291 ms. A single result that is updating (dimmed, "Updating this
+  result") and the spinner card over a plot wait the same 400 ms, where they
+  came after 120 ms and at once, and so does the spinner of a result area that
+  is still empty, so a result ready sooner is not even dimmed.
+- **The Abundance tab of Immune repertoire opens at once.** Its clone-size
+  histogram (0.2 s for 1.46 million cells) is counted shortly after the page
+  has drawn, and kept, instead of when the tab is opened: the tab is drawn
+  after 207 ms instead of 289 ms (Ren atlas; medians of 7 alternating rounds).
+- **A single change to a projection is drawn at once.** Projection, Gene
+  expression, Spatial and Trajectory gathered every change for 150 to 200 ms
+  before drawing it, even a lone choice such as another colour column. A
+  change after a quiet spell at least that long is now applied at once; a
+  burst of changes (a slider being dragged) is still gathered, and its last
+  value always lands. Colouring the Projection of 1.3 million cells by
+  another column is drawn after 7 ms instead of 193 ms (medians of 7
+  alternating rounds).
+- **The table of selected cells and the HLA hints work from the keyboard.**
+  The column headers of the table sort on Enter or Space and say how they are
+  sorted, the menu buttons say whether their menu is open, and Escape closes a
+  menu. The info marker beside an HLA control can take the focus, shows its
+  hint then, and a screen reader reads it. Text of the data set placed in the
+  Viewer's pages now has its single quotes escaped as well.
+
+# CerebroNexus 8.4.7
+
+- H5-backed data sets no longer falsely report mismatched cell names when
+  exported and opened with different `rlang` versions. New thin CRBs use
+  schema 5 with an explicitly versioned XXH3-128 checksum of the ordered
+  UTF-8 names, separated by zero bytes. The optional `digest` accelerator
+  encodes and hashes raw bytes in native code without R-object serialization,
+  decimal prefix allocation or temporary files.
+  Byte writes explicitly disable native-encoding translation, so non-ASCII
+  names produce the same checksum in UTF-8 and C/ASCII locales.
+  `digest` remains optional in Suggests; without a supported version, the
+  existing file hasher checks a temporary file of the same bytes with the
+  same checksum. No new required Imports are added.
+  Ordinary readers now require schema 5 and reject schema-3/4 files immediately
+  with a `convertCerebro()` message, without historical-hash retries on app
+  restart. The explicit converter verifies either historical `rlang` checksum
+  once and rewrites the CRB while reusing its existing H5 matrix. Reordered or
+  foreign cells remain rejected.
+- **Migration required for older thin H5 CRBs, regardless of dataset size.**
+  Stop apps using the export and run `convertCerebro("dataset.crb")` once
+  with the updated package before deploying the updated Viewer. Rebuild any
+  Viewer Pack if conversion did not already rebuild it. Embedded-expression
+  CRBs are unaffected. New schema-5 exports require an updated reader.
+- Normal ordered-cell checks still run before expression access in a new app
+  process and are cached for that process/file version; conversion does not
+  disable integrity checks. Cell-name validation errors are caught at the
+  shared Viewer sidecar boundary, including gene summaries, Spatial, Linked
+  views and Trekker, without disconnecting Shiny or painting replacement values.
+
+# CerebroNexus 8.4.6
+
+- **The large demo data sets keep one folder, and know what made them.** The
+  scripts in `data-raw/large-demo/` put a prepared data set in
+  `<name>/prepared/` instead of `<name>/cerebro-v<number>/`, and its stamp
+  (`demo-version`) records the CerebroNexus version and a hash of the script's
+  functions instead of a number that had to be raised by hand. A run prepares
+  the data set again when either changes; before, a data set made with older
+  defaults (the uncompressed H5 file of the Ren atlas, 27 GB) was taken as
+  current until someone remembered the number. Folders `cerebro-v2` and
+  `cerebro-v3` are no longer read.
+- **More than 200,000 cells go to an H5 file by default.** The export and
+  convert functions (`exportFromSeurat()`, `exportFromSCE()`,
+  `convertSeuratToCerebro()`, `convertSCEToCerebro()`,
+  `convertH5adToCerebro()`) take `expression_matrix_mode = "auto"` by default:
+  `"h5"` for more than 200,000 cells, `"embedded"` up to that (the option
+  `cerebro.h5_cell_threshold` sets the number). A matrix kept inside the CRB is
+  read whole into memory at every start of the Viewer; from the H5 file the
+  Viewer reads only the genes it shows. `"embedded"` and `"h5"` do what they did.
+  An H5 file needs the CRB's name to end in `.crb` and the HDF5Array package;
+  when `"auto"` chose it and either is missing, the error says so.
+- **An h5ad with more than 2^31 - 1 non-zero values converts on the h5 route.**
+  A dgCMatrix cannot hold that many values, so `convertH5adToCerebro(
+  expression_matrix_mode = "h5")` used to stop on the full 1.3 million cells
+  of the E18 mouse brain (2.6 billion values). Such a matrix (an HDF5 CSR `X`)
+  is now not read into R, and the file is read once for both the per-group
+  summaries and the gene-major expression file: each block of cells is sorted
+  by gene, adds its share to the summaries, and is left in a scratch file next
+  to the result (compressed with zstd where R has it, its values in 4 bytes
+  when the h5ad stores 32-bit floats), and each range of genes is then
+  collected in memory from those (`cerebro.h5ad_stream_budget`, default 2^28
+  values per process, about 5 GiB), in several R processes
+  (`cerebro.h5ad_stream_workers`, at most 4 by default: 8 ran out of memory on
+  a 128 GB machine). The main process appends each range as soon as it is in,
+  while the processes go on with the next ones. The file holds what the plain
+  route writes; values the h5ad stores as 32-bit floats stay 32-bit floats in
+  it (they read back as the same doubles), which halves what the one R thread
+  that writes the file compresses, and makes it 8 % smaller. On the 1.3 million cells of the E18 mouse brain the writer
+  takes 283 to 301 s with 4 processes; reading the whole file again for every
+  range of genes, as it first did, took 705 s, and appending a wave of ranges
+  while the processes waited, 319 to 331 s. The whole conversion of the 21 GB
+  h5ad of those cells takes 451 s; with its values written as 64-bit floats it
+  took 524 s, and reading the file once more for the summaries first, 766 s.
+  A cell and gene named twice in a row (valid in CSR) are added up, as the
+  ordinary reader does.
+  The embedded mode and the other sources still need a matrix that fits.
+  The demo-data scripts in `data-raw/large-demo/` (mouse brain, Ren) write
+  their H5 file with this writer too; their own transposing helper
+  `h5_transposed_write.R` and its test are gone, and so is the level-3
+  "[compressed]" twin of each demo's H5 file (`h5_compressed_variant.R`): the
+  demos' H5 files are written at gzip level 1. So is the file `exportToH5ad()`
+  writes (it used level 4).
+- **The first gene of a large H5 file no longer waits for the checksum.** The
+  checksum of the H5 file is still computed in the background, once per file
+  (the result is kept in the user cache), but a read of a gene's row does not
+  wait for it any more: every read looks again, and the first one after the
+  check is done refuses the file if it does not match the CRB. Attaching the
+  whole matrix (`getExpressionMatrix()` and the other accessors that do not read
+  a single row) still waits for the check, so that a file that does not match
+  is never handed out. Before, the first gene of a process that opened an
+  unverified 11 GB file waited 47 s for the check.
+- **The H5 file is compressed by default again, at gzip level 1.**
+  `exportFromSeurat()` and `convertSeuratToCerebro()` write the H5 expression
+  file at gzip level 1 (`h5_compression_level = 1`), and so do the SCE and
+  h5ad routes (which used HDF5Array's level 6). On 500,000 mouse brain cells
+  (1.0 billion values) level 1 gives a file within 3 % of level 6 (4.06 and
+  3.95 GiB, against 11.4 GiB without compression) and writes it in 222 s
+  instead of 361 s. The compressed file keeps its checksum, copy and
+  file-cache cost several times below that of an uncompressed one.
+  `h5_compression_level = 0` keeps the uncompressed file.
+
+# CerebroNexus 8.4.5
+
+- **Local open-mode Viewers require a per-run access token.**
+  `launchCerebro()` automatically opens and prints an authorized URL when
+  the effective bind address is loopback. Shiny sessions reject missing or
+  incorrect tokens before any Viewer server code runs. `require_token = TRUE` forces
+  protection on any address; `FALSE` explicitly opts out, for example behind
+  an authenticated reverse proxy. `cerebroStart()` and `start.R` support the
+  same setting (`--require-token=auto|true|false`). The generic HTML interface
+  stays public and keeps its original cached-page and early-start shortcuts;
+  without the token it cannot start a working session or accept uploads.
+  Data-bearing plot previews use private per-run URLs, published once the
+  token is available, while datasets load. Tokens are supplied automatically
+  in the browser URL; no password entry or secret HTML filename is needed.
+  Closed-mode and generated standalone Viewers keep their existing defaults.
+  Opening a bare Run App URL without the token shows an explanation pointing
+  to the authorized link in the R console. This is local access hardening,
+  not a replacement for HTTPS and deployment authentication.
+- **Breaking change for loopback-backed proxies serving an open-mode Viewer.**
+  An open-mode `launchCerebro()` / `cerebroStart()` behind nginx, Shiny Server,
+  or a Docker loopback mapping can also bind to localhost, so the automatic
+  token rule applies there too. For an intentionally public deployment, or
+  one already protected by proxy authentication and HTTPS, explicitly set
+  `require_token = FALSE` (`--require-token=false` with `start.R`).
+  The bind address alone does not distinguish a personal Viewer from a
+  proxy-backed deployment; untrusted proxy headers do not disable protection.
+
+# CerebroNexus 8.4.4
+
+- **The Builder needs an access token.** `launchCerebroBuilder()` now
+  makes a random token for each run and opens the page at an address that
+  carries it (`?token=...`, also printed in the R console). Without the token
+  the page is refused and no session starts. Shiny checks neither the
+  Origin nor the Host of a connection, so before this a web page open in the
+  same browser (through a cross-site WebSocket or DNS rebinding), or another
+  user of a shared machine, could connect to the Builder's port and drive it:
+  browse the home folder, open files and run the code inside an `.rds`.
+
 # CerebroNexus 8.4.3
 
 - **CI formatting uses the latest official Air binary.** The formatting workflow

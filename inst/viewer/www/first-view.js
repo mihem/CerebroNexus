@@ -50,6 +50,13 @@
   } catch (error) {
     return;
   }
+  var accessToken = params.get('token');
+  if (!/^[0-9a-f]{64}$/.test(accessToken || '')) accessToken = null;
+  var firstViewPrefix = 'cerebro-first-view' + (accessToken ? '-' + accessToken : '') + '/';
+  function resourceUrl(url) {
+    return url.indexOf('cerebro-first-view/') === 0
+      ? firstViewPrefix + url.slice('cerebro-first-view/'.length) : url;
+  }
   var page = params.get('page');
   // Without `?page=`: opened there where the description names the Projection
   // as the address's start page, prepared behind Data info otherwise.
@@ -108,7 +115,7 @@
   }
 
   function fetchBuffer(resource) {
-    return window.fetch(resource.url, { credentials: 'same-origin', cache: 'force-cache' })
+    return window.fetch(resourceUrl(resource.url), { credentials: 'same-origin', cache: 'force-cache' })
       .then(function (response) {
         if (!response.ok) throw new Error('first view: ' + response.status);
         return response.arrayBuffer();
@@ -119,7 +126,7 @@
   }
 
   var description = window.fetch(
-    'cerebro-first-view/' + firstViewKey() + '.json',
+    firstViewPrefix + firstViewKey() + '.json',
     { credentials: 'same-origin', cache: 'no-cache' }
   ).then(function (response) {
     return response.ok ? response.json() : null;

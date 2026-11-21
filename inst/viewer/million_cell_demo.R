@@ -71,23 +71,6 @@ viewerAddLargeDemo <- function(
     point_opacity
   )
 
-  ## run-demo.R writes a compressed twin of the H5 file as <stem>_compressed.crb
-  ## next to the CRB; it opens from the same menu, labelled as such.
-  twin <- sub("[.]crb$", "_compressed.crb", path)
-  if (
-    !identical(twin, path) &&
-      file.exists(twin) &&
-      file.exists(sub("[.]crb$", ".h5", twin))
-  ) {
-    options <- viewerAddLargeDemo(
-      options,
-      twin,
-      variable,
-      paste(label, "[compressed]"),
-      point_size,
-      point_opacity
-    )
-  }
   options
 }
 

@@ -122,7 +122,7 @@ cosmx_flat_files <- function(
   files
 }
 
-test_that("the CosMx and T-cell demos and their compressed twins join the menu", {
+test_that("the CosMx and T-cell demos join the menu", {
   env <- new.env(parent = baseenv())
   sys.source(viewer_test_path("million_cell_demo.R"), envir = env)
   original <- list(
@@ -162,29 +162,17 @@ test_that("the CosMx and T-cell demos and their compressed twins join the menu",
     )
   }
 
-  ## The large demos can be registered together; a compressed twin is offered
-  ## once both its files exist.
+  ## The large demos can be registered together.
   cosmx <- file.path(root, "cosmx.crb")
-  file.create(file.path(
-    root,
-    c("cosmx.h5", "tcell.h5", "cosmx_compressed.crb")
-  ))
+  file.create(file.path(root, c("cosmx.h5", "tcell.h5")))
   label <- demos$cosmx$label
-  twin <- paste(label, "[compressed]")
-  half <- env$viewerAddCosMxDemo(original, cosmx)
-  expect_identical(names(half$crb_file_to_load), c("Small", label))
-  file.create(file.path(root, "cosmx_compressed.h5"))
   both <- env$viewerAddTcellDemo(
     env$viewerAddCosMxDemo(original, cosmx),
     file.path(root, "tcell.crb")
   )
   expect_identical(
     names(both$crb_file_to_load),
-    c("Small", label, twin, demos$tcell$label)
-  )
-  expect_identical(
-    unname(both$crb_file_to_load[twin]),
-    normalizePath(file.path(root, "cosmx_compressed.crb"))
+    c("Small", label, demos$tcell$label)
   )
 })
 
@@ -255,7 +243,7 @@ test_that("a preparation keeps the previous data set until a new one is complete
   for (demo in c("CosMx", "Tcell")) {
     env <- large_demo_env(sprintf("prepare_viewer_%s_data.R", tolower(demo)))
     prepare <- env[[sprintf("prepareViewer%sDemoData", demo)]]
-    version <- env[[sprintf(".viewer%sVersion", demo)]]
+    recipe <- env[[sprintf(".viewer%sRecipe", demo)]]
     build <- sprintf(".viewer%sBuildObject", demo)
     root <- withr::local_tempdir()
     paths <- env[[sprintf(".viewer%sPaths", demo)]](root)
@@ -275,11 +263,11 @@ test_that("a preparation keeps the previous data set until a new one is complete
     env[[build]] <- function(paths, work) {
       writeLines("new", paths$crb)
       file.create(paths$sidecar, if (!is.null(paths$immune)) paths$immune)
-      writeLines(as.character(version), paths$stamp)
+      env$.demoStampWrite(paths$stamp, recipe)
     }
     expect_identical(prepare(root), paths$crb, info = demo)
     expect_identical(readLines(paths$crb), "new", info = demo)
-    ## A finished build of the current version is reused; another stamp is not.
+    ## A finished build of the current recipe is reused; another stamp is not.
     env[[build]] <- function(...) stop("must reuse the cache")
     expect_identical(prepare(root), paths$crb, info = demo)
     writeLines("0", paths$stamp)
@@ -712,85 +700,4 @@ test_that("the T-cell embedding covers every cell from batch-wise variable genes
   expect_identical(rownames(embedding), colnames(expression))
   expect_named(embedding, c("Dim_1", "Dim_2"))
   expect_false(anyNA(embedding))
-})
-
-test_that("a compressed twin holds the same counts and is rebuilt when stale", {
-  scripts <- testthat::test_path(
-    "..",
-    "..",
-    "data-raw",
-    "large-demo",
-    "h5_compressed_variant.R"
-  )
-  skip_if_not(file.exists(scripts), "repository-only script")
-  env <- new.env(parent = globalenv())
-  sys.source(scripts, envir = env)
-
-  ## Next to the CRB, under the stem the Viewer pairs it with.
-  root <- withr::local_tempdir()
-  crb <- file.path(root, "demo.crb")
-  writeLines("source", file.path(root, "demo.h5"))
-  paths <- env$.demoCompressedPaths(crb)
-  expect_identical(paths$crb, file.path(root, "demo_compressed.crb"))
-  expect_identical(paths$h5, file.path(root, "demo_compressed.h5"))
-  expect_identical(paths$source_h5, file.path(root, "demo.h5"))
-  ## Reused only with both files and a stamp of the same settings and source.
-  stamp <- function(level = 3L) {
-    env$.demoCompressedStamp(paths, level = level, chunk = 65536L)
-  }
-  current <- stamp()
-  expect_false(env$.demoCompressedComplete(paths, current))
-  file.create(paths$crb, paths$h5)
-  expect_false(env$.demoCompressedComplete(paths, current))
-  writeLines(current, paths$stamp)
-  expect_true(env$.demoCompressedComplete(paths, current))
-  expect_false(env$.demoCompressedComplete(paths, stamp(6L)))
-  writeLines("a longer source", paths$source_h5)
-  expect_false(env$.demoCompressedComplete(paths, stamp()))
-
-  skip_if_not_installed("HDF5Array")
-  skip_if_not_installed("rhdf5")
-  set.seed(3)
-  genes_by_cells <- abs(Matrix::rsparsematrix(40L, 700L, 0.1))
-  genes_by_cells@x <- round(genes_by_cells@x * 10) + 1
-  dimnames(genes_by_cells) <- list(paste0("g", 1:40), paste0("c", 1:700))
-  original <- withr::local_tempfile(fileext = ".h5")
-  HDF5Array::writeTENxMatrix(
-    methods::as(Matrix::t(genes_by_cells), "CsparseMatrix"),
-    original,
-    group = "expression",
-    level = 0L
-  )
-  ## A step shorter than the data exercises the piecewise copy.
-  compressed <- withr::local_tempfile(fileext = ".h5")
-  env$.demoRecompressH5(
-    original,
-    compressed,
-    level = 3L,
-    chunk = 1024L,
-    step = 1000,
-    verbose = FALSE
-  )
-  for (dataset in c(
-    "data",
-    "indices",
-    "indptr",
-    "shape",
-    "genes",
-    "barcodes"
-  )) {
-    expect_identical(
-      as.vector(rhdf5::h5read(compressed, paste0("expression/", dataset))),
-      as.vector(rhdf5::h5read(original, paste0("expression/", dataset))),
-      info = dataset
-    )
-  }
-  ## The long datasets are chunked at the requested length.
-  handle <- rhdf5::H5Fopen(compressed)
-  withr::defer(rhdf5::H5Fclose(handle))
-  values <- rhdf5::H5Dopen(handle, "expression/data")
-  withr::defer(rhdf5::H5Dclose(values))
-  plist <- rhdf5::H5Dget_create_plist(values)
-  withr::defer(rhdf5::H5Pclose(plist))
-  expect_identical(as.numeric(rhdf5::H5Pget_chunk(plist)), 1024)
 })

@@ -10,8 +10,7 @@
 ## mix of the two kinds below. --prepare-only downloads and converts without
 ## starting the Viewer.
 ##
-## 1m, ren, cosmx and tcell are written as CRBs directly. Each also gets a
-## compressed twin of its H5 file, listed in the menu as "<name> [compressed]".
+## 1m, ren, cosmx and tcell are written as CRBs directly.
 ##
 ## The Visium data sets are real tissue with their H&E photographs, several
 ## sections each (data-raw/large-demo/prepare_builder_visium_data.R):
@@ -37,28 +36,25 @@ repo_root <- if (length(script_arg)) {
   normalizePath(".", mustWork = TRUE)
 }
 
-## Each demo: its preparation function, the variable the Viewer reads and the
-## version stamp (rebuilt when it changes).
+## Each demo: its preparation function and the variable the Viewer reads. A
+## demo is prepared again when its stamp no longer matches this checkout
+## (.demoStampKey() in data-raw/large-demo/download_helpers.R).
 demos <- list(
   "1m" = list(
     prepare = function() prepareViewer1mBenchmarkData(),
-    variable = "CEREBRO_1M_DEMO_CRB",
-    version = function() .viewer1mVersion
+    variable = "CEREBRO_1M_DEMO_CRB"
   ),
   ren = list(
     prepare = function() prepareViewerRenDemoData(),
-    variable = "CEREBRO_REN_DEMO_CRB",
-    version = function() .viewerRenVersion
+    variable = "CEREBRO_REN_DEMO_CRB"
   ),
   cosmx = list(
     prepare = function() prepareViewerCosMxDemoData(),
-    variable = "CEREBRO_COSMX_DEMO_CRB",
-    version = function() .viewerCosMxVersion
+    variable = "CEREBRO_COSMX_DEMO_CRB"
   ),
   tcell = list(
     prepare = function() prepareViewerTcellDemoData(),
-    variable = "CEREBRO_TCELL_DEMO_CRB",
-    version = function() .viewerTcellVersion
+    variable = "CEREBRO_TCELL_DEMO_CRB"
   )
 )
 ## Built by the Builder from the file prepareBuilderVisiumDemoData() writes.
@@ -91,14 +87,12 @@ if (!requireNamespace("pkgload", quietly = TRUE)) {
 pkgload::load_all(repo_root, export_all = FALSE, quiet = TRUE, helpers = FALSE)
 message("Viewer source: ", repo_root)
 for (script in c(
-  "h5_transposed_write.R",
-  "prepare_viewer_1m_data.R",
   "download_helpers.R",
+  "prepare_viewer_1m_data.R",
   "prepare_viewer_ren_data.R",
   "prepare_viewer_cosmx_data.R",
   "prepare_viewer_tcell_data.R",
   "prepare_viewer_pack.R",
-  "h5_compressed_variant.R",
   "prepare_builder_visium_data.R"
 )) {
   source(file.path(repo_root, "data-raw", "large-demo", script), local = TRUE)
@@ -112,12 +106,11 @@ for (name in names(demos)) {
   }
   crb <- demo$prepare()
   prepareDemoViewerPack(crb)
-  prepareDemoViewerPack(prepareCompressedDemoVariant(crb))
   do.call(
     Sys.setenv,
     stats::setNames(list(normalizePath(crb, mustWork = TRUE)), demo$variable)
   )
-  message(name, " data version ", demo$version(), ": ", crb)
+  message(name, " data: ", crb)
 }
 visium <- intersect(visium_demos, selected)
 built <- vapply(

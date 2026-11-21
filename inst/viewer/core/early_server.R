@@ -115,7 +115,10 @@ viewerEarlyServerStart <- function(root, host, port, options) {
       document,
       indexhtml = TRUE,
       fallthrough = TRUE,
-      headers = list("Cache-Control" = "no-cache")
+      headers = list(
+        "Cache-Control" = "no-cache",
+        "Referrer-Policy" = "no-referrer"
+      )
     )
   )
   for (prefix in names(resource_paths)) {
@@ -169,22 +172,26 @@ viewerEarlyServerStart <- function(root, host, port, options) {
     )
     registered[[prefix]] <<- directory
   }
-  try(
-    env$viewerFirstViewPublishKept(
-      options,
-      register = function(prefix, directory) {
-        publish(
-          prefix,
-          directory,
-          env$viewerSharedResourceStaticPath(directory)
-        )
-      },
-      serve = function(prefix, directory) {
-        publish(prefix, directory, files(directory))
-      }
-    ),
-    silent = TRUE
-  )
+  ## Protected launches may send the generic shell now, but must wait for
+  ## launchCerebro() to establish a private token prefix before publishing data.
+  if (!isTRUE(options[[".defer_first_views"]])) {
+    try(
+      env$viewerFirstViewPublishKept(
+        options,
+        register = function(prefix, directory) {
+          publish(
+            prefix,
+            directory,
+            env$viewerSharedResourceStaticPath(directory)
+          )
+        },
+        serve = function(prefix, directory) {
+          publish(prefix, directory, files(directory))
+        }
+      ),
+      silent = TRUE
+    )
+  }
   structure(
     list(
       server = server,

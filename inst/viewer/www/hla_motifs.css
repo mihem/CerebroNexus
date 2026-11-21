@@ -85,7 +85,9 @@
   z-index: 2000;
 }
 .hla-hint:hover::after,
-.hla-hint:hover::before {
+.hla-hint:hover::before,
+.hla-hint:focus-visible::after,
+.hla-hint:focus-visible::before {
   opacity: 1;
   visibility: visible;
 }

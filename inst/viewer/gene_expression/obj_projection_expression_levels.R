@@ -575,45 +575,66 @@ expression_projection_read_levels <- function(
 ## the last result so such changes do not re-read million-cell expression.
 expression_projection_levels_memo <- viewerMemoOne()
 
-expression_projection_expression_levels <- reactive({
-  req(
-    expression_projection_cells_to_show(),
-    expression_selected_genes()
+## A refused sidecar must not escape an observer and end the session. Keep the
+## validation strict, show the reason, and silently abort this paint so the user
+## can still switch to another data set. Never substitute zero expression.
+expressionProjectionCheckSidecar <- function(read) {
+  tryCatch(
+    read(),
+    cerebro_cell_names_mismatch = function(error) {
+      expressionProjectionProgressClose()
+      shiny::showNotification(
+        conditionMessage(error),
+        id = "expression-sidecar-mismatch",
+        type = "error",
+        duration = 15
+      )
+      shiny::req(FALSE)
+    }
   )
+}
 
-  cells_to_show <- expression_projection_cells_to_show()
-  ## Keep the canonical numeric indices returned by the shared projection
-  ## sampler. Converting them to barcodes here only makes the backend match
-  ## the same million names back to the original column indices.
-  genes_data <- expression_selected_genes()
-
-  ## The debounced selection can briefly retain genes from the previous data
-  ## set during a switch. Re-filter before touching the expression backend.
-  genes_present <- intersect(
-    genes_data$genes_to_display_present,
-    getGeneNames()
-  )
-  display_mode <- expressionSummaryMode(
-    expression_projection_display_mode(),
-    length(genes_present),
-    ncol(expression_projection_coordinates())
-  )
-  levels_key <- list(
-    data_set(),
-    cells_to_show,
-    genes_present,
-    display_mode,
-    if (identical(display_mode, "rgb")) genes_data[["rgb_genes"]]
-  )
-  expression_projection_levels_memo(levels_key, function() {
-    expression_projection_read_levels(
-      cells_to_show,
-      genes_data,
-      genes_present,
-      display_mode
+expression_projection_expression_levels <- reactive(expressionProjectionCheckSidecar(
+  function() {
+    req(
+      expression_projection_cells_to_show(),
+      expression_selected_genes()
     )
-  })
-})
+
+    cells_to_show <- expression_projection_cells_to_show()
+    ## Keep the canonical numeric indices returned by the shared projection
+    ## sampler. Converting them to barcodes here only makes the backend match
+    ## the same million names back to the original column indices.
+    genes_data <- expression_selected_genes()
+
+    ## The debounced selection can briefly retain genes from the previous data
+    ## set during a switch. Re-filter before touching the expression backend.
+    genes_present <- intersect(
+      genes_data$genes_to_display_present,
+      getGeneNames()
+    )
+    display_mode <- expressionSummaryMode(
+      expression_projection_display_mode(),
+      length(genes_present),
+      ncol(expression_projection_coordinates())
+    )
+    levels_key <- list(
+      data_set(),
+      cells_to_show,
+      genes_present,
+      display_mode,
+      if (identical(display_mode, "rgb")) genes_data[["rgb_genes"]]
+    )
+    expression_projection_levels_memo(levels_key, function() {
+      expression_projection_read_levels(
+        cells_to_show,
+        genes_data,
+        genes_present,
+        display_mode
+      )
+    })
+  }
+))
 
 expression_summary_data <- reactive({
   req(
