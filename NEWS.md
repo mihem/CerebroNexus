@@ -1,5 +1,71 @@
 # CerebroNexus 8.4.5
 
+- **The large demo data sets keep one folder, and know what made them.** The
+  scripts in `data-raw/large-demo/` put a prepared data set in
+  `<name>/prepared/` instead of `<name>/cerebro-v<number>/`, and its stamp
+  (`demo-version`) records the CerebroNexus version and a hash of the script's
+  functions instead of a number that had to be raised by hand. A run prepares
+  the data set again when either changes; before, a data set made with older
+  defaults (the uncompressed H5 file of the Ren atlas, 27 GB) was taken as
+  current until someone remembered the number. Folders `cerebro-v2` and
+  `cerebro-v3` are no longer read.
+- **More than 200,000 cells go to an H5 file by default.** The export and
+  convert functions (`exportFromSeurat()`, `exportFromSCE()`,
+  `convertSeuratToCerebro()`, `convertSCEToCerebro()`,
+  `convertH5adToCerebro()`) take `expression_matrix_mode = "auto"` by default:
+  `"h5"` for more than 200,000 cells, `"embedded"` up to that (the option
+  `cerebro.h5_cell_threshold` sets the number). A matrix kept inside the CRB is
+  read whole into memory at every start of the Viewer; from the H5 file the
+  Viewer reads only the genes it shows. `"embedded"` and `"h5"` do what they did.
+  An H5 file needs the CRB's name to end in `.crb` and the HDF5Array package;
+  when `"auto"` chose it and either is missing, the error says so.
+- **An h5ad with more than 2^31 - 1 non-zero values converts on the h5 route.**
+  A dgCMatrix cannot hold that many values, so `convertH5adToCerebro(
+  expression_matrix_mode = "h5")` used to stop on the full 1.3 million cells
+  of the E18 mouse brain (2.6 billion values). Such a matrix (an HDF5 CSR `X`)
+  is now not read into R, and the file is read once for both the per-group
+  summaries and the gene-major expression file: each block of cells is sorted
+  by gene, adds its share to the summaries, and is left in a scratch file next
+  to the result (compressed with zstd where R has it, its values in 4 bytes
+  when the h5ad stores 32-bit floats), and each range of genes is then
+  collected in memory from those (`cerebro.h5ad_stream_budget`, default 2^28
+  values per process, about 5 GiB), in several R processes
+  (`cerebro.h5ad_stream_workers`, at most 4 by default: 8 ran out of memory on
+  a 128 GB machine). The main process appends each range as soon as it is in,
+  while the processes go on with the next ones. The file holds what the plain
+  route writes; values the h5ad stores as 32-bit floats stay 32-bit floats in
+  it (they read back as the same doubles), which halves what the one R thread
+  that writes the file compresses, and makes it 8 % smaller. On the 1.3 million cells of the E18 mouse brain the writer
+  takes 283 to 301 s with 4 processes; reading the whole file again for every
+  range of genes, as it first did, took 705 s, and appending a wave of ranges
+  while the processes waited, 319 to 331 s. The whole conversion of the 21 GB
+  h5ad of those cells takes 451 s; with its values written as 64-bit floats it
+  took 524 s, and reading the file once more for the summaries first, 766 s.
+  The embedded mode and the other sources still need a matrix that fits.
+  The demo-data scripts in `data-raw/large-demo/` (mouse brain, Ren) write
+  their H5 file with this writer too; their own transposing helper
+  `h5_transposed_write.R` and its test are gone, and so is the level-3
+  "[compressed]" twin of each demo's H5 file (`h5_compressed_variant.R`): the
+  demos' H5 files are written at gzip level 1. So is the file `exportToH5ad()`
+  writes (it used level 4).
+- **The first gene of a large H5 file no longer waits for the checksum.** The
+  checksum of the H5 file is still computed in the background, once per file
+  (the result is kept in the user cache), but a read of expression does not wait
+  for it any more: every read looks again, and the first one after the check is
+  done refuses the file if it does not match the CRB. Before, the first gene of
+  a process that opened an unverified 11 GB file waited 47 s for the check.
+- **The H5 file is compressed by default again, at gzip level 1.**
+  `exportFromSeurat()` and `convertSeuratToCerebro()` write the H5 expression
+  file at gzip level 1 (`h5_compression_level = 1`), and so do the SCE and
+  h5ad routes (which used HDF5Array's level 6). On 500,000 mouse brain cells
+  (1.0 billion values) level 1 gives a file within 3 % of level 6 (4.06 and
+  3.95 GiB, against 11.4 GiB without compression) and writes it in 222 s
+  instead of 361 s. The compressed file keeps its checksum, copy and
+  file-cache cost several times below that of an uncompressed one.
+  `h5_compression_level = 0` keeps the uncompressed file.
+
+# CerebroNexus 8.4.5
+
 - **Local open-mode Viewers require a per-run access token.**
   `launchCerebro()` automatically opens and prints an authorized URL when
   the effective bind address is loopback. Shiny sessions reject missing or

@@ -769,7 +769,7 @@
 #' Viewer's checksum of the file, copying it and keeping it in the operating
 #' system's file cache cost. Level 0 writes the data without compression: it
 #' builds faster and reads a single gene about a third faster, for a larger
-#' file. Before 8.4.1 the default was 0.
+#' file. Before 8.4.5 the default was 0.
 #' @param codec Serialization codec for the CRB payload. Defaults to
 #' \code{"qs2"}; use \code{"rds"} when direct compatibility with
 #' \code{readRDS()} is required.
