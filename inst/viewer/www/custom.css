@@ -3713,6 +3713,11 @@ body .cerebro-viz-toolbar .cerebro-gene-rgb-channel,
 body .cerebro-viz-primary .ir-flow-controls {
   display: contents;
 }
+/* Gene expression's RGB note takes the last row of the fields. */
+body .cerebro-viz-toolbar .cerebro-gene-input-output small {
+  order: 95;
+  flex: 1 1 100%;
+}
 /* RGB co-expression (cerebroRgbGeneFields()): one field whose three gene
    boxes are marked by their channel's dot and are all as wide as the longest
    gene in them, an inline grid of equal columns, with no minimum width. */
@@ -3746,10 +3751,17 @@ body .cerebro-rgb-select .selectize-control {
 body .cerebro-rgb-select .form-group > .control-label { display: none !important; }
 body .cerebro-rgb-select .selectize-input,
 body .coordviews-page .cv-topbar .cerebro-rgb-select .selectize-input {
-  min-width: 70px;
+  min-width: 92px;
   padding-left: 25px !important;
   padding-right: 28px !important;
   white-space: nowrap;
+}
+/* Selectize sizes the placeholder when the field is drawn, which for a field
+   still hidden (Linked views) is no width at all: an empty box keeps room for it. */
+body .cerebro-rgb-select .selectize-input:not(.has-items) > input,
+body .coordviews-page .cv-topbar .cerebro-rgb-select .selectize-input:not(.has-items) > input {
+  flex: 0 0 4.5em !important;
+  width: 4.5em !important;
 }
 .cerebro-rgb-select::before {
   content: '';

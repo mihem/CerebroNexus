@@ -477,7 +477,7 @@ spatial_projection_data_to_plot_raw <- reactive({
     )
   }
   ## Pin the axes to the FULL cell extent, not the currently displayed subset.
-  ## Otherwise, changing "Show % of observations" rescales the axes to whatever subset
+  ## Otherwise, changing "Show % of cells" rescales the axes to whatever subset
   ## is plotted and the plot visibly jitters. We compute the range over ALL cells
   ## (in the same rotated frame) and pass it as an explicit x/y range. A small
   ## margin keeps edge points off the frame.

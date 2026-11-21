@@ -49,7 +49,7 @@ output[["spatial_projection_data_parameters_UI"]] <- renderUI({
   tagList(
     viewerLimitedSlider(
       "spatial_projection_percentage_cells_to_show",
-      label = "Show % of observations",
+      label = "Show % of cells",
       limits = preferences[["cell_percentage_cells_to_show"]],
       value = appearance$percentage_cells_to_show
     )
@@ -383,7 +383,7 @@ spatial_projection_additional_parameters_info <- list(
     <ul>
       <li><b>Point size:</b> Controls how large the observations should be.</li>
       <li><b>Point opacity:</b> Controls the transparency of the observations.</li>
-      <li><b>Show % of observations:</b> Randomly subsamples cells or spots after the active Sample, FOV / section, ROI, and group filters.</li>
+      <li><b>Show % of cells:</b> Randomly subsamples cells or spots after the active Sample, FOV / section, ROI, and group filters.</li>
     </ul>
     "
   )

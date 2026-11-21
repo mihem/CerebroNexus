@@ -136,7 +136,7 @@ output$ir_main_params_UI <- shiny::bindEvent(
         controls,
         list(selectInput(
           "ir_chain",
-          "Chain:",
+          "Chain",
           choices = chain_choices,
           selected = ir_keep_selection(
             isolate(input$ir_chain),
@@ -163,7 +163,7 @@ output$ir_main_params_UI <- shiny::bindEvent(
       ) {
         "Compare by:"
       } else {
-        "Group results by:"
+        "Group results by"
       }
       controls <- c(
         controls,
@@ -231,10 +231,18 @@ output$ir_appearance_section_UI <- renderUI({
   if (!has_display && !has_cell_options) {
     return(NULL)
   }
-  cerebroSettingsSection(
-    "Appearance",
-    uiOutput("ir_additional_params_UI"),
-    cerebroInfoButton("ir_additional_parameters_info")
+  tagList(
+    cerebroSettingsSection(
+      "Appearance",
+      uiOutput("ir_additional_params_UI"),
+      cerebroInfoButton("ir_additional_parameters_info")
+    ),
+    if (has_cell_options) {
+      cerebroSettingsSection(
+        "Data",
+        uiOutput("ir_data_panel", class = "cerebro-settings-contents")
+      )
+    }
   )
 })
 
@@ -479,9 +487,12 @@ n_samples <- reactive({
 })
 
 ## ---- Scatter display options ------------------------------------------ ##
-## Renders the effective display controls applicable to the current tab. The
-## settings drawer owns the section and scrolling, so this stays flat.
-output$ir_display_panel <- renderUI({
+## The effective display controls of the current tab. The settings drawer
+## owns the section and scrolling, so this stays flat. "Show % of cells" is
+## the Data section's, as on the other pages; the rest is Appearance's.
+ir_percent_param_id <- "ir_d_percentage_cells_to_show"
+ir_display_controls <- function(part = c("appearance", "data")) {
+  part <- match.arg(part)
   req(ir_settings_requested())
   tab <- input$ir_tabs
   if (!exists("ir_display_params_for")) {
@@ -554,9 +565,15 @@ output$ir_display_panel <- renderUI({
     # text
     textInput(p$id, p$label, value = p$value)
   })
-
-  do.call(tagList, controls)
-})
+  in_data <- vapply(
+    spec,
+    function(p) identical(p$id, ir_percent_param_id),
+    logical(1)
+  )
+  do.call(tagList, controls[if (part == "data") in_data else !in_data])
+}
+output$ir_display_panel <- renderUI(ir_display_controls("appearance"))
+output$ir_data_panel <- renderUI(ir_display_controls("data"))
 
 output$ir_cell_view_options_UI <- renderUI({
   req(ir_settings_requested())
@@ -768,5 +785,6 @@ outputOptions(output, "ir_additional_params_UI", suspendWhenHidden = FALSE)
 outputOptions(output, "ir_appearance_section_UI", suspendWhenHidden = FALSE)
 outputOptions(output, "ir_group_filters_UI", suspendWhenHidden = FALSE)
 outputOptions(output, "ir_display_panel", suspendWhenHidden = FALSE)
+outputOptions(output, "ir_data_panel", suspendWhenHidden = FALSE)
 outputOptions(output, "ir_cell_view_options_UI", suspendWhenHidden = FALSE)
 outputOptions(output, "ir_more_analysis_UI", suspendWhenHidden = FALSE)

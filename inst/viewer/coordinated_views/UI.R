@@ -186,11 +186,6 @@ tab_coordinated_views <- tabItem(
       class = "cv-topbar",
       div(
         class = "cv-filters",
-        div(
-          class = "cv-ctl",
-          tags$label("Colour by", `for` = "cv-pick-color"),
-          tags$select(id = "cv-pick-color")
-        ),
         ## Projections are a multi-select. Every selected embedding receives its
         ## own linked card in the same responsive grid as Spatial, Trekker and TCR.
         ## All coordinates already travel in the bundle, so this stays client-side.
@@ -207,8 +202,14 @@ tab_coordinated_views <- tabItem(
           class = "cv-ctl cv-multiselect-ctl",
           id = "cv-spatial-ctl",
           style = "display:none",
-          tags$label("Spatial data"),
+          tags$label("Sections"),
           tags$select(id = "cv-pick-spatial", multiple = "multiple")
+        ),
+        ## Data, then what colours it: the order of every page's toolbar.
+        div(
+          class = "cv-ctl",
+          tags$label("Colour by", `for` = "cv-pick-color"),
+          tags$select(id = "cv-pick-color")
         ),
         ## Mean/per-gene expression picker. Per-gene mode expands the linked
         ## spaces into a gene x space grid; the client enforces a 12-panel cap.

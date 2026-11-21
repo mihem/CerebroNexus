@@ -73,9 +73,12 @@ variable. Hover to see cell metadata; zoom and pan with the Canvas toolbar.
 
 ## Main parameters
 
-- **Spatial data**: which image/FOV to plot when several are present.
-- **Plot type**: `ImageDimPlot` (categorical) or `ImageFeaturePlot` (gene).
-- **Color cells by**: metadata variable used for cell coloring.
+- **Sections**: which image/FOV to plot when several are present; several
+  give the section grid (below).
+- **Display mode**: *Groups* (colour by a metadata column, Seurat's
+  `ImageDimPlot`), *Gene expression* (`ImageFeaturePlot`) or
+  *RGB co-expression* (three genes, one per colour channel).
+- **Colour by**: metadata variable used for cell coloring.
 - **Background image**: histology overlay (only shown when a matching
   `spatial_images` entry exists for the loaded dataset).
 - **Image opacity**: blend factor for the background image.

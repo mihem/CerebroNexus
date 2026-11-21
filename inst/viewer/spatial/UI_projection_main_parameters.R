@@ -319,8 +319,13 @@ output[["spatial_projection_main_parameters_UI"]] <- renderUI({
   tagList(
     selectInput(
       "spatial_projection_plot_type",
-      label = "Plot type",
-      choices = c("ImageDimPlot", "ImageFeaturePlot", "Co-expression (RGB)"),
+      label = "Display mode",
+      ## The values stay Seurat's names; the labels say what is drawn.
+      choices = c(
+        "Groups" = "ImageDimPlot",
+        "Gene expression" = "ImageFeaturePlot",
+        "RGB co-expression" = "Co-expression (RGB)"
+      ),
       selected = plot_type
     ),
     conditionalPanel(
@@ -348,7 +353,7 @@ output[["spatial_projection_main_parameters_UI"]] <- renderUI({
       condition = "input.spatial_projection_plot_type == 'ImageFeaturePlot'",
       selectizeInput(
         "spatial_projection_feature_to_display",
-        label = "Feature/Gene",
+        label = "Gene",
         choices = NULL,
         multiple = FALSE,
         options = list(

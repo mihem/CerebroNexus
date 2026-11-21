@@ -62,9 +62,9 @@ tab_spatial <- tabItem(
             tagList(
               uiOutput("spatial_projection_scatter_parameters_UI"),
               uiOutput("spatial_projection_show_group_label_UI"),
-              uiOutput("spatial_projection_keep_square_UI"),
+              uiOutput("spatial_projection_show_region_outline_UI"),
               uiOutput("spatial_projection_point_border_UI"),
-              uiOutput("spatial_projection_show_region_outline_UI")
+              uiOutput("spatial_projection_keep_square_UI")
             ),
             cerebroInfoButton(
               "spatial_projection_additional_parameters_info"

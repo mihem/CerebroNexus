@@ -6757,9 +6757,10 @@
       optsOf(Object.keys(D.fields || {}), FIELD_PREFIX, function (k) {
         return D.fields[k].label || k;
       }));
-    html += grp('Expression',
-      '<option value="' + GENE_MODE + '">Mean gene expression</option>' +
-      '<option value="' + GENE_PANELS_MODE + '">Per-gene expression panels</option>' +
+    // Named as Gene expression's Display mode names them.
+    html += grp('Gene expression',
+      '<option value="' + GENE_MODE + '">Mean expression</option>' +
+      '<option value="' + GENE_PANELS_MODE + '">Separate panels</option>' +
       '<option value="' + RGB_MODE + '">RGB co-expression</option>');
     destroyPicker(sel);
     sel.innerHTML = html;

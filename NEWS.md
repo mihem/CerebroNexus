@@ -39,6 +39,18 @@
   views use the same toolbar. The composition plots of Groups and of
   Trajectory's States by group pick *Plot type* and *Bars show* (number or
   percent of cells) in fields instead of a button group and a switch.
+- **Every page names and orders its fields the same way.** A toolbar reads
+  data (Projection, Sections, Method, Receptor), then *Display mode* or
+  *Colour by*, then the genes, then that mode's options (Panel colours, RGB
+  layout). Spatial's Plot type is *Display mode* with the options *Groups*,
+  *Gene expression* and *RGB co-expression* (the values, and so shared
+  links, are unchanged); Linked views lists Gene expression's three modes
+  under the same names; Feature/Gene is *Gene*, Spatial data *Sections*,
+  Choose a method / trajectory *Method* / *Trajectory*, and labels lose
+  their colons. Settings drawers read Appearance (point size and opacity,
+  group labels, region outlines, borders, square plots), Data (*Show % of
+  cells*, on Spatial and Immune repertoire too), Analysis, then Group
+  filters, on HLA & TCR Motifs as well.
 - **Square keeps the canvas.** The *Square* layout of the cell views draws
   the plot in the largest centred square of a canvas that keeps the panel's
   size, outlined by a light grey frame, instead of shrinking the canvas to a

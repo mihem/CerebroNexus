@@ -40,7 +40,14 @@ tab_gene_expression <- tabItem(
                 selected = "Gene(s)"
               )
             ),
+            ## Data, display mode, genes, then the mode's own options: the
+            ## order of every page's toolbar.
+            uiOutput("expression_projection_select_projection_UI"),
             uiOutput("expression_projection_genes_in_separate_panels_UI"),
+            uiOutput(
+              "expression_projection_input_type_UI",
+              class = "cerebro-gene-input-output"
+            ),
             conditionalPanel(
               "input.expression_projection_genes_in_separate_panels == 'rgb'",
               selectInput(
@@ -54,11 +61,6 @@ tab_gene_expression <- tabItem(
               )
             ),
             uiOutput("expression_projection_gene_color_mode_UI"),
-            uiOutput("expression_projection_select_projection_UI"),
-            uiOutput(
-              "expression_projection_input_type_UI",
-              class = "cerebro-gene-input-output"
-            ),
             uiOutput("expression_genes_displayed")
           ),
           cerebroToolbarActions(
