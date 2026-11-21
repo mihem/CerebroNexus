@@ -247,7 +247,7 @@
 }
 
 .cerebroCellNamesHash <- function(cells) {
-  rlang::hash(enc2utf8(as.character(cells)))
+  .crbContract()$.runtimeCellNamesHash(cells)
 }
 
 .validCellNames <- function(cells) {
@@ -694,17 +694,12 @@
   payload$cell_fingerprint <- .cerebroCellFingerprint(cells)
   indexed <- .indexThinPayloadByCell(payload, cells)
   payload$crb_schema <- list(
-    version = 3L,
+    version = 5L,
     cell_names_hash = .cerebroCellNamesHash(cells),
     projection_rownames = compact_projections,
-    n_cells = length(cells)
+    n_cells = length(cells),
+    cell_indexed = indexed
   )
-  ## Version 4 only when something is stored by cell index, so that a release
-  ## that reads version 3 refuses it instead of showing rows without names.
-  if (length(indexed)) {
-    payload$crb_schema$version <- 4L
-    payload$crb_schema$cell_indexed <- indexed
-  }
   payload
 }
 
@@ -738,14 +733,7 @@
   ## The H5 file's cell names, read with rhdf5 so that the expression matrix
   ## stays unattached.
   cells <- .h5CellNames(.cerebroSidecar(file, backend))
-  if (!identical(.cerebroCellNamesHash(cells), schema$cell_names_hash)) {
-    stop(
-      "The H5 cell names do not match CRB '",
-      basename(file),
-      "'.",
-      call. = FALSE
-    )
-  }
+  .crbContract()$.runtimeCheckCellNames(cells, schema, file)
   if (!identical(length(cells), schema$n_cells)) {
     stop(
       "The thin CRB cell count does not match its H5 sidecar.",

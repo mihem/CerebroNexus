@@ -2,6 +2,7 @@ test_that("a daemon confirms an H5 file's cell names once per process", {
   skip_if_not_installed("rhdf5")
   skip_if_not_installed("mirai")
   crb_cache <- new.env()
+  sys.source(viewer_test_path("core", "crb_contract.R"), crb_cache)
   sys.source(viewer_test_path("crb_cache.R"), crb_cache)
   sidecar <- withr::local_tempfile(fileext = ".h5")
   cells <- c("AAAC-1", "AAAG-1", "AAAT-1")

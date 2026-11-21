@@ -1,3 +1,13 @@
+# CerebroNexus (development version)
+
+- H5-backed data sets no longer falsely report mismatched cell names when
+  exported and opened with different `rlang` versions. New thin CRBs use
+  schema 5 with a versioned MD5 checksum of the ordered UTF-8 cell names.
+  Package, standalone Viewer, Viewer Pack and background readers still verify
+  the historical schema-3/4 checksums from both `rlang` hashing formats.
+  Reordered or foreign cells remain rejected; a gene-expression cell-name
+  validation error is shown without disconnecting the Shiny session.
+
 # CerebroNexus 8.4.4
 
 - **The Builder needs an access token.** `launchCerebroBuilder()` now
