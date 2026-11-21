@@ -39,6 +39,10 @@
 #'   authentication. Tokens travel in the URL: keep it private and use HTTPS
 #'   for remote access. Closed-mode and generated standalone Viewers are
 #'   unchanged by default.
+#'   This default is a breaking change for open-mode launches behind a reverse
+#'   proxy that also binds to loopback. Set \code{require_token = FALSE} for an
+#'   intentionally public or externally authenticated deployment; proxy headers
+#'   are not used to disable protection automatically.
 #' @param ... Further parameters that are used by \code{shiny::runApp}, e.g.
 #' \code{host} or \code{port}.
 #'
@@ -216,14 +220,21 @@ launchCerebro <- function(
       if (
         !identical(.viewer_shared_resources$access_token, viewer_access$token)
       ) {
-        ## Prefixes and first-view files must not retain a previous run's
-        ## credential. Protected Pack URLs use the same OS-backed secret.
-        rm(
-          list = ls(.viewer_shared_resources, all.names = TRUE),
-          envir = .viewer_shared_resources
-        )
+        ## Only rotation invalidates existing prefixes. The first assignment
+        ## can follow adoption of resources which must keep their identities.
+        if (!is.null(.viewer_shared_resources$access_token)) {
+          rm(
+            list = ls(.viewer_shared_resources, all.names = TRUE),
+            envir = .viewer_shared_resources
+          )
+        }
         .viewer_shared_resources$access_token <- viewer_access$token
-        .viewer_shared_resources$token <- viewer_access$token
+        if (is.null(.viewer_shared_resources$token)) {
+          .viewer_shared_resources$token <- viewer_access$token
+        }
+        ## Re-publish descriptions under the private prefix, without losing
+        ## adopted Pack prefixes or their counters.
+        .viewer_shared_resources$published <- NULL
       }
     }
     viewer_access$token
@@ -415,6 +426,15 @@ launchCerebro <- function(
         viewer_access_token()
       )
     ) {
+      session$sendCustomMessage(
+        "cerebro_access_denied",
+        list(
+          message = paste0(
+            "Access token required. Open the authorized Viewer URL printed ",
+            "in the R console by launchCerebro() or cerebroStart()."
+          )
+        )
+      )
       session$close()
       return(invisible(NULL))
     }
@@ -505,7 +525,7 @@ launchCerebro <- function(
     }
     token <- viewer_access_token()
     if (!is.null(web_server)) {
-      viewer_access_address(viewerDocumentAddress(web_server))
+      viewer_access_address(.viewerAccessAddress(web_server))
       if (
         identical(mode, "open") &&
           is.null(token) &&

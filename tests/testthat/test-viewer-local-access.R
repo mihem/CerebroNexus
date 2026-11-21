@@ -70,6 +70,7 @@ test_that("the public shell does not bypass the session guard", {
   closed <- FALSE
   session <- list(
     clientData = list(url_search = ""),
+    sendCustomMessage = function(...) invisible(NULL),
     close = function() closed <<- TRUE
   )
   app$serverFuncSource()(NULL, NULL, session)
@@ -199,12 +200,93 @@ test_that("auto mode uses the running server's address, not just launch options"
   )
 })
 
+test_that("the first credential preserves adopted shared prefixes and counters", {
+  withr::local_options(cerebro.sockjs_compat = FALSE)
+  app <- launchCerebro()
+  env <- environment(app$serverFuncSource())
+  root <- withr::local_tempdir()
+  directory <- file.path(root, "projections")
+  dir.create(directory)
+  writeLines("{}", file.path(root, "manifest.json"))
+  env$.viewer_shared_resources$token <- strrep("c", 24)
+  env$.viewer_shared_resources$adopted_marker <- "keep"
+  env$.viewer_shared_resources$published <- TRUE
+  registrations <- character()
+  register <- function(prefix, directory) {
+    registrations <<- c(registrations, prefix)
+  }
+  before <- env$viewerSharedResourcePrefix(
+    "projection",
+    directory,
+    root,
+    register
+  )
+  env$viewer_access_token()
+  after <- env$viewerSharedResourcePrefix(
+    "projection",
+    directory,
+    root,
+    register
+  )
+  expect_identical(after, before)
+  expect_identical(registrations, before)
+  expect_identical(env$.viewer_shared_resources$adopted_marker, "keep")
+  expect_identical(env$.viewer_shared_resources$token, strrep("c", 24))
+  expect_null(env$.viewer_shared_resources$published)
+})
+
+test_that("console addresses are built without optional cache code", {
+  for (host in c("127.0.0.1", "0.0.0.0", "::", "::1", "[::1]")) {
+    server <- list(getHost = function() host, getPort = function() 3838L)
+    expected <- if (grepl(":", host, fixed = TRUE)) {
+      "http://[::1]:3838/"
+    } else {
+      "http://127.0.0.1:3838/"
+    }
+    expect_identical(.viewerAccessAddress(server), expected)
+  }
+})
+
+test_that("startup does not depend on an optional cached-document address helper", {
+  withr::local_options(cerebro.sockjs_compat = FALSE)
+  app <- launchCerebro()
+  env <- environment(app$serverFuncSource())
+  env$viewer_document <- NULL
+  env$viewerDocumentAddress <- function(...) {
+    stop("optional cache helper unavailable")
+  }
+  env$viewerFirstViewPublishKept <- function(...) invisible(NULL)
+  env$viewerSharedResourceHeaders <- function(...) invisible(NULL)
+  prepared <- FALSE
+  env$viewer_prepare_ui <- function() prepared <<- TRUE
+  env$viewer_prepare <- function() TRUE
+  original <- shiny::getShinyOption("server", default = NULL)
+  withr::defer(shiny::shinyOptions(server = original))
+  shiny::shinyOptions(
+    server = list(
+      isRunning = function() TRUE,
+      getHost = function() "127.0.0.1",
+      getPort = function() 3838
+    )
+  )
+  expect_message(
+    env$viewer_started(),
+    "Open the Viewer at http://127.0.0.1:3838/"
+  )
+  deadline <- Sys.time() + 2
+  while (!prepared && Sys.time() < deadline) {
+    later::run_now(0.05)
+  }
+  expect_true(prepared)
+})
+
 test_that("rerunning an app refreshes the token without changing global token options", {
   withr::local_options(cerebro.sockjs_compat = FALSE)
   app <- launchCerebro()
   env <- environment(app$serverFuncSource())
   before <- options()
   token <- env$viewer_access_token()
+  env$.viewer_shared_resources$rotation_marker <- "remove"
   cleanup <- list()
   local_mocked_bindings(
     onStop = function(fn, ...) cleanup[[length(cleanup) + 1L]] <<- fn,
@@ -222,6 +304,7 @@ test_that("rerunning an app refreshes the token without changing global token op
     }
   )
   expect_false(identical(env$viewer_access_token(), token))
+  expect_null(env$.viewer_shared_resources$rotation_marker)
   expect_identical(
     getOption("CerebroNexus.builder.access_token"),
     before[["CerebroNexus.builder.access_token"]]
@@ -247,6 +330,9 @@ test_that("cerebroStart preserves the early shell but defers protected previews"
   early_options <- NULL
   received <- NULL
   env$sys.source <- function(file, envir) {
+    if (identical(basename(file), "access_policy.R")) {
+      return(base::sys.source(file, envir))
+    }
     early_attempts <<- early_attempts + 1L
     envir$viewerEarlyServerStart <- function(root, host, port, options) {
       early_options <<- options
@@ -270,28 +356,38 @@ test_that("cerebroStart preserves the early shell but defers protected previews"
     c("Package: CerebroNexus", "Version: 0.0.1"),
     file.path(root, "DESCRIPTION")
   )
+  dir.create(file.path(root, "viewer", "core"), recursive = TRUE)
+  file.copy(
+    viewer_test_path("core", "access_policy.R"),
+    file.path(root, "viewer", "core", "access_policy.R")
+  )
   libraries <- .libPaths()
   withr::defer(.libPaths(libraries))
   for (settings in list(
     list(mode = "open"),
     list(mode = "open", require_token = TRUE),
-    list(mode = "closed", require_token = TRUE)
+    list(mode = "closed", require_token = TRUE),
+    list(mode = "open", require_token = TRUE, host = "0.0.0.0")
   )) {
     do.call(env$cerebroStart, c(settings, list(root = root)))
     expect_true(early_options$.defer_first_views)
-    expect_identical(received$options$host, "127.0.0.1")
+    expect_identical(
+      received$options$host,
+      if (is.null(settings$host)) "127.0.0.1" else settings$host
+    )
   }
   expect_error(
     env$cerebroStart(root = root, require_token = "invalid"),
     "require_token"
   )
-  expect_identical(early_attempts, 3L)
+  expect_identical(early_attempts, 4L)
   for (settings in list(
     list(mode = "closed"),
-    list(mode = "open", require_token = FALSE)
+    list(mode = "open", require_token = FALSE),
+    list(mode = "open", host = "0.0.0.0")
   )) {
     do.call(env$cerebroStart, c(settings, list(root = root)))
     expect_false(early_options$.defer_first_views)
   }
-  expect_identical(early_attempts, 5L)
+  expect_identical(early_attempts, 7L)
 })

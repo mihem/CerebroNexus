@@ -130,3 +130,25 @@ test_that("cerebroStart protects the real open-mode Viewer and its upload UI", {
   expect_identical(viewer_local_access_get(app$address)$status_code, 200L)
   expect_true(viewer_local_access_socket(app, "")$closed)
 })
+
+test_that("a bare Run App URL explains how to open the authorized Viewer", {
+  skip_if_no_chrome()
+  app <- viewer_local_access_process(start = TRUE, cached = TRUE)
+  browser <- chromote::ChromoteSession$new()
+  withr::defer(browser$close())
+  browser$Page$navigate(app$address)
+  message <- browser$Runtime$evaluate(
+    paste0(
+      "new Promise(resolve => { const deadline = Date.now() + 6000; ",
+      "const check = () => { const node = document.getElementById('cerebro-access-denied'); ",
+      "if (node) return resolve(node.textContent); ",
+      "if (Date.now() > deadline) return resolve(''); ",
+      "setTimeout(check, 50); }; check(); })"
+    ),
+    awaitPromise = TRUE,
+    returnByValue = TRUE
+  )$result$value
+  expect_match(message, "Access token required", fixed = TRUE)
+  expect_match(message, "R console", fixed = TRUE)
+  expect_false(grepl(app$token, message, fixed = TRUE))
+})

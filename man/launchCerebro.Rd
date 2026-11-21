@@ -60,7 +60,11 @@ token on any address; \code{FALSE} explicitly disables it, for example
 behind an authenticated reverse proxy. Loopback binding alone is not
 authentication. Tokens travel in the URL: keep it private and use HTTPS
 for remote access. Closed-mode and generated standalone Viewers are
-unchanged by default.}
+unchanged by default.
+This default is a breaking change for open-mode launches behind a reverse
+proxy that also binds to loopback. Set \code{require_token = FALSE} for an
+intentionally public or externally authenticated deployment; proxy headers
+are not used to disable protection automatically.}
 
 \item{...}{Further parameters that are used by \code{shiny::runApp}, e.g.
 \code{host} or \code{port}.}

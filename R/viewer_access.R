@@ -1,18 +1,31 @@
 ## Per-app credentials, never a process-wide option: two Viewer objects must
 ## not share a secret. Reuse the Builder's OS-backed credential generator.
-.viewerAccessRequired <- function(mode, require_token, host) {
-  if (
-    !is.null(require_token) &&
-      (!is.logical(require_token) ||
-        length(require_token) != 1L ||
-        is.na(require_token))
-  ) {
-    stop("'require_token' must be NULL, TRUE or FALSE.", call. = FALSE)
+.viewerAccessRequired <- local({
+  policy <- new.env(parent = baseenv())
+  function(mode, require_token, host) {
+    if (!exists("viewerAccessRequired", envir = policy, inherits = FALSE)) {
+      sys.source(
+        system.file("viewer/core/access_policy.R", package = "CerebroNexus"),
+        envir = policy
+      )
+    }
+    policy$viewerAccessRequired(mode, require_token, host)
   }
-  if (!is.null(require_token)) {
-    return(require_token)
+})
+
+## Console/browser access must not depend on optional cached-page helpers.
+.viewerAccessAddress <- function(server) {
+  host <- server$getHost()
+  if (host %in% c("0.0.0.0", "")) {
+    host <- "127.0.0.1"
   }
-  identical(mode, "open") && .builderHostIsLoopback(host)
+  if (identical(host, "::")) {
+    host <- "::1"
+  }
+  if (grepl(":", host, fixed = TRUE) && !startsWith(host, "[")) {
+    host <- paste0("[", host, "]")
+  }
+  sprintf("http://%s:%d/", host, as.integer(server$getPort()))
 }
 
 .viewerAccessAllowed <- function(query, token) {

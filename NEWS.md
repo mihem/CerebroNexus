@@ -13,8 +13,17 @@
   token is available, while datasets load. Tokens are supplied automatically
   in the browser URL; no password entry or secret HTML filename is needed.
   Closed-mode and generated standalone Viewers keep their existing defaults.
-  This is local
-  access hardening, not a replacement for HTTPS and deployment authentication.
+  Opening a bare Run App URL without the token shows an explanation pointing
+  to the authorized link in the R console. This is local access hardening,
+  not a replacement for HTTPS and deployment authentication.
+- **Breaking change for loopback-backed proxies serving an open-mode Viewer.**
+  An open-mode `launchCerebro()` / `cerebroStart()` behind nginx, Shiny Server,
+  or a Docker loopback mapping can also bind to localhost, so the automatic
+  token rule applies there too. For an intentionally public deployment, or
+  one already protected by proxy authentication and HTTPS, explicitly set
+  `require_token = FALSE` (`--require-token=false` with `start.R`).
+  The bind address alone does not distinguish a personal Viewer from a
+  proxy-backed deployment; untrusted proxy headers do not disable protection.
 
 # CerebroNexus 8.4.4
 

@@ -39,15 +39,10 @@ cerebroStart <- function(
   root = find.package("CerebroNexus"),
   require_token = NULL
 ) {
-  if (
-    !is.null(require_token) &&
-      (!is.logical(require_token) ||
-        length(require_token) != 1L ||
-        is.na(require_token))
-  ) {
-    stop("'require_token' must be NULL, TRUE or FALSE.", call. = FALSE)
-  }
   root <- normalizePath(root, winslash = "/", mustWork = TRUE)
+  policy <- new.env(parent = baseenv())
+  sys.source(file.path(root, "viewer", "core", "access_policy.R"), policy)
+  token_requested <- policy$viewerAccessRequired(mode, require_token, host)
   ## The package, and the background processes of the Viewer, are found where
   ## this installation is.
   library <- dirname(root)
@@ -69,8 +64,6 @@ cerebroStart <- function(
   early <- NULL
   ## The interface may be sent immediately, before loading the package. Data
   ## previews wait for the private token prefix when protection may be needed.
-  token_requested <- !identical(require_token, FALSE) &&
-    (identical(mode, "open") || isTRUE(require_token))
   if (isTRUE(getOption("CerebroNexus.ui_cache", TRUE))) {
     early <- tryCatch(
       {

@@ -17,7 +17,6 @@ utils::globalVariables(c(
   "viewerDocumentRestore",
   "viewerDocumentServe",
   "viewerDocumentCapture",
-  "viewerDocumentAddress",
   "viewerStartTab",
   "group",
   "."
