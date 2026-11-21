@@ -248,11 +248,14 @@
     var head = '<tr>' + shownColumns.map(function (c) {
       var state = self.sort && self.sort.column === c
         ? (self.sort.descending ? 'sorting_desc' : 'sorting_asc') : 'sorting';
-      return '<th class="' + state + '" data-col="' + c + '">' + esc(columns[c].name) + '</th>';
+      var ariaSort = state === 'sorting_asc' ? 'ascending'
+        : state === 'sorting_desc' ? 'descending' : 'none';
+      return '<th class="' + state + '" data-col="' + c + '" tabindex="0" aria-sort="' +
+        ariaSort + '">' + esc(columns[c].name) + '</th>';
     }).join('') + '</tr><tr class="cst-filters">' + shownColumns.map(function (c) {
       return '<td><input type="search" class="form-control" data-col="' + c +
         '" placeholder="All" value="' + esc(self.filterText(columns[c])) + '"' +
-        (columns[c].kind === 'text' ? '' : ' readonly') +
+        (columns[c].kind === 'text' ? '' : ' readonly aria-haspopup="true" aria-expanded="false"') +
         ' aria-label="Filter ' + esc(columns[c].name) + '"></td>';
     }).join('') + '</tr>';
     var body = '';
@@ -279,9 +282,11 @@
     el.innerHTML =
       '<div class="dataTables_wrapper form-inline dt-bootstrap no-footer">' +
       '<div class="dt-buttons btn-group">' +
-      '<button type="button" class="btn btn-default dt-button buttons-collection cst-colvis">' +
+      '<button type="button" class="btn btn-default dt-button buttons-collection cst-colvis" ' +
+      'aria-haspopup="true" aria-expanded="false">' +
       '<span>Column visibility</span></button>' +
-      '<button type="button" class="btn btn-default dt-button buttons-collection cst-download">' +
+      '<button type="button" class="btn btn-default dt-button buttons-collection cst-download" ' +
+      'aria-haspopup="true" aria-expanded="false">' +
       '<span>Download</span></button></div>' +
       '<button type="button" class="btn btn-default dt-button cst-close"><span>Hide table</span></button>' +
       '<div class="dataTables_scroll"><table class="table table-bordered table-condensed ' +
@@ -326,12 +331,22 @@
       });
     });
     Array.prototype.forEach.call(el.querySelectorAll('thead th[data-col]'), function (th) {
-      th.addEventListener('click', function () {
+      var sortThis = function () {
         var c = Number(th.getAttribute('data-col')), name = self.source.columns[c].name;
         // Ascending, then descending, then ascending again (as DataTables).
         self.sort = { column: c, name: name,
           descending: !!(self.sort && self.sort.column === c && !self.sort.descending) };
         self.order = null; self.page = 0; self.render();
+        return c;
+      };
+      th.addEventListener('click', sortThis);
+      // The header is a control too: Enter or Space sorts, and the table is
+      // drawn anew, so the same header takes the focus back.
+      th.addEventListener('keydown', function (event) {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        var again = self.el.querySelector('thead th[data-col="' + sortThis() + '"]');
+        if (again) again.focus();
       });
     });
     var timer = null;
@@ -339,6 +354,13 @@
       var c = Number(input.getAttribute('data-col')), column = self.source.columns[c];
       if (column.kind !== 'text') {
         input.addEventListener('click', function () { self.toggleMenu(input, 'filter', c); });
+        // A read-only box opens its menu from the keyboard as well.
+        input.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter' || event.key === 'ArrowDown') {
+            event.preventDefault();
+            self.toggleMenu(input, 'filter', c);
+          }
+        });
         return;
       }
       input.addEventListener('input', function () {
@@ -359,6 +381,9 @@
       this.menu.remove();
       this.menu = null;
       document.removeEventListener('mousedown', this.menuAway, true);
+      document.removeEventListener('keydown', this.menuKey, true);
+      if (this.menuAnchor) this.menuAnchor.setAttribute('aria-expanded', 'false');
+      this.menuAnchor = null;
     }
   };
   // A drop-down under `anchor`: column visibility, downloads, or the filter of
@@ -448,6 +473,15 @@
       if (!menu.contains(event.target) && event.target !== anchor) self.closeMenu();
     };
     document.addEventListener('mousedown', this.menuAway, true);
+    // Escape closes the menu and gives the focus back to what opened it.
+    this.menuKey = function (event) {
+      if (event.key !== 'Escape') return;
+      self.closeMenu();
+      anchor.focus();
+    };
+    document.addEventListener('keydown', this.menuKey, true);
+    this.menuAnchor = anchor;
+    anchor.setAttribute('aria-expanded', 'true');
   };
   // Every listed row (filters and order applied) in the visible columns.
   SelectionTable.prototype.eachRow = function (visit) {
