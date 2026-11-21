@@ -1,4 +1,4 @@
-# CerebroNexus 8.4.6
+# CerebroNexus 8.4.7
 
 - **A short wait shows no progress card.** A progress notification of the
   Viewer (a gene, a spatial section, a result table) appears only once its
