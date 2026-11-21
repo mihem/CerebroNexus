@@ -429,9 +429,10 @@ launchCerebro <- function(
       session$sendCustomMessage(
         "cerebro_access_denied",
         list(
+          title = "Access token required",
           message = paste0(
-            "Access token required. Open the authorized Viewer URL printed ",
-            "in the R console by launchCerebro() or cerebroStart()."
+            "Open the authorized Viewer URL printed in your R console ",
+            "by launchCerebro() or cerebroStart()."
           )
         )
       )

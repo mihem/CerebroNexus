@@ -151,4 +151,59 @@ test_that("a bare Run App URL explains how to open the authorized Viewer", {
   expect_match(message, "Access token required", fixed = TRUE)
   expect_match(message, "R console", fixed = TRUE)
   expect_false(grepl(app$token, message, fixed = TRUE))
+  presentation <- browser$Runtime$evaluate(
+    paste0(
+      "(() => { const node = document.getElementById('cerebro-access-denied'); ",
+      "return {tag:node.tagName, modal:node.matches(':modal'), role:node.getAttribute('role'), ",
+      "themed:node.classList.contains('cerebro-session-dialog'), ",
+      "inline:node.hasAttribute('style'), startup:!!document.getElementById('cerebro-startup')}; })()"
+    ),
+    returnByValue = TRUE
+  )$result$value
+  expect_identical(presentation$tag, "DIALOG")
+  expect_true(presentation$modal)
+  expect_identical(presentation$role, "alertdialog")
+  expect_true(presentation$themed)
+  expect_false(presentation$inline)
+  expect_false(presentation$startup)
+  matches_timeout <- browser$Runtime$evaluate(
+    paste0(
+      "(() => { const access = document.getElementById('cerebro-access-denied'); ",
+      "const timeout = document.getElementById('session-timeout-warning'); ",
+      "return ['backgroundColor', 'color', 'borderRadius', 'padding', 'boxShadow'].every(",
+      "name => getComputedStyle(access)[name] === getComputedStyle(timeout)[name]); })()"
+    ),
+    returnByValue = TRUE
+  )$result$value
+  expect_true(matches_timeout)
+  browser$Input$dispatchKeyEvent(
+    type = "keyDown",
+    key = "Escape",
+    code = "Escape"
+  )
+  browser$Input$dispatchKeyEvent(
+    type = "keyUp",
+    key = "Escape",
+    code = "Escape"
+  )
+  expect_true(
+    browser$Runtime$evaluate(
+      "document.getElementById('cerebro-access-denied').matches(':modal')",
+      returnByValue = TRUE
+    )$result$value
+  )
+  browser$Emulation$setDeviceMetricsOverride(
+    width = 375,
+    height = 812,
+    deviceScaleFactor = 1,
+    mobile = FALSE
+  )
+  fits <- browser$Runtime$evaluate(
+    paste0(
+      "(() => { const r = document.getElementById('cerebro-access-denied').getBoundingClientRect(); ",
+      "return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight; })()"
+    ),
+    returnByValue = TRUE
+  )$result$value
+  expect_true(fits)
 })

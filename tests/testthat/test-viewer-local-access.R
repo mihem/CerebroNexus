@@ -204,7 +204,9 @@ test_that("the first credential preserves adopted shared prefixes and counters",
   withr::local_options(cerebro.sockjs_compat = FALSE)
   app <- launchCerebro()
   env <- environment(app$serverFuncSource())
-  root <- withr::local_tempdir()
+  ## Match the helper's canonical-root contract: Windows separators and
+  ## symlinked temporary directories (as on macOS) must already be resolved.
+  root <- normalizePath(withr::local_tempdir(), winslash = "/", mustWork = TRUE)
   directory <- file.path(root, "projections")
   dir.create(directory)
   writeLines("{}", file.path(root, "manifest.json"))
@@ -221,6 +223,8 @@ test_that("the first credential preserves adopted shared prefixes and counters",
     root,
     register
   )
+  expect_match(before, "^cerebro-projection-")
+  expect_length(registrations, 1L)
   env$viewer_access_token()
   after <- env$viewerSharedResourcePrefix(
     "projection",
