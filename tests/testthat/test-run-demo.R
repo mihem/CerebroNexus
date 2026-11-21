@@ -120,7 +120,6 @@ test_that("run-demo builds the Visium sets with the Builder beside the others", 
       scope$prepareViewer1mBenchmarkData <- function() crb
       scope$.viewer1mVersion <- 1L
       scope$prepareDemoViewerPack <- function(crb) NULL
-      scope$prepareCompressedDemoVariant <- function(crb) crb
       scope$prepareBuilderVisiumDemoData <- function(id) {
         file.path(root, paste0("visium_", id, "_sce.rds"))
       }
