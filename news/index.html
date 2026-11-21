@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.4</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -77,6 +77,11 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="8.4.4" id="cerebronexus-844">CerebroNexus 8.4.4<a class="anchor" aria-label="anchor" href="#cerebronexus-844"></a></h2>
+<ul><li>
+<strong>The Builder needs an access token.</strong> <code><a href="../reference/launchCerebroBuilder.html">launchCerebroBuilder()</a></code> now makes a random token for each run and opens the page at an address that carries it (<code>?token=...</code>, also printed in the R console). Without the token the page is refused and no session starts. Shiny checks neither the Origin nor the Host of a connection, so before this a web page open in the same browser (through a cross-site WebSocket or DNS rebinding), or another user of a shared machine, could connect to the Builder’s port and drive it: browse the home folder, open files and run the code inside an <code>.rds</code>.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="8.4.3" id="cerebronexus-843">CerebroNexus 8.4.3<a class="anchor" aria-label="anchor" href="#cerebronexus-843"></a></h2>
 <ul><li>

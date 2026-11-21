@@ -40,7 +40,8 @@ launchCerebroBuilder(
 
 - launch_browser:
 
-  Open a browser; defaults to `TRUE`.
+  Open a browser at the address with the access token; defaults to
+  `TRUE`. The address is printed either way.
 
 - max_file_size:
 
@@ -58,6 +59,11 @@ The object is read by a local background R worker, so run it on your own
 machine or in your own RStudio Server session. It is not meant to be
 deployed for other people to upload data to: it reads whatever path it
 is given, and reading an \`.rds\` runs whatever code is inside it.
+
+Each run gets a random access token. The page opens with it in its
+address (`?token=...`), which is also printed in the R console; without
+it the page is refused and no session starts, so neither a web page you
+visit nor another user of a shared machine can drive the Builder.
 
 ## Examples
 

@@ -27,7 +27,7 @@ wrong in a hand-written call are visible before anything is written."><meta prop
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.4</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -137,7 +137,8 @@ because other machines could then reach the Builder.</p></dd>
 
 
 <dt id="arg-launch-browser">launch_browser<a class="anchor" aria-label="anchor" href="#arg-launch-browser"></a></dt>
-<dd><p>Open a browser; defaults to <code>TRUE</code>.</p></dd>
+<dd><p>Open a browser at the address with the access
+token; defaults to <code>TRUE</code>. The address is printed either way.</p></dd>
 
 
 <dt id="arg-max-file-size">max_file_size<a class="anchor" aria-label="anchor" href="#arg-max-file-size"></a></dt>
@@ -159,6 +160,10 @@ stops.</p></dd>
 your own RStudio Server session. It is not meant to be deployed for other
 people to upload data to: it reads whatever path it is given, and reading an
 `.rds` runs whatever code is inside it.</p>
+<p>Each run gets a random access token. The page opens with it in its address
+(<code>?token=...</code>), which is also printed in the R console; without it the
+page is refused and no session starts, so neither a web page you visit nor
+another user of a shared machine can drive the Builder.</p>
     </div>
 
     <div class="section level2">
