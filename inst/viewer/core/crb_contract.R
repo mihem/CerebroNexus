@@ -4,38 +4,30 @@
 
 ## A persistent checksum must not use rlang::hash(): its object-hashing format
 ## changed in rlang 1.3.0. Hash a specified byte stream instead: in canonical
-## order, each UTF-8 name prefixed by its decimal byte length and ":" (no
-## separators or newline). Length prefixes disambiguate names containing ":".
-## Unlike the cell-set fingerprint, this must NEVER sort the names.
+## order, each UTF-8 name followed by one zero byte, including the last name.
+## R strings cannot contain embedded NUL, so boundaries are unambiguous.
+## writeBin(character, raw()) writes exactly those C-style strings in native
+## code; unlike serialize(), it adds no object/R-version/encoding headers.
+## Unlike the cell-set fingerprint, this must NEVER sort the names. XXH3-128
+## (seed 0) is selected explicitly, never digest's object-serialization default.
 .runtimeCellNamesHash <- function(cells) {
   cells <- enc2utf8(as.character(cells))
-  path <- tempfile("cerebro-cell-order-")
-  on.exit(unlink(path), add = TRUE)
-  connection <- file(path, "wb")
-  tryCatch(
-    {
-      for (chunk in seq_len(ceiling(length(cells) / 65536L))) {
-        start <- (chunk - 1L) * 65536L + 1L
-        block <- cells[seq.int(start, min(length(cells), start + 65535L))]
-        writeBin(
-          charToRaw(paste0(
-            nchar(block, type = "bytes"),
-            ":",
-            block,
-            collapse = ""
-          )),
-          connection
-        )
-      }
-    },
-    finally = close(connection)
+  if (anyNA(cells)) {
+    stop("Cell names must not contain missing values.", call. = FALSE)
+  }
+  paste0(
+    "xxh3-128-cell-order-v1:",
+    digest::digest(
+      writeBin(cells, raw()),
+      algo = "xxh3_128",
+      serialize = FALSE,
+      seed = 0L
+    )
   )
-  paste0("md5-cell-order-v1:", unname(tools::md5sum(path)))
 }
 
 .runtimeCellNamesMatch <- function(cells, expected) {
-  cells <- enc2utf8(as.character(cells))
-  if (anyNA(cells) || !startsWith(expected, "md5-cell-order-v1:")) {
+  if (!startsWith(expected, "xxh3-128-cell-order-v1:") || anyNA(cells)) {
     return(FALSE)
   }
   identical(.runtimeCellNamesHash(cells), expected)
@@ -170,7 +162,7 @@
     !is.na(schema$cell_names_hash) &&
     grepl(
       if (identical(schema$version, 5L)) {
-        "^md5-cell-order-v1:[[:xdigit:]]{32}$"
+        "^xxh3-128-cell-order-v1:[[:xdigit:]]{32}$"
       } else {
         "^[[:xdigit:]]{32}$"
       },

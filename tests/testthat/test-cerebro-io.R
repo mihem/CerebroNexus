@@ -95,7 +95,7 @@ test_that("the H5 helpers read the cell and gene names of a cells x genes file",
   )
   expect_match(
     .cerebroCellNamesHash(fixture$cells),
-    "^md5-cell-order-v1:[[:xdigit:]]{32}$"
+    "^xxh3-128-cell-order-v1:[[:xdigit:]]{32}$"
   )
 })
 
@@ -348,7 +348,7 @@ test_that("a thin CRB with a wrong cell count or malformed schema is rejected", 
 
   bad_hash <- broken(function(p) {
     p$crb_schema$cell_names_hash <- paste0(
-      "md5-cell-order-v1:",
+      "xxh3-128-cell-order-v1:",
       strrep("0", 32L)
     )
   })

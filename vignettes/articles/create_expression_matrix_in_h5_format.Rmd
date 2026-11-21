@@ -139,8 +139,10 @@ If the `.crb` and the H5 file do not belong together, for example because the
 H5 file was re-exported with a different cell order, loading stops with an error
 instead of attaching expression values to the wrong cells.
 
-Schema 5 uses a versioned MD5 checksum of the ordered UTF-8 names, independent
-of the installed `rlang` version. Existing schema-3/4 files require a one-time
+Schema 5 uses a versioned XXH3-128 checksum (seed 0) of the ordered UTF-8 names,
+each terminated by a zero byte, independently of `rlang` and R-object
+serialization. Raw-byte encoding and hashing run in native code without
+temporary files. Existing schema-3/4 files require a one-time
 `convertCerebro("dataset.crb")` with the updated package; stop apps using the
 export first. Conversion validates the old checksum and reuses the H5 matrix
 without re-exporting expression. Rebuild its Viewer Pack if conversion did not

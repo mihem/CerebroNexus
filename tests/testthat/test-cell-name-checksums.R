@@ -10,26 +10,49 @@ test_that("ordered-name checksums have fixed, portable UTF-8 bytes", {
   hash <- contract$.runtimeCellNamesHash
   expect_identical(
     hash(c("cell1", "cell2")),
-    "md5-cell-order-v1:16ce54fc5b0d149c40e845c9d90e2d74"
+    "xxh3-128-cell-order-v1:172c476c1d6a9824bc3a3c2e962541c9"
   )
   expect_identical(
     hash(character()),
-    "md5-cell-order-v1:d41d8cd98f00b204e9800998ecf8427e"
+    "xxh3-128-cell-order-v1:99aa06d3014798d86001c324468d497f"
   )
   expect_false(identical(hash(c("ab", "c")), hash(c("a", "bc"))))
   expect_false(identical(hash(c("a:1", "b")), hash(c("b", "a:1"))))
   latin1 <- iconv("caf\u00e9", from = "UTF-8", to = "latin1")
   expect_identical(hash(latin1), hash("caf\u00e9"))
+  expect_identical(
+    hash(c("caf\u00e9", "\u03b2:1")),
+    "xxh3-128-cell-order-v1:e8b7172b67151481abddfc0b410fac42"
+  )
+  expect_error(hash(NA_character_), "must not contain missing values")
 
   ## The stable format does not call either rlang hashing API.
   testthat::local_mocked_bindings(
     hash = function(...) stop("object hashing is not a file format"),
-    hash_file = function(...) stop("not the specified MD5 algorithm"),
+    hash_file = function(...) stop("the new checksum must not call rlang"),
     .package = "rlang"
   )
   expect_identical(
     hash(c("cell1", "cell2")),
     .cerebroCellNamesHash(c("cell1", "cell2"))
+  )
+})
+
+test_that("the fast checksum hashes explicit raw bytes, never an R object", {
+  digest_bytes <- digest::digest
+  testthat::local_mocked_bindings(
+    digest = function(object, algo, serialize, seed) {
+      expect_identical(object, as.raw(c(0x41, 0x41, 0, 0x42, 0)))
+      expect_identical(algo, "xxh3_128")
+      expect_identical(serialize, FALSE)
+      expect_identical(seed, 0L)
+      digest_bytes(object, algo = algo, serialize = serialize, seed = seed)
+    },
+    .package = "digest"
+  )
+  expect_identical(
+    .cerebroCellNamesHash(c("AA", "B")),
+    "xxh3-128-cell-order-v1:f183324cf31f5adc606566c2648e3481"
   )
 })
 
@@ -89,8 +112,8 @@ test_that("schema 5 requires a known checksum algorithm and indexed-field list",
       schema,
       list(
         cell_names_hash = sub(
-          "md5-cell-order-v1",
-          "md5-cell-order-v2",
+          "xxh3-128-cell-order-v1",
+          "xxh3-128-cell-order-v2",
           schema$cell_names_hash
         )
       )
@@ -124,17 +147,29 @@ test_that("schema 5 requires a known checksum algorithm and indexed-field list",
   }
 })
 
-test_that("streaming checksums preserve names across a block boundary", {
+test_that("raw checksums preserve cell boundaries in long vectors", {
   cells <- paste0("cell-", seq_len(65537L))
   contract <- .crbContract()
   path <- withr::local_tempfile()
-  writeBin(
-    charToRaw(paste0(nchar(cells, type = "bytes"), ":", cells, collapse = "")),
-    path
-  )
+  connection <- file(path, "wb")
+  for (cell in cells) {
+    ## Independent reference: append a zero byte to each name, not an R
+    ## character-vector serialization or a newline-separated text file.
+    writeBin(c(charToRaw(cell), as.raw(0)), connection)
+  }
+  close(connection)
   expect_identical(
     contract$.runtimeCellNamesHash(cells),
-    paste0("md5-cell-order-v1:", unname(tools::md5sum(path)))
+    paste0(
+      "xxh3-128-cell-order-v1:",
+      digest::digest(
+        path,
+        algo = "xxh3_128",
+        serialize = FALSE,
+        file = TRUE,
+        seed = 0L
+      )
+    )
   )
   ## A character-vector walker reference with one name per write, independent
   ## of the production implementation's vectorized interleaving.
@@ -165,6 +200,13 @@ test_that("old thin CRBs require explicit conversion before ordinary reads", {
   root <- withr::local_tempdir()
   fixture <- viewer_h5_fixture(root, values = values)
   runtime <- viewer_runtime_env()
+  wait_for_checks <- function() {
+    ## Do not rewrite a sidecar while an asynchronous validator still has its
+    ## path open. On a loaded machine foreground verification can finish first.
+    for (entry in as.list(runtime$.crb_h5_cell_checks)) {
+      if (inherits(entry$task, "mirai")) mirai::call_mirai(entry$task)
+    }
+  }
 
   for (version in c(3L, 4L, 5L)) {
     hashes <- if (version == 5L) {
@@ -206,7 +248,6 @@ test_that("old thin CRBs require explicit conversion before ordinary reads", {
           )
         })
         ## The converter refuses a genuine mismatch and leaves the CRB intact.
-        h5_before <- unname(tools::md5sum(fixture$h5))
         crb_before <- unname(tools::md5sum(fixture$crb))
         viewer_h5_matrix(values[, 2:1], fixture$h5)
         expect_error(
@@ -228,6 +269,7 @@ test_that("old thin CRBs require explicit conversion before ordinary reads", {
       expect_identical(readCerebro(fixture$crb)$meta_data$cell_barcode, cells)
       object <- runtime$read_cerebro_file(fixture$crb)
       object <- runtime$.attachExternalExpression(object, fixture$crb)
+      wait_for_checks()
       expect_identical(object$meta_data$cell_barcode, cells)
       expect_equal(as.matrix(object$expression), values)
 
@@ -262,6 +304,7 @@ test_that("old thin CRBs require explicit conversion before ordinary reads", {
       )
       refused <- runtime$read_cerebro_file(fixture$crb)
       refused <- runtime$.attachExternalExpression(refused, fixture$crb)
+      wait_for_checks()
       expect_error(refused$meta_data, class = "cerebro_cell_names_mismatch")
       expect_error(refused$expression, class = "cerebro_cell_names_mismatch")
       viewer_h5_matrix(values, fixture$h5)
