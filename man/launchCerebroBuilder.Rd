@@ -18,7 +18,8 @@ because other machines could then reach the Builder.}
 
 \item{port}{Port to bind; defaults to a free one chosen by Shiny.}
 
-\item{launch_browser}{Open a browser; defaults to \code{TRUE}.}
+\item{launch_browser}{Open a browser at the address with the access
+token; defaults to \code{TRUE}. The address is printed either way.}
 
 \item{max_file_size}{Optional maximum size in MB for each local upload;
 defaults to \code{Inf}, so the local Builder does not impose an upload-size
@@ -48,6 +49,11 @@ The object is read by a local background R worker, so run it on your own machine
 your own RStudio Server session. It is not meant to be deployed for other
 people to upload data to: it reads whatever path it is given, and reading an
 `.rds` runs whatever code is inside it.
+
+Each run gets a random access token. The page opens with it in its address
+(\code{?token=...}), which is also printed in the R console; without it the
+page is refused and no session starts, so neither a web page you visit nor
+another user of a shared machine can drive the Builder.
 }
 
 \examples{
