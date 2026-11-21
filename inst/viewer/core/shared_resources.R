@@ -143,7 +143,11 @@ viewerSharedResourceHeaders <- function() {
 ## page can be opened at, named by viewerFirstViewKey().
 
 viewerFirstViewDirectory <- function() {
-  directory <- file.path(tempdir(), "cerebro-first-view")
+  name <- "cerebro-first-view"
+  if (!is.null(.viewer_shared_resources$access_token)) {
+    name <- paste0(name, "-", .viewer_shared_resources$access_token)
+  }
+  directory <- file.path(tempdir(), name)
   dir.create(directory, showWarnings = FALSE, recursive = TRUE)
   directory
 }
@@ -152,6 +156,12 @@ viewerFirstViewDirectory <- function() {
 ## which is all that selects a data set, as hexadecimal UTF-8. The browser
 ## computes the same from its location (firstViewKey() in first-view.js).
 viewerFirstViewKey <- function(pathname, search) {
+  ## A per-run authorized page is the root page, not a new dataset identity.
+  pathname <- sub(
+    "/cerebro-[0-9a-f]{64}[.]html$",
+    "/",
+    as.character(pathname %||% "/")
+  )
   dataset <- shiny::parseQueryString(as.character(search %||% ""))[["dataset"]]
   if (!is.character(dataset) || length(dataset) != 1L) {
     dataset <- ""
@@ -968,7 +978,11 @@ viewerFirstViewPublishKept <- function(
   if (!length(sources)) {
     return(invisible(FALSE))
   }
-  serve("cerebro-first-view", viewerFirstViewDirectory())
+  prefix <- "cerebro-first-view"
+  if (!is.null(.viewer_shared_resources$access_token)) {
+    prefix <- paste0(prefix, "-", .viewer_shared_resources$access_token)
+  }
+  serve(prefix, viewerFirstViewDirectory())
   try(
     viewerFirstViewRestore(
       viewerSharedResourceRoots(options),

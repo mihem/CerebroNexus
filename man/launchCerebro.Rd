@@ -13,6 +13,7 @@ launchCerebro(
   point_opacity = 1,
   percentage_cells_to_show = 100,
   projections_show_hover_info = TRUE,
+  require_token = NULL,
   ...
 )
 }
@@ -51,6 +52,16 @@ defaults to 100.}
 \item{projections_show_hover_info}{Show hover information in projections. This
 setting can be changed in the UI; defaults to TRUE.}
 
+\item{require_token}{Require a fresh per-run access token. The default,
+\code{NULL}, enables it for open-mode Viewers bound to a loopback address
+(for example \code{127.0.0.1}). The authorized URL is printed in the R
+console and used when the App opens its browser. \code{TRUE} requires a
+token on any address; \code{FALSE} explicitly disables it, for example
+behind an authenticated reverse proxy. Loopback binding alone is not
+authentication. Tokens travel in the URL: keep it private and use HTTPS
+for remote access. Closed-mode and generated standalone Viewers are
+unchanged by default.}
+
 \item{...}{Further parameters that are used by \code{shiny::runApp}, e.g.
 \code{host} or \code{port}.}
 }
@@ -72,6 +83,20 @@ its files and the first view of the Projection page, and then runs
 \code{launchCerebro()} behind it; the App keeps the address it was given.
 The first start of an installation has no page to send yet and starts as
 \code{launchCerebro()} does.
+
+A protected launch can still serve a cached page while R loads data: it
+uses an unguessable per-run filename containing the token, and a private
+first-view URL prefix. Bare page requests and Shiny sessions without the
+token are refused. \code{cerebroStart()} waits until the package is loaded
+before starting a protected server, rather than exposing its unchecked
+early static root. If you start the returned App yourself with
+\code{shiny::runApp(..., launch.browser = TRUE)}, use the authorized URL
+printed in the console instead of the bare address. To control browser
+opening while retaining the automatic authorized URL, pass
+\code{options = list(launch.browser = FALSE)} (or a browser function) to
+\code{launchCerebro()}. \code{cerebroStart()} accepts \code{require_token}
+too; its command-line equivalent is \code{--require-token=auto},
+\code{--require-token=true} or \code{--require-token=false}.
 }
 \examples{
 if ( interactive() ) {

@@ -1,3 +1,19 @@
+# CerebroNexus 8.4.5
+
+- **Local open-mode Viewers require a per-run access token.**
+  `launchCerebro()` automatically opens and prints an authorized URL when
+  the effective bind address is loopback. Both the page and Shiny sessions
+  reject missing or incorrect tokens. `require_token = TRUE` forces
+  protection on any address; `FALSE` explicitly opts out, for example behind
+  an authenticated reverse proxy. `cerebroStart()` and `start.R` support the
+  same setting (`--require-token=auto|true|false`). Cached pages and initial
+  plot previews remain available while R loads data, under unguessable per-run
+  URLs instead of a public static root. Protected `cerebroStart()` launches
+  wait for the package to load before listening, rather than serving an
+  unchecked early page. Closed-mode and generated standalone Viewers keep
+  their existing defaults and startup shortcuts. This is local
+  access hardening, not a replacement for HTTPS and deployment authentication.
+
 # CerebroNexus 8.4.4
 
 - **The Builder needs an access token.** `launchCerebroBuilder()` now

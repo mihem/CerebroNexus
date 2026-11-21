@@ -21,6 +21,9 @@
 ## address of the App, and `launch.browser` opens it. `root` is the directory
 ## of the installed package: the one this file is in when it is run as a
 ## script.
+## `require_token = NULL` protects local open-mode launches automatically;
+## TRUE forces protection and FALSE opts out. The CLI equivalent is
+## --require-token=auto|true|false.
 cerebroStart <- function(
   crb_file_to_load = NULL,
   port = 3838L,
@@ -33,8 +36,17 @@ cerebroStart <- function(
   percentage_cells_to_show = 100,
   projections_show_hover_info = TRUE,
   launch.browser = FALSE,
-  root = find.package("CerebroNexus")
+  root = find.package("CerebroNexus"),
+  require_token = NULL
 ) {
+  if (
+    !is.null(require_token) &&
+      (!is.logical(require_token) ||
+        length(require_token) != 1L ||
+        is.na(require_token))
+  ) {
+    stop("'require_token' must be NULL, TRUE or FALSE.", call. = FALSE)
+  }
   root <- normalizePath(root, winslash = "/", mustWork = TRUE)
   ## The package, and the background processes of the Viewer, are found where
   ## this installation is.
@@ -55,7 +67,12 @@ cerebroStart <- function(
     add = TRUE
   )
   early <- NULL
-  if (isTRUE(getOption("CerebroNexus.ui_cache", TRUE))) {
+  ## The early server's static root cannot check a URL token. Do not expose
+  ## it while loading a potentially protected App. Explicitly public and
+  ## closed-mode launches retain the early-start optimization.
+  token_requested <- !identical(require_token, FALSE) &&
+    (identical(mode, "open") || isTRUE(require_token))
+  if (isTRUE(getOption("CerebroNexus.ui_cache", TRUE)) && !token_requested) {
     early <- tryCatch(
       {
         version <- read.dcf(file.path(root, "DESCRIPTION"), "Version")[[1L]]
@@ -93,14 +110,15 @@ cerebroStart <- function(
     point_size = point_size,
     point_opacity = point_opacity,
     percentage_cells_to_show = percentage_cells_to_show,
-    projections_show_hover_info = projections_show_hover_info
+    projections_show_hover_info = projections_show_hover_info,
+    require_token = require_token,
+    options = list(host = host, port = port, launch.browser = launch.browser)
   )
   if (is.null(early)) {
     return(shiny::runApp(
       app,
       host = host,
-      port = port,
-      launch.browser = launch.browser
+      port = port
     ))
   }
   address <- sprintf(
@@ -142,6 +160,14 @@ local({
     )
     if (length(value)) value[[length(value)]] else default
   }
+  token_flag <- flag("require-token", "auto")
+  require_token <- switch(
+    token_flag,
+    auto = NULL,
+    true = TRUE,
+    false = FALSE,
+    stop("--require-token must be auto, true or false.", call. = FALSE)
+  )
   ## `name=file.crb` names a data set, as a named vector does.
   named <- grepl("^[^=/\\\\]+=", files)
   crb <- sub("^[^=/\\\\]+=", "", files)
@@ -154,6 +180,7 @@ local({
     host = flag("host", "127.0.0.1"),
     mode = flag("mode", "closed"),
     launch.browser = "--browser" %in% flags,
+    require_token = require_token,
     root = dirname(normalizePath(script, winslash = "/", mustWork = TRUE))
   )
 })

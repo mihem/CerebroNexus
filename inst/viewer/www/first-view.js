@@ -50,6 +50,14 @@
   } catch (error) {
     return;
   }
+  var authorizedPath = /\/cerebro-([0-9a-f]{64})\.html$/.exec(window.location.pathname);
+  var accessToken = authorizedPath ? authorizedPath[1] : params.get('token');
+  if (!/^[0-9a-f]{64}$/.test(accessToken || '')) accessToken = null;
+  var firstViewPrefix = 'cerebro-first-view' + (accessToken ? '-' + accessToken : '') + '/';
+  function resourceUrl(url) {
+    return url.indexOf('cerebro-first-view/') === 0
+      ? firstViewPrefix + url.slice('cerebro-first-view/'.length) : url;
+  }
   var page = params.get('page');
   // Without `?page=`: opened there where the description names the Projection
   // as the address's start page, prepared behind Data info otherwise.
@@ -69,7 +77,10 @@
   // viewerFirstViewKey() in viewer/core/shared_resources.R.
   function firstViewKey() {
     var dataset = params.get('dataset');
-    var address = window.location.pathname + '\n' + (dataset == null ? '' : dataset);
+    var pathname = authorizedPath
+      ? window.location.pathname.replace(/cerebro-[0-9a-f]{64}\.html$/, '')
+      : window.location.pathname;
+    var address = pathname + '\n' + (dataset == null ? '' : dataset);
     var bytes = new TextEncoder().encode(address), key = '';
     for (var i = 0; i < bytes.length; i++) {
       key += (bytes[i] < 16 ? '0' : '') + bytes[i].toString(16);
@@ -108,7 +119,7 @@
   }
 
   function fetchBuffer(resource) {
-    return window.fetch(resource.url, { credentials: 'same-origin', cache: 'force-cache' })
+    return window.fetch(resourceUrl(resource.url), { credentials: 'same-origin', cache: 'force-cache' })
       .then(function (response) {
         if (!response.ok) throw new Error('first view: ' + response.status);
         return response.arrayBuffer();
@@ -119,7 +130,7 @@
   }
 
   var description = window.fetch(
-    'cerebro-first-view/' + firstViewKey() + '.json',
+    firstViewPrefix + firstViewKey() + '.json',
     { credentials: 'same-origin', cache: 'no-cache' }
   ).then(function (response) {
     return response.ok ? response.json() : null;

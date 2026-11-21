@@ -30,6 +30,15 @@
 #'   defaults to 100.
 #' @param projections_show_hover_info Show hover information in projections. This
 #' setting can be changed in the UI; defaults to TRUE.
+#' @param require_token Require a fresh per-run access token. The default,
+#'   \code{NULL}, enables it for open-mode Viewers bound to a loopback address
+#'   (for example \code{127.0.0.1}). The authorized URL is printed in the R
+#'   console and used when the App opens its browser. \code{TRUE} requires a
+#'   token on any address; \code{FALSE} explicitly disables it, for example
+#'   behind an authenticated reverse proxy. Loopback binding alone is not
+#'   authentication. Tokens travel in the URL: keep it private and use HTTPS
+#'   for remote access. Closed-mode and generated standalone Viewers are
+#'   unchanged by default.
 #' @param ... Further parameters that are used by \code{shiny::runApp}, e.g.
 #' \code{host} or \code{port}.
 #'
@@ -45,6 +54,20 @@
 #' \code{launchCerebro()} behind it; the App keeps the address it was given.
 #' The first start of an installation has no page to send yet and starts as
 #' \code{launchCerebro()} does.
+#'
+#' A protected launch can still serve a cached page while R loads data: it
+#' uses an unguessable per-run filename containing the token, and a private
+#' first-view URL prefix. Bare page requests and Shiny sessions without the
+#' token are refused. \code{cerebroStart()} waits until the package is loaded
+#' before starting a protected server, rather than exposing its unchecked
+#' early static root. If you start the returned App yourself with
+#' \code{shiny::runApp(..., launch.browser = TRUE)}, use the authorized URL
+#' printed in the console instead of the bare address. To control browser
+#' opening while retaining the automatic authorized URL, pass
+#' \code{options = list(launch.browser = FALSE)} (or a browser function) to
+#' \code{launchCerebro()}. \code{cerebroStart()} accepts \code{require_token}
+#' too; its command-line equivalent is \code{--require-token=auto},
+#' \code{--require-token=true} or \code{--require-token=false}.
 #'
 #' @return
 #' Shiny application.
@@ -74,6 +97,7 @@ launchCerebro <- function(
   point_opacity = 1,
   percentage_cells_to_show = 100,
   projections_show_hover_info = TRUE,
+  require_token = NULL,
   ...
 ) {
   ##--------------------------------------------------------------------------##
@@ -85,6 +109,8 @@ launchCerebro <- function(
       call. = FALSE
     )
   }
+  ## Validate now; the effective bind address is only known when Shiny starts.
+  .viewerAccessRequired(mode, require_token, "127.0.0.1")
   limits <- list(
     point_size = c(1, 20),
     point_opacity = c(0.1, 1),
@@ -159,6 +185,56 @@ launchCerebro <- function(
     ".launch_reads_datasets" = TRUE
   )
   viewer_env <- environment()
+  viewer_access <- new.env(parent = emptyenv())
+  viewer_access$token <- NULL
+  viewer_access$printed <- FALSE
+  viewer_access_host <- function() {
+    web_server <- shiny::getShinyOption("server", default = NULL)
+    if (
+      !is.null(web_server) &&
+        isTRUE(tryCatch(web_server$isRunning(), error = function(error) FALSE))
+    ) {
+      return(web_server$getHost())
+    }
+    app_args[["options"]][["host"]] %||% getOption("shiny.host", "127.0.0.1")
+  }
+  viewer_access_token <- function() {
+    if (!.viewerAccessRequired(mode, require_token, viewer_access_host())) {
+      return(NULL)
+    }
+    if (is.null(viewer_access$token)) {
+      viewer_access$token <- .builderAccessToken()
+    }
+    if (
+      exists(".viewer_shared_resources", envir = viewer_env, inherits = FALSE)
+    ) {
+      if (
+        !identical(.viewer_shared_resources$access_token, viewer_access$token)
+      ) {
+        ## Prefixes and first-view files must not retain a previous run's
+        ## credential. Protected Pack URLs use the same OS-backed secret.
+        rm(
+          list = ls(.viewer_shared_resources, all.names = TRUE),
+          envir = .viewer_shared_resources
+        )
+        .viewer_shared_resources$access_token <- viewer_access$token
+        .viewer_shared_resources$token <- viewer_access$token
+      }
+    }
+    viewer_access$token
+  }
+  viewer_access_address <- function(url) {
+    token <- viewer_access_token()
+    url <- .viewerAccessUrl(url, token)
+    if (!is.null(viewer_document)) {
+      url <- .viewerAccessPageUrl(url, token)
+    }
+    if (!is.null(token) && !viewer_access$printed) {
+      message("Open the Viewer at ", url)
+      viewer_access$printed <- TRUE
+    }
+    url
+  }
 
   ##--------------------------------------------------------------------------##
   ## Prepare the Viewer: everything a session needs, done once.
@@ -328,6 +404,33 @@ launchCerebro <- function(
     viewer_server,
     system.file(package = "CerebroNexus")
   )
+  ## Outside the transport wrapper too: a denied page is an HTTP response,
+  ## not UI into which the SockJS wrapper should insert a script.
+  viewer_access_ui <- function(request) {
+    if (
+      !.viewerAccessAllowed(
+        request$QUERY_STRING,
+        viewer_access_token(),
+        request$CEREBRO_ACCESS_PATH %||% request$PATH_INFO
+      )
+    ) {
+      return(.viewerAccessDenied())
+    }
+    transport$ui(request)
+  }
+  viewer_access_server <- function(input, output, session) {
+    if (
+      !.viewerAccessAllowed(
+        shiny::isolate(session$clientData$url_search),
+        viewer_access_token(),
+        shiny::isolate(session$clientData$url_pathname)
+      )
+    ) {
+      session$close()
+      return(invisible(NULL))
+    }
+    transport$server(input, output, session)
+  }
 
   ##--------------------------------------------------------------------------##
   ## What a page can be given before the Viewer is prepared: the page as a
@@ -405,6 +508,23 @@ launchCerebro <- function(
   ## Viewer itself.
   viewer_started <- function() {
     web_server <- shiny::getShinyOption("server", default = NULL)
+    token <- viewer_access_token()
+    if (!is.null(web_server)) {
+      viewer_access_address(viewerDocumentAddress(web_server))
+      if (
+        identical(mode, "open") &&
+          is.null(token) &&
+          !.builderHostIsLoopback(web_server$getHost())
+      ) {
+        warning(
+          "The open Viewer is listening beyond this machine without an ",
+          "access token. Use require_token = TRUE with HTTPS or protect ",
+          "the deployment with authentication.",
+          call. = FALSE,
+          immediate. = TRUE
+        )
+      }
+    }
     if (!is.null(viewer_early) && !is.null(web_server)) {
       ## From here on "the server" is the early one and Shiny's together.
       web_server <- tryCatch(
@@ -412,8 +532,13 @@ launchCerebro <- function(
         error = function(error) web_server
       )
     }
+    ## A protected static root contains only an unguessable filename, never
+    ## index.html. It therefore cannot serve the page to a bare "/" request.
     if (!is.null(web_server) && !is.null(viewer_document)) {
-      try(viewerDocumentServe(web_server, viewer_document), silent = TRUE)
+      try(
+        viewerDocumentServe(web_server, viewer_document, access_token = token),
+        silent = TRUE
+      )
     }
     try(viewerFirstViewPublishKept(Cerebro.options), silent = TRUE)
     try(viewerSharedResourceHeaders(), silent = TRUE)
@@ -442,13 +567,20 @@ launchCerebro <- function(
           function() {
             prepared <- viewer_prepare_step(viewer_prepare)
             ## The first process of an installation keeps the page it sends.
-            if (prepared && viewer_document_capture && !is.null(web_server)) {
+            if (
+              prepared &&
+                viewer_document_capture &&
+                !is.null(web_server)
+            ) {
               viewer_document_capture <<- FALSE
               .viewerWhenQuiet(function() {
                 try(
                   viewerDocumentCapture(
                     web_server,
-                    viewer_document_key(cerebro_www_prefix)
+                    viewer_document_key(cerebro_www_prefix),
+                    fetch = function(address) {
+                      viewerDocumentFetch(.viewerAccessUrl(address, token))
+                    }
                   ),
                   silent = TRUE
                 )
@@ -467,6 +599,22 @@ launchCerebro <- function(
   ## Allow uploads up to `maxFileSize` MB while the app runs; the previous
   ## value is restored when it stops. A user `onStart` still runs afterwards.
   app_args <- list(...)
+  if (
+    !identical(require_token, FALSE) &&
+      (identical(mode, "open") || isTRUE(require_token))
+  ) {
+    launch_browser <- app_args[["options"]][["launch.browser"]] %||%
+      getOption("shiny.launch.browser", interactive())
+    app_args[["options"]][["launch.browser"]] <- function(url) {
+      url <- viewer_access_address(url)
+      if (is.function(launch_browser)) {
+        launch_browser(url)
+      } else if (isTRUE(launch_browser)) {
+        utils::browseURL(url)
+      }
+      invisible(url)
+    }
+  }
   if (is.null(app_args[["uiPattern"]])) {
     app_args[["uiPattern"]] <- transport_env$viewerDatasetUiPattern(
       names(Cerebro.options[["crb_file_to_load"]])
@@ -475,6 +623,9 @@ launchCerebro <- function(
   user_on_start <- app_args[["onStart"]]
   max_request_size <- maxFileSize * 1024^2
   app_args[["onStart"]] <- function() {
+    ## The same app object can be run again: every run gets a fresh secret.
+    viewer_access$token <- NULL
+    viewer_access$printed <- FALSE
     previous <- options(shiny.maxRequestSize = max_request_size)
     ## From here the App runs, and its first session has no use for compiling
     ## (see .viewerJitSuspend()). Put back after that session has its page
@@ -483,6 +634,13 @@ launchCerebro <- function(
     shiny::onStop(function() {
       options(previous)
       viewer_jit_release()
+      if (!is.null(viewer_access$token)) {
+        prefixes <- names(shiny::resourcePaths())
+        prefixes <- prefixes[grepl(viewer_access$token, prefixes, fixed = TRUE)]
+        for (prefix in prefixes) {
+          shiny::removeResourcePath(prefix)
+        }
+      }
     })
     later::later(viewer_jit_release, 60)
     later::later(viewer_started, 0)
@@ -490,10 +648,31 @@ launchCerebro <- function(
       user_on_start()
     }
   }
-  do.call(
+  app <- do.call(
     shiny::shinyApp,
-    c(list(ui = transport$ui, server = transport$server), app_args)
+    c(list(ui = viewer_access_ui, server = viewer_access_server), app_args)
   )
+  page_handler <- app$httpHandler
+  app$httpHandler <- function(request) {
+    token <- viewer_access_token()
+    if (
+      !is.null(token) &&
+        identical(request$PATH_INFO, paste0("/cerebro-", token, ".html"))
+    ) {
+      ## Before the cached file is registered (or if registration failed),
+      ## the authorized filename still reaches the same guarded UI handler.
+      request <- as.environment(as.list(request, all.names = TRUE))
+      request$CEREBRO_ACCESS_PATH <- request$PATH_INFO
+      request$PATH_INFO <- "/"
+    }
+    response <- page_handler(request)
+    if (!is.null(response) && !is.null(token)) {
+      response$headers[["Cache-Control"]] <- "no-store"
+      response$headers[["Referrer-Policy"]] <- "no-referrer"
+    }
+    response
+  }
+  app
 }
 
 ## R compiles a function to byte code the second time it is called. The

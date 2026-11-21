@@ -1,0 +1,129 @@
+skip_on_cran()
+
+test_that("a local open Viewer rejects HTTP and WebSocket requests without its token", {
+  app <- viewer_local_access_process()
+  expect_identical(app$initial$status_code, 403L)
+  expect_match(app$token, "^[0-9a-f]{64}$")
+  wrong <- paste0("?token=", strrep("0", 64))
+  expect_identical(
+    curl::curl_fetch_memory(paste0(app$address, wrong))$status_code,
+    403L
+  )
+  expect_identical(
+    curl::curl_fetch_memory(paste0(app$address, "?token=%00"))$status_code,
+    403L
+  )
+  handle <- curl::new_handle()
+  curl::handle_setheaders(handle, Host = "attacker.example")
+  expect_identical(
+    curl::curl_fetch_memory(app$address, handle)$status_code,
+    403L
+  )
+  authorized <- curl::curl_fetch_memory(paste0(
+    app$address,
+    "?token=",
+    app$token
+  ))
+  expect_identical(authorized$status_code, 200L)
+  expect_match(rawToChar(authorized$headers), "no-store", fixed = TRUE)
+  expect_match(rawToChar(authorized$headers), "no-referrer", fixed = TRUE)
+  for (query in c("", wrong)) {
+    probe <- viewer_local_access_socket(app, query)
+    expect_true(probe$opened)
+    expect_true(probe$closed)
+    expect_null(probe$values)
+    expect_length(probe$errors, 0L)
+  }
+  for (attempt in seq_len(2)) {
+    probe <- viewer_local_access_socket(app, paste0("?token=", app$token))
+    expect_false(probe$closed)
+    expect_identical(probe$values$pong, "pong:socket")
+  }
+})
+
+test_that("closed and explicitly public Viewers retain tokenless access", {
+  for (settings in list(list(mode = "closed"), list(require_token = FALSE))) {
+    app <- do.call(viewer_local_access_process, settings)
+    expect_identical(app$initial$status_code, 200L)
+    expect_null(app$token)
+    probe <- viewer_local_access_socket(app, "")
+    expect_false(probe$closed)
+    expect_identical(probe$values$pong, "pong:socket")
+  }
+})
+
+test_that("a headless browser can use the authorized Viewer interactively", {
+  skip_if_no_chrome()
+  app <- viewer_local_access_process()
+  browser <- chromote::ChromoteSession$new()
+  withr::defer(browser$close())
+  browser$Page$navigate(paste0(app$address, "?token=", app$token))
+  ready <- browser$Runtime$evaluate(
+    expression = paste0(
+      "new Promise(resolve => { const deadline = Date.now() + 20000; ",
+      "const check = () => { const pong = document.querySelector('#pong'); ",
+      "if (pong && pong.textContent === 'pong:') return resolve(true); ",
+      "if (Date.now() > deadline) return resolve(false); ",
+      "setTimeout(check, 50); }; check(); })"
+    ),
+    awaitPromise = TRUE,
+    returnByValue = TRUE
+  )
+  expect_true(ready$result$value)
+  result <- browser$Runtime$evaluate(
+    expression = paste0(
+      "Shiny.setInputValue('ping', 'browser'); ",
+      "new Promise(resolve => { const deadline = Date.now() + 10000; ",
+      "const check = () => { ",
+      "if (document.querySelector('#pong').textContent === 'pong:browser') ",
+      "return resolve(true); if (Date.now() > deadline) return resolve(false); ",
+      "setTimeout(check, 50); }; check(); })"
+    ),
+    awaitPromise = TRUE,
+    returnByValue = TRUE
+  )
+  expect_true(result$result$value)
+})
+
+test_that("cerebroStart protects the real open-mode Viewer and its upload UI", {
+  skip_if_no_chrome()
+  app <- viewer_local_access_process(start = TRUE)
+  expect_identical(app$initial$status_code, 403L)
+  expect_match(app$token, "^[0-9a-f]{64}$")
+  browser <- chromote::ChromoteSession$new()
+  withr::defer(browser$close())
+  browser$Page$navigate(paste0(app$address, "?token=", app$token))
+  ready_expression <- paste0(
+    "new Promise(resolve => { const deadline = Date.now() + 30000; ",
+    "const check = () => { ",
+    "if (window.Shiny && Shiny.shinyapp && Shiny.shinyapp.$socket && ",
+    "Shiny.shinyapp.$socket.readyState === 1) { ",
+    "const link = document.querySelector('[data-value=\"loadData\"]'); ",
+    "if (link) link.click(); ",
+    "if (document.querySelector('#input_file')) return resolve(true); } ",
+    "if (Date.now() > deadline) return resolve(false); ",
+    "setTimeout(check, 100); }; check(); })"
+  )
+  ready <- browser$Runtime$evaluate(
+    expression = ready_expression,
+    awaitPromise = TRUE,
+    returnByValue = TRUE
+  )
+  expect_true(ready$result$value)
+  retained <- browser$Runtime$evaluate(
+    "new URL(location.href).searchParams.get('token')",
+    returnByValue = TRUE
+  )
+  expect_identical(retained$result$value, app$token)
+  loaded <- browser$Page$loadEventFired(wait_ = FALSE)
+  browser$Page$reload()
+  browser$wait_for(loaded)
+  ready <- browser$Runtime$evaluate(
+    expression = ready_expression,
+    awaitPromise = TRUE,
+    returnByValue = TRUE
+  )
+  expect_true(ready$result$value)
+  # The same running Viewer remains inaccessible via its bare URL.
+  expect_identical(curl::curl_fetch_memory(app$address)$status_code, 403L)
+})
