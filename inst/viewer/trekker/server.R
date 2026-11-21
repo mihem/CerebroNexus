@@ -19,7 +19,15 @@ trekker_slot <- reactive({
 })
 
 trekker_gene_names <- reactive({
-  tryCatch(rownames(data_set()$expression), error = function(e) character(0))
+  tryCatch(
+    rownames(data_set()$expression),
+    error = function(error) {
+      if (inherits(error, "shiny.silent.error")) {
+        stop(error)
+      }
+      character(0)
+    }
+  )
 })
 
 ## Numeric, non-constant per-cell meta columns (differentiator 3): any existing
@@ -27,7 +35,15 @@ trekker_gene_names <- reactive({
 ## score (this demo ships a myelination score), velocity magnitude, a signaling
 ## score -- can colour the physical map with no page change.
 trekker_meta_cols <- reactive({
-  md <- tryCatch(data_set()$getMetaData(), error = function(e) NULL)
+  md <- tryCatch(
+    data_set()$getMetaData(),
+    error = function(error) {
+      if (inherits(error, "shiny.silent.error")) {
+        stop(error)
+      }
+      NULL
+    }
+  )
   trekker_numeric_meta_cols(md)
 })
 
@@ -161,12 +177,25 @@ observe({
     if (!is.null(gene) && gene %in% trekker_gene_names()) {
       color <- as.numeric(tryCatch(
         viewerExpressionRow(data_set(), keys, gene),
-        error = function(e) rep(NA_real_, length(keys))
+        error = function(error) {
+          if (inherits(error, "shiny.silent.error")) {
+            stop(error)
+          }
+          rep(NA_real_, length(keys))
+        }
       ))
       color_label <- gene
     }
   } else if (identical(mode, "meta")) {
-    md <- tryCatch(data_set()$getMetaData(), error = function(e) NULL)
+    md <- tryCatch(
+      data_set()$getMetaData(),
+      error = function(error) {
+        if (inherits(error, "shiny.silent.error")) {
+          stop(error)
+        }
+        NULL
+      }
+    )
     column <- input[["trekker_meta_pick"]]
     md_keys <- if (!is.null(md) && "cell_barcode" %in% names(md)) {
       md[["cell_barcode"]]

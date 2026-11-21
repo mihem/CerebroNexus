@@ -358,9 +358,9 @@ test_that("thin H5 first-frame cache includes its small gene index", {
   object$meta_data <- data.frame(group = factor(c("A", "B", "A", "B")))
   object$projections <- list(umap = data.frame(x = 1:4, y = 4:1))
   schema <- list(
-    version = 3L,
+    version = 5L,
     n_cells = 4L,
-    cell_names_hash = rlang::hash(enc2utf8(fixture$cells)),
+    cell_names_hash = .cerebroCellNamesHash(fixture$cells),
     projection_rownames = "umap"
   )
 
@@ -749,10 +749,10 @@ test_that("noncanonical thin projections cannot bypass barcode alignment", {
     umap = data.frame(x = c(30, 20, 10), y = 3:1, row.names = c("3", "2", "1"))
   )
   schema <- list(
-    version = 3L,
+    version = 5L,
     n_cells = 3L,
     projection_rownames = character(),
-    cell_names_hash = rlang::hash(enc2utf8(cells))
+    cell_names_hash = .cerebroCellNamesHash(cells)
   )
   scope$.deferThinCrbHydration(object, "data.crb", fixture$h5, schema)
   scope$data_set <- function() object
@@ -770,9 +770,9 @@ test_that("thin CRB cell names come from the H5 file and stay lazy", {
   fixture <- viewer_h5_fixture(root, save = FALSE)
   scope <- viewer_runtime_env()
   schema <- list(
-    version = 3L,
+    version = 5L,
     n_cells = 4L,
-    cell_names_hash = rlang::hash(enc2utf8(fixture$cells)),
+    cell_names_hash = .cerebroCellNamesHash(fixture$cells),
     projection_rownames = "umap"
   )
 
@@ -965,7 +965,7 @@ test_that("a thin CRB without its H5 file names the recovery step", {
   )
 })
 
-test_that("thin CRB schemas other than version 3 are retired", {
+test_that("unknown thin CRB schemas are retired", {
   skip_if_not_installed("HDF5Array")
   root <- withr::local_tempdir()
   fixture <- viewer_h5_fixture(root)

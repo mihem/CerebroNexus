@@ -1,3 +1,32 @@
+# CerebroNexus 8.4.7
+
+- H5-backed data sets no longer falsely report mismatched cell names when
+  exported and opened with different `rlang` versions. New thin CRBs use
+  schema 5 with an explicitly versioned XXH3-128 checksum of the ordered
+  UTF-8 names, separated by zero bytes. The optional `digest` accelerator
+  encodes and hashes raw bytes in native code without R-object serialization,
+  decimal prefix allocation or temporary files.
+  Byte writes explicitly disable native-encoding translation, so non-ASCII
+  names produce the same checksum in UTF-8 and C/ASCII locales.
+  `digest` remains optional in Suggests; without a supported version, the
+  existing file hasher checks a temporary file of the same bytes with the
+  same checksum. No new required Imports are added.
+  Ordinary readers now require schema 5 and reject schema-3/4 files immediately
+  with a `convertCerebro()` message, without historical-hash retries on app
+  restart. The explicit converter verifies either historical `rlang` checksum
+  once and rewrites the CRB while reusing its existing H5 matrix. Reordered or
+  foreign cells remain rejected.
+- **Migration required for older thin H5 CRBs, regardless of dataset size.**
+  Stop apps using the export and run `convertCerebro("dataset.crb")` once
+  with the updated package before deploying the updated Viewer. Rebuild any
+  Viewer Pack if conversion did not already rebuild it. Embedded-expression
+  CRBs are unaffected. New schema-5 exports require an updated reader.
+- Normal ordered-cell checks still run before expression access in a new app
+  process and are cached for that process/file version; conversion does not
+  disable integrity checks. Cell-name validation errors are caught at the
+  shared Viewer sidecar boundary, including gene summaries, Spatial, Linked
+  views and Trekker, without disconnecting Shiny or painting replacement values.
+
 # CerebroNexus 8.4.6
 
 - **The large demo data sets keep one folder, and know what made them.** The

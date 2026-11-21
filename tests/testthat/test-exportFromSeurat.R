@@ -317,10 +317,16 @@ test_that("exportFromSeurat: h5 mode writes a thin v3 CRB whose cell names live 
 
   payload <- readRDS(outf)
   schema <- payload$crb_schema
-  expect_identical(schema$version, 3L)
+  expect_identical(schema$version, 5L)
   expect_named(
     schema,
-    c("version", "cell_names_hash", "projection_rownames", "n_cells"),
+    c(
+      "version",
+      "cell_names_hash",
+      "projection_rownames",
+      "n_cells",
+      "cell_indexed"
+    ),
     ignore.order = TRUE
   )
   expect_identical(schema$n_cells, length(cells))

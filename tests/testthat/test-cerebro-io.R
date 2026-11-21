@@ -91,13 +91,16 @@ test_that("the H5 helpers read the cell and gene names of a cells x genes file",
   expect_identical(.h5Dim(fixture$h5), c(4L, 3L))
   expect_identical(
     .cerebroCellNamesHash(fixture$cells),
-    rlang::hash(enc2utf8(fixture$cells))
+    .crbContract()$.runtimeCellNamesHash(fixture$cells)
   )
-  expect_match(.cerebroCellNamesHash(fixture$cells), "^[[:xdigit:]]{32}$")
+  expect_match(
+    .cerebroCellNamesHash(fixture$cells),
+    "^xxh3-128-cell-order-v1:[[:xdigit:]]{32}$"
+  )
 })
 
 ## ---------------------------------------------------------------------------
-## Thin schema v3
+## Portable thin schema v5
 ## ---------------------------------------------------------------------------
 
 test_that("legacy-free RDS CRBs rebuild the current Cerebro class", {
@@ -119,7 +122,7 @@ test_that("legacy-free RDS CRBs rebuild the current Cerebro class", {
   )
 })
 
-test_that("thin v3 CRBs keep the cell names once, in the H5 file", {
+test_that("thin v5 CRBs keep the cell names once, in the H5 file", {
   skip_if_no_h5()
 
   root <- withr::local_tempdir()
@@ -165,15 +168,21 @@ test_that("thin v3 CRBs keep the cell names once, in the H5 file", {
     schema <- payload$crb_schema
     expect_named(
       schema,
-      c("version", "cell_names_hash", "projection_rownames", "n_cells"),
+      c(
+        "version",
+        "cell_names_hash",
+        "projection_rownames",
+        "n_cells",
+        "cell_indexed"
+      ),
       ignore.order = TRUE
     )
-    expect_identical(schema$version, 3L)
+    expect_identical(schema$version, 5L)
     expect_identical(schema$n_cells, 4L)
     expect_identical(schema$projection_rownames, "umap")
     expect_identical(
       schema$cell_names_hash,
-      rlang::hash(enc2utf8(fixture$cells))
+      .cerebroCellNamesHash(fixture$cells)
     )
     expect_identical(
       payload$cell_fingerprint,
@@ -188,7 +197,7 @@ test_that("thin v3 CRBs keep the cell names once, in the H5 file", {
     expect_identical(rownames(restored$projections$umap), fixture$cells)
     expect_cerebro_fields(restored, fixture)
     expect_identical(restored$meta_data$sample, c("a", "a", "b", "b"))
-    expect_identical(restored$crb_schema$version, 3L)
+    expect_identical(restored$crb_schema$version, 5L)
   }
 
   ## the input object is not modified by saving it
@@ -252,7 +261,7 @@ test_that("convertCerebro moves a thin CRB between codecs next to its H5 file", 
     as.raw(c(0x0b, 0x0e, 0x0a, 0xc1))
   ))
   expect_cerebro_fields(readCerebro(converted), fixture)
-  expect_identical(.readCerebroPayload(converted)$crb_schema$version, 3L)
+  expect_identical(.readCerebroPayload(converted)$crb_schema$version, 5L)
 
   ## the same directory spelled differently is still the same directory
   if (identical(.Platform$OS.type, "windows")) {
@@ -338,7 +347,10 @@ test_that("a thin CRB with a wrong cell count or malformed schema is rejected", 
   expect_error(readCerebro(double_version), "retired format")
 
   bad_hash <- broken(function(p) {
-    p$crb_schema$cell_names_hash <- strrep("0", 32L)
+    p$crb_schema$cell_names_hash <- paste0(
+      "xxh3-128-cell-order-v1:",
+      strrep("0", 32L)
+    )
   })
   expect_error(readCerebro(bad_hash), "H5 cell names do not match")
 
@@ -379,7 +391,7 @@ test_that("an H5 CRB written without a schema still reads", {
   ## converting it thins the CRB against the same H5 file
   convertCerebro(path)
   payload <- .readCerebroPayload(path)
-  expect_identical(payload$crb_schema$version, 3L)
+  expect_identical(payload$crb_schema$version, 5L)
   expect_false("cell_barcode" %in% names(payload$meta_data))
   expect_cerebro_fields(readCerebro(path), fixture)
 })
@@ -473,7 +485,7 @@ test_that("the Viewer hydrates a thin CRB lazily and checks it against the H5 fi
 test_that("Data Info reads the thin cell count without forcing metadata", {
   runtime <- viewer_runtime_env()
   object <- new.env(parent = emptyenv())
-  object$crb_schema <- list(version = 3L, n_cells = 4L)
+  object$crb_schema <- list(version = 5L, n_cells = 4L)
   delayedAssign(
     "meta_data",
     stop("metadata was forced"),
@@ -1257,7 +1269,7 @@ test_that("bundled demo CRBs use the current qs2 codec", {
 ## Gate parity, failed saves and malformed descriptors
 ## ---------------------------------------------------------------------------
 
-test_that("the CRB schema reader takes v3 only; both sides read the same H5 names", {
+test_that("the CRB schema reader checks v5; both sides read the same H5 names", {
   skip_if_no_h5()
   runtime <- viewer_runtime_env()
   fixture <- make_h5_cerebro(withr::local_tempdir())
@@ -1271,10 +1283,11 @@ test_that("the CRB schema reader takes v3 only; both sides read the same H5 name
   )
 
   valid <- list(
-    version = 3L,
+    version = 5L,
     cell_names_hash = .cerebroCellNamesHash(fixture$cells),
     projection_rownames = character(),
-    n_cells = 4L
+    n_cells = 4L,
+    cell_indexed = character()
   )
   schemas <- list(
     valid = valid,
@@ -1542,7 +1555,7 @@ test_that("a thin CRB stores repertoire barcodes by cell index", {
   embedded <- file.path(root, "embedded.crb")
   saveCerebro(fixture$object, embedded, immune_sidecar = "never")
   payload <- .readCerebroPayload(embedded)
-  expect_identical(payload$crb_schema$version, 4L)
+  expect_identical(payload$crb_schema$version, 5L)
   expect_identical(payload$crb_schema$cell_indexed, "immune_repertoire")
   expect_identical(payload$immune_repertoire$a$barcode, c(1L, 2L))
   expect_identical(
@@ -1615,7 +1628,7 @@ test_that("a thin CRB stores the row names of a trajectory by cell index", {
   )
 
   payload <- .readCerebroPayload(path)
-  expect_identical(payload$crb_schema$version, 4L)
+  expect_identical(payload$crb_schema$version, 5L)
   expect_identical(payload$crb_schema$cell_indexed, "trajectories")
   stored <- payload$trajectories$monocle2
   expect_identical(attr(stored$subset$meta, "row.names"), c(4L, 2L, 3L))
@@ -1706,7 +1719,7 @@ test_that("a thin CRB stores the cells of a spatial section by cell index", {
   saveCerebro(fixture$object, path)
 
   payload <- .readCerebroPayload(path)
-  expect_identical(payload$crb_schema$version, 4L)
+  expect_identical(payload$crb_schema$version, 5L)
   expect_identical(payload$crb_schema$cell_indexed, "spatial")
   stored <- payload$spatial$slice$coordinates
   expect_identical(attr(stored, "row.names"), c(3L, 1L, 4L))
@@ -1761,16 +1774,16 @@ test_that("a thin CRB stores the cells of a spatial section by cell index", {
   }
 })
 
-test_that("a thin CRB with nothing to index stays at schema version 3", {
+test_that("a thin CRB with nothing to index uses portable schema version 5", {
   skip_if_no_h5()
   root <- withr::local_tempdir()
   fixture <- make_h5_cerebro(root)
   path <- file.path(root, "plain.crb")
   saveCerebro(fixture$object, path)
-  expect_identical(.readCerebroPayload(path)$crb_schema$version, 3L)
+  expect_identical(.readCerebroPayload(path)$crb_schema$version, 5L)
 })
 
-test_that("the schema contract checks the cell-indexed fields of version 4", {
+test_that("the schema contract checks the cell-indexed fields of version 5", {
   skip_if_no_h5()
   root <- withr::local_tempdir()
   fixture <- make_h5_cerebro(root)
@@ -1779,10 +1792,9 @@ test_that("the schema contract checks the cell-indexed fields of version 4", {
   saveCerebro(fixture$object, path, immune_sidecar = "never")
   payload <- .readCerebroPayload(path)
   read_schema <- .crbContract()$.readRuntimeCrbSchema
-  expect_identical(read_schema(payload, path)$version, 4L)
+  expect_identical(read_schema(payload, path)$version, 5L)
   bad_fields <- list(
     "projections",
-    character(),
     c("immune_repertoire", "immune_repertoire")
   )
   for (bad in bad_fields) {
