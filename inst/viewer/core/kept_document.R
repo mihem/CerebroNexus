@@ -511,37 +511,21 @@ viewerDocumentRestore <- function(
   target
 }
 
-## Public Apps answer "/" with `directory`/index.html. A protected App instead
-## serves just an unguessable filename, leaving bare "/" to the access check.
-## Both forms are served off R's main thread while it prepares the Viewer.
-viewerDocumentServe <- function(server, directory, access_token = NULL) {
-  protected <- !is.null(access_token)
-  if (protected) {
-    target <- file.path(tempdir(), paste0("cerebro-document-", access_token))
-    dir.create(target, showWarnings = FALSE)
-    if (
-      !file.copy(
-        file.path(directory, "index.html"),
-        file.path(target, paste0("cerebro-", access_token, ".html")),
-        overwrite = TRUE
-      )
-    ) {
-      stop("The authorized Viewer page could not be prepared.", call. = FALSE)
-    }
-    directory <- target
-  }
+## Makes the running web server answer "/" with `directory`/index.html.
+## This generic interface contains no session data; sessions are checked
+## separately before any Viewer server code runs.
+viewerDocumentServe <- function(server, directory) {
   server$setStaticPath(
     .list = list(
       "/" = httpuv::staticPath(
         normalizePath(directory, mustWork = TRUE),
-        indexhtml = !protected,
+        indexhtml = TRUE,
         fallthrough = TRUE,
         ## The file is this process's; a browser asks for it every time.
-        headers = if (protected) {
-          list("Cache-Control" = "no-store", "Referrer-Policy" = "no-referrer")
-        } else {
-          list("Cache-Control" = "no-cache")
-        }
+        headers = list(
+          "Cache-Control" = "no-cache",
+          "Referrer-Policy" = "no-referrer"
+        )
       )
     )
   )

@@ -84,12 +84,12 @@ its files and the first view of the Projection page, and then runs
 The first start of an installation has no page to send yet and starts as
 \code{launchCerebro()} does.
 
-A protected launch can still serve a cached page while R loads data: it
-uses an unguessable per-run filename containing the token, and a private
-first-view URL prefix. Bare page requests and Shiny sessions without the
-token are refused. \code{cerebroStart()} waits until the package is loaded
-before starting a protected server, rather than exposing its unchecked
-early static root. If you start the returned App yourself with
+The cached HTML interface remains public, including the early page served
+by \code{cerebroStart()}. Without the token it cannot start a working Shiny
+session: uploads, analyses and session data remain inaccessible. Cached
+plot previews contain data, so their URLs remain private. No token needs
+to be entered manually; it is included in the browser URL automatically.
+If you start the returned App yourself with
 \code{shiny::runApp(..., launch.browser = TRUE)}, use the authorized URL
 printed in the console instead of the bare address. To control browser
 opening while retaining the automatic authorized URL, pass

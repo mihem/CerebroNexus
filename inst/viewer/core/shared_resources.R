@@ -156,12 +156,6 @@ viewerFirstViewDirectory <- function() {
 ## which is all that selects a data set, as hexadecimal UTF-8. The browser
 ## computes the same from its location (firstViewKey() in first-view.js).
 viewerFirstViewKey <- function(pathname, search) {
-  ## A per-run authorized page is the root page, not a new dataset identity.
-  pathname <- sub(
-    "/cerebro-[0-9a-f]{64}[.]html$",
-    "/",
-    as.character(pathname %||% "/")
-  )
   dataset <- shiny::parseQueryString(as.character(search %||% ""))[["dataset"]]
   if (!is.character(dataset) || length(dataset) != 1L) {
     dataset <- ""

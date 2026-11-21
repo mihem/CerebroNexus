@@ -1,4 +1,4 @@
-test_that("protected cached pages are served off-thread only at their secret filename", {
+test_that("the public cached shell is served off-thread at the original root", {
   skip_if_not_installed("curl")
   env <- new.env(parent = globalenv())
   sys.source(viewer_test_path("core", "kept_document.R"), env)
@@ -6,10 +6,9 @@ test_that("protected cached pages are served off-thread only at their secret fil
   # requiring an R callback would time out rather than return these bytes.
   directory <- withr::local_tempdir()
   html <- charToRaw(
-    "<!DOCTYPE html><html><body>private cached page</body></html>"
+    "<!DOCTYPE html><html><body>generic cached shell</body></html>"
   )
   writeBin(html, file.path(directory, "index.html"))
-  token <- strrep("ab", 32)
   port <- httpuv::randomPort()
   server <- httpuv::startServer(
     "127.0.0.1",
@@ -23,23 +22,23 @@ test_that("protected cached pages are served off-thread only at their secret fil
   )
   withr::defer(server$stop())
   env$viewerDocumentBundleDirectory <- withr::local_tempdir
-  env$viewerDocumentServe(server, directory, access_token = token)
+  env$viewerDocumentServe(server, directory)
   root <- server$getStaticPaths()[["/"]]
-  expect_false(root$options$indexhtml)
-  expect_false(file.exists(file.path(root$path, "index.html")))
+  expect_true(root$options$indexhtml)
+  expect_true(file.exists(file.path(root$path, "index.html")))
   expect_identical(
     list.files(root$path),
-    paste0("cerebro-", token, ".html")
+    "index.html"
   )
   handle <- curl::new_handle(timeout = 2)
   response <- curl::curl_fetch_memory(
-    sprintf("http://127.0.0.1:%d/cerebro-%s.html", port, token),
+    sprintf("http://127.0.0.1:%d/", port),
     handle
   )
   expect_identical(response$status_code, 200L)
   expect_identical(response$content, html)
   expect_match(rawToChar(response$headers), "no-referrer", fixed = TRUE)
-  expect_match(rawToChar(response$headers), "no-store", fixed = TRUE)
+  expect_match(rawToChar(response$headers), "no-cache", fixed = TRUE)
 })
 
 test_that("protected first-view URLs and temporary files do not use public aliases", {
@@ -60,14 +59,6 @@ test_that("protected first-view URLs and temporary files do not use public alias
     serve = function(prefix, directory) prefixes <<- c(prefixes, prefix)
   )
   expect_identical(prefixes, paste0("cerebro-first-view-", token))
-  expect_identical(
-    env$viewerFirstViewKey(paste0("/cerebro-", token, ".html"), "?dataset=a"),
-    env$viewerFirstViewKey("/", "?dataset=a")
-  )
-  expect_identical(
-    env$viewerFirstViewKey(paste0("/proxy/cerebro-", token, ".html"), ""),
-    env$viewerFirstViewKey("/proxy/", "")
-  )
 })
 
 test_that("the preview client uses authorized JSON and binary URLs", {
@@ -78,21 +69,19 @@ test_that("the preview client uses authorized JSON and binary URLs", {
   )
 })
 
-test_that("a browser can upload, download and reconnect from the authorized cached page", {
+test_that("the query token permits uploads, downloads and reloads with the public cached page", {
   skip_on_cran()
   skip_if_no_chrome()
   app <- viewer_local_access_process(cached = TRUE)
-  expect_identical(app$initial$status_code, 403L)
+  expect_identical(app$initial$status_code, 200L)
   expect_match(
     app$authorized_url,
-    paste0("/cerebro-", app$token, ".html"),
+    paste0("?token=", app$token),
     fixed = TRUE
   )
   browser <- chromote::ChromoteSession$new()
   withr::defer(browser$close())
-  # The filename itself is the bearer credential, so query-less reloads work.
-  address <- sub("[?].*$", "", app$authorized_url)
-  browser$Page$navigate(address)
+  browser$Page$navigate(app$authorized_url)
   ready <- paste0(
     "new Promise(resolve => { const deadline = Date.now() + 15000; ",
     "const check = () => { ",
@@ -115,8 +104,8 @@ test_that("a browser can upload, download and reconnect from the authorized cach
     returnByValue = TRUE
   )$result$value
   expect_identical(
-    rawToChar(curl::curl_fetch_memory(download)$content),
-    "authorized download\n"
+    trimws(rawToChar(curl::curl_fetch_memory(download)$content)),
+    "authorized download"
   )
   upload <- withr::local_tempfile(fileext = ".txt")
   writeLines("trusted test file", upload)
@@ -146,5 +135,6 @@ test_that("a browser can upload, download and reconnect from the authorized cach
       returnByValue = TRUE
     )$result$value
   )
-  expect_identical(curl::curl_fetch_memory(app$address)$status_code, 403L)
+  expect_identical(curl::curl_fetch_memory(app$address)$status_code, 200L)
+  expect_true(viewer_local_access_socket(app, "")$closed)
 })

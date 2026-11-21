@@ -39,8 +39,7 @@ async function check(pathname, search, prefix, key = "2f0a") {
 (async () => {
   await check("/", "", "cerebro-first-view/");
   await check("/", "?token=" + token, "cerebro-first-view-" + token + "/");
-  await check("/cerebro-" + token + ".html", "", "cerebro-first-view-" + token + "/");
-  await check("/proxy/cerebro-" + token + ".html", "", "cerebro-first-view-" + token + "/",
+  await check("/proxy/", "?token=" + token, "cerebro-first-view-" + token + "/",
     Buffer.from("/proxy/\n").toString("hex"));
   console.log("PASS protected preview URLs");
 })().catch(error => { console.error(error); process.exitCode = 1; });

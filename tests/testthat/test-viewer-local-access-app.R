@@ -1,23 +1,23 @@
 skip_on_cran()
 
-test_that("a local open Viewer rejects HTTP and WebSocket requests without its token", {
+test_that("a public Viewer shell cannot start unauthorized WebSocket sessions", {
   app <- viewer_local_access_process()
-  expect_identical(app$initial$status_code, 403L)
+  expect_identical(app$initial$status_code, 200L)
   expect_match(app$token, "^[0-9a-f]{64}$")
   wrong <- paste0("?token=", strrep("0", 64))
   expect_identical(
     curl::curl_fetch_memory(paste0(app$address, wrong))$status_code,
-    403L
+    200L
   )
   expect_identical(
     curl::curl_fetch_memory(paste0(app$address, "?token=%00"))$status_code,
-    403L
+    200L
   )
   handle <- curl::new_handle()
   curl::handle_setheaders(handle, Host = "attacker.example")
   expect_identical(
     curl::curl_fetch_memory(app$address, handle)$status_code,
-    403L
+    200L
   )
   authorized <- curl::curl_fetch_memory(paste0(
     app$address,
@@ -25,9 +25,8 @@ test_that("a local open Viewer rejects HTTP and WebSocket requests without its t
     app$token
   ))
   expect_identical(authorized$status_code, 200L)
-  expect_match(rawToChar(authorized$headers), "no-store", fixed = TRUE)
   expect_match(rawToChar(authorized$headers), "no-referrer", fixed = TRUE)
-  for (query in c("", wrong)) {
+  for (query in c("", wrong, "?token=%00")) {
     probe <- viewer_local_access_socket(app, query)
     expect_true(probe$opened)
     expect_true(probe$closed)
@@ -87,9 +86,10 @@ test_that("a headless browser can use the authorized Viewer interactively", {
 
 test_that("cerebroStart protects the real open-mode Viewer and its upload UI", {
   skip_if_no_chrome()
-  app <- viewer_local_access_process(start = TRUE)
-  expect_identical(app$initial$status_code, 403L)
+  app <- viewer_local_access_process(start = TRUE, cached = TRUE)
+  expect_identical(app$initial$status_code, 200L)
   expect_match(app$token, "^[0-9a-f]{64}$")
+  expect_match(app$log, "EARLY_CACHE_RUNNING:TRUE", fixed = TRUE)
   browser <- chromote::ChromoteSession$new()
   withr::defer(browser$close())
   browser$Page$navigate(paste0(app$address, "?token=", app$token))
@@ -124,6 +124,7 @@ test_that("cerebroStart protects the real open-mode Viewer and its upload UI", {
     returnByValue = TRUE
   )
   expect_true(ready$result$value)
-  # The same running Viewer remains inaccessible via its bare URL.
-  expect_identical(curl::curl_fetch_memory(app$address)$status_code, 403L)
+  # The bare URL still serves only a shell; no session is granted.
+  expect_identical(curl::curl_fetch_memory(app$address)$status_code, 200L)
+  expect_true(viewer_local_access_socket(app, "")$closed)
 })

@@ -51,6 +51,9 @@ viewer_local_access_process <- function(
   ) {
     root <- NULL
   }
+  if (!is.null(root)) {
+    skip_if_not_installed("pkgload")
+  }
   fixture <- viewer_local_access_fixture
   environment(fixture) <- baseenv()
   port <- httpuv::randomPort()
@@ -79,13 +82,63 @@ viewer_local_access_process <- function(
       if (start) {
         starter <- new.env(parent = globalenv())
         sys.source(system.file("start.R", package = "CerebroNexus"), starter)
+        start_root <- system.file(package = "CerebroNexus")
+        if (cached) {
+          ## A tiny installed-layout fixture exercises the real early server
+          ## under load_all() too (inst/ itself has no DESCRIPTION).
+          page_app <- launchCerebro(mode = mode, require_token = require_token)
+          page_env <- environment(page_app$serverFuncSource())
+          response <- page_app$httpHandler(list(
+            PATH_INFO = "/",
+            REQUEST_METHOD = "GET",
+            SCRIPT_NAME = "",
+            QUERY_STRING = ""
+          ))
+          start_root <- tempfile("viewer-access-install-")
+          dir.create(start_root)
+          file.copy(
+            system.file("viewer", package = "CerebroNexus"),
+            start_root,
+            recursive = TRUE
+          )
+          writeLines(
+            c(
+              "Package: CerebroNexus",
+              paste("Version:", utils::packageVersion("CerebroNexus"))
+            ),
+            file.path(start_root, "DESCRIPTION")
+          )
+          key <- page_env$viewerUiCacheKey(
+            file.path(start_root, "viewer"),
+            c(
+              version = as.character(utils::packageVersion("CerebroNexus")),
+              www_prefix = "cerebro_www"
+            )
+          )
+          content <- response$content
+          if (!is.raw(content)) {
+            content <- charToRaw(as.character(content))
+          }
+          page_env$viewerDocumentKeep(key, content)
+          starter$loadNamespace <- function(...) {
+            list(
+              launchCerebro = function(...) {
+                message(
+                  "EARLY_CACHE_RUNNING:",
+                  !is.null(getOption("CerebroNexus.early_server"))
+                )
+                CerebroNexus::launchCerebro(...)
+              }
+            )
+          }
+        }
         starter$cerebroStart(
           port = port,
           host = host,
           mode = mode,
           require_token = require_token,
           launch.browser = launch_browser,
-          root = system.file(package = "CerebroNexus")
+          root = start_root
         )
       } else {
         app <- fixture(
@@ -146,8 +199,26 @@ viewer_local_access_process <- function(
       paste(process$read_error_lines(), collapse = "\n")
     ))
   }
-  # The launch callback prints before the event loop accepts the HTTP request.
   log <- paste(process$read_error_lines(), collapse = "\n")
+  # An early cached shell may arrive before package loading and the browser
+  # callback. Wait for the credential, not just for a successful page response.
+  if (.viewerAccessRequired(mode, require_token, host)) {
+    while (
+      !grepl("token=[0-9a-f]{64}", log) &&
+        process$is_alive() &&
+        Sys.time() < deadline
+    ) {
+      Sys.sleep(0.05)
+      log <- paste(
+        log,
+        paste(process$read_error_lines(), collapse = "\n"),
+        sep = "\n"
+      )
+    }
+    if (!grepl("token=[0-9a-f]{64}", log)) {
+      stop(paste("No Viewer credential:", log))
+    }
+  }
   token <- regmatches(log, regexpr("(?<=token=)[0-9a-f]{64}", log, perl = TRUE))
   authorized_url <- regmatches(
     log,

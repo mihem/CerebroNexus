@@ -32,17 +32,6 @@ test_that("Viewer query tokens must match exactly", {
     expect_false(.viewerAccessAllowed(query, token))
   }
   expect_true(.viewerAccessAllowed("", NULL))
-  expect_true(.viewerAccessAllowed(
-    "",
-    token,
-    paste0("/cerebro-", token, ".html")
-  ))
-  expect_true(.viewerAccessAllowed(
-    "",
-    token,
-    paste0("/proxy/cerebro-", token, ".html")
-  ))
-  expect_false(.viewerAccessAllowed("", token, "/cerebro-wrong.html"))
 })
 
 test_that("authorized Viewer URLs retain dataset queries and fragments", {
@@ -64,7 +53,7 @@ test_that("authorized Viewer URLs retain dataset queries and fragments", {
   )
 })
 
-test_that("page and session guards run before Viewer initialization", {
+test_that("the public shell does not bypass the session guard", {
   withr::local_options(cerebro.sockjs_compat = FALSE)
   app <- viewer_local_access_fixture()
   env <- environment(app$serverFuncSource())
@@ -75,8 +64,8 @@ test_that("page and session guards run before Viewer initialization", {
     QUERY_STRING = "",
     SCRIPT_NAME = ""
   ))
-  expect_identical(response$status, 403L)
-  expect_match(response$content, "Access token required", fixed = TRUE)
+  expect_equal(response$status, 200L)
+  expect_match(as.character(response$content), "ping", fixed = TRUE)
   expect_false(env$viewer_prepared)
   closed <- FALSE
   session <- list(
@@ -88,17 +77,21 @@ test_that("page and session guards run before Viewer initialization", {
   expect_identical(env$prepared_count, 0L)
 })
 
-test_that("transport compatibility does not wrap an access-denied page", {
+test_that("the public shell retains transport compatibility", {
   withr::local_options(cerebro.sockjs_compat = TRUE)
-  app <- launchCerebro()
+  app <- viewer_local_access_fixture()
   response <- app$httpHandler(list(
     PATH_INFO = "/",
     REQUEST_METHOD = "GET",
     QUERY_STRING = "",
     SCRIPT_NAME = ""
   ))
-  expect_identical(response$status, 403L)
-  expect_false(grepl("transport_compat", response$content, fixed = TRUE))
+  expect_equal(response$status, 200L)
+  expect_match(
+    as.character(response$content),
+    "cerebro_sockjs_binary",
+    fixed = TRUE
+  )
 })
 
 test_that("protected Viewers print their URL and preserve browser callbacks", {
@@ -129,19 +122,14 @@ test_that("protected startup retains authorized cached pages and previews", {
   app <- launchCerebro()
   env <- environment(app$serverFuncSource())
   calls <- character()
-  served_token <- NULL
-  fetched_address <- NULL
   env$viewer_document <- tempdir()
   env$viewer_document_capture <- TRUE
-  env$viewerDocumentServe <- function(server, directory, access_token) {
+  env$viewerDocumentServe <- function(server, directory) {
     calls <<- c(calls, "serve")
-    served_token <<- access_token
   }
-  env$viewerDocumentCapture <- function(server, key, fetch) {
+  env$viewerDocumentCapture <- function(...) {
     calls <<- c(calls, "capture")
-    fetch("http://127.0.0.1:3838/")
   }
-  env$viewerDocumentFetch <- function(address) fetched_address <<- address
   env$viewerFirstViewPublishKept <- function(...) calls <<- c(calls, "preview")
   env$viewerSharedResourceHeaders <- function(...) invisible(NULL)
   env$viewer_prepare_ui <- function() invisible(NULL)
@@ -162,14 +150,13 @@ test_that("protected startup retains authorized cached pages and previews", {
     later::run_now(0.05)
   }
   expect_setequal(calls, c("serve", "preview", "capture"))
-  expect_identical(served_token, env$viewer_access_token())
   expect_identical(
-    fetched_address,
-    paste0("http://127.0.0.1:3838/?token=", served_token)
+    env$.viewer_shared_resources$access_token,
+    env$viewer_access_token()
   )
 })
 
-test_that("restoring a cached page cannot bypass the page check", {
+test_that("cached HTML stays public without generating a credential or reading data", {
   withr::local_options(cerebro.sockjs_compat = FALSE)
   app <- launchCerebro()
   env <- environment(app$serverFuncSource())
@@ -185,11 +172,11 @@ test_that("restoring a cached page cannot bypass the page check", {
     QUERY_STRING = "",
     SCRIPT_NAME = ""
   )
-  expect_identical(app$httpHandler(request)$status, 403L)
-  request$QUERY_STRING <- paste0("?token=", env$viewer_access_token())
   response <- app$httpHandler(request)
-  expect_identical(response$status, 200L)
+  expect_equal(response$status, 200L)
   expect_match(rawToChar(response$content), "cached-viewer-page", fixed = TRUE)
+  expect_null(env$viewer_access$token)
+  expect_false(env$viewer_prepared)
 })
 
 test_that("auto mode uses the running server's address, not just launch options", {
@@ -252,14 +239,19 @@ test_that("rerunning an app refreshes the token without changing global token op
   expect_true(unrelated %in% names(shiny::resourcePaths()))
 })
 
-test_that("cerebroStart never starts an unchecked early server for protected launches", {
+test_that("cerebroStart preserves the early shell but defers protected previews", {
+  withr::local_options(CerebroNexus.ui_cache = TRUE)
   env <- new.env(parent = globalenv())
   sys.source(inst_test_path("start.R"), env)
   early_attempts <- 0L
+  early_options <- NULL
   received <- NULL
-  env$sys.source <- function(...) {
+  env$sys.source <- function(file, envir) {
     early_attempts <<- early_attempts + 1L
-    stop("test: early server not needed")
+    envir$viewerEarlyServerStart <- function(root, host, port, options) {
+      early_options <<- options
+      NULL
+    }
   }
   env$loadNamespace <- function(...) {
     list(
@@ -286,14 +278,20 @@ test_that("cerebroStart never starts an unchecked early server for protected lau
     list(mode = "closed", require_token = TRUE)
   )) {
     do.call(env$cerebroStart, c(settings, list(root = root)))
-    expect_identical(early_attempts, 0L)
+    expect_true(early_options$.defer_first_views)
     expect_identical(received$options$host, "127.0.0.1")
   }
   expect_error(
     env$cerebroStart(root = root, require_token = "invalid"),
     "require_token"
   )
-  expect_identical(early_attempts, 0L)
-  env$cerebroStart(root = root, mode = "open", require_token = FALSE)
-  expect_identical(early_attempts, 1L)
+  expect_identical(early_attempts, 3L)
+  for (settings in list(
+    list(mode = "closed"),
+    list(mode = "open", require_token = FALSE)
+  )) {
+    do.call(env$cerebroStart, c(settings, list(root = root)))
+    expect_false(early_options$.defer_first_views)
+  }
+  expect_identical(early_attempts, 5L)
 })

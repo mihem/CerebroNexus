@@ -67,12 +67,11 @@ cerebroStart <- function(
     add = TRUE
   )
   early <- NULL
-  ## The early server's static root cannot check a URL token. Do not expose
-  ## it while loading a potentially protected App. Explicitly public and
-  ## closed-mode launches retain the early-start optimization.
+  ## The interface may be sent immediately, before loading the package. Data
+  ## previews wait for the private token prefix when protection may be needed.
   token_requested <- !identical(require_token, FALSE) &&
     (identical(mode, "open") || isTRUE(require_token))
-  if (isTRUE(getOption("CerebroNexus.ui_cache", TRUE)) && !token_requested) {
+  if (isTRUE(getOption("CerebroNexus.ui_cache", TRUE))) {
     early <- tryCatch(
       {
         version <- read.dcf(file.path(root, "DESCRIPTION"), "Version")[[1L]]
@@ -88,7 +87,8 @@ cerebroStart <- function(
             crb_file_to_load = crb_file_to_load,
             point_size = point_size,
             point_opacity = point_opacity,
-            percentage_cells_to_show = percentage_cells_to_show
+            percentage_cells_to_show = percentage_cells_to_show,
+            .defer_first_views = token_requested
           )
         )
       },
@@ -127,8 +127,24 @@ cerebroStart <- function(
     port
   )
   message("\nListening on ", address)
-  if (isTRUE(launch.browser)) {
-    utils::browseURL(address)
+  open <- app$options$launch.browser
+  on_start <- app$onStart
+  app$onStart <- function() {
+    if (is.function(on_start)) {
+      on_start()
+    }
+    ## onStart refreshes the per-run credential. Only open/print its URL
+    ## afterwards, when Shiny is ready to accept the early server's sockets.
+    later::later(
+      function() {
+        if (is.function(open)) {
+          open(address)
+        } else if (isTRUE(launch.browser)) {
+          utils::browseURL(address)
+        }
+      },
+      0
+    )
   }
   ## Shiny's own server: on this machine only, and on a port nobody is given.
   ## The early server takes its requests to the same App.

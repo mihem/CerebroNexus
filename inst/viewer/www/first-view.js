@@ -50,8 +50,7 @@
   } catch (error) {
     return;
   }
-  var authorizedPath = /\/cerebro-([0-9a-f]{64})\.html$/.exec(window.location.pathname);
-  var accessToken = authorizedPath ? authorizedPath[1] : params.get('token');
+  var accessToken = params.get('token');
   if (!/^[0-9a-f]{64}$/.test(accessToken || '')) accessToken = null;
   var firstViewPrefix = 'cerebro-first-view' + (accessToken ? '-' + accessToken : '') + '/';
   function resourceUrl(url) {
@@ -77,10 +76,7 @@
   // viewerFirstViewKey() in viewer/core/shared_resources.R.
   function firstViewKey() {
     var dataset = params.get('dataset');
-    var pathname = authorizedPath
-      ? window.location.pathname.replace(/cerebro-[0-9a-f]{64}\.html$/, '')
-      : window.location.pathname;
-    var address = pathname + '\n' + (dataset == null ? '' : dataset);
+    var address = window.location.pathname + '\n' + (dataset == null ? '' : dataset);
     var bytes = new TextEncoder().encode(address), key = '';
     for (var i = 0; i < bytes.length; i++) {
       key += (bytes[i] < 16 ? '0' : '') + bytes[i].toString(16);
