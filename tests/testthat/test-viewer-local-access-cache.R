@@ -1,5 +1,5 @@
 test_that("the public cached shell is served off-thread at the original root", {
-  skip_if_not_installed("curl")
+  skip_if_not_installed("httr")
   env <- new.env(parent = globalenv())
   sys.source(viewer_test_path("core", "kept_document.R"), env)
   # This request deliberately runs synchronously on R's main thread. A page
@@ -30,15 +30,14 @@ test_that("the public cached shell is served off-thread at the original root", {
     list.files(root$path),
     "index.html"
   )
-  handle <- curl::new_handle(timeout = 2)
-  response <- curl::curl_fetch_memory(
+  response <- viewer_local_access_get(
     sprintf("http://127.0.0.1:%d/", port),
-    handle
+    httr::timeout(2)
   )
   expect_identical(response$status_code, 200L)
   expect_identical(response$content, html)
-  expect_match(rawToChar(response$headers), "no-referrer", fixed = TRUE)
-  expect_match(rawToChar(response$headers), "no-cache", fixed = TRUE)
+  expect_identical(response$headers[["referrer-policy"]], "no-referrer")
+  expect_identical(response$headers[["cache-control"]], "no-cache")
 })
 
 test_that("protected first-view URLs and temporary files do not use public aliases", {
@@ -104,7 +103,7 @@ test_that("the query token permits uploads, downloads and reloads with the publi
     returnByValue = TRUE
   )$result$value
   expect_identical(
-    trimws(rawToChar(curl::curl_fetch_memory(download)$content)),
+    trimws(rawToChar(viewer_local_access_get(download)$content)),
     "authorized download"
   )
   upload <- withr::local_tempfile(fileext = ".txt")
@@ -135,6 +134,6 @@ test_that("the query token permits uploads, downloads and reloads with the publi
       returnByValue = TRUE
     )$result$value
   )
-  expect_identical(curl::curl_fetch_memory(app$address)$status_code, 200L)
+  expect_identical(viewer_local_access_get(app$address)$status_code, 200L)
   expect_true(viewer_local_access_socket(app, "")$closed)
 })

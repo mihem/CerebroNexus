@@ -34,6 +34,11 @@ viewer_local_access_fixture <- function(...) {
   app
 }
 
+viewer_local_access_get <- function(url, ...) {
+  skip_if_not_installed("httr")
+  httr::GET(url, httr::timeout(5), ...)
+}
+
 viewer_local_access_process <- function(
   mode = "open",
   require_token = NULL,
@@ -43,23 +48,13 @@ viewer_local_access_process <- function(
   cached = FALSE
 ) {
   skip_if_not_installed("callr")
-  skip_if_not_installed("curl")
-  root <- normalizePath(testthat::test_path("..", ".."), winslash = "/")
-  if (
-    !file.exists(file.path(root, "DESCRIPTION")) ||
-      !dir.exists(file.path(root, "R"))
-  ) {
-    root <- NULL
-  }
-  if (!is.null(root)) {
-    skip_if_not_installed("pkgload")
-  }
+  skip_if_not_installed("httr")
+  skip_without_installed_package()
   fixture <- viewer_local_access_fixture
   environment(fixture) <- baseenv()
   port <- httpuv::randomPort()
   process <- callr::r_bg(
     function(
-      root,
       fixture,
       port,
       mode,
@@ -72,11 +67,7 @@ viewer_local_access_process <- function(
       cache <- tempfile("viewer-access-cache-")
       dir.create(cache)
       Sys.setenv(R_USER_CACHE_DIR = cache)
-      if (is.null(root)) {
-        library(CerebroNexus)
-      } else {
-        pkgload::load_all(root, quiet = TRUE)
-      }
+      library(CerebroNexus)
       environment(fixture) <- globalenv()
       options(cerebro.sockjs_compat = FALSE)
       if (start) {
@@ -84,8 +75,7 @@ viewer_local_access_process <- function(
         sys.source(system.file("start.R", package = "CerebroNexus"), starter)
         start_root <- system.file(package = "CerebroNexus")
         if (cached) {
-          ## A tiny installed-layout fixture exercises the real early server
-          ## under load_all() too (inst/ itself has no DESCRIPTION).
+          ## Warm the installed page cache, then exercise the real early server.
           page_app <- launchCerebro(mode = mode, require_token = require_token)
           page_env <- environment(page_app$serverFuncSource())
           response <- page_app$httpHandler(list(
@@ -94,32 +84,11 @@ viewer_local_access_process <- function(
             SCRIPT_NAME = "",
             QUERY_STRING = ""
           ))
-          start_root <- tempfile("viewer-access-install-")
-          dir.create(start_root)
-          file.copy(
-            system.file("viewer", package = "CerebroNexus"),
-            start_root,
-            recursive = TRUE
-          )
-          writeLines(
-            c(
-              "Package: CerebroNexus",
-              paste("Version:", utils::packageVersion("CerebroNexus"))
-            ),
-            file.path(start_root, "DESCRIPTION")
-          )
-          key <- page_env$viewerUiCacheKey(
-            file.path(start_root, "viewer"),
-            c(
-              version = as.character(utils::packageVersion("CerebroNexus")),
-              www_prefix = "cerebro_www"
-            )
-          )
           content <- response$content
           if (!is.raw(content)) {
             content <- charToRaw(as.character(content))
           }
-          page_env$viewerDocumentKeep(key, content)
+          page_env$viewerDocumentKeep(page_env$viewer_document_key(), content)
           starter$loadNamespace <- function(...) {
             list(
               launchCerebro = function(...) {
@@ -168,7 +137,6 @@ viewer_local_access_process <- function(
       }
     },
     args = list(
-      root,
       fixture,
       port,
       mode,
@@ -188,7 +156,7 @@ viewer_local_access_process <- function(
   response <- NULL
   while (is.null(response) && process$is_alive() && Sys.time() < deadline) {
     response <- tryCatch(
-      curl::curl_fetch_memory(address),
+      viewer_local_access_get(address),
       error = function(error) NULL
     )
     if (is.null(response)) Sys.sleep(0.05)
@@ -235,53 +203,75 @@ viewer_local_access_process <- function(
   )
 }
 
-viewer_local_access_socket <- function(
-  app,
-  query,
-  origin = "http://evil.example"
-) {
-  skip_if_not_installed("websocket")
-  state <- new.env(parent = emptyenv())
-  state$opened <- FALSE
-  state$closed <- FALSE
-  state$values <- NULL
-  state$errors <- character()
-  ws <- websocket::WebSocket$new(
-    sprintf("ws://127.0.0.1:%d/websocket", app$port),
-    headers = c(Origin = origin),
-    autoConnect = FALSE
+viewer_local_access_socket <- function(app, query) {
+  skip_if_no_chrome()
+  ## A different loopback port is a real foreign origin, without depending on
+  ## DNS, external sites or another WebSocket client package. The attacker page
+  ## contains no Shiny script and opens only the raw socket under test.
+  directory <- withr::local_tempdir()
+  writeLines(
+    "<!DOCTYPE html><html><body>Foreign origin</body></html>",
+    file.path(directory, "index.html")
   )
-  on.exit(ws$close(), add = TRUE)
-  ws$onOpen(function(event) {
-    state$opened <- TRUE
-    ws$send(jsonlite::toJSON(
-      list(
-        method = "init",
-        data = list(
-          .clientdata_url_protocol = "http:",
-          .clientdata_url_hostname = "127.0.0.1",
-          .clientdata_url_port = as.character(app$port),
-          .clientdata_url_pathname = "/",
-          .clientdata_url_search = query,
-          .clientdata_url_hash_initial = "",
-          .clientdata_singletons = "",
-          .clientdata_output_pong_hidden = FALSE,
-          ping = "socket"
-        )
+  port <- httpuv::randomPort()
+  attacker <- httpuv::startServer(
+    "127.0.0.1",
+    port,
+    list(
+      call = function(req) list(status = 404L, headers = list(), body = ""),
+      staticPaths = list("/" = httpuv::staticPath(directory, indexhtml = TRUE))
+    )
+  )
+  withr::defer(attacker$stop())
+  browser <- chromote::ChromoteSession$new()
+  withr::defer(browser$close())
+  loaded <- browser$Page$loadEventFired(wait_ = FALSE)
+  browser$Page$navigate(sprintf("http://127.0.0.1:%d/", port))
+  browser$wait_for(loaded)
+  init <- list(
+    method = "init",
+    data = list(
+      .clientdata_url_protocol = "http:",
+      .clientdata_url_hostname = "127.0.0.1",
+      .clientdata_url_port = as.character(app$port),
+      .clientdata_url_pathname = "/",
+      .clientdata_url_search = query,
+      .clientdata_url_hash_initial = "",
+      .clientdata_singletons = "",
+      .clientdata_output_pong_hidden = FALSE,
+      ping = "socket"
+    )
+  )
+  result <- browser$Runtime$evaluate(
+    expression = sprintf(
+      paste0(
+        "new Promise(resolve => { ",
+        "const state = {opened:false, closed:false, values:null, errors:[], origin:location.origin}; ",
+        "let finished = false; const ws = new WebSocket(%s); ",
+        "const finish = () => { if (finished) return; finished = true; ",
+        "clearTimeout(timer); resolve({...state, errors:[...state.errors]}); ws.close(); }; ",
+        "const timer = setTimeout(() => { state.errors.push('Socket timed out'); finish(); }, 10000); ",
+        "ws.onopen = () => { state.opened = true; ws.send(JSON.stringify(%s)); }; ",
+        "ws.onmessage = event => { if (typeof event.data !== 'string') return; ",
+        "try { const message = JSON.parse(event.data); ",
+        "if (message.values && Object.keys(message.values).length) {state.values = message.values; finish();} ",
+        "} catch (error) {state.errors.push(String(error)); finish();} }; ",
+        "ws.onerror = () => {state.errors.push('WebSocket error'); finish();}; ",
+        "ws.onclose = () => {state.closed = true; finish();}; })"
       ),
-      auto_unbox = TRUE
-    ))
-  })
-  ws$onMessage(function(event) {
-    message <- jsonlite::fromJSON(event$data, simplifyVector = FALSE)
-    if (length(message$values)) state$values <- message$values
-  })
-  ws$onClose(function(event) state$closed <- TRUE)
-  ws$onError(function(event) state$errors <- c(state$errors, event$message))
-  ws$connect()
-  deadline <- Sys.time() + 10
-  while (!state$closed && is.null(state$values) && Sys.time() < deadline) {
-    later::run_now(0.05)
+      jsonlite::toJSON(
+        sprintf("ws://127.0.0.1:%d/websocket", app$port),
+        auto_unbox = TRUE
+      ),
+      jsonlite::toJSON(init, auto_unbox = TRUE)
+    ),
+    awaitPromise = TRUE,
+    returnByValue = TRUE
+  )
+  if (!is.null(result$exceptionDetails)) {
+    stop(result$exceptionDetails$text)
   }
-  as.list(state)
+  result <- result$result$value
+  result$errors <- unlist(result$errors, use.names = FALSE)
+  result
 }

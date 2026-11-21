@@ -6,29 +6,31 @@ test_that("a public Viewer shell cannot start unauthorized WebSocket sessions", 
   expect_match(app$token, "^[0-9a-f]{64}$")
   wrong <- paste0("?token=", strrep("0", 64))
   expect_identical(
-    curl::curl_fetch_memory(paste0(app$address, wrong))$status_code,
+    viewer_local_access_get(paste0(app$address, wrong))$status_code,
     200L
   )
   expect_identical(
-    curl::curl_fetch_memory(paste0(app$address, "?token=%00"))$status_code,
+    viewer_local_access_get(paste0(app$address, "?token=%00"))$status_code,
     200L
   )
-  handle <- curl::new_handle()
-  curl::handle_setheaders(handle, Host = "attacker.example")
   expect_identical(
-    curl::curl_fetch_memory(app$address, handle)$status_code,
+    viewer_local_access_get(
+      app$address,
+      httr::add_headers(Host = "attacker.example")
+    )$status_code,
     200L
   )
-  authorized <- curl::curl_fetch_memory(paste0(
+  authorized <- viewer_local_access_get(paste0(
     app$address,
     "?token=",
     app$token
   ))
   expect_identical(authorized$status_code, 200L)
-  expect_match(rawToChar(authorized$headers), "no-referrer", fixed = TRUE)
+  expect_identical(authorized$headers[["referrer-policy"]], "no-referrer")
   for (query in c("", wrong, "?token=%00")) {
     probe <- viewer_local_access_socket(app, query)
     expect_true(probe$opened)
+    expect_false(identical(probe$origin, sub("/$", "", app$address)))
     expect_true(probe$closed)
     expect_null(probe$values)
     expect_length(probe$errors, 0L)
@@ -125,6 +127,6 @@ test_that("cerebroStart protects the real open-mode Viewer and its upload UI", {
   )
   expect_true(ready$result$value)
   # The bare URL still serves only a shell; no session is granted.
-  expect_identical(curl::curl_fetch_memory(app$address)$status_code, 200L)
+  expect_identical(viewer_local_access_get(app$address)$status_code, 200L)
   expect_true(viewer_local_access_socket(app, "")$closed)
 })
