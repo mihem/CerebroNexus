@@ -8,9 +8,9 @@ run_demo <- function(options, scope = new.env(parent = globalenv())) {
 }
 
 test_that("run-demo prepares the data sets --data names and opens the Viewer", {
-  keys <- c("1m", "ren", "cosmx", "tcell")
-  variables <- paste0("CEREBRO_", toupper(keys), "_DEMO_CRB")
-  withr::local_envvar(stats::setNames(rep(NA, 4), variables))
+  keys <- c("1m", "ren", "cosmx", "tcell", "xenium-prime")
+  variables <- paste0("CEREBRO_", toupper(gsub("-", "_", keys)), "_DEMO_CRB")
+  withr::local_envvar(stats::setNames(rep(NA, length(keys)), variables))
   datasets <- stats::setNames(tempfile(paste0(keys, "-")), keys)
   file.create(datasets)
   withr::defer(unlink(datasets))
@@ -36,6 +36,7 @@ test_that("run-demo prepares the data sets --data names and opens the Viewer", {
   runs <- list(
     list(options = character(), expected = "1m"),
     list(options = "--data=cosmx", expected = "cosmx"),
+    list(options = "--data=xenium-prime", expected = "xenium-prime"),
     list(options = "--data=tcell,ren,1m", expected = c("1m", "ren", "tcell"))
   )
   fake <- function(key) {
@@ -53,6 +54,18 @@ test_that("run-demo prepares the data sets --data names and opens the Viewer", {
       scope$prepareViewerRenDemoData <- fake("ren")
       scope$prepareViewerCosMxDemoData <- fake("cosmx")
       scope$prepareViewerTcellDemoData <- fake("tcell")
+      scope$prepareViewerXeniumPrimeDemoData <- function(image_script) {
+        expect_identical(
+          image_script,
+          file.path(
+            root,
+            "data-raw",
+            "large-demo",
+            "prepare_xenium_prime_image.py"
+          )
+        )
+        fake("xenium-prime")()
+      }
       ## A Viewer Pack for each prepared data set.
       scope$prepareDemoViewerPack <- function(crb) {
         packs <<- c(packs, basename(crb))
@@ -81,7 +94,7 @@ test_that("run-demo rejects unknown options and data sets", {
   for (options in list("--everything", "--data=mouse", "--data=")) {
     expect_error(
       run_demo(options),
-      "Usage: Rscript run-demo.R [--data=1m,ren,cosmx,tcell] [--prepare-only]",
+      "Usage: Rscript run-demo.R [--data=1m,ren,cosmx,tcell,xenium-prime] [--prepare-only]",
       fixed = TRUE
     )
   }

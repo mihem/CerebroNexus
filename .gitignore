@@ -36,6 +36,7 @@ inst/private-data/linked-view-shares.sqlite
 /tests/testthat/_artifacts/
 
 node_modules/
+__pycache__/
 /tests/testthat/_problems/
 /tests/testthat/testthat-problems.rds
 # Historical one-off Viewer investigations are archived outside the checkout.

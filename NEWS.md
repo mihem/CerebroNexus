@@ -1,3 +1,13 @@
+# CerebroNexus (development version)
+
+- The source-checkout demo launcher accepts `--data=xenium-prime`: the
+  optional 10x Xenium Prime 5K fresh-frozen mouse brain, with all panel genes,
+  published clusters and UMAP, and a four-stain composite microscopy PNG.
+  Expression uses an H5 sidecar; source-derived image bounds keep the
+  background aligned without manual offsets. Data stay in the user cache,
+  outside the package/CRAN tarball. This uses the existing image renderer;
+  interactive channels and tiled microscopy are not added.
+
 # CerebroNexus 8.4.9
 
 - **Numbered groups in natural order (#284).** Group levels such as

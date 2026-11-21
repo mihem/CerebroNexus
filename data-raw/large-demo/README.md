@@ -10,10 +10,11 @@ You normally do not run these scripts yourself. From the repository root, run th
 Rscript run-demo.R                             # the mouse brain, then the Viewer in the browser
 Rscript run-demo.R --data=ren                  # only the Ren atlas
 Rscript run-demo.R --data=1m,ren,cosmx,tcell   # all four large data sets
+Rscript run-demo.R --data=xenium-prime         # Prime 5K with four-stain microscopy
 Rscript run-demo.R --data=ren --prepare-only   # download and convert, do not start the Viewer
 ```
 
-`--data` takes a comma-separated list of `1m` (the mouse brain), `ren`, `cosmx` and `tcell`; without it the launcher prepares the mouse brain.
+`--data` takes a comma-separated list of `1m` (the mouse brain), `ren`, `cosmx`, `tcell` and `xenium-prime`; without it the launcher prepares the mouse brain.
 
 The launcher loads this checkout with `pkgload`, sources the scripts below, prepares each data set (a complete cache is reused, so only the first run downloads and converts), builds the Viewer Pack, and starts the app on `http://127.0.0.1:7451`. It needs `pkgload`, `rhdf5`, `HDF5Array`, `DelayedArray`, `readxl` and `qs2`, plus the packages the Viewer itself uses.
 
@@ -48,6 +49,7 @@ crb <- prepareViewerRenDemoData()   # returns the path of the prepared .crb
 - `prepare_viewer_ren_data.R`: downloads the Ren et al. atlas (about 61 GB as `.h5ad`), the cell annotation, the clinical sample table and the TCR/BCR tables, and builds the Ren `.crb` with its immune repertoire. Entry function: `prepareViewerRenDemoData()`.
 - `prepare_viewer_cosmx_data.R`: downloads the eight section archives of the CosMx NSCLC data set (11.3 GB), reads the expression and cell tables, and builds the CosMx `.crb` with one spatial entry per section. Entry function: `prepareViewerCosMxDemoData()`. Source, licence status and changes: [`cosmx.ATTRIBUTION.md`](cosmx.ATTRIBUTION.md).
 - `prepare_viewer_tcell_data.R`: downloads the Zenodo files of the pan-cancer T-cell atlas (14.1 GB), joins the 70 per-data-set expression objects, computes the joint embedding and builds the `.crb` with the TCR repertoire and the CD8 trajectory. Entry function: `prepareViewerTcellDemoData()`. Source, licence and changes: [`tcell.ATTRIBUTION.md`](tcell.ATTRIBUTION.md).
+- `prepare_viewer_xenium_prime_data.R` and `prepare_xenium_prime_image.py`: prepare the optional Prime 5K mouse brain with a fixed-colour microscopy PNG. Entry function: `prepareViewerXeniumPrimeDemoData()`. See [below](#xenium-prime-5k-mouse-brain) and [`xenium-prime.ATTRIBUTION.md`](xenium-prime.ATTRIBUTION.md).
 - `download_helpers.R`: the cache folder, the checked download (size, then MD5 or SHA256, resumable) and the publish-by-rename shared by the two scripts above. `run-demo.R` sources it before them.
 - `prepare_viewer_pack.R`: builds or reuses the Viewer Pack of a prepared `.crb`. Entry function: `prepareDemoViewerPack()`.
 - The expression matrix of the mouse brain and Ren data sets is written as the cells x genes H5 sidecar by the package's own streaming writer (`R/h5ad_stream.R`, the one `convertH5adToCerebro()` uses for an h5ad with more than 2^31 - 1 non-zero values), not by a script of this folder: `HDF5Array::writeTENxMatrix()` can only write one gene after the other, and a source stored by cells is then scanned from start to end for every block of genes, which takes days for these atlases. The writer reads the CSR arrays directly, in several R processes.
@@ -79,3 +81,69 @@ Notes on the T-cell data set:
 - The H5 file and the intermediate matrix are held in memory while the data set is built: the peak was about 52 GB of resident memory.
 
 Benchmarks and smoke checks live in [CerebroNexus_paper_code](https://github.com/duocang/CerebroNexus_paper_code) (`topics/viewer_performance/` and `topics/expression_backends/`).
+
+## Xenium Prime 5K mouse brain
+
+This is a separate, newer data set, not a replacement for the small Xenium V1
+CTX+HP example. It keeps all 63,173 cells and the 5,006 Gene Expression features
+of the Prime panel. Negative controls are excluded. The published 10x graph
+clusters and UMAP are used, not recomputed; the 11 cells omitted by XOA remain
+available spatially, labelled `Unassigned`, with missing UMAP coordinates.
+
+```bash
+# One-time build dependencies for the microscopy converter (no Python in the Viewer):
+python3 -m pip install numpy tifffile imagecodecs Pillow
+Rscript run-demo.R --data=xenium-prime
+# Or download/prepare without starting the Viewer:
+Rscript run-demo.R --data=xenium-prime --prepare-only
+```
+
+Set `CEREBRO_DEMO_PYTHON` to a Python executable with those packages if it is not
+the `python3` on PATH. With Nix, use a Python built against the same library
+environment as R, or an executable wrapper that isolates Python's library
+environment; mixing different Nixpkgs snapshots' `LD_LIBRARY_PATH` can prevent
+NumPy from loading. Python dependencies are build-time only.
+
+The first run downloads the **13.3 GB** 10x outs ZIP into
+`large-examples/xenium-prime/source/`. Only the expression matrix, cell table,
+analysis archive and four focus TIFFs (about 2.1 GB combined) are unpacked in a
+temporary build directory. Allow roughly **17 GB free disk** for preparation.
+The transcript clouds, boundaries and 3D morphology stack are not extracted.
+
+The prepared directory contains:
+
+- `cerebro_xenium_prime.crb`: metadata, spatial coordinates and published UMAP.
+- `cerebro_xenium_prime.h5`: log-normalised expression, read on demand.
+- `morphology.png`: a four-stain RGB composite, at most 4,096 pixels per side.
+- `morphology.json`: full-resolution physical extent, source pixel sizes,
+  display dimensions, channel colours and contrast windows.
+- `demo-version` and the Viewer Pack.
+
+The PNG combines **DAPI (blue), ATP1A1/CD45/E-Cadherin (green), 18S (magenta) and
+alphaSMA/Vimentin (yellow)**. Each channel is contrast-stretched independently
+before additive compositing. This is measured microscopy, not coloured clusters
+or a tint of DAPI. Channel settings are baked into the PNG; this demo adds no
+interactive multichannel or tiled-image support.
+
+The source's micrometre pixel calibration defines the complete image extent
+even after downsampling. Cell coordinates use `(x_centroid, -y_centroid)`, so the
+native PNG and cells share a frame without hand-tuned offsets or scale. This is
+demo-specific preparation, not a general calibration/import change.
+
+Choose **Mouse brain (Xenium Prime 5K)** in the data set menu, then Spatial.
+Its background is selected automatically and the cell overlay starts faint.
+Cached prepared data can also be opened with the source app by setting
+`CEREBRO_XENIUM_PRIME_DEMO_CRB` to the `.crb` path; keep its H5, PNG and JSON
+beside it. Python is not needed to reopen a current prepared cache.
+
+No data are added to the repository or installed package. This source-checkout
+demo is not registered in `downloadDemoData()` (which downloads small, already
+prepared examples). A failed rebuild preserves the previous prepared directory.
+Changing either the R recipe or Python compositor invalidates its build stamp.
+
+Tests, without downloading the real data:
+
+```bash
+nix-shell --run 'Rscript -e "devtools::test(filter = \"xenium-prime-demo|run-demo\")"'
+python3 -m unittest discover -s tests/python -v
+```

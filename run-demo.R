@@ -2,7 +2,7 @@
 
 ## Prepares the large demo data sets and opens them in this checkout's Viewer.
 ##
-##   Rscript run-demo.R [--data=1m,ren,cosmx,tcell] [--prepare-only]
+##   Rscript run-demo.R [--data=1m,ren,cosmx,tcell,xenium-prime] [--prepare-only]
 ##
 ## --data names the data sets to prepare (default: 1m, the mouse brain).
 ## --prepare-only downloads and converts without starting the Viewer.
@@ -39,6 +39,19 @@ demos <- list(
   tcell = list(
     prepare = function() prepareViewerTcellDemoData(),
     variable = "CEREBRO_TCELL_DEMO_CRB"
+  ),
+  "xenium-prime" = list(
+    prepare = function() {
+      prepareViewerXeniumPrimeDemoData(
+        image_script = file.path(
+          repo_root,
+          "data-raw",
+          "large-demo",
+          "prepare_xenium_prime_image.py"
+        )
+      )
+    },
+    variable = "CEREBRO_XENIUM_PRIME_DEMO_CRB"
   )
 )
 
@@ -56,7 +69,7 @@ if (
     !all(selected %in% names(demos))
 ) {
   stop(
-    "Usage: Rscript run-demo.R [--data=1m,ren,cosmx,tcell] [--prepare-only]",
+    "Usage: Rscript run-demo.R [--data=1m,ren,cosmx,tcell,xenium-prime] [--prepare-only]",
     call. = FALSE
   )
 }
@@ -73,6 +86,7 @@ for (script in c(
   "prepare_viewer_ren_data.R",
   "prepare_viewer_cosmx_data.R",
   "prepare_viewer_tcell_data.R",
+  "prepare_viewer_xenium_prime_data.R",
   "prepare_viewer_pack.R"
 )) {
   source(file.path(repo_root, "data-raw", "large-demo", script), local = TRUE)
