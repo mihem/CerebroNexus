@@ -9,6 +9,12 @@
   The microscopy is read with Bio-Formats (`RBioFormats`), which only building
   the demo needs. This uses the existing image renderer; interactive channels
   and tiled microscopy are not added.
+- **Split by on the Spatial page draws its cells again for a data set with a
+  Viewer Pack.** Once the Pack's cell-name file was ready, a split frame sent
+  neither cell names nor the rows that stand for them, so every panel was
+  empty (0 of 63,173 cells for the Xenium Prime 5K demo; the smaller Xenium
+  demo has no Pack and was not affected). The frame now carries
+  the canonical rows and the file, and the browser resolves a range of rows.
 
 # CerebroNexus 8.4.9
 

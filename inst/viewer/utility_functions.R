@@ -2117,6 +2117,18 @@ cerebroCellViewRender <- function(
   } else if (is.function(deferred_aux)) {
     auxiliary <- deferred_aux()
     message$data$selection_key <- auxiliary$selection_key
+    ## With the cell-name file the cells come as canonical rows, not names: the
+    ## frame carries the rows and the file, and the browser resolves the names
+    ## before it draws (resolveFrameCellNames() in cell_views.js). Without them
+    ## the frame would have no cells (the split Spatial panels drew none).
+    if (
+      is.null(auxiliary$selection_key) &&
+        !is.null(auxiliary$selection_index) &&
+        is.list(auxiliary$cell_names_resource)
+    ) {
+      message$data$selection_index <- auxiliary$selection_index
+      message$data$cell_names_resource <- auxiliary$cell_names_resource
+    }
     message$hover <- auxiliary$hover
   }
 

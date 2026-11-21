@@ -110,6 +110,10 @@ test_that("Slice panels draw shared rows named through the cell-name resource", 
   viewer_browser_test("slicePanels")
 })
 
+test_that("Keyed split panels draw when the frame names its cells by a row range", {
+  viewer_browser_test("keyedPanelsFromRowRange")
+})
+
 test_that("An appearance patch with the drawn values does not redraw", {
   viewer_browser_test("appearanceUnchanged")
 })

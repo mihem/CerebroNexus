@@ -571,6 +571,28 @@ window.viewerScenarios = {
     t.check(tips.includes('Cell: c-0')&&tips.includes('expansion: Single'),'Rows are named and coloured by code');
     return true;
   },
+  async keyedPanelsFromRowRange() {
+    // A split Spatial frame names its cells by a range of canonical rows and
+    // the cell-name resource; its panels name their cells by barcode.
+    const t=viewerTest;t.dataset();const id='spatial_projection';
+    const identity={cell_count:5,cell_fingerprint:'md5-cell-set-v1:'+'a'.repeat(32),
+      cell_order_fingerprint:'md5-cell-order-v1:'+'b'.repeat(32),pack_dataset_fingerprint:'md5-crb-v1:'+'c'.repeat(32)};
+    const resource={protocol:'canonical-cell-names-v1',cells:5,bytes:20,
+      url:URL.createObjectURL(new Blob(['c-0\0c-1\0c-2\0c-3\0c-4\0'])),
+      dataset_fingerprint:identity.cell_fingerprint,cell_order_fingerprint:identity.cell_order_fingerprint,
+      pack_dataset_fingerprint:identity.pack_dataset_fingerprint};
+    const range={x_range:[-1,11],y_range:[-1,11]};
+    await t.render({selection_key:null,selection_index:{kind:'range',start:0,length:5},cell_names_resource:resource,
+      group:['A','B','A','B','B'],color:null,
+      panels:[{id:'split-1',label:'A',selection_key:['c-0','c-2'],x:[0,10],y:[0,10],spatial:true,...range},
+        {id:'split-2',label:'B',selection_key:['c-1','c-3','c-4'],x:[10,5,0],y:[0,5,10],spatial:true,...range}]},
+      {color_type:'categorical',color_variable:'cluster',traces:['A','B'],
+        group_colors:['#00ff00','#ff0000']},id,{dataset_identity:identity},true);
+    for(let i=0;i<5;i++)await t.settle();
+    t.equal(t.arcs('cv-cv-a').length,2,'The first split panel draws its cells');
+    t.equal(t.arcs('cv-cv-b').length,3,'The second split panel draws its cells');
+    return true;
+  },
   async appearanceUnchanged() {
     const t=viewerTest;t.dataset();const id='overview_projection';
     await t.render({},{},id);
