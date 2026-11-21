@@ -37,6 +37,21 @@
     function install() {
       if (installed || !window.Shiny || !window.Shiny.addCustomMessageHandler) return;
       installed = true;
+      window.Shiny.addCustomMessageHandler("cerebro_access_denied", function (message) {
+        if (!message || typeof message.message !== "string") return;
+        var alert = document.getElementById("cerebro-access-denied");
+        if (!alert) {
+          alert = document.createElement("div");
+          alert.id = "cerebro-access-denied";
+          alert.setAttribute("role", "alert");
+          alert.style.cssText = "position:fixed;top:16px;left:16px;right:16px;" +
+            "z-index:2147483647;padding:16px;border:2px solid #9a6700;" +
+            "border-radius:6px;background:#fff8c5;color:#24292f;" +
+            "font:16px/1.5 sans-serif;box-shadow:0 2px 12px #0003";
+          document.body.appendChild(alert);
+        }
+        alert.textContent = message.message;
+      });
       // Keep ?page= and ?dataset= in the address bar (other query parameters
       // stay) without adding history entries. The query wins over a /name path
       // on reload, so switching data sets never rewrites the path, which may be

@@ -143,7 +143,11 @@ viewerSharedResourceHeaders <- function() {
 ## page can be opened at, named by viewerFirstViewKey().
 
 viewerFirstViewDirectory <- function() {
-  directory <- file.path(tempdir(), "cerebro-first-view")
+  name <- "cerebro-first-view"
+  if (!is.null(.viewer_shared_resources$access_token)) {
+    name <- paste0(name, "-", .viewer_shared_resources$access_token)
+  }
+  directory <- file.path(tempdir(), name)
   dir.create(directory, showWarnings = FALSE, recursive = TRUE)
   directory
 }
@@ -968,7 +972,11 @@ viewerFirstViewPublishKept <- function(
   if (!length(sources)) {
     return(invisible(FALSE))
   }
-  serve("cerebro-first-view", viewerFirstViewDirectory())
+  prefix <- "cerebro-first-view"
+  if (!is.null(.viewer_shared_resources$access_token)) {
+    prefix <- paste0(prefix, "-", .viewer_shared_resources$access_token)
+  }
+  serve(prefix, viewerFirstViewDirectory())
   try(
     viewerFirstViewRestore(
       viewerSharedResourceRoots(options),

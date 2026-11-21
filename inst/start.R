@@ -21,6 +21,9 @@
 ## address of the App, and `launch.browser` opens it. `root` is the directory
 ## of the installed package: the one this file is in when it is run as a
 ## script.
+## `require_token = NULL` protects local open-mode launches automatically;
+## TRUE forces protection and FALSE opts out. The CLI equivalent is
+## --require-token=auto|true|false.
 cerebroStart <- function(
   crb_file_to_load = NULL,
   port = 3838L,
@@ -33,9 +36,13 @@ cerebroStart <- function(
   percentage_cells_to_show = 100,
   projections_show_hover_info = TRUE,
   launch.browser = FALSE,
-  root = find.package("CerebroNexus")
+  root = find.package("CerebroNexus"),
+  require_token = NULL
 ) {
   root <- normalizePath(root, winslash = "/", mustWork = TRUE)
+  policy <- new.env(parent = baseenv())
+  sys.source(file.path(root, "viewer", "core", "access_policy.R"), policy)
+  token_requested <- policy$viewerAccessRequired(mode, require_token, host)
   ## The package, and the background processes of the Viewer, are found where
   ## this installation is.
   library <- dirname(root)
@@ -55,6 +62,8 @@ cerebroStart <- function(
     add = TRUE
   )
   early <- NULL
+  ## The interface may be sent immediately, before loading the package. Data
+  ## previews wait for the private token prefix when protection may be needed.
   if (isTRUE(getOption("CerebroNexus.ui_cache", TRUE))) {
     early <- tryCatch(
       {
@@ -71,7 +80,8 @@ cerebroStart <- function(
             crb_file_to_load = crb_file_to_load,
             point_size = point_size,
             point_opacity = point_opacity,
-            percentage_cells_to_show = percentage_cells_to_show
+            percentage_cells_to_show = percentage_cells_to_show,
+            .defer_first_views = token_requested
           )
         )
       },
@@ -93,14 +103,15 @@ cerebroStart <- function(
     point_size = point_size,
     point_opacity = point_opacity,
     percentage_cells_to_show = percentage_cells_to_show,
-    projections_show_hover_info = projections_show_hover_info
+    projections_show_hover_info = projections_show_hover_info,
+    require_token = require_token,
+    options = list(host = host, port = port, launch.browser = launch.browser)
   )
   if (is.null(early)) {
     return(shiny::runApp(
       app,
       host = host,
-      port = port,
-      launch.browser = launch.browser
+      port = port
     ))
   }
   address <- sprintf(
@@ -109,8 +120,24 @@ cerebroStart <- function(
     port
   )
   message("\nListening on ", address)
-  if (isTRUE(launch.browser)) {
-    utils::browseURL(address)
+  open <- app$options$launch.browser
+  on_start <- app$onStart
+  app$onStart <- function() {
+    if (is.function(on_start)) {
+      on_start()
+    }
+    ## onStart refreshes the per-run credential. Only open/print its URL
+    ## afterwards, when Shiny is ready to accept the early server's sockets.
+    later::later(
+      function() {
+        if (is.function(open)) {
+          open(address)
+        } else if (isTRUE(launch.browser)) {
+          utils::browseURL(address)
+        }
+      },
+      0
+    )
   }
   ## Shiny's own server: on this machine only, and on a port nobody is given.
   ## The early server takes its requests to the same App.
@@ -142,6 +169,14 @@ local({
     )
     if (length(value)) value[[length(value)]] else default
   }
+  token_flag <- flag("require-token", "auto")
+  require_token <- switch(
+    token_flag,
+    auto = NULL,
+    true = TRUE,
+    false = FALSE,
+    stop("--require-token must be auto, true or false.", call. = FALSE)
+  )
   ## `name=file.crb` names a data set, as a named vector does.
   named <- grepl("^[^=/\\\\]+=", files)
   crb <- sub("^[^=/\\\\]+=", "", files)
@@ -154,6 +189,7 @@ local({
     host = flag("host", "127.0.0.1"),
     mode = flag("mode", "closed"),
     launch.browser = "--browser" %in% flags,
+    require_token = require_token,
     root = dirname(normalizePath(script, winslash = "/", mustWork = TRUE))
   )
 })

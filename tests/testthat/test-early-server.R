@@ -101,6 +101,28 @@ test_that("the early server sends the kept page and its files by itself", {
   expect_false(env$viewerEarlyServerRunning(early))
 })
 
+test_that("an early protected shell is public but does not publish data previews", {
+  skip_on_cran()
+  withr::local_envvar(R_USER_CACHE_DIR = withr::local_tempdir())
+  early_server_keep()
+  env <- early_server_env()
+  crb <- withr::local_tempfile(fileext = ".crb")
+  writeBin(raw(8), crb)
+  options <- early_server_options(crb)
+  options$.defer_first_views <- TRUE
+  early <- env$viewerEarlyServerStart(
+    early_server_root(),
+    "127.0.0.1",
+    httpuv::randomPort(),
+    options
+  )
+  withr::defer(early$server$stop())
+  expect_identical(early_server_get(early$port, "/"), early_server_page())
+  expect_null(early$state$published)
+  expect_length(early$registered, 0L)
+  expect_false("/cerebro-first-view" %in% names(early$server$getStaticPaths()))
+})
+
 test_that("the early server sends the bundled form of the page, kept for good", {
   skip_on_cran()
   withr::local_envvar(R_USER_CACHE_DIR = withr::local_tempdir())
