@@ -2,6 +2,7 @@ test_that("a daemon confirms an H5 file's cell names once per process", {
   skip_if_not_installed("rhdf5")
   skip_if_not_installed("mirai")
   crb_cache <- new.env()
+  sys.source(viewer_test_path("core", "crb_contract.R"), crb_cache)
   sys.source(viewer_test_path("crb_cache.R"), crb_cache)
   sidecar <- withr::local_tempfile(fileext = ".h5")
   cells <- c("AAAC-1", "AAAG-1", "AAAT-1")
@@ -9,7 +10,7 @@ test_that("a daemon confirms an H5 file's cell names once per process", {
   rhdf5::h5createGroup(sidecar, "expression")
   rhdf5::h5write(cells, sidecar, "expression/genes")
   rhdf5::h5closeAll()
-  expected <- rlang::hash(enc2utf8(cells))
+  expected <- crb_cache$.runtimeCellNamesHash(cells)
 
   crb_cache$crb_h5_cell_check_start(sidecar, expected)
   ## The session never waits for the daemon; the test does.

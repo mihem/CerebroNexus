@@ -158,6 +158,10 @@ test_that("parameter bars use available width and wrap without losing controls",
     if (page == "groups") {
       next
     }
+    ## Resizes and display-mode changes can still have reactive UI updates in
+    ## flight. Let them settle before opening an overlay that those updates
+    ## would otherwise close or replace.
+    app$wait_for_idle(timeout = 30000)
     app$click(selector = paste0('#shiny-tab-', page, ' .cerebro-more-btn'))
     app$wait_for_js(
       "!!document.querySelector('.cerebro-settings-drawer.is-open')"
@@ -166,6 +170,7 @@ test_that("parameter bars use available width and wrap without losing controls",
       resize(width)
       app$wait_for_js(paste0(
         "(() => {const drawer=document.querySelector('.cerebro-settings-drawer.is-open');",
+        "if(!drawer)return false;",
         "const fields=Array.from(drawer.querySelectorAll('.form-group')).filter(e=>e.getClientRects().length);",
         "const bounds=drawer.getBoundingClientRect();return fields.length>0 && fields.every(e=>{",
         "const r=e.getBoundingClientRect();return r.left>=bounds.left && r.right<=bounds.right;});})()"

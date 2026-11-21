@@ -3647,7 +3647,7 @@ getGroupLevels <- function(group) {
   }
   if (
     is.list(schema) &&
-      isTRUE(schema$version %in% c(3L, 4L)) &&
+      isTRUE(schema$version %in% .runtimeThinSchemaVersions) &&
       is.integer(schema$n_cells) &&
       length(schema$n_cells) == 1L &&
       !is.na(schema$n_cells)
@@ -4201,20 +4201,7 @@ get_or_load_crb <- function(
 }
 
 .checkThinCrbCells <- function(cells, schema, crb_path) {
-  if (
-    !identical(
-      rlang::hash(enc2utf8(as.character(cells))),
-      schema$cell_names_hash
-    )
-  ) {
-    stop(
-      "The H5 cell names do not match CRB '",
-      basename(crb_path),
-      "'.",
-      call. = FALSE
-    )
-  }
-  invisible(cells)
+  .runtimeCheckCellNames(cells, schema, crb_path)
 }
 
 .validateThinCrbShape <- function(metadata, projections, schema) {

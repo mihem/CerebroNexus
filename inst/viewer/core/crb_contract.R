@@ -1,6 +1,60 @@
 ## The CRB reading contract shared by the package (readCerebro,
-## createShinyApp) and the Viewer runtime. Pure functions only: the package
+## createShinyApp) and the Viewer runtime. No session state: the package
 ## loads this file into its own environment, the Viewer once per process.
+
+## A persistent checksum must not use rlang::hash(): its object-hashing format
+## changed in rlang 1.3.0. Hash a specified byte stream instead: in canonical
+## order, each UTF-8 name followed by one zero byte, including the last name.
+## R strings cannot contain embedded NUL, so boundaries are unambiguous.
+## writeBin(character, raw()) writes exactly those C-style strings in native
+## code; unlike serialize(), it adds no object/R-version/encoding headers.
+## Unlike the cell-set fingerprint, this must NEVER sort the names. XXH3-128
+## (seed 0) is selected explicitly, never digest's object-serialization default.
+## digest is optional acceleration, not an additional Import. Without it the
+## existing rlang file hasher reads the same bytes, not an R object. Both paths
+## must produce identical checksums; .use_digest lets tests force the fallback.
+.runtimeCellNamesHash <- function(cells, .use_digest = TRUE) {
+  cells <- enc2utf8(as.character(cells))
+  if (anyNA(cells)) {
+    stop("Cell names must not contain missing values.", call. = FALSE)
+  }
+  value <- if (
+    isTRUE(.use_digest) &&
+      requireNamespace("digest", quietly = TRUE) &&
+      numeric_version(getNamespaceVersion("digest")) >= "0.6.39"
+  ) {
+    digest::digest(
+      writeBin(cells, raw()),
+      algo = "xxh3_128",
+      serialize = FALSE,
+      seed = 0L
+    )
+  } else {
+    path <- tempfile("cerebro-cell-order-")
+    on.exit(unlink(path), add = TRUE)
+    connection <- file(path, "wb")
+    tryCatch(writeBin(cells, connection), finally = close(connection))
+    unname(rlang::hash_file(path))
+  }
+  paste0("xxh3-128-cell-order-v1:", value)
+}
+
+.runtimeCellNamesMatch <- function(cells, expected) {
+  if (!startsWith(expected, "xxh3-128-cell-order-v1:") || anyNA(cells)) {
+    return(FALSE)
+  }
+  identical(.runtimeCellNamesHash(cells), expected)
+}
+
+.runtimeCheckCellNames <- function(cells, schema, crb_path) {
+  if (!.runtimeCellNamesMatch(cells, schema$cell_names_hash)) {
+    stop(errorCondition(
+      paste0("The H5 cell names do not match CRB '", basename(crb_path), "'."),
+      class = "cerebro_cell_names_mismatch"
+    ))
+  }
+  invisible(cells)
+}
 
 ## Expression backend types a CRB may declare; the one list for the package and
 ## the Viewer.
@@ -53,11 +107,14 @@
 ## the H5 file; 4 also stores repertoire barcodes and the row names of
 ## trajectories and spatial coordinates by cell index (`cell_indexed` names
 ## which fields). A release that reads only 3 refuses 4, and one that does not
-## know a field named there refuses the file.
-.runtimeThinSchemaVersions <- c(3L, 4L)
+## know a field named there refuses the file. Version 5 uses a tagged, portable
+## ordered-name checksum and records cell_indexed even when it is empty.
+## Ordinary readers open only 5; the explicit converter can inspect 3/4.
+.runtimeThinSchemaVersions <- 5L
+.runtimeConvertibleThinSchemaVersions <- c(3L, 4L, 5L)
 .runtimeCellIndexedFields <- c("immune_repertoire", "trajectories", "spatial")
 
-.readRuntimeCrbSchema <- function(obj, crb_path) {
+.readRuntimeCrbSchema <- function(obj, crb_path, allow_legacy = FALSE) {
   field <- "crb_schema"
   if (!is.environment(obj) || !exists(field, envir = obj, inherits = FALSE)) {
     return(NULL)
@@ -86,7 +143,12 @@
     "cell_names_hash",
     "projection_rownames",
     "n_cells",
-    if (is.list(schema) && identical(schema$version, 4L)) "cell_indexed"
+    if (
+      is.list(schema) &&
+        isTRUE(schema$version %in% c(4L, 5L))
+    ) {
+      "cell_indexed"
+    }
   )
   indexed <- if (is.list(schema)) schema$cell_indexed
   valid <- is.list(schema) &&
@@ -97,16 +159,28 @@
     setequal(schema_names, expected_names) &&
     is.integer(schema$version) &&
     length(schema$version) == 1L &&
-    schema$version %in% .runtimeThinSchemaVersions &&
-    (is.null(indexed) ||
+    schema$version %in%
+      (if (isTRUE(allow_legacy)) {
+        .runtimeConvertibleThinSchemaVersions
+      } else {
+        .runtimeThinSchemaVersions
+      }) &&
+    ((identical(schema$version, 3L) && is.null(indexed)) ||
       (is.character(indexed) &&
-        length(indexed) > 0L &&
+        (length(indexed) > 0L || identical(schema$version, 5L)) &&
         !anyDuplicated(indexed) &&
         all(indexed %in% .runtimeCellIndexedFields))) &&
     is.character(schema$cell_names_hash) &&
     length(schema$cell_names_hash) == 1L &&
     !is.na(schema$cell_names_hash) &&
-    grepl("^[[:xdigit:]]{32}$", schema$cell_names_hash) &&
+    grepl(
+      if (identical(schema$version, 5L)) {
+        "^xxh3-128-cell-order-v1:[[:xdigit:]]{32}$"
+      } else {
+        "^[[:xdigit:]]{32}$"
+      },
+      schema$cell_names_hash
+    ) &&
     is.character(schema$projection_rownames) &&
     !anyNA(schema$projection_rownames) &&
     !any(!nzchar(schema$projection_rownames)) &&
@@ -143,6 +217,14 @@
     return(if (is_stored("expression_backend")) no_backend)
   }
   schema <- stored("crb_schema")
+  if (
+    is.list(schema) &&
+      is.integer(schema$version) &&
+      length(schema$version) == 1L &&
+      schema$version %in% c(3L, 4L)
+  ) {
+    return("its cell-name checksum predates the portable format")
+  }
   if (
     is.list(schema) &&
       !(is.integer(schema$version) &&
