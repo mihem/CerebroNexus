@@ -1,3 +1,15 @@
+# CerebroNexus (development version)
+
+- **Experimental direct expression assets.** `buildViewerPack()` can export
+  selected genes as lossless, gzip-compressed sparse/dense double-precision
+  rows. With `options(CerebroNexus.direct_expression = TRUE)`, public configured
+  datasets can fetch these rows over HTTP instead of receiving their values
+  through Shiny. A bounded browser cache previews previously loaded single
+  genes without waiting for R; Shiny still confirms state and computes summaries.
+  The feature is off by default, preserves the existing renderer, and falls
+  back for missing assets and unsupported modes. Authenticated datasets and
+  uploads retain their existing delivery path.
+
 # CerebroNexus 8.4.1
 
 - **Closed Viewers also block HLA typing uploads.** The Data & QC tab hides

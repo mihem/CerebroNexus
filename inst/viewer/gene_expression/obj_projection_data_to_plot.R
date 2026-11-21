@@ -23,6 +23,7 @@ expression_projection_data_to_plot_raw <- reactive({
     expression_projection_parameters_color(),
     expression_projection_trajectory(),
     no_gene_selected ||
+      is.list(attr(expression_levels, "expression_resource", exact = TRUE)) ||
       nrow(coordinates) == length(expression_levels) ||
       nrow(coordinates) == length(expression_levels[[1]]),
     !is.null(expression_projection_display_mode())

@@ -1674,6 +1674,34 @@ server <- function(input, output, session) {
     )
   }
   viewer_projection_resources <- new.env(parent = emptyenv())
+  ## Experimental direct rows are opt-in, public configured datasets only.
+  ## Never register a new expression URL for authenticated or uploaded data.
+  viewerExpressionAsset <- function(gene, cells) {
+    if (!isTRUE(getOption("CerebroNexus.direct_expression", FALSE)) ||
+        !is.null(Cerebro.options[[".viewer_auth"]]) ||
+        is.null(viewer_first_view_source())) return(NULL)
+    pack <- viewerPackCurrent()
+    if (!viewerPackCanonical(pack) ||
+        !identical(as.integer(cells), seq_len(pack$cell_count))) return(NULL)
+    rows <- pack$manifest$expression_rows
+    if (!is.data.frame(rows)) return(NULL)
+    i <- which(rows$gene == gene)
+    if (length(i) != 1L) return(NULL)
+    path <- as.character(rows$path[[i]])
+    if (!grepl("^expression/[0-9]+[.]bin[.]gz$", path)) return(NULL)
+    asset <- viewerPackVerifiedAsset(pack, path, accept = function(asset) {
+      identical(asset$dtype, "expression-f64-gzip-v1") &&
+        identical(asset$dimensions, as.integer(pack$cell_count))
+    })
+    if (is.null(asset)) return(NULL)
+    prefix <- viewerStaticResourcePrefix("expression", dirname(asset$file))
+    c(list(
+      protocol = "expression-f64-gzip-v1", gene = gene,
+      url = paste0(prefix, "/", basename(asset$file), "?v=", asset$checksum),
+      cells = pack$cell_count, bytes = asset$bytes, checksum = asset$checksum,
+      range = c(rows$low[[i]], rows$high[[i]])
+    ), viewerCanonicalResourceIdentity(pack))
+  }
   viewerProjectionAsset <- function(name, cell_indices = NULL) {
     pack <- viewerPackCurrent()
     if (

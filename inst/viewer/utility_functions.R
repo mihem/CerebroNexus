@@ -1807,6 +1807,7 @@ cerebroCellViewRecolor <- function(
     "render_key",
     "sparse_color",
     "color_cache_key",
+    "expression_resource",
     "packed_rgb",
     "packed_rgb_cache_keys",
     "zero_color"

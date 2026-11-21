@@ -216,6 +216,11 @@ expression_projection_update_plot <- function(input) {
     cell_indices,
     n_cells
   )
+  resource <- attr(expression_levels, "expression_resource", exact = TRUE)
+  if (is.list(resource)) {
+    output_data$color <- NULL
+    output_data$expression_resource <- resource
+  }
   shared_projection <- if (
     exists("viewerSharedProjectionName", mode = "function", inherits = TRUE)
   ) {

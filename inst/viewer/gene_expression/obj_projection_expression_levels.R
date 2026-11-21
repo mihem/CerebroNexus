@@ -529,11 +529,22 @@ expression_projection_read_levels <- function(
         0.3,
         "Extracting single gene expression..."
       )
-      expression_levels <- expressionProjectionCachedRow(
-        data_set(),
-        cells_to_show,
-        genes_present[[1L]]
-      )
+      resource <- if (
+        identical(display_mode, "mean") &&
+        exists("viewerExpressionAsset", mode = "function")
+      ) viewerExpressionAsset(genes_present[[1L]], cells_to_show)
+      if (is.list(resource) && !identical(
+        isolate(input[["expression_projection_expression_resource_failed"]]),
+        resource$url
+      )) {
+        ## A small marker, not a synthetic million-value vector. Summaries below
+        ## still read exact source values, only when their consumer needs them.
+        expression_levels <- structure(NA_real_, expression_resource = resource)
+      } else {
+        expression_levels <- expressionProjectionCachedRow(
+          data_set(), cells_to_show, genes_present[[1L]]
+        )
+      }
     } else if (length(genes_present) >= 2 && length(genes_present) <= 9L) {
       expressionProjectionProgressUpdate(0.3, "Calculating mean expression...")
       rows <- expressionProjectionCachedRows(
@@ -603,6 +614,7 @@ expression_projection_expression_levels <- reactive({
     cells_to_show,
     genes_present,
     display_mode,
+    input[["expression_projection_expression_resource_failed"]],
     if (identical(display_mode, "rgb")) genes_data[["rgb_genes"]]
   )
   expression_projection_levels_memo(levels_key, function() {
@@ -634,6 +646,12 @@ expression_summary_data <- reactive({
     ncol(expression_projection_coordinates())
   )
   expression_levels <- expression_projection_expression_levels()
+  if (is.list(attr(expression_levels, "expression_resource", exact = TRUE))) {
+    req(expression_projection_summary_ready())
+    expression_levels <- expressionProjectionCachedRow(
+      data_set(), expression_projection_cells_to_show(), genes[[1L]]
+    )
+  }
   spec$series <- lapply(spec$series, function(series) {
     series$values <- if (identical(spec$kind, "mean")) {
       expression_levels

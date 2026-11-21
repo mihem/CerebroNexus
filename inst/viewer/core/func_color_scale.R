@@ -91,6 +91,8 @@ expressionPanelColors <- function(palette = "default") {
 }
 
 expressionValueRange <- function(expression_levels) {
+  resource <- attr(expression_levels, "expression_resource", exact = TRUE)
+  if (is.list(resource)) return(as.numeric(resource$range))
   series <- if (is.list(expression_levels)) {
     expression_levels
   } else {

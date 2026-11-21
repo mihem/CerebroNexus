@@ -6,13 +6,72 @@
 ##      immune/clonal/), and the HLA first frames without their segments
 ##      (version 3, hla_tcr/<chain>.first.v3.qs2), which are in
 ##      hla_tcr/<chain>.first.segments.qs2.
+##   3: optional, lossless single-gene browser rows (`expression_rows`).
 ## A Viewer uses each asset only when its manifest entry is present and valid,
 ## so an older Pack opens as before and a newer one is never rejected. An asset
 ## whose content changes gets a new path: a Viewer of revision 1 reads
 ## hla_tcr/<chain>.first.qs2 without checking its version and takes its
 ## segments from it, so a first frame without them must not be found there
 ## (that Viewer builds the first view from the repertoire instead).
-.viewerPackFormatRevision <- 2L
+.viewerPackFormatRevision <- 3L
+
+## Optional, lossless browser rows. Separate gzip files avoid read amplification
+## and do not require HTTP Range support. Only one dense gene is held at a time.
+.viewerPackExpressionAssets <- function(object, stage, genes) {
+  empty <- data.frame(
+    gene = character(), path = character(), cells = integer(),
+    low = numeric(), high = numeric(), stringsAsFactors = FALSE
+  )
+  if (!is.null(genes) && !length(genes)) {
+    return(list(assets = NULL, rows = empty))
+  }
+  available <- object$getGeneNames()
+  if (is.null(genes)) genes <- available
+  if (!is.character(genes) || anyNA(genes) || any(!genes %in% available)) {
+    stop("`expression_genes` must contain available gene names, or NULL for all.",
+         call. = FALSE)
+  }
+  genes <- unique(genes)
+  cells <- .viewerPackCells(object)
+  assets <- list()
+  rows <- list()
+  for (i in seq_along(genes)) {
+    values <- unname(object$getExpressionRow(genes[[i]], cells = cells))
+    n <- length(values)
+    present <- which(!is.finite(values) | values != 0)
+    sparse <- length(present) * 12 < n * 8
+    count <- if (sparse) length(present) else n
+    header <- c(charToRaw("CGE1"), writeBin(
+      as.integer(c(n, count, sparse)), raw(), size = 4L, endian = "little"
+    ))
+    bytes <- c(header, if (sparse) c(
+      writeBin(as.integer(present - 1L), raw(), size = 4L, endian = "little"),
+      raw((8L - (count * 4) %% 8L) %% 8L)
+    ), writeBin(
+      if (sparse) values[present] else values,
+      raw(), size = 8L, endian = "little"
+    ))
+    path <- sprintf("expression/%06d.bin.gz", i)
+    file <- file.path(stage, path)
+    dir.create(dirname(file), showWarnings = FALSE, recursive = TRUE)
+    connection <- gzfile(file, "wb", compression = 1L)
+    tryCatch(writeBin(bytes, connection), finally = close(connection))
+    limits <- suppressWarnings(range(values, finite = TRUE))
+    if (any(!is.finite(limits)) || all(limits == 0)) limits <- c(0, 1)
+    limits <- round(limits, 2)
+    assets[[i]] <- data.frame(
+      path = path, dtype = "expression-f64-gzip-v1", dimensions = as.character(n),
+      bytes = as.numeric(file.info(file)$size), checksum = .viewerPackMd5(file)
+    )
+    rows[[i]] <- data.frame(
+      gene = genes[[i]], path = path, cells = n,
+      low = limits[[1L]], high = limits[[2L]]
+    )
+  }
+  list(assets = do.call(rbind, assets), rows = if (length(rows)) {
+    do.call(rbind, rows)
+  } else empty)
+}
 
 .viewerDatasetCapabilities <- function(object) {
   ## Each capability is one stored field. An object without the accessor
@@ -1338,6 +1397,9 @@ readViewerPack <- function(file, pack = .viewerPackPath(file)) {
 #' @param viewer_binary One of `"auto"`, `"always"`, or `"never"`.
 #' @param viewer_binary_threshold Dataset-level threshold used by `"auto"`.
 #' @param overwrite Replace an existing valid or invalid pack.
+#' @param expression_genes Experimental lossless browser expression assets:
+#'   gene names to export, `NULL` for all genes, or `character()` (default) for
+#'   none. Adds build time and disk space; older packs retain websocket delivery.
 #' @return The pack path invisibly, or `NULL` when disabled.
 #' @examples
 #' dir <- tempfile("cerebro-")
@@ -1352,9 +1414,12 @@ buildViewerPack <- function(
   file,
   viewer_binary = c("auto", "always", "never"),
   viewer_binary_threshold = 100000L,
-  overwrite = FALSE
+  overwrite = FALSE,
+  expression_genes = character()
 ) {
   options <- .viewerPackOptions(viewer_binary, viewer_binary_threshold)
+  options$expression_genes <- expression_genes
+  options$expression_all <- is.null(expression_genes)
   .buildViewerPack(file, options, overwrite)
 }
 
@@ -1406,6 +1471,11 @@ buildViewerPack <- function(
     add = TRUE
   )
   built <- .viewerPackBuildAssets(object, stage)
+  expression <- .viewerPackExpressionAssets(
+    object, stage,
+    if (isTRUE(options$expression_all)) NULL else options$expression_genes %||% character()
+  )
+  built$assets <- rbind(built$assets, expression$assets)
   ## The CRB is hashed once (0.7 s for 380 MB): the check of the staged pack
   ## below compares the manifest with the same file, unchanged since.
   crb_md5 <- .viewerPackMd5(file)
@@ -1426,6 +1496,7 @@ buildViewerPack <- function(
     immune_encoding = built$immune_encoding,
     immune_clonal_frames = built$immune_clonal_frames,
     hla_chains = built$hla_chains,
+    expression_rows = expression$rows,
     assets = built$assets
   )
   jsonlite::write_json(

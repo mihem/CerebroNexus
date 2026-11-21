@@ -10220,7 +10220,8 @@
   var SINGLE_COLOR_FIELDS = [
     'color', 'rgb', 'rgb_genes', 'colorscale', 'panel_colorscales',
     'color_range', 'reversescale', 'paint_order', 'render_key', 'sparse_color',
-    'color_cache_key', 'packed_rgb', 'packed_rgb_cache_keys', 'zero_color'
+    'color_cache_key', 'packed_rgb', 'packed_rgb_cache_keys', 'zero_color',
+    'expression_resource'
   ];
   function updateSingleExpression(id, previousMeta, previousData, message) {
     var view = singleView(id), data = view.data, meta = view.meta;
@@ -10298,9 +10299,25 @@
     // A second RGB packet can land while the pointer is stationary. Re-pick
     // against the retained geometry and refresh values after the colour change.
     activePanels.forEach(refreshPanelHover);
-    reportSinglePainted(id, view, D);
+    if (!view.directPreview) reportSinglePainted(id, view, D);
 
     return true;
+  }
+
+  function confirmsDirectPreview(view, message) {
+    var a = view.data || {}, b = message.data || {};
+    if (!a.expression_resource || !b.expression_resource ||
+        a.expression_resource.url !== b.expression_resource.url ||
+        a.color !== b.color) return false;
+    var same = SINGLE_COLOR_FIELDS.every(function (name) {
+      if (name === 'color' || name === 'sparse_color' ||
+          name === 'expression_resource') return true;
+      return JSON.stringify(a[name]) === JSON.stringify(b[name]);
+    });
+    return same && Object.keys(message.meta || {}).every(function (key) {
+      return key === 'render_token' ||
+        JSON.stringify((view.meta || {})[key]) === JSON.stringify(message.meta[key]);
+    });
   }
 
   function recolorSingle(message) {
@@ -10311,7 +10328,18 @@
     }
     if (!sameDatasetContext(view.dataset_context, message.dataset_context) ||
         Number(message.render_token) <= Number(view.render_token)) return false;
+    // The server confirms exactly what a cached preview already drew: take the
+    // token and report the paint, without hydrating and drawing it a second time.
+    if (view.directPreview && confirmsDirectPreview(view, message)) {
+      view.render_token = Number(message.render_token);
+      view.directPreview = false;
+      if (singleActive === message.id && visibleSingleId() === message.id && D) {
+        reportSinglePainted(message.id, view, D);
+      }
+      return true;
+    }
     view.render_token = Number(message.render_token);
+    view.directPreview = false;
     var previousMeta = view.meta || {}, previousData = view.data;
     var data = Object.assign({}, view.data);
     SINGLE_COLOR_FIELDS.forEach(function (name) { delete data[name]; });
@@ -10324,6 +10352,104 @@
         !updateSingleExpression(message.id, previousMeta, previousData, message)) {
       activateSingle(message.id, false, false, 'primary');
     }
+    return true;
+  }
+
+  // Direct assets replace only the values, never geometry or selection state.
+  // Token checks apply again after asynchronous IO: an older fetch cannot win.
+  var expressionFrameToken = 0, expressionFrames = new Map();
+  function expressionControlsKey() {
+    return JSON.stringify(Array.from(document.querySelectorAll(
+      'input[id],select[id]'
+    )).filter(function (el) {
+      return el.id !== 'expression_genes_input' &&
+        !el.id.endsWith('-selectized') && !el.id.startsWith('selectize-');
+    }).map(function (el) {
+      return [el.id, el.value, el.checked];
+    }));
+  }
+  function expressionResourceFailed(message) {
+    if (!datasetMessageFresh(message) || !message.data.expression_resource) return;
+    Shiny.setInputValue('expression_projection_expression_resource_failed',
+      message.data.expression_resource.url, {priority: 'event'});
+  }
+  function hydrateExpressionResource(message) {
+    var resource = message && message.data && message.data.expression_resource;
+    if (!resource) return Promise.resolve(message);
+    var view = singleView(message.id, message.dataset_context);
+    var controls = expressionControlsKey();
+    if (!window.CerebroExpressionAssets || !canonicalResourceIdentityMatches(
+      resource, message.dataset_identity || (view && view.datasetIdentity)
+    )) {
+      return Promise.reject(new Error('Expression identity mismatch'));
+    }
+    return window.CerebroExpressionAssets.load(resource).then(function (values) {
+      message.data.color = values;
+      var id = resource.pack_dataset_fingerprint + '|' + resource.gene;
+      expressionFrames.delete(id);
+      var descriptor = {};
+      SINGLE_COLOR_FIELDS.forEach(function (name) {
+        if (name !== 'color' && name !== 'sparse_color' &&
+            Object.prototype.hasOwnProperty.call(message.data, name)) {
+          descriptor[name] = message.data[name];
+        }
+      });
+      expressionFrames.set(id, {
+        context: message.dataset_context, data: descriptor, meta: message.meta,
+        controls: controls
+      });
+      while (expressionFrames.size > 32) {
+        expressionFrames.delete(expressionFrames.keys().next().value);
+      }
+      return message;
+    });
+  }
+  function onSingleRecolorBinary(buffer) {
+    var message = window.CBViewWire.unpack(buffer);
+    if (!message || !datasetMessageFresh(message)) return;
+    if (message.id !== 'expression_projection') return recolorSingle(message);
+    if (!message.data.expression_resource) {
+      ++expressionFrameToken;
+      return recolorSingle(message);
+    }
+    var token = ++expressionFrameToken;
+    hydrateExpressionResource(message).then(function (hydrated) {
+      if (token !== expressionFrameToken || !datasetMessageFresh(hydrated)) return;
+      recolorSingle(hydrated);
+    }).catch(function () {
+      if (token === expressionFrameToken) expressionResourceFailed(message);
+    });
+  }
+  function previewCachedExpression(value) {
+    var genes = Array.isArray(value) ? value : value ? [value] : [];
+    var id = 'expression_projection', view = singleView(id);
+    if (genes.length !== 1 || singleActive !== id || visibleSingleId() !== id ||
+        !view || !view.data || !view.data.expression_resource ||
+        singleSpaceIds.length !== 1 || view.data.z || view.data.panels) return false;
+    var resource = view.data.expression_resource;
+    var frame = expressionFrames.get(resource.pack_dataset_fingerprint + '|' + genes[0]);
+    if (!frame || !sameDatasetContext(frame.context, view.dataset_context) ||
+        frame.controls !== expressionControlsKey()) return false;
+    var values = window.CerebroExpressionAssets.peek(frame.data.expression_resource);
+    if (!values) return false;
+    var previousData = view.data, previousMeta = view.meta;
+    var data = Object.assign({}, previousData);
+    SINGLE_COLOR_FIELDS.forEach(function (name) { delete data[name]; });
+    SINGLE_COLOR_FIELDS.forEach(function (name) {
+      if (Object.prototype.hasOwnProperty.call(frame.data, name)) data[name] = frame.data[name];
+    });
+    data.color = values;
+    view.data = data; view.meta = Object.assign({}, view.meta, frame.meta);
+    view.directPreview = true;
+    if (!updateSingleExpression(id, previousMeta, previousData, {
+      data: frame.data, meta: frame.meta
+    })) {
+      view.data = previousData; view.meta = previousMeta; view.directPreview = false;
+      return false;
+    }
+    document.dispatchEvent(new CustomEvent('cerebro:expression-preview', {
+      detail: {gene: genes[0], time: performance.now()}
+    }));
     return true;
   }
 
@@ -11012,20 +11138,27 @@
         return;
       }
       if (!datasetMessageFresh(message)) return;
+      var expressionToken = message.id === 'expression_projection'
+        ? ++expressionFrameToken : null;
       var namesFailed = false;
       (frameNeedsCellNames(message)
         ? resolveFrameCellNames(message).then(hydrateSingleProjectionResource, function (error) {
           namesFailed = true;
           throw error;
         })
-        : hydrateSingleProjectionResource(message)).then(function (hydrated) {
-        if (!datasetMessageFresh(hydrated)) return;
+         : hydrateSingleProjectionResource(message)).then(hydrateExpressionResource).then(function (hydrated) {
+         if (!datasetMessageFresh(hydrated)) return;
+         if (expressionToken !== null && expressionToken !== expressionFrameToken) return;
         if (hydrated.dataset_identity) {
           window.cerebroSavedViewDataset = hydrated.dataset_identity;
         }
         renderSingleAfterOutputs(hydrated);
       }).catch(function () {
-        if (!datasetMessageFresh(message)) return;
+         if (!datasetMessageFresh(message)) return;
+         if (message.data.expression_resource) {
+           if (expressionToken === expressionFrameToken) expressionResourceFailed(message);
+           return;
+         }
         if (namesFailed) {
           cellNamesResourceFailed(message.id, message.data.cell_names_resource);
           return;
@@ -12190,8 +12323,12 @@
       applyDeferredAsset(message.key, message.uri);
     });
     Shiny.addCustomMessageHandler('cell_view_binary', onSingleBinary);
-    Shiny.addCustomMessageHandler('cell_view_recolor_binary', function(buffer) {
-      recolorSingle(window.CBViewWire.unpack(buffer));
+    Shiny.addCustomMessageHandler('cell_view_recolor_binary', onSingleRecolorBinary);
+    window.jQuery(document).on('shiny:inputchanged.cerebroExpression', function (event) {
+      if (event.name === 'expression_genes_input') {
+        ++expressionFrameToken;
+        previewCachedExpression(event.value);
+      }
     });
     Shiny.addCustomMessageHandler('cell_view_aux_binary', onSingleAuxBinary);
     Shiny.addCustomMessageHandler(

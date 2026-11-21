@@ -1,4 +1,70 @@
 window.viewerScenarios = {
+  async directExpression() {
+    const t = viewerTest; t.dataset();
+    const identity = {cell_count:3, cell_fingerprint:'md5-cell-set-v1:'+'a'.repeat(32),
+      cell_order_fingerprint:'md5-cell-order-v1:'+'b'.repeat(32),
+      pack_dataset_fingerprint:'md5-crb-v1:'+'c'.repeat(32)};
+    const resource = gene => ({protocol:'expression-f64-gzip-v1',gene,cells:3,
+      dataset_fingerprint:identity.cell_fingerprint,
+      cell_order_fingerprint:identity.cell_order_fingerprint,
+      pack_dataset_fingerprint:identity.pack_dataset_fingerprint,
+      url:'cerebro-expression-test/000001.bin.gz?v='+'d'.repeat(32)});
+    const arrays = {A:new Float64Array([0,1,2]),B:new Float64Array([9,0,0])};
+    let release, delayed = false;
+    const original = window.CerebroExpressionAssets;
+    window.CerebroExpressionAssets = {
+      load:r=>delayed && r.gene==='B'
+        ? new Promise(resolve=>{release=()=>resolve(arrays.B);})
+        : Promise.resolve(arrays[r.gene]),
+      peek:r=>arrays[r.gene]
+    };
+    try {
+      await t.render({expression_resource:resource('A'),render_key:'A'},
+        {color_variable:'A'},'expression_projection',{dataset_identity:identity});
+      const recolor = gene => {
+        const message=t.message('expression_projection');
+        delete message.dataset_identity;
+        message.data={expression_resource:resource(gene),render_key:gene,color_range:[0,9]};
+        message.meta={color_type:'continuous',color_variable:gene};
+        t.sendWire('cell_view_recolor_binary',message);
+      };
+      recolor('B');await t.settle();
+      t.check(document.getElementById('cv-cbar').textContent.includes('B'),'Direct B drawn');
+      const state=cerebroCellViews.captureState('expression_projection');
+      const acknowledgements=t.requests.length;
+      let previews=0;
+      document.addEventListener('cerebro:expression-preview',()=>previews++,{once:true});
+      jQuery(document).trigger({type:'shiny:inputchanged',name:'expression_genes_input',value:['A']});
+      await t.settle();
+      t.equal(previews,1,'Cached gene draws before any server response');
+      t.equal(cerebroCellViews.captureState('expression_projection'),state,'Preview preserves state');
+      t.check(document.getElementById('cv-cbar').textContent.includes('A'),'Cached A drawn');
+      t.equal(t.requests.length,acknowledgements,'Preview is not a server readiness acknowledgement');
+      // A confirmation identical to the preview is acknowledged, not redrawn;
+      // a different gene (the control) repaints in full.
+      t.resetPaint();
+      const confirmation=t.message('expression_projection');delete confirmation.dataset_identity;
+      confirmation.data={expression_resource:resource('A'),render_key:'A'};
+      confirmation.meta={color_type:'continuous',color_variable:'A'};
+      t.sendWire('cell_view_recolor_binary',confirmation);await t.settle();
+      t.check(t.events.some(e=>e.name==='cerebro:cell-view-ready'&&e.renderToken===confirmation.render_token),
+        'Confirmation is still announced as painted');
+      const skipPaints=t.paints.length;
+      t.resetPaint();recolor('B');await t.settle();
+      const controlPaints=t.paints.length;
+      t.check(skipPaints>0&&skipPaints<controlPaints,
+        'Control: a different gene repaints more than an identical confirmation ('+skipPaints+' vs '+controlPaints+')');
+      jQuery(document).trigger({type:'shiny:inputchanged',name:'expression_genes_input',value:['A']});
+      await t.settle();
+      delayed=true;recolor('B');await t.settle();
+      recolor('A');await t.settle();release();await t.settle();
+      t.check(document.getElementById('cv-cbar').textContent.includes('A'),'Late B cannot overwrite A');
+      t.dataset('B',2);release();await t.settle();
+      t.check(!t.requests.some(r=>r.name==='expression_projection_expression_resource_failed'),
+        'Stale IO does not report failure for a new dataset');
+    } finally {window.CerebroExpressionAssets=original;}
+    return true;
+  },
   async colors() {
     const t=viewerTest;t.dataset();const exact=1+2**-40;
     for(const sparse of [false,true]) {

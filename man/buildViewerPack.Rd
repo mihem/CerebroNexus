@@ -8,7 +8,8 @@ buildViewerPack(
   file,
   viewer_binary = c("auto", "always", "never"),
   viewer_binary_threshold = 100000L,
-  overwrite = FALSE
+  overwrite = FALSE,
+  expression_genes = character()
 )
 }
 \arguments{
@@ -19,6 +20,10 @@ buildViewerPack(
 \item{viewer_binary_threshold}{Dataset-level threshold used by `"auto"`.}
 
 \item{overwrite}{Replace an existing valid or invalid pack.}
+
+\item{expression_genes}{Experimental lossless browser expression assets:
+gene names to export, `NULL` for all genes, or `character()` (default) for
+none. Adds build time and disk space; older packs retain websocket delivery.}
 }
 \value{
 The pack path invisibly, or `NULL` when disabled.

@@ -126,6 +126,7 @@ viewer_browser_test <- function(scenario) {
     "cell_views_state.js",
     "cell_views_wire.js",
     "cv-geom.js",
+    "expression-assets.js",
     "cell_views.js"
   )) {
     evaluate(read_js(viewer_test_path("www", file)))

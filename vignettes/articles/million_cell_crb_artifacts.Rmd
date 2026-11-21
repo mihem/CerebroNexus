@@ -129,6 +129,40 @@ Rebuild such a pack once with
 `buildViewerPack("path/to/data.crb", overwrite = TRUE)`.
 Do not suppress checksum failures or edit a manifest to make a pack appear valid.
 
+## Experimental direct gene access
+
+Shiny remains the application and analysis backend. An opt-in path exports
+lossless expression rows into the Viewer Pack so the Gene expression page can
+fetch values directly over HTTP:
+
+```{r direct-expression, eval=FALSE}
+buildViewerPack("study.crb", viewer_binary = "always", overwrite = TRUE,
+  expression_genes = c("CD3D", "MS4A1"))
+options(CerebroNexus.direct_expression = TRUE)
+launchCerebro(mode = "closed", crb_file_to_load = c(study = "study.crb"))
+```
+
+`expression_genes = NULL` exports every available gene. The default,
+`character()`, exports none. This is additional derived storage, not a new
+expression backend; the `.crb` and `.h5` remain necessary. Large exports can
+substantially increase build time and disk usage, so start with a small panel.
+Rebuilding a pack replaces its previous expression panel.
+
+Each gene is a separate gzip-compressed binary file, using sparse cell indices
+or a dense vector, whichever has fewer uncompressed bytes. Values retain R's
+double precision; no uint8 quantization or normalization is introduced.
+The browser retains up to 64 MiB of decoded rows. Its existing renderer reuses
+coordinates. A cached gene can be previewed immediately when the current view
+and controls remain compatible; Shiny still confirms the selection and computes
+requested summaries. Previously unseen genes still use Shiny's control path,
+but their values come from the asset rather than an R-generated value packet.
+
+The experiment applies to single-gene, full-canonical-cell coloring in public
+configured datasets. Other genes, multi-gene/RGB modes, uploaded datasets,
+authenticated datasets, and failed asset requests use the existing path.
+Browsers without gzip `DecompressionStream` support also fall back. Do not
+enable direct delivery as a substitute for access control.
+
 # Understand large-group plots
 
 Violin density uses at most 4,096 mid-quantile values per group on the original
