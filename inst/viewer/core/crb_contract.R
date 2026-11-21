@@ -33,78 +33,12 @@
   paste0("md5-cell-order-v1:", unname(tools::md5sum(path)))
 }
 
-## Compatibility for untagged v3/v4 checksums. Both historical rlang formats
-## used XXH128, exposed by hash_file() independently of object hashing. Rebuild
-## their bytes rather than installing an old rlang or trusting an unordered
-## fingerprint. `cells` is an ordinary, unnamed UTF-8 character vector.
-.runtimeLegacyCellNamesHash <- function(cells, format) {
-  path <- tempfile("cerebro-legacy-cell-order-")
-  on.exit(unlink(path), add = TRUE)
-  connection <- file(path, "wb")
-  tryCatch(
-    {
-      if (identical(format, "serialized")) {
-        bytes <- serialize(
-          cells,
-          NULL,
-          ascii = FALSE,
-          xdr = FALSE,
-          version = 3L
-        )
-        ## Native serialization header: magic (2), version/R versions (12),
-        ## encoding byte length (4), then that many encoding bytes.
-        encoding_length <- readBin(bytes[15:18], "integer", n = 1L)
-        writeBin(bytes[-seq_len(18L + encoding_length)], connection)
-      } else {
-        ## rlang 1.3's character-vector walker: type, S4 flag, 64-bit length;
-        ## per string: NA flag, encoding, byte length, UTF-8 bytes. Native
-        ## integers are intentional here: these reproduce historical hashes.
-        size <- length(cells)
-        size_words <- if (.Platform$endian == "little") {
-          c(as.integer(size), 0L)
-        } else {
-          c(0L, as.integer(size))
-        }
-        writeBin(c(16L, 0L, size_words), connection)
-        for (start in seq.int(1L, max(1L, size), by = 65536L)) {
-          if (!size) {
-            break
-          }
-          block <- cells[seq.int(start, min(size, start + 65535L))]
-          lengths <- nchar(block, type = "bytes")
-          encoding <- as.integer(Encoding(block) == "UTF-8")
-          headers <- writeBin(as.vector(rbind(0L, encoding, lengths)), raw())
-          widths <- lengths + 12L
-          offsets <- cumsum(widths) - widths
-          positions <- rep(offsets, each = 12L) + rep(1:12, length(block))
-          bytes <- raw(sum(widths))
-          bytes[positions] <- headers
-          bytes[-positions] <- charToRaw(paste0(block, collapse = ""))
-          writeBin(bytes, connection)
-        }
-      }
-    },
-    finally = close(connection)
-  )
-  unname(rlang::hash_file(path))
-}
-
 .runtimeCellNamesMatch <- function(cells, expected) {
   cells <- enc2utf8(as.character(cells))
-  if (anyNA(cells)) {
+  if (anyNA(cells) || !startsWith(expected, "md5-cell-order-v1:")) {
     return(FALSE)
   }
-  if (startsWith(expected, "md5-cell-order-v1:")) {
-    return(identical(.runtimeCellNamesHash(cells), expected))
-  }
-  if (!grepl("^[[:xdigit:]]{32}$", expected)) {
-    return(FALSE)
-  }
-  ## The usual legacy case needs no temporary stream. The fallbacks also let
-  ## an old server open a file from a newer exporter, and vice versa.
-  identical(rlang::hash(cells), expected) ||
-    identical(.runtimeLegacyCellNamesHash(cells, "serialized"), expected) ||
-    identical(.runtimeLegacyCellNamesHash(cells, "walker"), expected)
+  identical(.runtimeCellNamesHash(cells), expected)
 }
 
 .runtimeCheckCellNames <- function(cells, schema, crb_path) {
@@ -170,10 +104,12 @@
 ## which fields). A release that reads only 3 refuses 4, and one that does not
 ## know a field named there refuses the file. Version 5 uses a tagged, portable
 ## ordered-name checksum and records cell_indexed even when it is empty.
-.runtimeThinSchemaVersions <- c(3L, 4L, 5L)
+## Ordinary readers open only 5; the explicit converter can inspect 3/4.
+.runtimeThinSchemaVersions <- 5L
+.runtimeConvertibleThinSchemaVersions <- c(3L, 4L, 5L)
 .runtimeCellIndexedFields <- c("immune_repertoire", "trajectories", "spatial")
 
-.readRuntimeCrbSchema <- function(obj, crb_path) {
+.readRuntimeCrbSchema <- function(obj, crb_path, allow_legacy = FALSE) {
   field <- "crb_schema"
   if (!is.environment(obj) || !exists(field, envir = obj, inherits = FALSE)) {
     return(NULL)
@@ -218,7 +154,12 @@
     setequal(schema_names, expected_names) &&
     is.integer(schema$version) &&
     length(schema$version) == 1L &&
-    schema$version %in% .runtimeThinSchemaVersions &&
+    schema$version %in%
+      (if (isTRUE(allow_legacy)) {
+        .runtimeConvertibleThinSchemaVersions
+      } else {
+        .runtimeThinSchemaVersions
+      }) &&
     ((identical(schema$version, 3L) && is.null(indexed)) ||
       (is.character(indexed) &&
         (length(indexed) > 0L || identical(schema$version, 5L)) &&
@@ -271,6 +212,14 @@
     return(if (is_stored("expression_backend")) no_backend)
   }
   schema <- stored("crb_schema")
+  if (
+    is.list(schema) &&
+      is.integer(schema$version) &&
+      length(schema$version) == 1L &&
+      schema$version %in% c(3L, 4L)
+  ) {
+    return("its cell-name checksum predates the portable format")
+  }
   if (
     is.list(schema) &&
       !(is.integer(schema$version) &&

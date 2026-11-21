@@ -3,13 +3,20 @@
 - H5-backed data sets no longer falsely report mismatched cell names when
   exported and opened with different `rlang` versions. New thin CRBs use
   schema 5 with a versioned MD5 checksum of the ordered UTF-8 cell names.
-  Package, standalone Viewer, Viewer Pack and background readers still verify
-  the historical schema-3/4 checksums from both `rlang` hashing formats.
-  Reordered or foreign cells remain rejected; a gene-expression cell-name
-  validation error is shown without disconnecting the Shiny session.
-- New schema-5 exports require an updated package or standalone Viewer.
-  Existing schema-3/4 data sets do not need their expression matrices
-  re-exported.
+  Ordinary readers now require schema 5 and reject schema-3/4 files immediately
+  with a `convertCerebro()` message, without historical-hash retries on app
+  restart. The explicit converter verifies either historical `rlang` checksum
+  once and rewrites the CRB while reusing its existing H5 matrix. Reordered or
+  foreign cells remain rejected.
+- **Migration required for older thin H5 CRBs, regardless of dataset size.**
+  Stop apps using the export and run `convertCerebro("dataset.crb")` once
+  with the updated package before deploying the updated Viewer. Rebuild any
+  Viewer Pack if conversion did not already rebuild it. Embedded-expression
+  CRBs are unaffected. New schema-5 exports require an updated reader.
+- Normal ordered-cell checks still run before expression access in a new app
+  process and are cached for that process/file version; conversion does not
+  disable integrity checks. A gene-expression cell-name validation error is
+  shown without disconnecting the Shiny session.
 
 # CerebroNexus 8.4.4
 

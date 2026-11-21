@@ -20,6 +20,8 @@ their FOV is requested. A CRB from an older release that this version no
 longer reads (for example one without an expression-backend descriptor,
 or one with a singular spatial image or an embedded spatial molecule table)
 is rejected with a pointer to \code{\link{convertCerebro}}.
+Thin H5-backed CRBs require schema 5. Convert schema-3/4 files once with
+\code{convertCerebro()}; historical checksum retries are not performed here.
 }
 \examples{
 crb <- system.file("extdata/examples/example.crb", package = "CerebroNexus")

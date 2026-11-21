@@ -10,7 +10,7 @@ test_that("a daemon confirms an H5 file's cell names once per process", {
   rhdf5::h5createGroup(sidecar, "expression")
   rhdf5::h5write(cells, sidecar, "expression/genes")
   rhdf5::h5closeAll()
-  expected <- rlang::hash(enc2utf8(cells))
+  expected <- crb_cache$.runtimeCellNamesHash(cells)
 
   crb_cache$crb_h5_cell_check_start(sidecar, expected)
   ## The session never waits for the daemon; the test does.

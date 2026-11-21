@@ -277,7 +277,6 @@ crb_h5_cell_check_start <- function(path, expected) {
     helpers <- new.env(parent = baseenv())
     for (name in c(
       ".runtimeCellNamesHash",
-      ".runtimeLegacyCellNamesHash",
       ".runtimeCellNamesMatch"
     )) {
       helpers[[name]] <- get(name, mode = "function")

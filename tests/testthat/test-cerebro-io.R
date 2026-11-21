@@ -485,7 +485,7 @@ test_that("the Viewer hydrates a thin CRB lazily and checks it against the H5 fi
 test_that("Data Info reads the thin cell count without forcing metadata", {
   runtime <- viewer_runtime_env()
   object <- new.env(parent = emptyenv())
-  object$crb_schema <- list(version = 3L, n_cells = 4L)
+  object$crb_schema <- list(version = 5L, n_cells = 4L)
   delayedAssign(
     "meta_data",
     stop("metadata was forced"),

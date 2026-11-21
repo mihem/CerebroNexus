@@ -34,14 +34,13 @@ test_that("ordered-name checksums have fixed, portable UTF-8 bytes", {
 })
 
 test_that("both historical rlang formats validate without their original rlang", {
-  contract <- .crbContract()
   cells <- c("cell1", "cell2")
   expect_identical(
-    contract$.runtimeLegacyCellNamesHash(cells, "serialized"),
+    .legacyCerebroCellNamesHash(cells, "serialized"),
     unname(legacy_cell_hashes[[1L]])
   )
   expect_identical(
-    contract$.runtimeLegacyCellNamesHash(cells, "walker"),
+    .legacyCerebroCellNamesHash(cells, "walker"),
     unname(legacy_cell_hashes[[2L]])
   )
   ## Force both compatibility paths even on the matching rlang release.
@@ -49,14 +48,14 @@ test_that("both historical rlang formats validate without their original rlang",
     hash = function(...) strrep("0", 32L),
     .package = "rlang"
   )
-  for (expected in c(legacy_cell_hashes, .cerebroCellNamesHash(cells))) {
-    expect_true(contract$.runtimeCellNamesMatch(cells, expected))
-    expect_false(contract$.runtimeCellNamesMatch(rev(cells), expected))
-    expect_false(contract$.runtimeCellNamesMatch(
+  for (expected in legacy_cell_hashes) {
+    expect_true(.legacyCerebroCellNamesMatch(cells, expected))
+    expect_false(.legacyCerebroCellNamesMatch(rev(cells), expected))
+    expect_false(.legacyCerebroCellNamesMatch(
       c("cell1", "foreign"),
       expected
     ))
-    expect_false(contract$.runtimeCellNamesMatch(
+    expect_false(.legacyCerebroCellNamesMatch(
       c("cell1", NA_character_),
       expected
     ))
@@ -64,10 +63,14 @@ test_that("both historical rlang formats validate without their original rlang",
 })
 
 test_that("schema 5 requires a known checksum algorithm and indexed-field list", {
-  read_schema <- function(schema) {
+  read_schema <- function(schema, allow_legacy = FALSE) {
     object <- new.env(parent = emptyenv())
     object$crb_schema <- schema
-    .crbContract()$.readRuntimeCrbSchema(object, "test.crb")
+    .crbContract()$.readRuntimeCrbSchema(
+      object,
+      "test.crb",
+      allow_legacy = allow_legacy
+    )
   }
   schema <- list(
     version = 5L,
@@ -109,10 +112,14 @@ test_that("schema 5 requires a known checksum algorithm and indexed-field list",
     expect_error(read_schema(old), "unsupported CRB schema")
     old$cell_names_hash <- legacy_cell_hashes[[1L]]
     old$cell_indexed <- if (version == 4L) "immune_repertoire" else NULL
-    expect_identical(read_schema(old), old)
+    expect_error(read_schema(old), "unsupported CRB schema")
+    expect_identical(read_schema(old, allow_legacy = TRUE), old)
     if (version == 4L) {
       old$cell_indexed <- character()
-      expect_error(read_schema(old), "unsupported CRB schema")
+      expect_error(
+        read_schema(old, allow_legacy = TRUE),
+        "unsupported CRB schema"
+      )
     }
   }
 })
@@ -145,12 +152,12 @@ test_that("streaming checksums preserve names across a block boundary", {
   }
   close(connection)
   expect_identical(
-    contract$.runtimeLegacyCellNamesHash(cells, "walker"),
+    .legacyCerebroCellNamesHash(cells, "walker"),
     unname(rlang::hash_file(path))
   )
 })
 
-test_that("package, standalone Viewer and pack checks accept legacy CRBs", {
+test_that("old thin CRBs require explicit conversion before ordinary reads", {
   skip_if_not_installed("HDF5Array")
   skip_if_not_installed("rhdf5")
   cells <- c("cell1", "cell2")
@@ -179,6 +186,45 @@ test_that("package, standalone Viewer and pack checks accept legacy CRBs", {
         payload$crb_schema$cell_indexed <- character()
       }
       saveRDS(payload, fixture$crb)
+      if (version %in% c(3L, 4L)) {
+        local({
+          testthat::local_mocked_bindings(
+            .h5CellNames = function(...) stop("must not read H5"),
+            .legacyCerebroCellNamesMatch = function(...) {
+              stop("must not try legacy hashes")
+            },
+            .package = "CerebroNexus"
+          )
+          expect_error(
+            readCerebro(fixture$crb),
+            "portable format.*convertCerebro"
+          )
+          old <- runtime$read_cerebro_file(fixture$crb)
+          expect_error(
+            runtime$.attachExternalExpression(old, fixture$crb),
+            "portable format.*convertCerebro"
+          )
+        })
+        ## The converter refuses a genuine mismatch and leaves the CRB intact.
+        h5_before <- unname(tools::md5sum(fixture$h5))
+        crb_before <- unname(tools::md5sum(fixture$crb))
+        viewer_h5_matrix(values[, 2:1], fixture$h5)
+        expect_error(
+          convertCerebro(fixture$crb),
+          class = "cerebro_cell_names_mismatch"
+        )
+        expect_identical(unname(tools::md5sum(fixture$crb)), crb_before)
+        viewer_h5_matrix(values, fixture$h5)
+        h5_before <- unname(tools::md5sum(fixture$h5))
+        convertCerebro(fixture$crb)
+        expect_identical(unname(tools::md5sum(fixture$h5)), h5_before)
+        payload <- .readCerebroPayload(fixture$crb)
+        expect_identical(payload$crb_schema$version, 5L)
+        expect_identical(
+          payload$crb_schema$cell_names_hash,
+          .cerebroCellNamesHash(cells)
+        )
+      }
       expect_identical(readCerebro(fixture$crb)$meta_data$cell_barcode, cells)
       object <- runtime$read_cerebro_file(fixture$crb)
       object <- runtime$.attachExternalExpression(object, fixture$crb)
@@ -223,7 +269,7 @@ test_that("package, standalone Viewer and pack checks accept legacy CRBs", {
   }
 })
 
-test_that("the background check uses portable and legacy validation", {
+test_that("the background check uses only portable validation", {
   skip_if_not_installed("rhdf5")
   skip_if_not_installed("mirai")
   runtime <- viewer_runtime_env()
@@ -233,8 +279,17 @@ test_that("the background check uses portable and legacy validation", {
   rhdf5::h5createGroup(sidecar, "expression")
   rhdf5::h5write(cells, sidecar, "expression/genes")
   rhdf5::h5closeAll()
-  hashes <- c(legacy_cell_hashes, .cerebroCellNamesHash(cells))
-  for (expected in c(hashes, .cerebroCellNamesHash(rev(cells)))) {
+  hashes <- .cerebroCellNamesHash(cells)
+  expect_false(exists(
+    ".runtimeLegacyCellNamesHash",
+    envir = runtime,
+    inherits = FALSE
+  ))
+  for (expected in c(
+    hashes,
+    legacy_cell_hashes,
+    .cerebroCellNamesHash(rev(cells))
+  )) {
     runtime$crb_h5_cell_check_start(sidecar, expected)
     key <- runtime$.crbH5CellCheckKey(sidecar, expected)
     task <- runtime$.crb_h5_cell_checks[[key]]$task

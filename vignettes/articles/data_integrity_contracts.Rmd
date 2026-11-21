@@ -206,10 +206,19 @@ The checksum is tagged `md5-cell-order-v1:`. Its input is the cell names in
 their original order, encoded as UTF-8; each is prefixed with its decimal byte
 length and `:` with no other separator. Unlike an R-object hash, these bytes
 and their MD5 do not depend on the installed `rlang` version. Schema 5 also
-supports the `cell_indexed` fields introduced by schema 4. Older schema-3/4
-files remain readable: readers verify either historical `rlang` hash format
-against the ordered names, without falling back to an unordered cell set.
-Older releases that do not support schema 5 refuse new files explicitly.
+supports the `cell_indexed` fields introduced by schema 4. Ordinary readers
+require schema 5: schema-3/4 files are rejected with a `convertCerebro()`
+message before reading H5 names or trying historical hashes. The explicit
+converter verifies either historical ordered-name hash format once and writes
+schema 5, reusing the H5 matrix. Stop apps using the export before conversion;
+rebuild its Viewer Pack if conversion did not already rebuild it. This applies
+to every thin H5 CRB, not only large datasets. Embedded-expression CRBs do not
+need this migration. Older releases that do not support schema 5 refuse new
+files explicitly.
+
+Conversion does not turn off validation: normal ordered-name checks still run
+before expression access in a new Viewer process and are cached for that
+process and file version. Historical-format retries happen only in conversion.
 
 When the `.crb` is loaded, `readCerebro()` and the Viewer read the cell names
 back from the H5 file, verify them against the checksum and restore both fields.
@@ -224,7 +233,7 @@ The readers accept only the current layout. `readCerebro()`, `launchCerebro()`,
 `createShinyApp()` and the Viewer all reject a `.crb` that
 
 - has no `expression_backend` descriptor;
-- has a thin schema other than version 3, 4 or 5;
+- has a thin schema other than version 5 (versions 3/4 require conversion);
 - still stores receptors in non-empty `bcr_data` / `tcr_data` fields;
 - records an immune repertoire sidecar of any type other than `"file"`;
 - predates spatial support (the Cerebro v1.3 class), HLA typing support,
