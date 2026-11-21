@@ -221,20 +221,23 @@ syncGridView(panels[0]);
 assert.strictEqual(panels[1].view, null);
 assert.strictEqual(gridSyncing, false);
 console.log('PASS synced zoom gives every shown section the same relative view');
-// An enlarged panel fills the window with the others beside or below it, and
-// the arrangement follows the shape of what the enlarged panel draws.
-var besideUmap = focusGridPacking(4, 1310, 726, 18, 58, 8, 1);
-assert.strictEqual(besideUmap.place, 'beside', JSON.stringify(besideUmap));
-assert.ok(besideUmap.mainW + 18 + 8 + besideUmap.cols * (besideUmap.ctxW + 18) +
-  (besideUmap.cols - 1) * 8 <= 1310, 'the beside layout fits the width');
-var belowTissue = focusGridPacking(3, 1310, 1100, 18, 58, 8, 1.6);
-assert.strictEqual(belowTissue.place, 'above', JSON.stringify(belowTissue));
-assert.ok(belowTissue.cols * (belowTissue.ctxW + 18) + (belowTissue.cols - 1) * 8 <= 1310 &&
-  belowTissue.ctxW + 18 >= belowTissue.side + 18, 'the panels below fill the row');
-[besideUmap, belowTissue].forEach(function (pack) {
-  assert.ok(pack.side >= FOCUS_CONTEXT_MIN, 'the others stay readable');
-  assert.ok(Math.min(pack.mainW, pack.mainH) > pack.side, 'the enlarged panel stays larger');
-});
-assert.strictEqual(focusGridPacking(4, 500, 300, 18, 58, 8, 1), null,
+// An enlarged panel reads like a photo viewer: it spans the width on top and
+// the others are one strip of thumbnails below, paged when they do not fit,
+// so many sections never shrink it.
+var few = focusGridPacking(3, 1310, 726, 18, 58, 8);
+assert.strictEqual(few.place, 'photo');
+assert.strictEqual(few.paged, false);
+assert.strictEqual(few.perPage, 3);
+assert.strictEqual(few.mainW, 1310 - 18, 'the enlarged panel takes the full width');
+assert.ok(few.side >= FOCUS_THUMB_MIN && few.side <= FOCUS_THUMB_MAX, JSON.stringify(few));
+assert.ok(few.mainH + 58 + few.side + 58 + 8 <= 726, 'both rows fit the window');
+var many = focusGridPacking(40, 1310, 726, 18, 58, 8);
+assert.strictEqual(many.paged, true);
+assert.strictEqual(many.mainW, few.mainW, 'forty sections leave the enlarged panel as wide');
+assert.strictEqual(many.mainH, few.mainH, 'and as tall');
+assert.ok(many.perPage * (many.ctxW + 18) + (many.perPage - 1) * 8 + 2 * (FOCUS_ARROW + 8) <= 1310,
+  'a page of thumbnails and its arrows fit the width');
+assert.strictEqual(many.pages, Math.ceil(40 / many.perPage));
+assert.strictEqual(focusGridPacking(4, 500, 200, 18, 58, 8), null,
   'no room: the page scrolls as before');
-console.log('PASS an enlarged panel fills the window beside or above the others');
+console.log('PASS an enlarged panel is a photo above a paged strip of the others');

@@ -6122,7 +6122,9 @@
       if (isSpatialSpace(spaceById[p.spaceId])) activateSpatial(p.spaceId);
     });
     p.pane.addEventListener('click', function (e) {
-      if (e.target.closest('.cv-ptitle') && canFocusPanel() && p.spaceId) {
+      // With a panel enlarged, a thumbnail's title enlarges it on every page.
+      if (e.target.closest('.cv-ptitle') && p.spaceId &&
+          (canFocusPanel() || (focusPanel && focusPanel !== p.key))) {
         setFocusPanel(p.key);
       }
     });
@@ -8071,71 +8073,103 @@
     for (var c = 1; c <= k; c++) if (widthOf(c) >= Math.max(260, floor)) scrollCols = c;
     return scrolling(scrollCols);
   }
-  // An enlarged panel and its n linked context panels, filling availW x availH:
-  // the enlarged one beside a grid of the others (c columns), or above them
-  // (rows taking at most 40 % of the height). Of the arrangements that draw
-  // the enlarged panel within 10 % of its largest, the one with the largest
-  // other panels wins, so they are not shrunk for a few pixels more; all stay
-  // readable (FOCUS_CONTEXT_MIN) and clearly smaller than the enlarged one.
-  // Null when none fits; the page then scrolls as before.
-  var FOCUS_CONTEXT_MIN = 160;
-  function focusGridPacking(n, availW, availH, chromeX, chromeY, gap, aspect) {
-    aspect = aspect > 0 && isFinite(aspect) ? aspect : 1;
-    var layouts = [];
-    var consider = function (layout) {
-      // The size the enlarged panel's content is drawn at: a wide section in
-      // a tall panel is drawn as wide as the panel, not as tall.
-      var drawnW = Math.min(layout.mainW, layout.mainH * aspect);
-      var drawnH = Math.min(layout.mainH, layout.mainW / aspect);
-      var mainSide = Math.sqrt(Math.max(0, drawnW) * Math.max(0, drawnH));
-      if (layout.side < FOCUS_CONTEXT_MIN || mainSide < layout.side * 1.3) return;
-      layout.score = mainSide;
-      layouts.push(layout);
+  // An enlarged panel reads like a photo viewer: it spans the width on top, and
+  // the n others are a strip of thumbnails below it, one row of equal squares
+  // taking at most a fifth of the height (FOCUS_THUMB_MIN to FOCUS_THUMB_MAX).
+  // When they do not fit the width, the strip shows a page of them between
+  // arrows that turn the pages, so many sections never shrink the enlarged
+  // panel. Null without room for both.
+  var FOCUS_THUMB_MIN = 96, FOCUS_THUMB_MAX = 200, FOCUS_STRIP_SHARE = 0.24;
+  var FOCUS_ARROW = 36;
+  function focusGridPacking(n, availW, availH, chromeX, chromeY, gap) {
+    var side = Math.floor(Math.max(FOCUS_THUMB_MIN,
+      Math.min(FOCUS_THUMB_MAX, availH * FOCUS_STRIP_SHARE - chromeY)));
+    var fits = function (width) {
+      return Math.max(0, Math.floor((width + gap) / (side + chromeX + gap)));
     };
-    for (var cols = 1; cols <= n; cols++) {
-      var rows = Math.ceil(n / cols);
-      // Beside: the others in a grid of squares on the right, full height.
-      var side = Math.floor((availH - (rows - 1) * gap) / rows) - chromeY;
-      var gridW = cols * (side + chromeX) + (cols - 1) * gap;
-      consider({ place: 'beside', cols: cols, rows: rows, side: side, ctxW: side,
-        mainW: Math.floor(availW - gridW - gap - chromeX),
-        mainH: rows * (side + chromeY) + (rows - 1) * gap - chromeY });
-      // Above: the others in rows below, full width (their panels as wide as
-      // their share of it, their plots as tall as the height allows).
-      var cellW = Math.floor((availW - (cols - 1) * gap) / cols);
-      var below = Math.min(cellW - chromeX,
-        Math.floor((availH * 0.4 - (rows - 1) * gap) / rows) - chromeY);
-      consider({ place: 'above', cols: cols, rows: rows, side: below, ctxW: cellW - chromeX,
-        mainW: Math.floor(availW - chromeX),
-        mainH: Math.floor(availH - rows * (below + chromeY) - rows * gap - chromeY) });
-    }
-    if (!layouts.length) return null;
-    var top = Math.max.apply(null, layouts.map(function (layout) { return layout.score; }));
-    return layouts.filter(function (layout) { return layout.score >= top * 0.9; })
-      .sort(function (a, b) { return b.side - a.side || b.score - a.score; })[0];
+    var perPage = fits(availW);
+    var paged = n > perPage;
+    if (paged) perPage = fits(availW - 2 * (FOCUS_ARROW + gap));
+    var pack = { place: 'photo', side: side, ctxW: side, n: n,
+      perPage: Math.max(1, Math.min(n, perPage)), paged: paged,
+      pages: paged ? Math.ceil(n / Math.max(1, perPage)) : 1,
+      mainW: Math.floor(availW - chromeX),
+      mainH: Math.floor(availH - (side + chromeY) - gap - chromeY) };
+    if (perPage < 1 || pack.mainH < side * 1.5) return null;
+    return pack;
+  }
+  // The page of the strip shown, and its arrows.
+  var focusStripPage = 0, focusStripKey = null, focusStripArrows = null;
+  function focusStripArrowsOf(panes) {
+    if (focusStripArrows && focusStripArrows.prev.parentElement === panes) return focusStripArrows;
+    var make = function (direction) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'cv-strip-arrow cv-strip-' + direction;
+      button.setAttribute('aria-label', direction === 'prev' ? 'Previous views' : 'Next views');
+      button.innerHTML = direction === 'prev' ? '&#8249;' : '&#8250;';
+      button.addEventListener('click', function () {
+        focusStripPage += direction === 'prev' ? -1 : 1;
+        _layoutKey = null;
+        resizeAll();
+      });
+      panes.appendChild(button);
+      return button;
+    };
+    focusStripArrows = { prev: make('prev'), next: make('next') };
+    return focusStripArrows;
   }
   // The panes' grid for an enlarged panel, or the ordinary flow without one.
   function applyFocusGrid(panes, vis, primaryKey, pack, chromeX, chromeY, gap) {
-    vis.forEach(function (p) {
-      if (!p.pane) return;
-      var primary = pack && p.key === primaryKey;
-      p.pane.style.gridColumn = primary ? (pack.place === 'beside' ? '1' : '1 / -1') : '';
-      p.pane.style.gridRow = primary ? (pack.place === 'beside' ? '1 / span ' + pack.rows : '1') : '';
-    });
+    var arrows = pack && pack.paged ? focusStripArrowsOf(panes)
+      : (focusStripArrows && focusStripArrows.prev.parentElement === panes ? focusStripArrows : null);
+    if (arrows) {
+      arrows.prev.hidden = arrows.next.hidden = !(pack && pack.paged);
+    }
     if (!pack) {
+      vis.forEach(function (p) {
+        if (!p.pane) return;
+        p.pane.style.gridColumn = p.pane.style.gridRow = '';
+        p.pane.classList.remove('cv-strip-off');
+      });
       panes.style.display = panes.style.gridTemplateColumns = panes.style.gridTemplateRows = '';
       panes.classList.remove('cv-focus-grid');
+      focusStripKey = null;
       return;
     }
-    var cell = (pack.ctxW + chromeX) + 'px', row = (pack.side + chromeY) + 'px';
+    if (focusStripKey !== primaryKey) { focusStripKey = primaryKey; focusStripPage = 0; }
+    focusStripPage = Math.max(0, Math.min(pack.pages - 1, focusStripPage));
+    var first = focusStripPage * pack.perPage;
+    var shown = Math.min(pack.perPage, pack.n - first);
+    // Flexible gutters at both ends hold the arrows and centre the strip.
     panes.classList.add('cv-focus-grid');
     panes.style.display = 'grid';
-    if (pack.place === 'beside') {
-      panes.style.gridTemplateColumns = (pack.mainW + chromeX) + 'px repeat(' + pack.cols + ', ' + cell + ')';
-      panes.style.gridTemplateRows = 'repeat(' + pack.rows + ', ' + row + ')';
-    } else {
-      panes.style.gridTemplateColumns = 'repeat(' + pack.cols + ', ' + cell + ')';
-      panes.style.gridTemplateRows = (pack.mainH + chromeY) + 'px repeat(' + pack.rows + ', ' + row + ')';
+    panes.style.gridTemplateColumns = 'minmax(0, 1fr) repeat(' + shown + ', ' +
+      (pack.ctxW + chromeX) + 'px) minmax(0, 1fr)';
+    panes.style.gridTemplateRows = (pack.mainH + chromeY) + 'px ' + (pack.side + chromeY) + 'px';
+    var index = 0;
+    vis.forEach(function (p) {
+      if (!p.pane) return;
+      if (p.key === primaryKey) {
+        p.pane.style.gridColumn = '1 / -1';
+        p.pane.style.gridRow = '1';
+        p.pane.classList.remove('cv-strip-off');
+        return;
+      }
+      var slot = index++ - first;
+      var onPage = slot >= 0 && slot < shown;
+      p.pane.classList.toggle('cv-strip-off', !onPage);
+      p.pane.style.gridColumn = onPage ? String(slot + 2) : '';
+      p.pane.style.gridRow = onPage ? '2' : '';
+    });
+    if (arrows && pack.paged) {
+      arrows.prev.style.gridColumn = '1';
+      arrows.next.style.gridColumn = String(shown + 2);
+      arrows.prev.style.gridRow = arrows.next.style.gridRow = '2';
+      arrows.prev.disabled = focusStripPage === 0;
+      arrows.next.disabled = focusStripPage >= pack.pages - 1;
+      arrows.prev.title = arrows.next.title = 'Views ' + (first + 1) + '–' + (first + shown) +
+        ' of ' + pack.n;
     }
   }
   function sectionGridRowOf(pack, index) {
@@ -8288,13 +8322,8 @@
         }
       }
     }
-    var focusAspect = 1;
-    if (focusPanel && !keepPlotsSquare) {
-      focusAspect = sectionGridActive() ? sectionGridAspect()
-        : (panelsAspect(vis.filter(function (p) { return p.key === focusPanel; }))[0] || 1);
-    }
     var focusPack = focusPanel && k > 1 && availH > 0
-      ? focusGridPacking(k - 1, usableW, availH, chromeX, overhead, gap, focusAspect)
+      ? focusGridPacking(k - 1, usableW, availH, chromeX, overhead, gap)
       : null;
     applyFocusGrid(panes, vis, focusPanel, focusPack, chromeX, overhead, gap);
     // Explicit tracks consume all available width. In the default fluid mode,
@@ -10139,12 +10168,18 @@
   }
   function wireSectionGrid() {
     if (!window.jQuery) return;
-    // A grid panel's title shows only its section (the single view).
+    // A grid panel's title shows only its section (the single view). With a
+    // panel enlarged, a thumbnail's title enlarges it instead, as a photo
+    // viewer's thumbnails do.
     document.addEventListener('click', function (event) {
       var title = event.target.closest && event.target.closest('.cv-ptitle');
       if (!title || !sectionGridActive()) return;
       var pane = title.closest('.cv-pane');
       var panel = panels.filter(function (p) { return p.pane === pane; })[0];
+      if (focusPanel) {
+        if (panel && panel.key !== focusPanel) setFocusPanel(panel.key);
+        return;
+      }
       var space = panel && spaceById[panel.spaceId];
       var el = document.getElementById('spatial_projection_sections');
       if (!space || space._gridSection == null || !el || !el.selectize) return;
@@ -10153,7 +10188,8 @@
     document.addEventListener('mouseover', function (event) {
       var title = event.target.closest && event.target.closest('.cv-ptitle');
       if (!title) return;
-      title.title = sectionGridActive() ? 'Show only this section' : '';
+      title.title = !sectionGridActive() ? ''
+        : (focusPanel ? 'Enlarge this section' : 'Show only this section');
       title.classList.toggle('cv-ptitle-link', sectionGridActive());
     });
     window.addEventListener('cerebro:cell-view-ready', function (event) {

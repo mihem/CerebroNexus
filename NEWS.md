@@ -68,11 +68,13 @@
   is held, echoes are left out, the plot redraws once per frame (or, when a
   draw is slow, without the GPU, once the slider rests or is let go), and
   "% of cells" is applied when the slider rests or is let go.
-- **An enlarged panel fills the window with the others.** Enlarge in Linked
-  views or the Spatial grid puts the enlarged panel beside a grid of the
-  others or above a row of them, whichever draws its content (a wide section,
-  a square embedding) largest while the others stay readable, instead of
-  wrapping them into rows with empty space around. Spatial's *Sync zoom* is a
+- **Enlarge reads like a photo viewer.** Enlarge in Linked views, the
+  Spatial grid or Gene expression's separate panels shows the enlarged panel
+  across the width on top and the others as one strip of thumbnails below it,
+  instead of wrapping them into rows with empty space around. When the
+  thumbnails do not fit the width, arrows at the ends of the strip page
+  through them, so many sections never shrink the enlarged panel; a
+  thumbnail's title enlarges it. Spatial's *Sync zoom* is a
   switch, as Linked views' Cross-view highlight, with a short help on hover.
 - **Linked views fills the window.** Its panels have one size and their rows
   share the window's height, so the views end at the window's bottom edge

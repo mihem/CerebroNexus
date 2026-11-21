@@ -362,7 +362,41 @@
   justify-content: center;
   align-items: start;
 }
-.coordviews-page .cv-panes.cv-focus-grid > .cv-pane { align-self: stretch; }
+.coordviews-page .cv-panes.cv-focus-grid > .cv-pane { align-self: start; }
+/* The strip of an enlarged view: thumbnails off the shown page are hidden,
+   and the arrows at its ends turn its pages. */
+.coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-strip-off { display: none; }
+/* A thumbnail keeps its title, which enlarges it; it needs no Enlarge button. */
+.coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-focus-context .cv-focus-btn { display: none; }
+.coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-focus-context .cv-ptitle { cursor: pointer; }
+.coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-focus-context .cv-ptitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.coordviews-page .cv-strip-arrow {
+  align-self: center;
+  width: 36px;
+  height: 56px;
+  padding: 0;
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+  background: var(--c-surface);
+  box-shadow: var(--shadow-1);
+  color: var(--c-text-2);
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+}
+.coordviews-page .cv-strip-prev { justify-self: end; }
+.coordviews-page .cv-strip-next { justify-self: start; }
+.coordviews-page .cv-strip-arrow:hover:not(:disabled) {
+  border-color: var(--c-amber-200);
+  color: var(--c-amber-700);
+}
+.coordviews-page .cv-strip-arrow:disabled { opacity: .35; cursor: default; }
+.coordviews-page .cv-strip-arrow[hidden] { display: none; }
 /* A narrow linked panel keeps its title; its "Context" badge gives way. */
 .coordviews-page .cv-pane.cv-narrow.cv-focus-context .cv-role-badge { display: none; }
 .coordviews-page .cv-pane.cv-focus-primary {
