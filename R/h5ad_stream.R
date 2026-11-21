@@ -210,10 +210,25 @@
   )
   ## a stable sort keeps the cells of a gene in order
   o <- order(x$gene, method = "radix")
-  counts <- tabulate(x$gene + 1L, nbins = n_vars)
+  raw_entries <- length(o)
+  gene <- x$gene[o]
   value <- x$value[o]
   cell <- cell[o]
   rm(x, o)
+  ## A row of a CSR matrix may name a gene twice: the entries add up, as they do
+  ## in a dgCMatrix. After the sort such entries are neighbours.
+  if (raw_entries > 1L) {
+    repeated <- gene[-1L] == gene[-raw_entries] &
+      cell[-1L] == cell[-raw_entries]
+    if (any(repeated)) {
+      first <- c(TRUE, !repeated)
+      value <- as.numeric(rowsum(value, cumsum(first), reorder = FALSE))
+      gene <- gene[first]
+      cell <- cell[first]
+    }
+  }
+  counts <- tabulate(gene + 1L, nbins = n_vars)
+  rm(gene)
   sums <- positive <- NULL
   if (!is.null(item$members)) {
     ## sorted by gene, the block is a valid cells x genes dgCMatrix as it is
@@ -261,6 +276,7 @@
     counts = counts,
     index = index,
     value_size = source$value_size,
+    raw_entries = raw_entries,
     sums = sums,
     positive = positive
   )
@@ -517,7 +533,7 @@
         positive + block$positive
       }
     }
-    block[c("path", "counts", "index", "value_size")]
+    block[c("path", "counts", "index", "value_size", "raw_entries")]
   }
   split <- .h5adStreamRun(
     items,
@@ -602,7 +618,10 @@
   }
   gene_ptr <- c(0, cumsum(counts))
   nnz <- gene_ptr[[n_vars + 1]]
-  if (nnz != source$nnz) {
+  ## what the blocks read is what the file stores; entries naming the same cell
+  ## and gene twice were added up, so `nnz` may be smaller
+  stored <- sum(vapply(split, function(block) block$raw_entries, numeric(1)))
+  if (stored != source$nnz) {
     stop(
       "The indices of the matrix do not add up to its values.",
       call. = FALSE

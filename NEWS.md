@@ -41,6 +41,8 @@
   while the processes waited, 319 to 331 s. The whole conversion of the 21 GB
   h5ad of those cells takes 451 s; with its values written as 64-bit floats it
   took 524 s, and reading the file once more for the summaries first, 766 s.
+  A cell and gene named twice in a row (valid in CSR) are added up, as the
+  ordinary reader does.
   The embedded mode and the other sources still need a matrix that fits.
   The demo-data scripts in `data-raw/large-demo/` (mouse brain, Ren) write
   their H5 file with this writer too; their own transposing helper
@@ -50,10 +52,13 @@
   writes (it used level 4).
 - **The first gene of a large H5 file no longer waits for the checksum.** The
   checksum of the H5 file is still computed in the background, once per file
-  (the result is kept in the user cache), but a read of expression does not wait
-  for it any more: every read looks again, and the first one after the check is
-  done refuses the file if it does not match the CRB. Before, the first gene of
-  a process that opened an unverified 11 GB file waited 47 s for the check.
+  (the result is kept in the user cache), but a read of a gene's row does not
+  wait for it any more: every read looks again, and the first one after the
+  check is done refuses the file if it does not match the CRB. Attaching the
+  whole matrix (`getExpressionMatrix()` and the other accessors that do not read
+  a single row) still waits for the check, so that a file that does not match
+  is never handed out. Before, the first gene of a process that opened an
+  unverified 11 GB file waited 47 s for the check.
 - **The H5 file is compressed by default again, at gzip level 1.**
   `exportFromSeurat()` and `convertSeuratToCerebro()` write the H5 expression
   file at gzip level 1 (`h5_compression_level = 1`), and so do the SCE and

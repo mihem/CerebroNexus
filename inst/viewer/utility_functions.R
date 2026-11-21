@@ -4726,6 +4726,13 @@ get_or_load_crb <- function(
   delayedAssign(
     "expression",
     {
+      ## The attached matrix is read without going through verify_cells()
+      ## again, so it is not handed out before the checksum is in: a file that
+      ## does not match is refused here, however early the matrix is asked for.
+      ## A gene's row (cerebro_h5_rows) does not come this way and does not wait.
+      if (inherits(h5_checksum$task, "mirai")) {
+        mirai::call_mirai(h5_checksum$task)
+      }
       verify_cells()
       message(glue::glue(
         "[{Sys.time()}] Attaching h5 backend (lazy TENxMatrix): {loc_abs}"

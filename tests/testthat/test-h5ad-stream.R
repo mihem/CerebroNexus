@@ -53,6 +53,47 @@ test_that("a streamed matrix gives the same expression file and summaries", {
   expect_identical(b$getExpressionBackend()$type, "h5")
 })
 
+test_that("entries naming a cell and a gene twice are added up", {
+  ## A CSR row may repeat a gene; the entries add up, as they do in a dgCMatrix.
+  ## Every stored entry is split into two halves at the same coordinate, which
+  ## is the same matrix.
+  doubled <- withr::local_tempfile(fileext = ".h5ad")
+  file.copy(anndata_test_fixture("small_csr.h5ad"), doubled)
+  indptr <- as.vector(rhdf5::h5read(doubled, "X/indptr"))
+  indices <- as.vector(rhdf5::h5read(doubled, "X/indices"))
+  data <- as.vector(rhdf5::h5read(doubled, "X/data"))
+  for (name in c("indptr", "indices", "data")) {
+    rhdf5::h5delete(doubled, paste0("X/", name))
+  }
+  twice <- rep(seq_along(data), each = 2L)
+  rhdf5::h5write(as.integer(indptr * 2L), doubled, "X/indptr")
+  rhdf5::h5write(as.integer(indices[twice]), doubled, "X/indices")
+  rhdf5::h5write(data[twice] / 2, doubled, "X/data")
+
+  reference <- withr::local_tempdir()
+  expected <- quiet(stream_convert(reference, verbose = FALSE))
+
+  withr::local_options(
+    cerebro.h5ad_stream_nnz = 0,
+    cerebro.h5ad_stream_budget = 40,
+    cerebro.h5ad_stream_block = 25,
+    cerebro.h5ad_stream_workers = 1
+  )
+  streamed_dir <- withr::local_tempdir()
+  streamed <- quiet(convertH5adToCerebro(
+    doubled,
+    streamed_dir,
+    groups = c("cell_type", "donor"),
+    expression_matrix_mode = "h5",
+    viewer_binary = "never"
+  ))
+  expect_equal(read_sidecar(streamed_dir), read_sidecar(reference))
+  a <- readCerebro(expected)
+  b <- readCerebro(streamed)
+  expect_equal(b$mean_expression, a$mean_expression)
+  expect_equal(b$most_expressed_genes, a$most_expressed_genes)
+})
+
 test_that("the blocks and passes do not change what is written", {
   reference <- withr::local_tempdir()
   quiet(stream_convert(reference, verbose = FALSE))
