@@ -13,10 +13,16 @@ hla_label_hint <- function(label, hint) {
   tagList(
     label,
     # data-tip (not title): a CSS bubble in hla_motifs.css shows it instantly on
-    # hover, instead of the browser's slow ~1s native title tooltip.
+    # hover, instead of the browser's slow ~1s native title tooltip. The marker
+    # takes the keyboard focus (the bubble shows on focus too) and carries the
+    # hint as its accessible name, since a CSS bubble is invisible to a screen
+    # reader.
     tags$span(
       icon("info-circle"),
       class = "hla-hint",
+      tabindex = "0",
+      role = "img",
+      `aria-label` = hint,
       `data-tip` = hint
     )
   )

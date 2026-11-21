@@ -82,6 +82,9 @@
   /* --- Motion --------------------------------------------------------- */
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --dur:  0.16s;
+  /* How long work runs before a card, spinner or dimming shows. The same
+     number is WAIT_SHOW_MS in viewer-shell.js. */
+  --wait-delay: 400ms;
   --c-toolbar-control-height: 34px;
   --c-control-width: 240px;
   --c-select-min-width: 12rem;
@@ -2221,6 +2224,12 @@ body .shiny-spinner-output-container .load-container > .loader,
 body .shiny-spinner-output-container > .load-container.shiny-spinner-hidden {
   display: none;
 }
+/* A plot that is ready before --wait-delay never shows its spinner card. The
+   animation starts again each time shinycssloaders shows the card, because it
+   sets display: none in between. */
+body .shiny-spinner-output-container > .load-container:not(.shiny-spinner-hidden) {
+  animation: cerebro-progress-late 1ms linear var(--wait-delay) backwards;
+}
 body .shiny-spinner-output-container .load-container > .loader {
   margin: 0 !important;
   background: transparent !important;
@@ -2240,6 +2249,15 @@ body .shiny-notification:has(.shiny-progress-notification) {
   padding: 16px 20px !important;
   border-radius: var(--r-lg) !important;
   box-shadow: var(--shadow-3) !important;
+  /* Shown from --wait-delay on, like the page's loading card: work that ends
+     sooner never flashes a card (viewer-shell.js hides one as it closes). */
+  animation: cerebro-progress-late 1ms linear var(--wait-delay) backwards;
+}
+body .shiny-notification.cerebro-notification-leaving {
+  visibility: hidden !important;
+}
+@keyframes cerebro-progress-late {
+  from, to { visibility: hidden; }
 }
 body .shiny-progress-notification .progress-message,
 body .shiny-progress-container .progress-message {
@@ -2602,6 +2620,20 @@ body .shiny-bound-output.cerebro-output-waiting {
   *, *::before, *::after {
     animation: none !important;
     transition: none !important;
+  }
+  /* The wait delay moves nothing, so it stays: a short wait still shows no
+     card. Its spinner stands still. */
+  body .shiny-spinner-output-container > .load-container:not(.shiny-spinner-hidden),
+  body .shiny-notification:has(.shiny-progress-notification),
+  .cerebro-groups-controls:empty::before,
+  .cerebro-result-controls:empty::before,
+  .cerebro-result-slot:empty::before,
+  .cerebro-result-slot .datatables:empty::before,
+  .cerebro-groups-controls:empty::after,
+  .cerebro-result-controls:empty::after,
+  .cerebro-result-slot:empty::after,
+  .cerebro-result-slot .datatables:empty::after {
+    animation: cerebro-progress-late 1ms linear var(--wait-delay) backwards !important;
   }
 }
 
@@ -3038,6 +3070,23 @@ body .shiny-bound-output.cerebro-output-waiting {
   content: "Loading controls…";
 }
 .cerebro-result-slot:empty::after { content: "Loading result…"; }
+/* An empty slot that fills within --wait-delay never shows its spinner or its
+   "Loading ..." line, like the page card and the plot spinners. The spinner
+   keeps turning once it shows, so the delay is a second animation next to it. */
+.cerebro-groups-controls:empty::before,
+.cerebro-result-controls:empty::before,
+.cerebro-result-slot:empty::before,
+.cerebro-result-slot .datatables:empty::before {
+  animation:
+    cerebro-progress-late 1ms linear var(--wait-delay) backwards,
+    cerebro-loading-spin .8s linear infinite;
+}
+.cerebro-groups-controls:empty::after,
+.cerebro-result-controls:empty::after,
+.cerebro-result-slot:empty::after,
+.cerebro-result-slot .datatables:empty::after {
+  animation: cerebro-progress-late 1ms linear var(--wait-delay) backwards;
+}
 .cerebro-result-slot .datatables:empty {
   min-height: 300px;
 }

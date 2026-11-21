@@ -1,3 +1,34 @@
+# CerebroNexus 8.4.8
+
+- **A short wait shows no progress card.** A progress notification of the
+  Viewer (a gene, a spatial section, a result table) appears only once its
+  work has taken 400 ms, and goes the moment the work is done instead of
+  fading out over 250 ms with its spinner still turning. Choosing another
+  table on Enriched pathways (example data set; Windows, Chrome on the GPU,
+  medians of 7 alternating rounds) leaves the screen still after 7 ms instead
+  of 291 ms. A single result that is updating (dimmed, "Updating this
+  result") and the spinner card over a plot wait the same 400 ms, where they
+  came after 120 ms and at once, and so does the spinner of a result area that
+  is still empty, so a result ready sooner is not even dimmed.
+- **The Abundance tab of Immune repertoire opens at once.** Its clone-size
+  histogram (0.2 s for 1.46 million cells) is counted shortly after the page
+  has drawn, and kept, instead of when the tab is opened: the tab is drawn
+  after 207 ms instead of 289 ms (Ren atlas; medians of 7 alternating rounds).
+- **A single change to a projection is drawn at once.** Projection, Gene
+  expression, Spatial and Trajectory gathered every change for 150 to 200 ms
+  before drawing it, even a lone choice such as another colour column. A
+  change after a quiet spell at least that long is now applied at once; a
+  burst of changes (a slider being dragged) is still gathered, and its last
+  value always lands. Colouring the Projection of 1.3 million cells by
+  another column is drawn after 7 ms instead of 193 ms (medians of 7
+  alternating rounds).
+- **The table of selected cells and the HLA hints work from the keyboard.**
+  The column headers of the table sort on Enter or Space and say how they are
+  sorted, the menu buttons say whether their menu is open, and Escape closes a
+  menu. The info marker beside an HLA control can take the focus, shows its
+  hint then, and a screen reader reads it. Text of the data set placed in the
+  Viewer's pages now has its single quotes escaped as well.
+
 # CerebroNexus 8.4.7
 
 - H5-backed data sets no longer falsely report mismatched cell names when

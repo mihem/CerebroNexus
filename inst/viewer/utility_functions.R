@@ -673,13 +673,25 @@ cachePlot <- function(x, ...) {
 }
 
 ## Return the first complete reactive value immediately; debounce only later
-## invalidations caused by interactive controls.
+## invalidations caused by interactive controls, and of those only the ones
+## that follow another within `millis`.
 ##
 ## shiny::debounce() evaluates its source eagerly on every invalidation, so a
 ## page-owned `reactive` should req() its page itself. Pass the same predicate
 ## as `active`: returning to the page then reads the source immediately instead
 ## of first replaying the value held from before the page was left.
 debounceAfterFirst <- function(reactive, millis, active = NULL) {
+  ## The clock shiny::debounce() reads: the session's own, so that the quiet
+  ## spell below is measured on the same time as the debounce delay (a test
+  ## moves it with session$elapse()), and the system clock without a session.
+  domain <- shiny::getDefaultReactiveDomain()
+  now_ms <- function() {
+    if (!is.null(domain) && is.function(domain$.now)) {
+      domain$.now()
+    } else {
+      as.numeric(Sys.time()) * 1000
+    }
+  }
   initialized <- FALSE
   current <- NULL
   revision <- shiny::reactiveVal(0L)
@@ -701,18 +713,34 @@ debounceAfterFirst <- function(reactive, millis, active = NULL) {
     if (!initialized) {
       current <<- reactive()
       initialized <<- TRUE
+      publish <- function(next_value) {
+        if (!identical(current, next_value)) {
+          current <<- next_value
+          revision(shiny::isolate(revision()) + 1L)
+        }
+      }
+      ## A change after `millis` without one (a click: another colour, a
+      ## section) is taken at once; one that follows another sooner (a slider
+      ## dragged, controls redrawn by the first change) waits for the burst to
+      ## settle, and its last value is taken then.
+      last_change <- now_ms()
+      first_run <- TRUE
+      shiny::observeEvent(reactive(), {
+        next_value <- reactive()
+        ## Its first run sees the value taken above, unless it changed since.
+        if (first_run && identical(current, next_value)) {
+          first_run <<- FALSE
+          return()
+        }
+        first_run <<- FALSE
+        now <- now_ms()
+        quiet <- now - last_change >= millis
+        ## A return to the value on show is a change too: it extends the burst.
+        last_change <<- now
+        if (quiet) publish(next_value)
+      })
       delayed <- shiny::debounce(reactive, millis)
-      shiny::observeEvent(
-        delayed(),
-        {
-          next_value <- delayed()
-          if (!identical(current, next_value)) {
-            current <<- next_value
-            revision(shiny::isolate(revision()) + 1L)
-          }
-        },
-        ignoreInit = TRUE
-      )
+      shiny::observeEvent(delayed(), publish(delayed()), ignoreInit = TRUE)
     }
     current
   })

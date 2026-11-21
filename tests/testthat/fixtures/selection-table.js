@@ -60,4 +60,21 @@ table.filters = { nUMI: { min: 2, max: 6 } }; table.order = null;
 assert.deepEqual(Array.from(table.rows()), [0, 3]);
 table.filters = { cell_barcode: { text: 'b' } }; table.order = null;
 assert.deepEqual(Array.from(table.rows()), [2]);
+// The drawn table is usable from the keyboard: sortable headers are focusable and
+// say how they are sorted, and the buttons that open a menu say so.
+const open = element();
+const keyboard = T.mount(open, {
+  n: 4, open: true, columns: [
+    { name: 'cell_barcode', kind: 'text', value: i => cells[i] },
+    { name: 'nUMI', kind: 'numeric', value: i => umi[i] }
+  ]
+});
+assert.ok(/<th class="sorting" data-col="0" tabindex="0" aria-sort="none">/.test(open.innerHTML));
+keyboard.sort = { column: 1, name: 'nUMI', descending: true }; keyboard.render();
+assert.ok(/data-col="1" tabindex="0" aria-sort="descending"/.test(open.innerHTML));
+keyboard.sort = { column: 1, name: 'nUMI', descending: false }; keyboard.render();
+assert.ok(/data-col="1" tabindex="0" aria-sort="ascending"/.test(open.innerHTML));
+assert.ok(/cst-colvis" aria-haspopup="true" aria-expanded="false"/.test(open.innerHTML));
+assert.ok(/cst-download" aria-haspopup="true" aria-expanded="false"/.test(open.innerHTML));
+assert.ok(/data-col="1"[^>]*readonly aria-haspopup="true"/.test(open.innerHTML));
 console.log('PASS selection table formats, colours, sorts, filters and zips like the DT table');
