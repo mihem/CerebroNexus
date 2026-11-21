@@ -55,6 +55,11 @@
   the plot in the largest centred square of a canvas that keeps the panel's
   size, outlined by a light grey frame, instead of shrinking the canvas to a
   square on a grey mat.
+- **Point size, opacity and % of cells reach every panel.** On Linked views
+  each section kept the point size, opacity and share of cells of its Spatial
+  settings whatever the sliders said, so the sliders moved only the
+  embedding. A section's own settings now hold until the reader moves a
+  slider, as on the other pages, and then every panel follows it.
 - **Linked views fills the window.** Its panels have one size and their rows
   share the window's height, so the views end at the window's bottom edge
   instead of leaving it empty.

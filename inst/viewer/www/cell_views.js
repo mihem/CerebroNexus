@@ -143,6 +143,9 @@
   // state remains global, while viewport and 3-D rotation live on the panel.
   var selectedProjections = [];
   var pctShow = 100;            // % of cells to render
+  // The reader set "% of cells": every panel shows it, a section with an
+  // author's own percentage too (panelPctMask()).
+  var pctEdited = false;
   var sharedScatter = null;
   var scatterUserEdit = null;
   var scatterControlFields = {
@@ -185,6 +188,7 @@
     if ((!singleActive || singleClientPercentage()) &&
         pctShow !== values.percentage_cells_to_show) {
       pctShow = values.percentage_cells_to_show;
+      pctEdited = true;
       rebuildPctMask();
     }
   }
@@ -1005,7 +1009,7 @@
   // Overview page's group-filter + "show % of cells" behaviour.
   function panelPctMask(p) {
     var space = p && spaceById[p.spaceId];
-    if (singleActive || !isSpatialSpace(space)) return pctMask;
+    if (singleActive || pctEdited || !isSpatialSpace(space)) return pctMask;
     var percentage = Number(space.builder_percentage_cells);
     if (!isFinite(percentage) || percentage >= 100) return null;
     if (!space._pctMask || space._pctMask.length !== D.n) {
@@ -1761,14 +1765,14 @@
   // exactly where it matters most.
   function pointSizeOf(p) {
     var sp = spaceById[p.spaceId];
-    if ((!pointSizeEdited || !singleActive) && sp && sp.builder_point_size != null) {
+    if (!pointSizeEdited && sp && sp.builder_point_size != null) {
       return Math.max(1, Math.min(20, Number(sp.builder_point_size)));
     }
     return ps;
   }
   function pointOpacityOf(p) {
     var sp = spaceById[p.spaceId];
-    if ((!pointOpacityEdited || !singleActive) && sp && sp.builder_point_opacity != null) {
+    if (!pointOpacityEdited && sp && sp.builder_point_opacity != null) {
       return Math.max(0, Math.min(1, Number(sp.builder_point_opacity)));
     }
     return pointOpacity;
@@ -11064,6 +11068,7 @@
       pointCount: isFinite(pointCount) ? pointCount : 0,
       pointSize: ready ? (singleActive === id ? ps : view.data.point_size) : null,
       pointOpacity: ready ? (singleActive === id ? pointOpacity : view.data.point_opacity) : null,
+      panels: ready && singleActive === id ? panelAppearance() : [],
       xExtent: ready ? numericExtent(view.data.x) : null,
       yExtent: ready ? numericExtent(view.data.y) : null,
       backgroundIdentity: ready ? view.background_identity || null : null,
@@ -12087,6 +12092,7 @@
       pctShow = D.default_percentage_cells_to_show != null &&
         isFinite(configuredPercentage)
         ? Math.max(10, Math.min(100, configuredPercentage)) : 100;
+      pctEdited = false;
       rebuildPctMask();
       setLinkedSliderValue('cv-pct', pctShow, 10);
     }
@@ -12566,6 +12572,8 @@
     ps = finiteNumber(display.point_size, ps, 0, 20);
     pointOpacity = finiteNumber(display.point_opacity, pointOpacity, 0, 1);
     pctShow = finiteNumber(display.percentage_cells, pctShow, 5, 100);
+    pctEdited = isFinite(Number(display.percentage_cells)) &&
+      Number(display.percentage_cells) < 100;
     psSeeded = true;
     var overrides = workspacePointOverrides(config);
     pointSizeEdited = overrides.size;
@@ -12636,6 +12644,22 @@
     return { selected_cells: restoredSelection.size };
   }
 
+  // What each shown panel draws with: its point size and opacity and how many
+  // cells it shows, so a check can see that a setting reaches every panel.
+  function panelAppearance() {
+    if (!D) return [];
+    return panels.filter(function (p) {
+      return p.spaceId && p.pane && !p.pane.classList.contains('cv-hidden');
+    }).map(function (p) {
+      var space = spaceById[p.spaceId];
+      return {
+        panel: space ? (space._gridSection != null ? space._gridSection : space.label) : p.spaceId,
+        pointSize: pointSizeOf(p),
+        pointOpacity: pointOpacityOf(p),
+        shown: shownState(p).count
+      };
+    });
+  }
   function workspaceSummary() {
     var ownsWorkspace = !singleActive && D && D === linkedBundle && datasetMessageFresh(D);
     var primaryPanel = ownsWorkspace && panels.filter(function (panel) {
@@ -12663,6 +12687,7 @@
       selectedCells: sel ? sel.size : 0,
       selectedCellBarcodes: selectedCellIds(),
       colourMode: colorBy,
+      panels: ownsWorkspace ? panelAppearance() : [],
       projections: selectedProjections.slice(),
       spatialSections: selectedSpatial.slice(),
       activeSpatial: D && activeSpatial() ? activeSpatial()._sampleName || null : null,
@@ -13538,6 +13563,7 @@
         drawAll();
       } else if (id === 'cv-pct') {
         pctShow = value;
+        pctEdited = true;
         rebuildPctMask(); applyActiveChange();
       } else if (id === 'cv-dissolve') {
         dissolvePct = value;

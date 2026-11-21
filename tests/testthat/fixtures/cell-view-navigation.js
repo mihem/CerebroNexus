@@ -144,7 +144,7 @@ for (const via of ['direct', 'groups', 'loadData']) {
     panels:[{spaceId:'umap',canvas:{dataset:{pointCount:7}}}],
     datasetMessageFresh:x=>x.dataset_context==='current',configFingerprint:()=> 'fp',
     sel:null,selectedCellIds:()=>[],colorBy:'group',selectedProjections:['umap'],
-    selectedSpatial:[],activeSpatial:()=>null,transportMetrics:{}};
+    selectedSpatial:[],activeSpatial:()=>null,transportMetrics:{},panelAppearance:()=>[]};
   vm.createContext(c); vm.runInContext(fn('workspaceSummary'),c);
   assert(c.workspaceSummary().primaryReady); assert(!c.workspaceSummary().complete);
   c.D.progressive = false; assert(c.workspaceSummary().complete);
