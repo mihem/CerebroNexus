@@ -261,7 +261,7 @@ test_that("a Prime 5K build opens its H5 expression and keeps missing UMAP cells
   expect_true(dir.exists(pack))
 })
 
-test_that("the optional Prime 5K menu entry adds the dataset and a faint cell overlay", {
+test_that("the optional Prime 5K menu entry adds the dataset with readable cell dots", {
   env <- new.env(parent = baseenv())
   sys.source(viewer_test_path("million_cell_demo.R"), env)
   original <- list(
@@ -285,7 +285,11 @@ test_that("the optional Prime 5K menu entry adds the dataset and a faint cell ov
   appearance <- configured$viewer_content[[
     label
   ]]$spatial_point_appearance$coronal
-  expect_identical(appearance, list(point_size = 1, point_opacity = 0.1))
+  expect_identical(appearance, list(point_size = 2, point_opacity = 0.9))
+  ## 63,000 cells: dots that are neither the million-cell defaults nor opaque
+  ## blobs, so the clusters read clearly and the tissue shows between them.
+  expect_equal(unname(configured$point_size[label]), 2)
+  expect_equal(unname(configured$point_opacity[label]), 0.8)
   unlink(file.path(root, "prime.h5"))
   expect_error(
     env$viewerAddXeniumPrimeDemo(original, crb),

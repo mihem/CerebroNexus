@@ -136,7 +136,7 @@ native PNG and cells share a frame without hand-tuned offsets or scale. This is
 demo-specific preparation, not a general calibration/import change.
 
 Choose **Mouse brain (Xenium Prime 5K)** in the data set menu, then Spatial.
-Its background is selected automatically and the cell overlay starts faint.
+Its background is selected automatically. The cell dots are small (size 2) and nearly opaque (90%), so the clusters read clearly while the microscopy shows between them; both can be changed in the page's Settings.
 Cached prepared data can also be opened with the source app by setting
 `CEREBRO_XENIUM_PRIME_DEMO_CRB` to the `.crb` path; keep its H5 beside it.
 Python is not needed to reopen a current prepared cache.
