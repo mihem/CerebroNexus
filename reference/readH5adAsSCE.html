@@ -13,7 +13,7 @@ convertSCEToCerebro, or to any other tool that reads SCE."><meta property="og:im
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.5</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.6</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -103,7 +103,8 @@ with <span class="pkg">rhdf5</span>, without Python or <span class="pkg">zellkon
 <span>  spatial_images <span class="op">=</span> <span class="st">"auto"</span>,</span>
 <span>  extra_modalities <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  verbose <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  .root <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  .root <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  .stream_x <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -175,6 +176,11 @@ the cells of the expression modality (cells it lacks get zeros).</p></dd>
 <dt id="arg--root">.root<a class="anchor" aria-label="anchor" href="#arg--root"></a></dt>
 <dd><p>Internal: HDF5 group that holds the data set (used for the
 modalities inside a MuData file). Leave <code>NULL</code>.</p></dd>
+
+
+<dt id="arg--stream-x">.stream_x<a class="anchor" aria-label="anchor" href="#arg--stream-x"></a></dt>
+<dd><p>Internal: do not read an X with more than 2^31 - 1
+non-zero values, describe it for streaming (see <code><a href="convertH5adToCerebro.html">convertH5adToCerebro</a></code>).</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -261,22 +267,23 @@ not read.</p>
 <span class="r-in"><span>  assay <span class="op">=</span> <span class="st">"X"</span>,</span></span>
 <span class="r-in"><span>  groups <span class="op">=</span> <span class="st">"sample"</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:13] Calculating most expressed genes and mean expression for each group...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:13] Processing group: sample</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:13] Most expressed genes and mean expression calculation completed.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:13] Initializing Cerebro object...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:13] Adding expression data (embedded)...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:13] Collecting available meta data...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:13] Extracting all meta data columns...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:13] Extracting dimensional reductions...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:13] Will export the following dimensional reductions: UMAP</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:13] Extracting tables of most expressed genes...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:13] Extracting tables of mean expression...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:13] Extracting marker genes table...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:13] No trajectories to extract...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:13] Overview of Cerebro object:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:38] Calculating most expressed genes and mean expression for each group...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:38] Processing group: sample</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:38] Most expressed genes and mean expression calculation completed.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:38] expression_matrix_mode = "auto": 1,000 cells, so "embedded".</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:38] Initializing Cerebro object...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:38] Adding expression data (embedded)...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:38] Collecting available meta data...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:38] Extracting all meta data columns...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:38] Extracting dimensional reductions...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:38] Will export the following dimensional reductions: UMAP</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:38] Extracting tables of most expressed genes...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:38] Extracting tables of mean expression...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:38] Extracting marker genes table...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:38] No trajectories to extract...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:38] Overview of Cerebro object:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> class: Cerebro</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> exporter package version: 8.4.5</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> exporter package version: 8.4.6</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> experiment name: SingleCellExperiment</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> organism: Human</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> date of analysis: </span>
@@ -296,8 +303,8 @@ not read.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Immune repertoire:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> HLA typing: none</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Spatial data:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:13] Saving Cerebro object to: /tmp/nix-shell-4250-376363681/Rtmp9qtN2e/output/cerebro_SingleCellExperiment.crb</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:13] Done!</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:38] Saving Cerebro object to: /tmp/nix-shell-4240-1014109666/RtmpwTIKCH/output/cerebro_SingleCellExperiment.crb</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:38] Done!</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Successfully exported: cerebro_SingleCellExperiment.crb</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>

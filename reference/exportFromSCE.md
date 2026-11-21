@@ -18,7 +18,7 @@ exportFromSCE(
   nGene = "nGene",
   add_all_meta_data = TRUE,
   use_delayed_array = FALSE,
-  expression_matrix_mode = c("embedded", "h5"),
+  expression_matrix_mode = c("auto", "embedded", "h5"),
   codec = c("qs2", "rds"),
   viewer_binary = c("auto", "always", "never"),
   viewer_binary_threshold = 100000L,
@@ -99,7 +99,8 @@ exportFromSCE(
 
 - expression_matrix_mode:
 
-  How to persist the expression matrix. One of `"embedded"` (default) or
+  How to persist the expression matrix. One of `"auto"` (default: `"h5"`
+  for more than 200,000 cells, `"embedded"` otherwise), `"embedded"` or
   `"h5"`; identical to
   [`exportFromSeurat`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md).
   The `"h5"` backend writes a sibling `<stem>.h5` file next to the
@@ -191,16 +192,17 @@ exportFromSCE(
   use_delayed_array = FALSE,
   verbose = TRUE
 )
-#> [14:28:01] Initializing Cerebro object...
-#> [14:28:01] Adding expression data (embedded)...
-#> [14:28:01] Collecting available meta data...
-#> [14:28:01] Extracting all meta data columns...
-#> [14:28:01] Extracting dimensional reductions...
-#> [14:28:01] Will export the following dimensional reductions: UMAP
-#> [14:28:01] No trajectories to extract...
-#> [14:28:01] Overview of Cerebro object:
+#> [15:46:24] expression_matrix_mode = "auto": 80 cells, so "embedded".
+#> [15:46:24] Initializing Cerebro object...
+#> [15:46:24] Adding expression data (embedded)...
+#> [15:46:24] Collecting available meta data...
+#> [15:46:24] Extracting all meta data columns...
+#> [15:46:24] Extracting dimensional reductions...
+#> [15:46:24] Will export the following dimensional reductions: UMAP
+#> [15:46:24] No trajectories to extract...
+#> [15:46:24] Overview of Cerebro object:
 #> class: Cerebro
-#> exporter package version: 8.4.5
+#> exporter package version: 8.4.6
 #> experiment name: PBMC
 #> organism: hg
 #> date of analysis: 
@@ -219,7 +221,7 @@ exportFromSCE(
 #> Immune repertoire:
 #> HLA typing: none
 #> Spatial data:
-#> [14:28:01] Saving Cerebro object to: /tmp/nix-shell-4250-376363681/Rtmp9qtN2e/pbmc_SCE.crb
-#> [14:28:01] Done!
+#> [15:46:24] Saving Cerebro object to: /tmp/nix-shell-4240-1014109666/RtmpwTIKCH/pbmc_SCE.crb
+#> [15:46:24] Done!
 # }
 ```

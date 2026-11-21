@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.5</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.6</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -98,8 +98,8 @@
 <span>  nGene <span class="op">=</span> <span class="st">"nGene"</span>,</span>
 <span>  add_all_meta_data <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  use_delayed_array <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  expression_matrix_mode <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"embedded"</span>, <span class="st">"h5"</span><span class="op">)</span>,</span>
-<span>  h5_compression_level <span class="op">=</span> <span class="fl">0L</span>,</span>
+<span>  expression_matrix_mode <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"auto"</span>, <span class="st">"embedded"</span>, <span class="st">"h5"</span><span class="op">)</span>,</span>
+<span>  h5_compression_level <span class="op">=</span> <span class="fl">1L</span>,</span>
 <span>  codec <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"qs2"</span>, <span class="st">"rds"</span><span class="op">)</span>,</span>
 <span>  viewer_binary <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"auto"</span>, <span class="st">"always"</span>, <span class="st">"never"</span><span class="op">)</span>,</span>
 <span>  viewer_binary_threshold <span class="op">=</span> <span class="fl">100000L</span>,</span>
@@ -197,7 +197,13 @@ such as <code>dgCMatrix</code> from the <code>Matrix</code> package. Ignored whe
 
 <dt id="arg-expression-matrix-mode">expression_matrix_mode<a class="anchor" aria-label="anchor" href="#arg-expression-matrix-mode"></a></dt>
 <dd><p>How to persist the expression matrix. One of
-<code>"embedded"</code> (default) or <code>"h5"</code>.</p><ul><li><p><code>"embedded"</code> stores the matrix inside the <code>.crb</code> file.</p></li>
+<code>"auto"</code> (default), <code>"embedded"</code> or <code>"h5"</code>.</p><ul><li><p><code>"auto"</code> is <code>"h5"</code> for more than 200,000 cells and
+  <code>"embedded"</code> otherwise (the option <code>cerebro.h5_cell_threshold</code>
+  sets the number). A large matrix inside the <code>.crb</code> is read whole into
+  memory at every start of the Viewer; from the H5 file it reads only the
+  genes it shows. The <code>"h5"</code> mode needs <code>file</code> to end in
+  <code>.crb</code> and the <span class="pkg">HDF5Array</span> package.</p></li>
+<li><p><code>"embedded"</code> stores the matrix inside the <code>.crb</code> file.</p></li>
 <li><p><code>"h5"</code> writes the matrix, laid out as
   <code><a href="https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html" class="external-link">HDF5Array::writeTENxMatrix()</a></code> writes it,
   to a TENx-format sparse HDF5 file next to the <code>.crb</code> (sibling
@@ -212,8 +218,8 @@ such as <code>dgCMatrix</code> from the <code>Matrix</code> package. Ignored whe
   RAM stays close to the <code>.crb</code> metadata size. The <code>.crb</code> is thin:
   the cell names are kept once, in the H5 file, and the <code>.crb</code> records
   their order and a checksum. The gzip level is set by
-  <code>h5_compression_level</code>; the default (no compression) is several
-  times larger than a compressed file but builds and reads faster.
+  <code>h5_compression_level</code>; the default (1) gives a file several times
+  smaller than level 0 (no compression), which builds and reads faster.
   Requires the <span class="pkg">HDF5Array</span> package.</p></li>
 </ul><p>The CRB and any sidecar are built and validated in a private sibling stage.
 On POSIX systems, new stages and external matrices are owner-only; replacing
@@ -232,11 +238,14 @@ responsibility on every platform.</p></dd>
 <dt id="arg-h-compression-level">h5_compression_level<a class="anchor" aria-label="anchor" href="#arg-h-compression-level"></a></dt>
 <dd><p>Gzip compression level, from 0 to 9, of the
 H5 file written when <code>expression_matrix_mode = "h5"</code>; ignored by the
-other modes. The default 0 writes the data without compression: the file
-is about 7 times larger than at HDF5Array's default level 6 (about 69 GiB
-instead of 10 GiB for 1.5 million human prefrontal cortex cells), but it
-builds about three times faster and single-gene reads are about a third
-faster. Set 6 when disk space matters more than speed.</p></dd>
+other modes. The default 1 gives a file within 3 <!-- % of the size at level 6 -->
+(3.95 and 4.06 GiB for 500,000 mouse brain cells) and writes it about 40 <!-- % -->
+faster (222 s instead of 361 s); the file is about 3 times smaller than one
+written without compression (level 0: 11.4 GiB), which is also what the
+Viewer's checksum of the file, copying it and keeping it in the operating
+system's file cache cost. Level 0 writes the data without compression: it
+builds faster and reads a single gene about a third faster, for a larger
+file. Before 8.4.6 the default was 0.</p></dd>
 
 
 <dt id="arg-codec">codec<a class="anchor" aria-label="anchor" href="#arg-codec"></a></dt>
@@ -367,18 +376,19 @@ genotype is never mistaken for a directly typed one.</p>
 <span class="r-in"><span>  use_delayed_array <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
 <span class="r-in"><span>  verbose <span class="op">=</span> <span class="cn">TRUE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:01] Initializing Cerebro object...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:01] Adding expression data (embedded)...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:01] Collecting available meta data...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:01] Extracting all meta data columns...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:01] Extracting dimensional reductions...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:01] Will export the following dimensional reductions: umap</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:01] Extracting marker genes table...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:01] No trajectories to extract...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:01] Checking for spatial data...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:01] Overview of Cerebro object:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:24] expression_matrix_mode = "auto": 80 cells, so "embedded".</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:24] Initializing Cerebro object...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:24] Adding expression data (embedded)...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:24] Collecting available meta data...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:24] Extracting all meta data columns...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:24] Extracting dimensional reductions...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:24] Will export the following dimensional reductions: umap</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:24] Extracting marker genes table...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:24] No trajectories to extract...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:24] Checking for spatial data...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:24] Overview of Cerebro object:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> class: Cerebro</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> exporter package version: 8.4.5</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> exporter package version: 8.4.6</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> experiment name: PBMC</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> organism: hg</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> date of analysis: </span>
@@ -398,8 +408,8 @@ genotype is never mistaken for a directly typed one.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Immune repertoire:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> HLA typing: none</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Spatial data:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:01] Saving Cerebro object to: /tmp/nix-shell-4250-376363681/Rtmp9qtN2e/pbmc_Seurat.crb</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:28:01] Done!</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:24] Saving Cerebro object to: /tmp/nix-shell-4240-1014109666/RtmpwTIKCH/pbmc_Seurat.crb</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:46:24] Done!</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

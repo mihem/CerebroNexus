@@ -32,13 +32,14 @@ This study compares four ways to store the expression matrix: H5 with
 gzip level 6 (HDF5Array’s default, used by the exporter before 5.1.3),
 the same H5 file at gzip level 0, i.e. written without compression (the
 [`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
-default from 5.1.3; `h5_compression_level` changes it), BPCells, and
-embedded storage. In the tables and figures, `h5_uncompressed` is the
-gzip level 0 file. Two public datasets were used: the 10x mouse brain
-E18 matrix (1,306,127 cells, 27,998 genes, 2.6 billion nonzeros) and the
-PsychAD human prefrontal cortex HBCC matrix (1,486,324 cells, 34,176
-genes, 6.1 billion nonzeros). Each source was measured at 1k, 10k, 50k,
-100k, 300k and 500k cells and at its full size.
+default from 5.1.3 to 8.4.0; `h5_compression_level` changes it, and
+since 8.4.6 the default is gzip level 1), BPCells, and embedded storage.
+In the tables and figures, `h5_uncompressed` is the gzip level 0 file.
+Two public datasets were used: the 10x mouse brain E18 matrix (1,306,127
+cells, 27,998 genes, 2.6 billion nonzeros) and the PsychAD human
+prefrontal cortex HBCC matrix (1,486,324 cells, 34,176 genes, 6.1
+billion nonzeros). Each source was measured at 1k, 10k, 50k, 100k, 300k
+and 500k cells and at its full size.
 
 Every source, size and backend combination was built five times, and
 every build was opened in two fresh R processes, one thread each. All
@@ -293,7 +294,7 @@ disk before starting it. Do not use an arbitrary memory limit or a
 historical completion time as a guarantee.
 
 ``` r
-source("data-raw/large-demo/h5_transposed_write.R")
+source("data-raw/large-demo/download_helpers.R")
 source("data-raw/large-demo/prepare_viewer_1m_data.R")
 pkgload::load_all(".")
 crb <- prepareViewer1mBenchmarkData()
