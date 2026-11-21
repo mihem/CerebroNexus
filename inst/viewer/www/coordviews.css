@@ -353,8 +353,8 @@
 .coordviews-page .cv-panes:not(.cv-has-focus) > .cv-pane { align-self: stretch; }
 .coordviews-page .cv-panes.cv-focus-transitioning .cv-pane {
   will-change: transform, opacity;
-  transition: transform .2s cubic-bezier(.22, .61, .36, 1),
-    opacity .16s ease, border-color .16s ease, box-shadow .16s ease;
+  transition: transform .32s cubic-bezier(.2, .8, .2, 1),
+    opacity .24s ease, border-color .2s ease, box-shadow .2s ease;
 }
 .coordviews-page .cv-panes.cv-focus-transitioning canvas { transition: none; }
 /* An enlarged view in its grid (focusGridPacking()): tracks set by JS. */
@@ -397,6 +397,25 @@
 }
 .coordviews-page .cv-strip-arrow:disabled { opacity: .35; cursor: default; }
 .coordviews-page .cv-strip-arrow[hidden] { display: none; }
+/* A turned page of thumbnails slides in from the side it comes from. */
+@keyframes cv-strip-in-next {
+  from { opacity: 0; transform: translateX(64px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes cv-strip-in-prev {
+  from { opacity: 0; transform: translateX(-64px); }
+  to { opacity: 1; transform: none; }
+}
+.coordviews-page .cv-pane.cv-strip-in-next {
+  animation: cv-strip-in-next .3s cubic-bezier(.2, .8, .2, 1) both;
+}
+.coordviews-page .cv-pane.cv-strip-in-prev {
+  animation: cv-strip-in-prev .3s cubic-bezier(.2, .8, .2, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .coordviews-page .cv-pane.cv-strip-in-next,
+  .coordviews-page .cv-pane.cv-strip-in-prev { animation: none; }
+}
 /* A narrow linked panel keeps its title; its "Context" badge gives way. */
 .coordviews-page .cv-pane.cv-narrow.cv-focus-context .cv-role-badge { display: none; }
 .coordviews-page .cv-pane.cv-focus-primary {

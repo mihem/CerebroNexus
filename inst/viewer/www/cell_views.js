@@ -3221,11 +3221,15 @@
       if (!p.pane || !p.spaceId || !before[p.key]) return;
       var from = before[p.key], to = p.pane.getBoundingClientRect();
       if (!(to.width > 0 && to.height > 0)) return;
-      var dx = from.left - to.left, dy = from.top - to.top;
-      var sx = from.width / to.width, sy = from.height / to.height;
+      // One scale for both axes: a pane changing shape is not stretched while
+      // it moves (its text and plot keep their proportions), it grows from the
+      // centre of where it was.
+      var scale = Math.min(from.width / to.width, from.height / to.height);
+      var dx = from.left + from.width / 2 - (to.left + to.width * scale / 2);
+      var dy = from.top + from.height / 2 - (to.top + to.height * scale / 2);
       p.pane.style.transition = 'none';
       p.pane.style.transformOrigin = 'top left';
-      p.pane.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(' + sx + ',' + sy + ')';
+      p.pane.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(' + scale + ')';
       p.pane.style.opacity = focusPanel && p.key !== focusPanel ? '.88' : '.96';
     });
     if (host) void host.offsetWidth; // commit the inverse transforms before release
@@ -3245,8 +3249,10 @@
         if (!p.pane) return;
         p.pane.style.transformOrigin = '';
       });
-      resizeAll();
-    }, 460);
+      // The panes reached their size before the motion: resize only a pane
+      // whose header wrapped meanwhile, rather than drawing every plot again.
+      resizeAll(true);
+    }, 380);
   }
   // The per-panel "zoom to selection" is only an action while there IS one, and
   // only on a panel that lays cells out in a plane -- a rotated cloud has no
@@ -8109,9 +8115,7 @@
       button.setAttribute('aria-label', direction === 'prev' ? 'Previous views' : 'Next views');
       button.innerHTML = direction === 'prev' ? '&#8249;' : '&#8250;';
       button.addEventListener('click', function () {
-        focusStripPage += direction === 'prev' ? -1 : 1;
-        _layoutKey = null;
-        resizeAll();
+        turnFocusStrip(direction === 'prev' ? -1 : 1);
       });
       panes.appendChild(button);
       return button;
@@ -8119,8 +8123,55 @@
     focusStripArrows = { prev: make('prev'), next: make('next') };
     return focusStripArrows;
   }
+  // Turns the strip a page: the panels keep their size, so only the shown
+  // thumbnails change; they slide in from the side they come from.
+  var lastFocusGrid = null;
+  function turnFocusStrip(step) {
+    var last = lastFocusGrid;
+    if (!last || !last.pack || !last.pack.paged) return;
+    var page = Math.max(0, Math.min(last.pack.pages - 1, focusStripPage + step));
+    if (page === focusStripPage) return;
+    var before = last.vis.filter(function (p) {
+      return p.pane && !p.pane.classList.contains('cv-strip-off');
+    });
+    focusStripPage = page;
+    applyFocusGrid(last.panes, last.vis, last.primaryKey, last.pack,
+      last.chromeX, last.chromeY, last.gap);
+    var slot = 0;
+    last.vis.forEach(function (p) {
+      if (!p.pane || p.key === last.primaryKey || p.pane.classList.contains('cv-strip-off') ||
+          before.indexOf(p) >= 0) return;
+      var pane = p.pane;
+      pane.classList.remove('cv-strip-in-next', 'cv-strip-in-prev');
+      void pane.offsetWidth;
+      pane.style.animationDelay = (slot++ * 30) + 'ms';
+      pane.classList.add(step > 0 ? 'cv-strip-in-next' : 'cv-strip-in-prev');
+      pane.addEventListener('animationend', function done() {
+        pane.removeEventListener('animationend', done);
+        pane.classList.remove('cv-strip-in-next', 'cv-strip-in-prev');
+        pane.style.animationDelay = '';
+      });
+      // A thumbnail hidden while its plot was last drawn shows it now.
+      if (p._resizedUndrawn) drawPanel(p);
+    });
+    anchorComposition(singleActive);
+  }
+  // Left and right keys turn the strip of an enlarged view.
+  if (typeof document !== 'undefined' && document.addEventListener) {
+    document.addEventListener('keydown', function (event) {
+      if (!focusPanel || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
+      var target = event.target;
+      if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+      if (!lastFocusGrid || !lastFocusGrid.pack || !lastFocusGrid.pack.paged ||
+          !lastFocusGrid.panes.getClientRects().length) return;
+      event.preventDefault();
+      turnFocusStrip(event.key === 'ArrowLeft' ? -1 : 1);
+    });
+  }
   // The panes' grid for an enlarged panel, or the ordinary flow without one.
   function applyFocusGrid(panes, vis, primaryKey, pack, chromeX, chromeY, gap) {
+    lastFocusGrid = { panes: panes, vis: vis, primaryKey: primaryKey, pack: pack,
+      chromeX: chromeX, chromeY: chromeY, gap: gap };
     var arrows = pack && pack.paged ? focusStripArrowsOf(panes)
       : (focusStripArrows && focusStripArrows.prev.parentElement === panes ? focusStripArrows : null);
     if (arrows) {

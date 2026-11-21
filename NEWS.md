@@ -73,8 +73,12 @@
   across the width on top and the others as one strip of thumbnails below it,
   instead of wrapping them into rows with empty space around. When the
   thumbnails do not fit the width, arrows at the ends of the strip page
-  through them, so many sections never shrink the enlarged panel; a
-  thumbnail's title enlarges it. Spatial's *Sync zoom* is a
+  through them (or the left and right keys), sliding the next page in, so
+  many sections never shrink the enlarged panel; a thumbnail's title enlarges
+  it. Enlarge and Restore move each panel at its own proportions instead of
+  stretching it, and draw the plots once instead of twice: with a million
+  cells in 13 panels, 70 to 74 frames a second instead of 42 to 60, with no
+  pause longer than 67 ms instead of up to 384 ms. Spatial's *Sync zoom* is a
   switch, as Linked views' Cross-view highlight, with a short help on hover.
 - **Linked views fills the window.** Its panels have one size and their rows
   share the window's height, so the views end at the window's bottom edge
