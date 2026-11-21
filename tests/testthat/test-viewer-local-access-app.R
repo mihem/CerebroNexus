@@ -176,6 +176,24 @@ test_that("a bare Run App URL explains how to open the authorized Viewer", {
     returnByValue = TRUE
   )$result$value
   expect_true(matches_timeout)
+  error_accent <- browser$Runtime$evaluate(
+    paste0(
+      "(() => { const access = document.getElementById('cerebro-access-denied'); ",
+      "const style = getComputedStyle(access); ",
+      "const heading = getComputedStyle(access.querySelector('h2')); ",
+      "const theme = getComputedStyle(document.documentElement); ",
+      "return {border:style.borderTopColor, width:style.borderTopWidth, heading:heading.color, ",
+      "error:theme.getPropertyValue('--c-error').trim(), ",
+      "darkError:theme.getPropertyValue('--c-error-700').trim()}; })()"
+    ),
+    returnByValue = TRUE
+  )$result$value
+  css_rgb <- function(color) {
+    paste0("rgb(", paste(grDevices::col2rgb(color)[, 1], collapse = ", "), ")")
+  }
+  expect_identical(error_accent$border, css_rgb(error_accent$error))
+  expect_identical(error_accent$width, "3px")
+  expect_identical(error_accent$heading, css_rgb(error_accent$darkError))
   browser$Input$dispatchKeyEvent(
     type = "keyDown",
     key = "Escape",

@@ -1923,6 +1923,8 @@ body .modal-footer { border-top: 1px solid var(--c-border); padding: 15px 24px; 
   font-variant-numeric: tabular-nums;
 }
 #session-timeout-continue { margin-top: 18px; }
+#cerebro-access-denied { border-top: 3px solid var(--c-error); }
+#cerebro-access-denied h2 { color: var(--c-error-700); }
 /* The native session dialog owns the blocked state and its backdrop. */
 .cerebro-access-is-denied #shiny-disconnected-overlay { display: none; }
 
