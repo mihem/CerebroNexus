@@ -58,6 +58,52 @@ test_that("the fast checksum hashes explicit raw bytes, never an R object", {
   )
 })
 
+test_that("UTF-8 cell-name bytes survive an R process started with LC_ALL=C", {
+  skip_on_os("windows")
+  skip_if_not_installed("callr")
+  cells <- list(
+    character(),
+    c("", "ASCII", "a\nb"),
+    c("caf\u00e9-1", "\u7ec6\u80de"),
+    c(iconv("caf\u00e9", from = "UTF-8", to = "latin1"), "\u03b2:1"),
+    rep(c("caf\u00e9-1", "\u7ec6\u80de", "ASCII"), length.out = 65537L)
+  )
+  ## Independent byte reference: charToRaw never translates to native text.
+  expected <- vapply(
+    cells,
+    function(names) {
+      path <- tempfile()
+      on.exit(unlink(path))
+      bytes <- as.raw(unlist(lapply(enc2utf8(names), function(name) {
+        c(charToRaw(name), as.raw(0))
+      })))
+      writeBin(bytes, path)
+      paste0("xxh3-128-cell-order-v1:", unname(rlang::hash_file(path)))
+    },
+    character(1)
+  )
+  hash <- .crbContract()$.runtimeCellNamesHash
+  environment(hash) <- baseenv()
+  result <- callr::r(
+    function(hash, cells) {
+      before <- Sys.getlocale("LC_CTYPE")
+      list(
+        before = before,
+        accelerated = vapply(cells, hash, character(1)),
+        fallback = vapply(cells, hash, character(1), .use_digest = FALSE),
+        after = Sys.getlocale("LC_CTYPE")
+      )
+    },
+    args = list(hash = hash, cells = cells),
+    env = c(callr::rcmd_safe_env(), LC_ALL = "C", LANG = "C")
+  )
+  expect_identical(result$before, "C")
+  expect_identical(result$after, result$before)
+  expect_identical(result$accelerated, expected)
+  expect_identical(result$fallback, expected)
+  expect_identical(vapply(cells, hash, character(1)), expected)
+})
+
 test_that("the existing-dependency fallback gives exactly the same checksum", {
   hash <- .crbContract()$.runtimeCellNamesHash
   for (cells in list(
@@ -428,5 +474,102 @@ test_that("an expression sidecar refusal does not disconnect the session", {
       session$setInputs(other_dataset = 1L)
       expect_identical(value(), "usable")
     }
+  )
+})
+
+test_that("all Viewer sidecar accessors refuse mismatches without closing Shiny", {
+  skip_if_not_installed("HDF5Array")
+  skip_if_not_installed("rhdf5")
+  fixture <- viewer_h5_fixture(withr::local_tempdir())
+  runtime <- viewer_runtime_env()
+  ## Exercise synchronous validation deterministically, not a daemon race.
+  runtime$crb_h5_cell_check_start <- function(...) invisible(NULL)
+  runtime$crb_h5_cells_verified <- function(...) FALSE
+  object <- runtime$read_cerebro_file(fixture$crb)
+  object$crb_schema$cell_names_hash <- .cerebroCellNamesHash(rev(fixture$cells))
+  object <- runtime$.attachExternalExpression(object, fixture$crb)
+  runtime$data_set <- function() object
+  viewer_server_load(
+    viewer_server_statements("coordinated_views", "server.R"),
+    runtime,
+    names = "cv_gene_values"
+  )
+  runtime$expressionProjectionDatasetKey <- function() NULL
+  runtime$expressionProjectionRowCacheGet <- function(...) NULL
+  viewer_server_load(
+    viewer_server_statements(
+      "gene_expression",
+      "obj_projection_expression_levels.R"
+    ),
+    runtime,
+    names = "expressionProjectionGeneMeans"
+  )
+  readers <- list(
+    h5_row = function() attr(object, "cerebro_h5_rows")$row("g1"),
+    h5_sparse = function() {
+      attr(object, "cerebro_h5_rows")$each_sparse("g1", function(...) NULL)
+    },
+    viewer_row = function() runtime$viewerExpressionRow(object, 1:2, "g1"),
+    viewer_rgb = function() {
+      runtime$viewerExpressionValues(object, 1:2, c("g1", "g2"))
+    },
+    viewer_mean = function() {
+      runtime$viewerH5ExpressionMean(object, NULL, c("g1", "g2"))
+    },
+    matrix = function() object$getExpressionMatrix(genes = "g1"),
+    row = function() object$getExpressionRow("g1"),
+    block = function() object$getExpressionBlock(genes = "g1"),
+    gene_means = function() object$getMeanExpressionForGenes(c("g1", "g2")),
+    cell_means = function() {
+      object$getMeanExpressionForCells(genes = c("g1", "g2"))
+    },
+    gene_summary = function() {
+      runtime$expressionProjectionGeneMeans(object, c("g1", "g2"))
+    },
+    linked_rows = function() runtime$cv_gene_values("g1"),
+    linked_matrix = function() {
+      runtime$cv_gene_values("g1", cells = fixture$cells)
+    },
+    metadata = function() object$meta_data,
+    projections = function() object$projections
+  )
+  notifications <- character()
+  testthat::local_mocked_bindings(
+    showNotification = function(ui, ...) {
+      notifications <<- c(notifications, as.character(ui))
+      "expression-sidecar-mismatch"
+    },
+    .package = "shiny"
+  )
+  shiny::testServer(
+    function(input, output, session) {
+      value <- shiny::reactiveVal(NULL)
+      completed <- shiny::reactiveVal(FALSE)
+      shiny::observeEvent(input$read, {
+        result <- readers[[input$read]]()
+        value(result)
+        completed(TRUE)
+      })
+      shiny::observeEvent(input$other_dataset, value("usable"))
+    },
+    {
+      session$flushReact()
+      for (reader in names(readers)) {
+        previous_notifications <- length(notifications)
+        expect_no_error(suppressWarnings(session$setInputs(read = reader)))
+        expect_false(session$isClosed(), info = reader)
+        expect_null(value(), info = reader)
+        expect_false(completed(), info = reader)
+        expect_gt(length(notifications), previous_notifications)
+      }
+      expect_true(all(grepl("H5 cell names do not match CRB", notifications)))
+      session$setInputs(other_dataset = 1L)
+      expect_identical(value(), "usable")
+    }
+  )
+  ## The same runtime outside Shiny, and package reads, still fail hard.
+  expect_error(
+    suppressWarnings(readers$matrix()),
+    class = "cerebro_cell_names_mismatch"
   )
 })

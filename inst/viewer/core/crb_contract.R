@@ -6,8 +6,9 @@
 ## changed in rlang 1.3.0. Hash a specified byte stream instead: in canonical
 ## order, each UTF-8 name followed by one zero byte, including the last name.
 ## R strings cannot contain embedded NUL, so boundaries are unambiguous.
-## writeBin(character, raw()) writes exactly those C-style strings in native
-## code; unlike serialize(), it adds no object/R-version/encoding headers.
+## writeBin(useBytes = TRUE) writes exactly those C-style strings in native
+## code without translating to the session encoding, even in an ASCII locale.
+## Unlike serialize(), this adds no object/R-version/encoding headers.
 ## Unlike the cell-set fingerprint, this must NEVER sort the names. XXH3-128
 ## (seed 0) is selected explicitly, never digest's object-serialization default.
 ## digest is optional acceleration, not an additional Import. Without it the
@@ -24,7 +25,7 @@
       numeric_version(getNamespaceVersion("digest")) >= "0.6.39"
   ) {
     digest::digest(
-      writeBin(cells, raw()),
+      writeBin(cells, raw(), useBytes = TRUE),
       algo = "xxh3_128",
       serialize = FALSE,
       seed = 0L
@@ -33,7 +34,10 @@
     path <- tempfile("cerebro-cell-order-")
     on.exit(unlink(path), add = TRUE)
     connection <- file(path, "wb")
-    tryCatch(writeBin(cells, connection), finally = close(connection))
+    tryCatch(
+      writeBin(cells, connection, useBytes = TRUE),
+      finally = close(connection)
+    )
     unname(rlang::hash_file(path))
   }
   paste0("xxh3-128-cell-order-v1:", value)

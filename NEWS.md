@@ -6,6 +6,8 @@
   UTF-8 names, separated by zero bytes. The optional `digest` accelerator
   encodes and hashes raw bytes in native code without R-object serialization,
   decimal prefix allocation or temporary files.
+  Byte writes explicitly disable native-encoding translation, so non-ASCII
+  names produce the same checksum in UTF-8 and C/ASCII locales.
   `digest` remains optional in Suggests; without a supported version, the
   existing file hasher checks a temporary file of the same bytes with the
   same checksum. No new required Imports are added.
@@ -21,8 +23,9 @@
   CRBs are unaffected. New schema-5 exports require an updated reader.
 - Normal ordered-cell checks still run before expression access in a new app
   process and are cached for that process/file version; conversion does not
-  disable integrity checks. A gene-expression cell-name validation error is
-  shown without disconnecting the Shiny session.
+  disable integrity checks. Cell-name validation errors are caught at the
+  shared Viewer sidecar boundary, including gene summaries, Spatial, Linked
+  views and Trekker, without disconnecting Shiny or painting replacement values.
 
 # CerebroNexus 8.4.4
 

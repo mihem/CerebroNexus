@@ -4201,7 +4201,26 @@ get_or_load_crb <- function(
 }
 
 .checkThinCrbCells <- function(cells, schema, crb_path) {
-  .runtimeCheckCellNames(cells, schema, crb_path)
+  ## Every Viewer expression path (direct H5 rows, R6 matrix/mean accessors,
+  ## and deferred metadata hydration) passes here. Abort only this reactive,
+  ## not the session; package and non-reactive reads still raise the hard error.
+  tryCatch(
+    .runtimeCheckCellNames(cells, schema, crb_path),
+    cerebro_cell_names_mismatch = function(error) {
+      session <- shiny::getDefaultReactiveDomain()
+      if (is.null(session)) {
+        stop(error)
+      }
+      shiny::showNotification(
+        conditionMessage(error),
+        id = "expression-sidecar-mismatch",
+        type = "error",
+        duration = 15,
+        session = session
+      )
+      shiny::req(FALSE)
+    }
+  )
 }
 
 .validateThinCrbShape <- function(metadata, projections, schema) {
@@ -4684,7 +4703,9 @@ get_or_load_crb <- function(
       tryCatch(
         .thinCrbCellNames(cell_names_state, loc_abs, crb_schema, crb_path),
         error = function(error) {
-          message(glue::glue("[{Sys.time()}] {conditionMessage(error)}"))
+          if (!inherits(error, "shiny.silent.error")) {
+            message(glue::glue("[{Sys.time()}] {conditionMessage(error)}"))
+          }
           stop(error)
         }
       )

@@ -211,8 +211,11 @@ without a supported version, the existing `rlang::hash_file()` hashes a
 temporary file containing exactly the same bytes and produces the same value.
 That fallback never passes an R object to `rlang::hash()`. Unlike an R-object hash,
 this specifies both the bytes and the algorithm independently of `rlang`.
-Native encoding and in-memory hashing avoid per-cell text-prefix allocations
-and temporary files. One temporary raw buffer is proportional to the total
+Both checksum paths explicitly use `writeBin(..., useBytes = TRUE)` after
+UTF-8 normalization: non-ASCII names are never translated to the session's
+native encoding, including when R starts with `LC_ALL=C`.
+Native-code byte encoding and in-memory hashing on the accelerated path avoid
+per-cell text-prefix allocations and temporary files. One temporary raw buffer is proportional to the total
 UTF-8 name bytes plus one byte per cell. Schema 5 also
 supports the `cell_indexed` fields introduced by schema 4. Ordinary readers
 require schema 5: schema-3/4 files are rejected with a `convertCerebro()`
@@ -227,6 +230,10 @@ files explicitly.
 Conversion does not turn off validation: normal ordered-name checks still run
 before expression access in a new Viewer process and are cached for that
 process and file version. Historical-format retries happen only in conversion.
+In a Viewer session, a cell-name mismatch notifies the user and aborts the
+current reactive read at the shared sidecar boundary, so all expression pages
+remain connected and never substitute synthetic expression values. Outside
+Shiny, the runtime and package readers still raise a hard mismatch error.
 
 When the `.crb` is loaded, `readCerebro()` and the Viewer read the cell names
 back from the H5 file, verify them against the checksum and restore both fields.
