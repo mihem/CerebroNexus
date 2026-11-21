@@ -357,6 +357,14 @@
     opacity .16s ease, border-color .16s ease, box-shadow .16s ease;
 }
 .coordviews-page .cv-panes.cv-focus-transitioning canvas { transition: none; }
+/* An enlarged view in its grid (focusGridPacking()): tracks set by JS. */
+.coordviews-page .cv-panes.cv-focus-grid {
+  justify-content: center;
+  align-items: start;
+}
+.coordviews-page .cv-panes.cv-focus-grid > .cv-pane { align-self: stretch; }
+/* A narrow linked panel keeps its title; its "Context" badge gives way. */
+.coordviews-page .cv-pane.cv-narrow.cv-focus-context .cv-role-badge { display: none; }
 .coordviews-page .cv-pane.cv-focus-primary {
   border-color: var(--c-amber);
   box-shadow: 0 0 0 2px var(--c-amber-50), var(--shadow-2);

@@ -8071,6 +8071,73 @@
     for (var c = 1; c <= k; c++) if (widthOf(c) >= Math.max(260, floor)) scrollCols = c;
     return scrolling(scrollCols);
   }
+  // An enlarged panel and its n linked context panels, filling availW x availH:
+  // the enlarged one beside a grid of the others (c columns), or above them
+  // (rows taking at most 40 % of the height). Of the arrangements that draw
+  // the enlarged panel within 10 % of its largest, the one with the largest
+  // other panels wins, so they are not shrunk for a few pixels more; all stay
+  // readable (FOCUS_CONTEXT_MIN) and clearly smaller than the enlarged one.
+  // Null when none fits; the page then scrolls as before.
+  var FOCUS_CONTEXT_MIN = 160;
+  function focusGridPacking(n, availW, availH, chromeX, chromeY, gap, aspect) {
+    aspect = aspect > 0 && isFinite(aspect) ? aspect : 1;
+    var layouts = [];
+    var consider = function (layout) {
+      // The size the enlarged panel's content is drawn at: a wide section in
+      // a tall panel is drawn as wide as the panel, not as tall.
+      var drawnW = Math.min(layout.mainW, layout.mainH * aspect);
+      var drawnH = Math.min(layout.mainH, layout.mainW / aspect);
+      var mainSide = Math.sqrt(Math.max(0, drawnW) * Math.max(0, drawnH));
+      if (layout.side < FOCUS_CONTEXT_MIN || mainSide < layout.side * 1.3) return;
+      layout.score = mainSide;
+      layouts.push(layout);
+    };
+    for (var cols = 1; cols <= n; cols++) {
+      var rows = Math.ceil(n / cols);
+      // Beside: the others in a grid of squares on the right, full height.
+      var side = Math.floor((availH - (rows - 1) * gap) / rows) - chromeY;
+      var gridW = cols * (side + chromeX) + (cols - 1) * gap;
+      consider({ place: 'beside', cols: cols, rows: rows, side: side, ctxW: side,
+        mainW: Math.floor(availW - gridW - gap - chromeX),
+        mainH: rows * (side + chromeY) + (rows - 1) * gap - chromeY });
+      // Above: the others in rows below, full width (their panels as wide as
+      // their share of it, their plots as tall as the height allows).
+      var cellW = Math.floor((availW - (cols - 1) * gap) / cols);
+      var below = Math.min(cellW - chromeX,
+        Math.floor((availH * 0.4 - (rows - 1) * gap) / rows) - chromeY);
+      consider({ place: 'above', cols: cols, rows: rows, side: below, ctxW: cellW - chromeX,
+        mainW: Math.floor(availW - chromeX),
+        mainH: Math.floor(availH - rows * (below + chromeY) - rows * gap - chromeY) });
+    }
+    if (!layouts.length) return null;
+    var top = Math.max.apply(null, layouts.map(function (layout) { return layout.score; }));
+    return layouts.filter(function (layout) { return layout.score >= top * 0.9; })
+      .sort(function (a, b) { return b.side - a.side || b.score - a.score; })[0];
+  }
+  // The panes' grid for an enlarged panel, or the ordinary flow without one.
+  function applyFocusGrid(panes, vis, primaryKey, pack, chromeX, chromeY, gap) {
+    vis.forEach(function (p) {
+      if (!p.pane) return;
+      var primary = pack && p.key === primaryKey;
+      p.pane.style.gridColumn = primary ? (pack.place === 'beside' ? '1' : '1 / -1') : '';
+      p.pane.style.gridRow = primary ? (pack.place === 'beside' ? '1 / span ' + pack.rows : '1') : '';
+    });
+    if (!pack) {
+      panes.style.display = panes.style.gridTemplateColumns = panes.style.gridTemplateRows = '';
+      panes.classList.remove('cv-focus-grid');
+      return;
+    }
+    var cell = (pack.ctxW + chromeX) + 'px', row = (pack.side + chromeY) + 'px';
+    panes.classList.add('cv-focus-grid');
+    panes.style.display = 'grid';
+    if (pack.place === 'beside') {
+      panes.style.gridTemplateColumns = (pack.mainW + chromeX) + 'px repeat(' + pack.cols + ', ' + cell + ')';
+      panes.style.gridTemplateRows = 'repeat(' + pack.rows + ', ' + row + ')';
+    } else {
+      panes.style.gridTemplateColumns = 'repeat(' + pack.cols + ', ' + cell + ')';
+      panes.style.gridTemplateRows = (pack.mainH + chromeY) + 'px repeat(' + pack.rows + ', ' + row + ')';
+    }
+  }
   function sectionGridRowOf(pack, index) {
     var rows = pack && pack.rowSizes;
     if (!rows) return null;
@@ -8221,6 +8288,15 @@
         }
       }
     }
+    var focusAspect = 1;
+    if (focusPanel && !keepPlotsSquare) {
+      focusAspect = sectionGridActive() ? sectionGridAspect()
+        : (panelsAspect(vis.filter(function (p) { return p.key === focusPanel; }))[0] || 1);
+    }
+    var focusPack = focusPanel && k > 1 && availH > 0
+      ? focusGridPacking(k - 1, usableW, availH, chromeX, overhead, gap, focusAspect)
+      : null;
+    applyFocusGrid(panes, vis, focusPanel, focusPack, chromeX, overhead, gap);
     // Explicit tracks consume all available width. In the default fluid mode,
     // canvases also consume their row's share of available height. Square mode
     // constrains both dimensions to the shorter side.
@@ -8245,6 +8321,12 @@
       if (gridRow) {
         width = gridRow.width; height = gridRow.height;
         paneWidth = gridRow.width + chromeX;
+      }
+      // An enlarged view's grid sizes its panels (focusGridPacking()).
+      if (focusPack) {
+        width = primary ? focusPack.mainW : focusPack.ctxW;
+        height = primary ? focusPack.mainH : focusPack.side;
+        paneWidth = width + chromeX;
       }
       if (p.pane) {
         p.pane.style.flexBasis = paneWidth + 'px';

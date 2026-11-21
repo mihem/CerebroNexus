@@ -3789,7 +3789,8 @@ body .coordviews-page .cv-topbar .cerebro-rgb-select .selectize-input:not(.has-i
 }
 .cv-rgb-range { color: var(--c-text-3); font-variant-numeric: tabular-nums; }
 /* Spatial: the grid's fields after the plot's, before the actions. */
-body .cerebro-viz-toolbar .spatial-grid-controls > .form-group { order: 50; }
+body .cerebro-viz-toolbar .spatial-grid-controls > .form-group,
+body .cerebro-viz-toolbar .spatial-grid-controls > .cerebro-groups-switches { order: 50; }
 body .cerebro-viz-toolbar [data-display-if]:not(.shiny-conditional--shown) {
   display: none !important;
 }

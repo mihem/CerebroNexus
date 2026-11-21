@@ -274,10 +274,20 @@ output[["spatial_projection_scene_UI"]] <- renderUI({
           selected = isolate(input[["spatial_projection_grid_projection"]]) %||%
             "__none__"
         ),
-        checkboxInput(
-          "spatial_projection_grid_sync_zoom",
-          label = "Sync zoom",
-          value = isTRUE(isolate(input[["spatial_projection_grid_sync_zoom"]]))
+        ## A switch, as Linked views' Cross-view highlight: zooming or panning
+        ## one section moves the others to the same part of their tissue.
+        div(
+          class = "cerebro-groups-switches",
+          title = "Zoom and pan every section together",
+          shinyWidgets::materialSwitch(
+            inputId = "spatial_projection_grid_sync_zoom",
+            label = "Sync zoom",
+            value = isTRUE(isolate(input[[
+              "spatial_projection_grid_sync_zoom"
+            ]])),
+            status = "primary",
+            inline = TRUE
+          )
         )
       )
     )
