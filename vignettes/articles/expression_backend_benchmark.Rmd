@@ -240,6 +240,7 @@ script and available disk before starting it. Do not use an arbitrary memory
 limit or a historical completion time as a guarantee.
 
 ```{r prepare-mouse, eval=FALSE}
+source("data-raw/large-demo/download_helpers.R")
 source("data-raw/large-demo/prepare_viewer_1m_data.R")
 pkgload::load_all(".")
 crb <- prepareViewer1mBenchmarkData()

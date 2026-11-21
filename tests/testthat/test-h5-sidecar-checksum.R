@@ -306,6 +306,7 @@ test_that("the Viewer opens a data set before its H5 file is hashed", {
   expect_length(good$row(), 80L)
   expect_false(settle(good$object))
   expect_length(good$row(), 80L)
+  expect_length(suppressMessages(good$object$getExpressionRow(gene)), 80L)
 
   ## a file with other values: the data set opens, and its expression is
   ## refused from the first read after the checksum is in
@@ -315,6 +316,22 @@ test_that("the Viewer opens a data set before its H5 file is hashed", {
   expect_false(settle(other$object))
   expect_error(other$row(), "checksum does not match CRB 'pbmc.crb'")
   expect_error(other$row(), "checksum does not match CRB 'pbmc.crb'")
+
+  ## the attached matrix is not handed out before the check is in either: a
+  ## file that does not match is refused although the matrix is asked for
+  ## while the checksum is still being computed
+  out <- h5_checksum_export(h5_checksum_user_dir())
+  h5_checksum_rewrite(out$h5)
+  early <- read(out)
+  expect_true(early$pending)
+  expect_error(
+    suppressMessages(early$object$getExpressionMatrix(genes = gene)),
+    "checksum does not match CRB 'pbmc.crb'"
+  )
+  expect_error(
+    suppressMessages(early$object$getExpressionRow(gene)),
+    "checksum does not match CRB 'pbmc.crb'"
+  )
 })
 
 test_that("process-wide Viewer helpers call only process-wide Viewer helpers", {
