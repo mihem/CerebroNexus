@@ -206,8 +206,11 @@
     var tab = inputs ? inputs.ir_tabs : null;
     return !tab || tab === 'Clonal UMAP';
   }
+  var lastScatterEdit = 0, lastScatterEditContext = null;
   function publishScatterEdit(field, value) {
     if (!field || !currentDatasetContext()) return;
+    lastScatterEdit = Date.now();
+    lastScatterEditContext = currentDatasetContext();
     var known = sharedScatterValues();
     var values = Object.assign({}, known || {});
     values[field] = value;
@@ -1066,6 +1069,62 @@
   }
   function rebuildPctMask() {
     pctMask = (!D || pctShow >= 100) ? null : percentageMask(D.n, pctShow);
+  }
+  // A slider held with the mouse sends a value per step. Drawing each on a
+  // million cells stalls the drag, so while one is held a point size or
+  // opacity draws once per frame with the latest value, or, when a draw takes
+  // longer than a frame or three (no GPU), once the slider rests for a moment
+  // or is let go; "% of cells", which filters every panel's cells again,
+  // always waits for that. Keys and code still apply at once.
+  var sliderHeld = false, drawFrame = null, drawTimer = null, pctTimer = null;
+  var heldDrawCost = 0;
+  function timedDrawAll() {
+    var started = performance.now();
+    drawAll();
+    heldDrawCost = performance.now() - started;
+  }
+  function drawAllNow() {
+    if (drawTimer != null) { clearTimeout(drawTimer); drawTimer = null; }
+    timedDrawAll();
+  }
+  function drawAllSoon() {
+    if (!sliderHeld || typeof window.requestAnimationFrame !== 'function') {
+      drawAll();
+      return;
+    }
+    if (heldDrawCost > 50) {
+      if (drawTimer != null) clearTimeout(drawTimer);
+      drawTimer = setTimeout(drawAllNow, 250);
+      return;
+    }
+    if (drawFrame != null) return;
+    drawFrame = window.requestAnimationFrame(function () {
+      drawFrame = null;
+      timedDrawAll();
+    });
+  }
+  function applyPctNow() {
+    if (pctTimer != null) { clearTimeout(pctTimer); pctTimer = null; }
+    rebuildPctMask(); applyActiveChange();
+  }
+  function applyPctSoon() {
+    if (!sliderHeld) { applyPctNow(); return; }
+    if (pctTimer != null) clearTimeout(pctTimer);
+    pctTimer = setTimeout(applyPctNow, 250);
+  }
+  if (typeof document !== 'undefined' && document.addEventListener) {
+    document.addEventListener('pointerdown', function (event) {
+      if (event.target && event.target.closest && event.target.closest('.irs')) sliderHeld = true;
+    }, true);
+    ['pointerup', 'pointercancel'].forEach(function (name) {
+      document.addEventListener(name, function () {
+        if (!sliderHeld) return;
+        sliderHeld = false;
+        heldDrawCost = 0;
+        if (pctTimer != null) applyPctNow();
+        if (drawTimer != null) drawAllNow();
+      }, true);
+    });
   }
   // After a filter / subsample change: drop now-inactive cells from the current
   // selection, then redraw. Keeps the coordinated selection consistent.
@@ -12875,6 +12934,11 @@
     });
     Shiny.addCustomMessageHandler('cerebro_scatter_defaults', function (message) {
       if (!message || !sameDatasetContext(message.dataset_context, currentDatasetContext())) return;
+      // While a slider is dragged, the server echoes each step it was sent,
+      // late. Applying an echo set the dragged slider and the drawing back to
+      // an older step mid-drag; this page already holds the latest values.
+      if ((sliderHeld || Date.now() - lastScatterEdit < 1500) &&
+          sameDatasetContext(message.dataset_context, lastScatterEditContext)) return;
       sharedScatter = message;
       Object.keys(scatterControlFields).forEach(function (id) {
         setLinkedSliderValue(id, message.values[scatterControlFields[id]]);
@@ -12912,10 +12976,10 @@
       } else if (field === 'point_opacity') {
         pointOpacity = Math.max(0, Math.min(1, value)); pointOpacityEdited = true;
       } else if (field === 'percentage_cells_to_show' && singleClientPercentage()) {
-        pctShow = Math.max(10, Math.min(100, value)); rebuildPctMask(); applyActiveChange();
+        pctShow = Math.max(10, Math.min(100, value)); applyPctSoon();
         return;
       } else return;
-      drawAll();
+      drawAllSoon();
     });
     // Display toggles of the single views patch the drawn view at once; R's
     // cell_view_appearance patch then carries the values already drawn.
@@ -13556,15 +13620,15 @@
         psSeeded = true;
         pointSizeEdited = true;
         ps = value;
-        drawAll();
+        drawAllSoon();
       } else if (id === 'cv-opacity') {
         pointOpacityEdited = true;
         pointOpacity = value;
-        drawAll();
+        drawAllSoon();
       } else if (id === 'cv-pct') {
         pctShow = value;
         pctEdited = true;
-        rebuildPctMask(); applyActiveChange();
+        applyPctSoon();
       } else if (id === 'cv-dissolve') {
         dissolvePct = value;
         rebuildDissolve(); applyActiveChange();

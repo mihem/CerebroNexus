@@ -60,6 +60,13 @@
   settings whatever the sliders said, so the sliders moved only the
   embedding. A section's own settings now hold until the reader moves a
   slider, as on the other pages, and then every panel follows it.
+- **Dragging Point size, Point opacity or Show % of cells no longer stalls.**
+  The server's echo of each step set the dragged slider and the drawing back
+  to an older step mid-drag, and every step filtered all cells of every panel
+  again (0.6 s a step on Linked views with a million cells). While a slider
+  is held, echoes are left out, the plot redraws once per frame (or, when a
+  draw is slow, without the GPU, once the slider rests or is let go), and
+  "% of cells" is applied when the slider rests or is let go.
 - **Linked views fills the window.** Its panels have one size and their rows
   share the window's height, so the views end at the window's bottom edge
   instead of leaving it empty.
