@@ -37,6 +37,40 @@
     function install() {
       if (installed || !window.Shiny || !window.Shiny.addCustomMessageHandler) return;
       installed = true;
+      window.Shiny.addCustomMessageHandler("cerebro_access_denied", function (message) {
+        if (!message || typeof message.message !== "string") return;
+        var alert = document.getElementById("cerebro-access-denied");
+        if (!alert) {
+          alert = document.createElement("dialog");
+          alert.id = "cerebro-access-denied";
+          alert.className = "cerebro-session-dialog";
+          alert.setAttribute("role", "alertdialog");
+          alert.setAttribute("aria-modal", "true");
+          alert.setAttribute("aria-labelledby", "cerebro-access-denied-title");
+          alert.setAttribute("aria-describedby", "cerebro-access-denied-message");
+          alert.tabIndex = -1;
+          var title = document.createElement("h2");
+          title.id = "cerebro-access-denied-title";
+          var detail = document.createElement("p");
+          detail.id = "cerebro-access-denied-message";
+          alert.appendChild(title);
+          alert.appendChild(detail);
+          alert.addEventListener("cancel", function (event) { event.preventDefault(); });
+          document.body.appendChild(alert);
+        }
+        alert.querySelector("h2").textContent = message.title || "Access token required";
+        alert.querySelector("p").textContent = message.message;
+        document.documentElement.classList.add("cerebro-access-is-denied");
+        document.dispatchEvent(new CustomEvent("cerebro:overlay-opening", {
+          detail: { owner: "viewer-access" }
+        }));
+        window.dispatchEvent(new CustomEvent("cerebro:access-denied"));
+        document.documentElement.classList.remove("cerebro-starting");
+        var startup = document.getElementById("cerebro-startup");
+        if (startup) startup.remove();
+        if (!alert.open) alert.showModal();
+        alert.focus();
+      });
       // Keep ?page= and ?dataset= in the address bar (other query parameters
       // stay) without adding history entries. The query wins over a /name path
       // on reload, so switching data sets never rewrites the path, which may be

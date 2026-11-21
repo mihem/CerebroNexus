@@ -511,8 +511,9 @@ viewerDocumentRestore <- function(
   target
 }
 
-## Makes the running web server answer "/" with `directory`/index.html. Every
-## other path still reaches Shiny.
+## Makes the running web server answer "/" with `directory`/index.html.
+## This generic interface contains no session data; sessions are checked
+## separately before any Viewer server code runs.
 viewerDocumentServe <- function(server, directory) {
   server$setStaticPath(
     .list = list(
@@ -521,7 +522,10 @@ viewerDocumentServe <- function(server, directory) {
         indexhtml = TRUE,
         fallthrough = TRUE,
         ## The file is this process's; a browser asks for it every time.
-        headers = list("Cache-Control" = "no-cache")
+        headers = list(
+          "Cache-Control" = "no-cache",
+          "Referrer-Policy" = "no-referrer"
+        )
       )
     )
   )

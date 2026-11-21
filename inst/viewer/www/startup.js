@@ -5,11 +5,25 @@
     var cover = document.getElementById('cerebro-startup');
     if (!cover) return;
     var finished = false;
+    function cleanup() {
+      clearTimeout(slow);
+      window.removeEventListener('cerebro:page-ready', finish);
+      window.removeEventListener('cerebro:view-terminal', finish);
+      window.removeEventListener('cerebro:dataset-context', failed);
+      window.removeEventListener('cerebro:first-view', previewed);
+      window.removeEventListener('cerebro:access-denied', denied);
+    }
+    function denied() {
+      finished = true;
+      cleanup();
+      document.documentElement.classList.remove('cerebro-starting');
+      cover.remove();
+    }
     function finish(allowError) {
       var pane = document.querySelector('.tab-pane.active[id^="shiny-tab-"]');
       if (finished || !pane || (allowError !== true && !window.CerebroPageLifecycle.isSettled(pane))) return;
       finished = true;
-      clearTimeout(slow);
+      cleanup();
       document.documentElement.classList.remove('cerebro-starting');
       // Cross a paint boundary after removing the shield on the actual layout.
       requestAnimationFrame(function () {
@@ -17,10 +31,6 @@
         setTimeout(function () { cover.remove(); },
           matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 120);
       });
-      window.removeEventListener('cerebro:page-ready', finish);
-      window.removeEventListener('cerebro:view-terminal', finish);
-      window.removeEventListener('cerebro:dataset-context', failed);
-      window.removeEventListener('cerebro:first-view', previewed);
     }
     function previewed() {
       // first-view.js drew the page's plot from the Viewer Pack: there is
@@ -41,6 +51,7 @@
     window.addEventListener('cerebro:view-terminal', finish);
     window.addEventListener('cerebro:dataset-context', failed);
     window.addEventListener('cerebro:first-view', previewed);
+    window.addEventListener('cerebro:access-denied', denied);
     if (window.CerebroFirstView && window.CerebroFirstView.shown) previewed();
     finish();
   }
