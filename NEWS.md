@@ -1,4 +1,4 @@
-# CerebroNexus (development version)
+# CerebroNexus 8.4.5
 
 - H5-backed data sets no longer falsely report mismatched cell names when
   exported and opened with different `rlang` versions. New thin CRBs use
@@ -7,6 +7,9 @@
   the historical schema-3/4 checksums from both `rlang` hashing formats.
   Reordered or foreign cells remain rejected; a gene-expression cell-name
   validation error is shown without disconnecting the Shiny session.
+- New schema-5 exports require an updated package or standalone Viewer.
+  Existing schema-3/4 data sets do not need their expression matrices
+  re-exported.
 
 # CerebroNexus 8.4.4
 
