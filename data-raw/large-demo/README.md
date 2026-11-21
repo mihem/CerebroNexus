@@ -49,7 +49,7 @@ crb <- prepareViewerRenDemoData()   # returns the path of the prepared .crb
 - `prepare_viewer_ren_data.R`: downloads the Ren et al. atlas (about 61 GB as `.h5ad`), the cell annotation, the clinical sample table and the TCR/BCR tables, and builds the Ren `.crb` with its immune repertoire. Entry function: `prepareViewerRenDemoData()`.
 - `prepare_viewer_cosmx_data.R`: downloads the eight section archives of the CosMx NSCLC data set (11.3 GB), reads the expression and cell tables, and builds the CosMx `.crb` with one spatial entry per section. Entry function: `prepareViewerCosMxDemoData()`. Source, licence status and changes: [`cosmx.ATTRIBUTION.md`](cosmx.ATTRIBUTION.md).
 - `prepare_viewer_tcell_data.R`: downloads the Zenodo files of the pan-cancer T-cell atlas (14.1 GB), joins the 70 per-data-set expression objects, computes the joint embedding and builds the `.crb` with the TCR repertoire and the CD8 trajectory. Entry function: `prepareViewerTcellDemoData()`. Source, licence and changes: [`tcell.ATTRIBUTION.md`](tcell.ATTRIBUTION.md).
-- `prepare_viewer_xenium_prime_data.R` and `prepare_xenium_prime_image.py`: prepare the optional Prime 5K mouse brain with a fixed-colour microscopy PNG. Entry function: `prepareViewerXeniumPrimeDemoData()`. See [below](#xenium-prime-5k-mouse-brain) and [`xenium-prime.ATTRIBUTION.md`](xenium-prime.ATTRIBUTION.md).
+- `prepare_viewer_xenium_prime_data.R`: prepares the optional Prime 5K mouse brain with a fixed-colour four-stain microscopy image. Entry function: `prepareViewerXeniumPrimeDemoData()`. See [below](#xenium-prime-5k-mouse-brain) and [`xenium-prime.ATTRIBUTION.md`](xenium-prime.ATTRIBUTION.md).
 - `download_helpers.R`: the cache folder, the checked download (size, then MD5 or SHA256, resumable) and the publish-by-rename shared by the two scripts above. `run-demo.R` sources it before them.
 - `prepare_viewer_pack.R`: builds or reuses the Viewer Pack of a prepared `.crb`. Entry function: `prepareDemoViewerPack()`.
 - The expression matrix of the mouse brain and Ren data sets is written as the cells x genes H5 sidecar by the package's own streaming writer (`R/h5ad_stream.R`, the one `convertH5adToCerebro()` uses for an h5ad with more than 2^31 - 1 non-zero values), not by a script of this folder: `HDF5Array::writeTENxMatrix()` can only write one gene after the other, and a source stored by cells is then scanned from start to end for every block of genes, which takes days for these atlases. The writer reads the CSR arrays directly, in several R processes.
@@ -91,18 +91,24 @@ clusters and UMAP are used, not recomputed; the 11 cells omitted by XOA remain
 available spatially, labelled `Unassigned`, with missing UMAP coordinates.
 
 ```bash
-# One-time build dependencies for the microscopy converter (no Python in the Viewer):
-python3 -m pip install numpy tifffile imagecodecs Pillow
 Rscript run-demo.R --data=xenium-prime
 # Or download/prepare without starting the Viewer:
 Rscript run-demo.R --data=xenium-prime --prepare-only
 ```
 
-Set `CEREBRO_DEMO_PYTHON` to a Python executable with those packages if it is not
-the `python3` on PATH. With Nix, use a Python built against the same library
-environment as R, or an executable wrapper that isolates Python's library
-environment; mixing different Nixpkgs snapshots' `LD_LIBRARY_PATH` can prevent
-NumPy from loading. Python dependencies are build-time only.
+The microscopy is a JPEG 2000 OME-TIFF that R's `tiff` and `EBImage` cannot
+decode, so it is read with Bio-Formats through the Bioconductor package
+`RBioFormats` (as the original Xenium demo does; see `data-raw/spatial.md`).
+That needs `RBioFormats` and `png`, and a Java runtime for `rJava`:
+
+```r
+BiocManager::install("RBioFormats")   # needs a JDK
+```
+
+On Nix, `rPackages.RBioFormats` and `rPackages.rJava` bring their own JDK.
+They are build-time requirements of this script only: `DESCRIPTION` and the
+Viewer do not use them, and the script checks for them before it starts the
+13 GB download.
 
 The first run downloads the **13.3 GB** 10x outs ZIP into
 `large-examples/xenium-prime/source/`. Only the expression matrix, cell table,
@@ -118,8 +124,10 @@ The prepared directory contains:
   inline). The Viewer only serves *external* image files from inside its own
   app folders, so a PNG left in the cache would be refused.
 - `cerebro_xenium_prime.h5`: log-normalised expression, read on demand.
-- `morphology.png`: the same four-stain RGB composite (at most 4,096 pixels per
-  side), kept for inspection; it is not read when the Viewer opens.
+- `morphology.png`: the same four-stain RGB composite, kept for inspection; it
+  is not read when the Viewer opens. It is the smallest pyramid level of the
+  scan that is at least 4,096 px on its long side (4,269 x 2,989 px), decoded
+  directly; the 34,154 x 23,912 px scan is never read in full.
 - `morphology.json`: full-resolution physical extent, source pixel sizes,
   display dimensions, channel colours and contrast windows.
 - `demo-version` and the Viewer Pack.
@@ -139,16 +147,21 @@ Choose **Mouse brain (Xenium Prime 5K)** in the data set menu, then Spatial.
 Its background is selected automatically. The cell dots are small (size 2) and nearly opaque (90%), so the clusters read clearly while the microscopy shows between them; both can be changed in the page's Settings.
 Cached prepared data can also be opened with the source app by setting
 `CEREBRO_XENIUM_PRIME_DEMO_CRB` to the `.crb` path; keep its H5 beside it.
-Python is not needed to reopen a current prepared cache.
+`RBioFormats` is not needed to reopen a current prepared cache.
 
 No data are added to the repository or installed package. This source-checkout
 demo is not registered in `downloadDemoData()` (which downloads small, already
 prepared examples). A failed rebuild preserves the previous prepared directory.
-Changing either the R recipe or Python compositor invalidates its build stamp.
+Changing the script (a hash of its functions) or updating CerebroNexus
+prepares the data set again; with the 13 GB ZIP already in `source/` that
+took about 1 minute.
 
 Tests, without downloading the real data:
 
 ```bash
 nix-shell --run 'Rscript -e "devtools::test(filter = \"xenium-prime-demo|run-demo\")"'
-python3 -m unittest discover -s tests/python -v
 ```
+
+They cover the contrast window, the colour compositing, the pyramid-level
+choice and the build on tiny stand-in files. The Bio-Formats read itself is
+checked by hand on the real image, because it needs Java.

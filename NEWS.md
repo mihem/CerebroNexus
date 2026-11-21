@@ -5,8 +5,10 @@
   published clusters and UMAP, and a four-stain composite microscopy PNG.
   Expression uses an H5 sidecar; the composite is embedded in the CRB with
   source-derived bounds, so it is aligned without manual offsets. Data stay
-  in the user cache, outside the package/CRAN tarball. This uses the existing
-  image renderer; interactive channels and tiled microscopy are not added.
+  in the user cache (`CEREBRO_LARGE_CACHE`), outside the package/CRAN tarball.
+  The microscopy is read with Bio-Formats (`RBioFormats`), which only building
+  the demo needs. This uses the existing image renderer; interactive channels
+  and tiled microscopy are not added.
 
 # CerebroNexus 8.4.9
 

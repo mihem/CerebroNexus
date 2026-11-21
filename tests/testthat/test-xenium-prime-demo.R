@@ -1,5 +1,6 @@
-## Optional demo preparation: tiny vendor-format inputs, no network or real
-## microscopy needed by the R tests. The Python image helper has its own tests.
+## Optional demo preparation: tiny vendor-format inputs, no network, Java or
+## real microscopy. The Bio-Formats read itself is checked by hand against the
+## real image; its pure steps (level, contrast window, compositing) are here.
 
 xenium_prime_env <- function() {
   scripts <- testthat::test_path(
@@ -15,16 +16,6 @@ xenium_prime_env <- function() {
     sys.source(script, env)
   }
   env
-}
-
-xenium_prime_image_script <- function() {
-  testthat::test_path(
-    "..",
-    "..",
-    "data-raw",
-    "large-demo",
-    "prepare_xenium_prime_image.py"
-  )
 }
 
 xenium_prime_analysis <- function(root, cells = c("c2", "c1")) {
@@ -129,37 +120,82 @@ test_that("Prime 5K reads gene counts and physical coordinates in matrix order",
   )
 })
 
-test_that("Prime 5K preparation publishes atomically, caches all assets, and stamps the image recipe", {
+test_that("the Prime 5K pyramid level is the smallest one that is large enough", {
+  env <- xenium_prime_env()
+  sizes <- cbind(
+    x = c(34154, 17077, 8538, 4269, 2134, 1067),
+    y = c(23912, 11956, 5978, 2989, 1494, 747)
+  )
+  expect_identical(env$.viewerXeniumPrimeLevel(sizes, 4096L), 4L)
+  expect_identical(env$.viewerXeniumPrimeLevel(sizes, 3000L), 4L)
+  expect_identical(env$.viewerXeniumPrimeLevel(sizes, 4270L), 3L)
+  ## Nothing is large enough: take the finest level there is.
+  expect_identical(env$.viewerXeniumPrimeLevel(sizes, 100000L), 1L)
+})
+
+test_that("a Prime 5K stain is stretched over its positive signal only", {
+  env <- xenium_prime_env()
+  expect_equal(env$.viewerXeniumPrimeWindow(c(0, 0, 0)), c(0, 1))
+  expect_equal(env$.viewerXeniumPrimeWindow(c(0, 7, 7)), c(0, 7))
+  expect_equal(env$.viewerXeniumPrimeWindow(c(NA, 0, 5)), c(0, 5))
+  signal <- c(rep(0, 1000), seq(1, 2000, length.out = 5000))
+  window <- env$.viewerXeniumPrimeWindow(signal)
+  ## Zeros are background, so they do not drag the window down.
+  expect_gt(window[[1L]], 1)
+  expect_lt(window[[2L]], 2000)
+  expect_gt(window[[2L]], window[[1L]])
+})
+
+test_that("the four Prime 5K stains are drawn in their own colours and added", {
+  env <- xenium_prime_env()
+  stains <- env$.viewerXeniumPrimeStains()
+  expect_identical(nrow(stains), 4L)
+  rgb_of <- function(colour) unname(grDevices::col2rgb(colour)[, 1L]) / 255
+  ## One landmark per stain (columns 1-4), and one pixel with all four.
+  planes <- array(0, dim = c(2L, 5L, 4L))
+  for (stain in 1:4) {
+    planes[1L, stain, stain] <- 1000
+  }
+  planes[1L, 5L, ] <- 1000
+  composite <- env$.viewerXeniumPrimeCompose(planes, stains)
+  expect_identical(dim(composite$rgb), c(2L, 5L, 3L))
+  for (stain in 1:4) {
+    expect_equal(
+      composite$rgb[1L, stain, ],
+      rgb_of(stains$colour[[stain]]),
+      info = stains$name[[stain]]
+    )
+  }
+  expect_equal(composite$rgb[2L, 1L, ], c(0, 0, 0))
+  expect_equal(
+    composite$rgb[1L, 5L, ],
+    pmin(rowSums(vapply(stains$colour, rgb_of, numeric(3L))), 1)
+  )
+  expect_true(all(composite$rgb >= 0 & composite$rgb <= 1))
+  expect_error(
+    env$.viewerXeniumPrimeCompose(planes[,, 1:3], stains),
+    "one plane per stain"
+  )
+})
+
+test_that("Prime 5K preparation publishes atomically, caches all assets, and stamps the recipe", {
   env <- xenium_prime_env()
   root <- withr::local_tempdir()
   paths <- env$.viewerXeniumPrimePaths(root)
   dir.create(dirname(paths$crb), recursive = TRUE)
   writeLines("previous", paths$crb)
   env$.demoRequire <- function(...) NULL
-  env$system2 <- function(...) 0L
   env$.demoDownload <- function(...) NULL
   env$.viewerXeniumPrimeBuildObject <- function(paths, ...) {
     writeLines("partial", paths$crb)
     stop("simulated failure")
   }
-  prepare <- function() {
-    env$prepareViewerXeniumPrimeDemoData(
-      root,
-      python = "test-python",
-      image_script = xenium_prime_image_script()
-    )
-  }
+  prepare <- function() env$prepareViewerXeniumPrimeDemoData(root)
   expect_error(prepare(), "simulated failure")
   expect_identical(readLines(paths$crb), "previous")
   expect_length(list.files(paths$root, pattern = "stage-"), 0L)
   calls <- 0L
-  env$.viewerXeniumPrimeBuildObject <- function(
-    paths,
-    work,
-    python,
-    image_script,
-    recipe
-  ) {
+  env$.viewerXeniumPrimeBuildObject <- function(paths, work, recipe) {
     calls <<- calls + 1L
     writeLines("new", paths$crb)
     file.create(paths$sidecar, paths$image, paths$image_info)
@@ -171,16 +207,24 @@ test_that("Prime 5K preparation publishes atomically, caches all assets, and sta
   unlink(paths$image)
   expect_identical(prepare(), paths$crb)
   expect_identical(calls, 2L)
-  ## Editing only the compositor must invalidate the prepared cache too.
-  changed <- tempfile(fileext = ".py")
-  withr::defer(unlink(changed))
-  writeLines(c(readLines(xenium_prime_image_script()), "# changed"), changed)
-  env$prepareViewerXeniumPrimeDemoData(
-    root,
-    python = "test-python",
-    image_script = changed
-  )
+  ## The recipe is a hash of the script's functions, so editing the compositor
+  ## (or anything else in it) prepares the data set again.
+  env$.viewerXeniumPrimeRecipe <- "an edited script"
+  expect_identical(prepare(), paths$crb)
   expect_identical(calls, 3L)
+})
+
+test_that("Prime 5K asks for its packages before the 13 GB download", {
+  env <- xenium_prime_env()
+  root <- withr::local_tempdir()
+  downloaded <- FALSE
+  env$.demoDownload <- function(...) downloaded <<- TRUE
+  env$.demoRequire <- function(packages, demo) {
+    expect_true("RBioFormats" %in% packages)
+    stop("missing packages", call. = FALSE)
+  }
+  expect_error(env$prepareViewerXeniumPrimeDemoData(root), "missing packages")
+  expect_false(downloaded)
 })
 
 test_that("a Prime 5K build opens its H5 expression and keeps missing UMAP cells spatially", {
@@ -218,22 +262,16 @@ test_that("a Prime 5K build opens its H5 expression and keeps missing UMAP cells
   )
   env$.viewerXeniumPrimeExtract <- function(...) c(channel0 = "unused.ome.tif")
   env$.viewerXeniumPrimeRead <- function(...) section
-  env$system2 <- function(...) {
-    png::writePNG(array(0, c(4, 4, 3)), paths$image)
+  env$.viewerXeniumPrimeMorphology <- function(ome, png_file, info_file, ...) {
+    expect_identical(ome, "unused.ome.tif")
+    png::writePNG(array(0, c(4, 4, 3)), png_file)
     jsonlite::write_json(
       list(bounds = list(xmin = 0, xmax = 4, ymin = -4, ymax = 0)),
-      paths$image_info,
+      info_file,
       auto_unbox = TRUE
     )
-    0L
   }
-  env$.viewerXeniumPrimeBuildObject(
-    paths,
-    root,
-    "test-python",
-    xenium_prime_image_script(),
-    "test-recipe"
-  )
+  env$.viewerXeniumPrimeBuildObject(paths, root, "test-recipe")
   object <- readCerebro(paths$crb)
   expect_identical(object$getExpressionBackend()$type, "h5")
   expect_identical(object$getMetaData()$cell_barcode, cells)

@@ -43,13 +43,15 @@ files. The software's MIT licence does not replace the source data's terms.
 - All four `morphology_focus_0000`–`0003.ome.tif` files are kept together while
   converting: they are one OME image with four measured channels, not four
   unrelated background alternatives.
-- A suitable source pyramid level is decoded, each channel is linearly
-  stretched between the 0.5th and 99.9th percentiles of positive intensities,
-  then clipped and additively combined: DAPI `#4c8dff`,
-  ATP1A1/CD45/E-Cadherin `#3fd14a`, 18S `#ff4fd8`,
-  alphaSMA/Vimentin `#ffd23f`. The RGB result is limited to 4,096 pixels per
-  side, without changing its physical bounds. The JSON records the exact
-  windows and dimensions used.
+- The image is read with Bio-Formats (`RBioFormats`). Only one pyramid level
+  is decoded, the smallest whose long side is at least 4,096 px (level 4 of 8,
+  4,269 x 2,989 px); the 34,154 x 23,912 px scan is never read in full. Each
+  channel is linearly stretched between the 0.5th and 99.9th percentiles of its
+  positive intensities, then clipped and additively combined: DAPI `#4c8dff`,
+  ATP1A1/CD45/E-Cadherin `#3fd14a`, 18S `#ff4fd8`, alphaSMA/Vimentin
+  `#ffd23f`. The physical bounds come from the full-resolution size and pixel
+  size, not from the level decoded. The JSON records the exact windows and
+  dimensions used.
 - Transcript points, cell/nucleus boundaries and the 3D morphology stack are
   not imported. The composite is embedded in the CRB and drawn by CerebroNexus'
   existing background-image renderer.

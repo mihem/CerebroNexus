@@ -160,26 +160,199 @@
   )
 }
 
-.viewerXeniumPrimeBuildObject <- function(
-  paths,
-  work,
-  python,
-  image_script,
-  recipe
+## The four stains of the morphology image, in file order, and the colour each
+## is drawn in. The names are checked against the file, so a differently
+## ordered or relabelled image is refused instead of being coloured wrongly.
+.viewerXeniumPrimeStains <- function() {
+  data.frame(
+    name = c("DAPI", "ATP1A1/CD45/E-Cadherin", "18S", "alphaSMA/Vimentin"),
+    colour = c("#4c8dff", "#3fd14a", "#ff4fd8", "#ffd23f"),
+    stringsAsFactors = FALSE
+  )
+}
+
+## The pyramid level to decode: the smallest whose longer side is at least
+## `max_px`, else the largest one there is. `sizes` is a matrix of (x, y) per
+## level, finest first. Returns the 1-based level.
+.viewerXeniumPrimeLevel <- function(sizes, max_px = 4096L) {
+  longest <- apply(sizes, 1L, max)
+  enough <- which(longest >= max_px)
+  if (length(enough)) enough[[which.min(longest[enough])]] else 1L
+}
+
+## Display window of one stain: the 0.5th to 99.9th percentile of its positive
+## intensities. Stretching to the full 16-bit range would leave a stain whose
+## signal sits in the low thousands looking black.
+.viewerXeniumPrimeWindow <- function(plane) {
+  positive <- as.numeric(plane)
+  positive <- positive[is.finite(positive) & positive > 0]
+  if (!length(positive)) {
+    return(c(0, 1))
+  }
+  window <- stats::quantile(
+    positive,
+    c(0.005, 0.999),
+    names = FALSE,
+    type = 7
+  )
+  if (window[[2L]] > window[[1L]]) window else c(0, max(window[[2L]], 1))
+}
+
+## The four stains of `planes` (rows x columns x 4) as one RGB image: each
+## stain is stretched over its own window, drawn in its colour, and the four
+## are added. Returns the image (rows x columns x 3, in 0..1) and the windows.
+.viewerXeniumPrimeCompose <- function(
+  planes,
+  stains = .viewerXeniumPrimeStains()
 ) {
+  if (length(dim(planes)) != 3L || dim(planes)[[3L]] != nrow(stains)) {
+    stop("Expected one plane per stain.", call. = FALSE)
+  }
+  rgb <- array(0, dim = c(dim(planes)[1:2], 3L))
+  windows <- vector("list", nrow(stains))
+  for (stain in seq_len(nrow(stains))) {
+    plane <- planes[,, stain]
+    window <- .viewerXeniumPrimeWindow(plane)
+    windows[[stain]] <- window
+    signal <- pmin(
+      pmax((plane - window[[1L]]) / (window[[2L]] - window[[1L]]), 0),
+      1
+    )
+    weight <- grDevices::col2rgb(stains$colour[[stain]])[, 1L] / 255
+    for (channel in 1:3) {
+      rgb[,, channel] <- rgb[,, channel] + signal * weight[[channel]]
+    }
+  }
+  list(rgb = pmin(rgb, 1), windows = windows)
+}
+
+## Reads the four-stain morphology image with Bio-Formats (RBioFormats, as the
+## original Xenium demo does), writes the composite as a PNG and its calibration
+## as JSON. The four morphology_focus_000*.ome.tif files describe one image and
+## must stay together in one folder; Bio-Formats follows their cross-references.
+##
+## Only one pyramid level is decoded, never the full 34,154 x 23,912 px scan.
+## The physical extent comes from the full-resolution size and the pixel size in
+## the file, so it does not depend on the level chosen. Cells use
+## (x_centroid, -y_centroid), so the picture's top row sits at y = 0.
+.viewerXeniumPrimeMorphology <- function(
+  ome,
+  png_file,
+  info_file,
+  max_px = 4096L
+) {
+  .demoRequire(c("RBioFormats", "png", "jsonlite"), "Xenium Prime 5K")
+  if (is.null(getOption("java.parameters"))) {
+    options(java.parameters = "-Xmx4g")
+  }
+  stains <- .viewerXeniumPrimeStains()
+  metadata <- RBioFormats::read.metadata(ome)
+  sizes <- t(vapply(
+    seq_along(metadata),
+    function(level) {
+      core <- RBioFormats::coreMetadata(metadata, series = level)
+      c(core$sizeX, core$sizeY, core$sizeC)
+    },
+    numeric(3L)
+  ))
+  if (any(sizes[, 3L] != nrow(stains))) {
+    stop(
+      "The morphology image does not have the four expected stains.",
+      call. = FALSE
+    )
+  }
+  omexml <- RBioFormats::read.omexml(ome)
+  found <- regmatches(
+    omexml,
+    gregexpr("<Channel [^>]*Name=\"[^\"]+\"", omexml)
+  )[[1L]]
+  names_found <- sub(".*Name=\"([^\"]+)\".*", "\\1", found)
+  if (!identical(tolower(names_found), tolower(stains$name))) {
+    stop(
+      "Unexpected morphology stains: ",
+      paste(names_found, collapse = ", "),
+      call. = FALSE
+    )
+  }
+  micron <- function(axis) {
+    value <- as.numeric(sub(
+      ".*PhysicalSize[XY]=\"([^\"]+)\".*",
+      "\\1",
+      regmatches(
+        omexml,
+        regexpr(sprintf("PhysicalSize%s=\"[^\"]+\"", axis), omexml)
+      )
+    ))
+    unit <- sub(
+      ".*Unit=\"([^\"]+)\".*",
+      "\\1",
+      regmatches(
+        omexml,
+        regexpr(sprintf("PhysicalSize%sUnit=\"[^\"]+\"", axis), omexml)
+      )
+    )
+    if (!is.finite(value) || value <= 0 || !unit %in% c("\u00b5m", "um")) {
+      stop(
+        "The morphology pixel size must be a positive size in micrometres.",
+        call. = FALSE
+      )
+    }
+    value
+  }
+  pixel <- c(x = micron("X"), y = micron("Y"))
+  level <- .viewerXeniumPrimeLevel(sizes[, 1:2, drop = FALSE], max_px)
+  message(sprintf(
+    "Decoding morphology level %d of %d (%d x %d px)...",
+    level,
+    nrow(sizes),
+    sizes[level, 1L],
+    sizes[level, 2L]
+  ))
+  image <- RBioFormats::read.image(ome, resolution = level, normalize = FALSE)
+  planes <- as.array(image)
+  ## Bio-Formats returns [x, y, stain]; the PNG wants [row = y, column = x].
+  planes <- aperm(planes[,, seq_len(nrow(stains)), drop = FALSE], c(2L, 1L, 3L))
+  composite <- .viewerXeniumPrimeCompose(planes, stains)
+  png::writePNG(composite$rgb, png_file)
+  full <- sizes[1L, 1:2]
+  info <- list(
+    sourceSize = unname(full),
+    pixelSize = unname(pixel),
+    displaySize = unname(sizes[level, 1:2]),
+    bounds = list(
+      xmin = 0,
+      xmax = unname(full[[1L]] * pixel[["x"]]),
+      ymin = unname(-full[[2L]] * pixel[["y"]]),
+      ymax = 0
+    ),
+    channels = lapply(seq_len(nrow(stains)), function(stain) {
+      list(
+        name = stains$name[[stain]],
+        color = stains$colour[[stain]],
+        window = composite$windows[[stain]]
+      )
+    })
+  )
+  jsonlite::write_json(
+    info,
+    info_file,
+    auto_unbox = TRUE,
+    pretty = TRUE,
+    digits = NA
+  )
+  invisible(info)
+}
+
+.viewerXeniumPrimeBuildObject <- function(paths, work, recipe) {
   files <- .viewerXeniumPrimeExtract(paths$archive, work)
   message("Reading the Prime 5K matrix and published analysis...")
   section <- .viewerXeniumPrimeRead(files, work)
   message("Preparing the four-stain morphology composite...")
-  status <- system2(
-    python,
-    shQuote(c(image_script, files[["channel0"]], paths$image, paths$image_info))
+  .viewerXeniumPrimeMorphology(
+    files[["channel0"]],
+    paths$image,
+    paths$image_info
   )
-  if (
-    status != 0L || !file.exists(paths$image) || !file.exists(paths$image_info)
-  ) {
-    stop("Prime 5K morphology preparation failed.", call. = FALSE)
-  }
   info <- jsonlite::fromJSON(paths$image_info)
   co <- section$coordinates
   b <- info$bounds
@@ -283,42 +456,17 @@
     .demoStampCurrent(paths$stamp, recipe)
 }
 
-prepareViewerXeniumPrimeDemoData <- function(
-  cache_dir = NULL,
-  python = Sys.getenv("CEREBRO_DEMO_PYTHON", Sys.which("python3")),
-  image_script = file.path(
-    "data-raw",
-    "large-demo",
-    "prepare_xenium_prime_image.py"
-  )
-) {
-  if (!file.exists(image_script)) {
-    stop(
-      "Cannot find the Prime 5K image preparation script: ",
-      image_script,
-      call. = FALSE
-    )
-  }
-  recipe <- paste(.viewerXeniumPrimeRecipe, unname(tools::md5sum(image_script)))
+prepareViewerXeniumPrimeDemoData <- function(cache_dir = NULL) {
+  recipe <- .viewerXeniumPrimeRecipe
   paths <- .viewerXeniumPrimePaths(cache_dir)
   if (.viewerXeniumPrimeComplete(paths, recipe)) {
     return(paths$crb)
   }
-  .demoRequire(c("Matrix", "rhdf5", "jsonlite"), "Xenium Prime 5K")
-  if (
-    !nzchar(python) ||
-      system2(
-        python,
-        c("-c", shQuote("import numpy, tifffile, imagecodecs, PIL"))
-      ) !=
-        0L
-  ) {
-    stop(
-      "Prime 5K image preparation needs Python with numpy, tifffile, imagecodecs and Pillow. ",
-      "Set CEREBRO_DEMO_PYTHON to that Python executable.",
-      call. = FALSE
-    )
-  }
+  ## Checked before the 13 GB download, not after it.
+  .demoRequire(
+    c("Matrix", "rhdf5", "jsonlite", "RBioFormats", "png"),
+    "Xenium Prime 5K"
+  )
   message(
     "Preparing Prime 5K source (13.3 GB; only required members are unpacked)..."
   )
@@ -332,7 +480,7 @@ prepareViewerXeniumPrimeDemoData <- function(
   for (name in c("crb", "sidecar", "image", "image_info", "stamp")) {
     staged[[name]] <- file.path(stage, basename(paths[[name]]))
   }
-  .viewerXeniumPrimeBuildObject(staged, work, python, image_script, recipe)
+  .viewerXeniumPrimeBuildObject(staged, work, recipe)
   unlink(work, recursive = TRUE)
   if (!.viewerXeniumPrimeComplete(staged, recipe)) {
     stop("Prime 5K preparation did not finish.", call. = FALSE)

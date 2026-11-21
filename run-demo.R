@@ -41,16 +41,7 @@ demos <- list(
     variable = "CEREBRO_TCELL_DEMO_CRB"
   ),
   "xenium-prime" = list(
-    prepare = function() {
-      prepareViewerXeniumPrimeDemoData(
-        image_script = file.path(
-          repo_root,
-          "data-raw",
-          "large-demo",
-          "prepare_xenium_prime_image.py"
-        )
-      )
-    },
+    prepare = function() prepareViewerXeniumPrimeDemoData(),
     variable = "CEREBRO_XENIUM_PRIME_DEMO_CRB"
   )
 )
