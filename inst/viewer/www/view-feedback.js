@@ -44,11 +44,10 @@
     var label = document.createElement('span');
     label.className = 'cerebro-layout-label';
     label.id = id + '_layout_label';
-    // Tissue keeps its proportions, so Spatial offers the panel's shape: fitted
-    // to the section(s), or square. ("Layout" there is one section or a grid.)
+    // One name on every page: the shape of the plot panels. Tissue keeps its
+    // proportions, so Spatial's wide option fits the panel to the section(s).
     var spatial = id === 'spatial_projection';
-    label.textContent = spatial ? 'Panel shape'
-      : id === 'trajectory_projection' ? 'Trajectory layout' : 'UMAP layout';
+    label.textContent = 'Panel shape';
     group.setAttribute('aria-labelledby', label.id);
     group.appendChild(label);
     var segments = document.createElement('span');

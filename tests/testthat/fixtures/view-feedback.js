@@ -196,8 +196,8 @@ elements[ir+'_cell_view_host'] = element(ir);
 let clonalVisible = true;
 elements[ir+'_cell_view_host'].getClientRects = () => clonalVisible ? [{}] : [];
 for (const [id, buttonId, inputId, label] of [
-  [ir, 'ir_more_button', 'ir_clonalUMAP_keep_square', 'UMAP layout'],
-  ['trajectory_projection', 'trajectory_projection_more_button', 'trajectory_projection_keep_square', 'Trajectory layout']
+  [ir, 'ir_more_button', 'ir_clonalUMAP_keep_square', 'Panel shape'],
+  ['trajectory_projection', 'trajectory_projection_more_button', 'trajectory_projection_keep_square', 'Panel shape']
 ]) {
   paint(id, 200);
   measured(id);

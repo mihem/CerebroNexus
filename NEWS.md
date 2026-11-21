@@ -46,8 +46,9 @@
   *Gene expression* and *RGB co-expression* (the values, and so shared
   links, are unchanged); Linked views lists Gene expression's three modes
   under the same names; Feature/Gene is *Gene*, Spatial data *Sections*,
-  Choose a method / trajectory *Method* / *Trajectory*, and labels lose
-  their colons. Settings drawers read Appearance (point size and opacity,
+  Choose a method / trajectory *Method* / *Trajectory*, the switch at the
+  top right is *Panel shape* on every page (was UMAP layout or Trajectory
+  layout), and labels lose their colons. Settings drawers read Appearance (point size and opacity,
   group labels, region outlines, borders, square plots), Data (*Show % of
   cells*, on Spatial and Immune repertoire too), Analysis, then Group
   filters, on HLA & TCR Motifs as well.
