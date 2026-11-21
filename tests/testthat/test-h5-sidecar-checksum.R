@@ -328,8 +328,9 @@ test_that("the Viewer opens a data set before its H5 file is hashed", {
     suppressMessages(early$object$getExpressionMatrix(genes = gene)),
     "checksum does not match CRB 'pbmc.crb'"
   )
+  ## R says so when a promise that failed is evaluated again
   expect_error(
-    suppressMessages(early$object$getExpressionRow(gene)),
+    suppressWarnings(suppressMessages(early$object$getExpressionRow(gene))),
     "checksum does not match CRB 'pbmc.crb'"
   )
 })
