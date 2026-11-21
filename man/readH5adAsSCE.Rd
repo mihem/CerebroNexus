@@ -14,7 +14,8 @@ readH5adAsSCE(
   spatial_images = "auto",
   extra_modalities = NULL,
   verbose = FALSE,
-  .root = NULL
+  .root = NULL,
+  .stream_x = FALSE
 )
 }
 \arguments{
@@ -63,6 +64,9 @@ the cells of the expression modality (cells it lacks get zeros).}
 
 \item{.root}{Internal: HDF5 group that holds the data set (used for the
 modalities inside a MuData file). Leave \code{NULL}.}
+
+\item{.stream_x}{Internal: do not read an X with more than 2^31 - 1
+non-zero values, describe it for streaming (see \code{\link{convertH5adToCerebro}}).}
 }
 \value{
 A \code{SingleCellExperiment} with genes in rows and cells in

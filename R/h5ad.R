@@ -770,6 +770,8 @@
 #' @param verbose Print what was skipped.
 #' @param .root Internal: HDF5 group that holds the data set (used for the
 #'   modalities inside a MuData file). Leave \code{NULL}.
+#' @param .stream_x Internal: do not read an X with more than 2^31 - 1
+#'   non-zero values, describe it for streaming (see \code{\link{convertH5adToCerebro}}).
 #'
 #' @return A \code{SingleCellExperiment} with genes in rows and cells in
 #'   columns. Duplicate gene names are made unique with a message; duplicate
@@ -804,7 +806,8 @@ readH5adAsSCE <- function(
   spatial_images = "auto",
   extra_modalities = NULL,
   verbose = FALSE,
-  .root = NULL
+  .root = NULL,
+  .stream_x = FALSE
 ) {
   .h5adRequire()
   if (!requireNamespace("SingleCellExperiment", quietly = TRUE)) {
@@ -930,7 +933,21 @@ readH5adAsSCE <- function(
     dimnames(m) <- list(genes, cells)
     m
   }
-  if (.h5adHas(ctx, x_path)) {
+  ## A matrix too large for a dgCMatrix is not read (`.stream_x`, set by the h5
+  ## route of convertH5adToCerebro()): an empty one stands in for it and its
+  ## description goes to the caller, who streams the file.
+  stream <- if (isTRUE(.stream_x) && x_path == "X") {
+    .h5adStreamPlan(ctx, x_path, length(cells), length(genes))
+  }
+  if (!is.null(stream)) {
+    stream$cells <- cells
+    stream$genes <- genes
+    assays[["X"]] <- with_dimnames(methods::new(
+      "dgCMatrix",
+      p = integer(length(cells) + 1L),
+      Dim = c(length(genes), length(cells))
+    ))
+  } else if (.h5adHas(ctx, x_path)) {
     assays[["X"]] <- with_dimnames(.h5adReadMatrix(
       ctx,
       x_path,
@@ -938,7 +955,12 @@ readH5adAsSCE <- function(
       length(genes)
     ))
   }
-  if (!isTRUE(use_raw) && .h5adHas(ctx, "layers")) {
+  if (!is.null(stream) && !isTRUE(use_raw) && .h5adHas(ctx, "layers")) {
+    message(
+      "[INFO] The matrix of `X` has more than 2^31 - 1 non-zero values and is ",
+      "streamed; the layers of the file are not read."
+    )
+  } else if (!isTRUE(use_raw) && .h5adHas(ctx, "layers")) {
     for (layer in .h5adChildren(ctx, "layers")) {
       assays[[layer]] <- tryCatch(
         with_dimnames(.h5adReadMatrix(
@@ -967,6 +989,9 @@ readH5adAsSCE <- function(
     rowData = row_data,
     reducedDims = embeddings
   )
+  if (!is.null(stream)) {
+    sce@metadata$.h5ad_x_stream <- stream
+  }
   if (identical(extra_modalities, "all")) {
     ## every modality but the expression one and the receptor one
     extra_modalities <- setdiff(

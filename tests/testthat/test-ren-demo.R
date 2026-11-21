@@ -262,7 +262,7 @@ test_that("Ren preparation preserves prior datasets on failure and upgrade", {
     writeLines("new data", paths$crb)
     file.create(paths$sidecar)
     file.create(paths$immune)
-    writeLines("2", paths$stamp)
+    env$.demoStampWrite(paths$stamp, env$.viewerRenRecipe)
   }
   expect_identical(env$prepareViewerRenDemoData(root), paths$crb)
   expect_identical(readLines(legacy), "preserve legacy data")

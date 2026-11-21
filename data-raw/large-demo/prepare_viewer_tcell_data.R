@@ -1,7 +1,6 @@
 ## Pan-cancer T-cell atlas (Zheng et al., Science 374:abe6474, 2021): 397,810
 ## T cells of 316 patients and 21 cancer types, with TCR sequences and the
 ## published CD8 T-cell exhaustion continuum. See tcell.ATTRIBUTION.md.
-.viewerTcellVersion <- 2L
 
 .viewerTcellZenodo <- "https://zenodo.org/api/records/5461803/files/"
 
@@ -35,7 +34,7 @@
     )
   }
   root <- file.path(.demoLargeCacheDir(cache_dir), "tcell")
-  prepared <- file.path(root, paste0("cerebro-v", .viewerTcellVersion))
+  prepared <- .demoPreparedDir(root)
   list(
     root = root,
     source_dir = file.path(root, "source"),
@@ -733,8 +732,12 @@
 
   message("Writing the H5 expression sidecar...")
   dir.create(dirname(paths$sidecar), recursive = TRUE, showWarnings = FALSE)
-  ## The matrix is in memory: one process, so it is not copied to workers.
-  .demoWriteH5Transposed(expression, paths$sidecar, workers = 1L)
+  CerebroNexus:::.writeTENxExpression(
+    methods::as(Matrix::t(expression), "CsparseMatrix"),
+    paths$sidecar,
+    group = "expression",
+    level = 1L
+  )
 
   message("Computing the joint embedding...")
   projection <- .viewerTcellEmbedding(expression, meta$dataset)
@@ -834,7 +837,7 @@
     )
   )
   saveCerebro(object, paths$crb)
-  writeLines(as.character(.viewerTcellVersion), paths$stamp)
+  .demoStampWrite(paths$stamp, .viewerTcellRecipe)
   paths$crb
 }
 
@@ -844,11 +847,7 @@
     file.exists(paths$sidecar) &&
     !dir.exists(paths$sidecar) &&
     file.exists(paths$immune) &&
-    file.exists(paths$stamp) &&
-    identical(
-      readLines(paths$stamp, warn = FALSE),
-      as.character(.viewerTcellVersion)
-    )
+    .demoStampCurrent(paths$stamp, .viewerTcellRecipe)
 }
 
 prepareViewerTcellDemoData <- function(cache_dir = NULL) {
@@ -878,7 +877,7 @@ prepareViewerTcellDemoData <- function(cache_dir = NULL) {
   ## Build privately. A failed preparation must not delete a working data set.
   dir.create(paths$root, recursive = TRUE, showWarnings = FALSE)
   stage <- tempfile(
-    paste0("cerebro-v", .viewerTcellVersion, "-stage-"),
+    "prepared-stage-",
     paths$root
   )
   dir.create(stage)
@@ -897,3 +896,7 @@ prepareViewerTcellDemoData <- function(cache_dir = NULL) {
   .demoPublishStage(stage, dirname(paths$crb), paths$root, "T-cell")
   paths$crb
 }
+
+## What the stamp of these files records (.demoRecipe()), taken now: after the
+## last function of this script.
+.viewerTcellRecipe <- .demoRecipe(environment(), "Tcell")

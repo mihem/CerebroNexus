@@ -437,7 +437,8 @@
   meta,
   expr_matrix,
   groups,
-  verbose
+  verbose,
+  stream = NULL
 ) {
   # Initialize list structures
   if (
@@ -455,11 +456,66 @@
 
   # One cells x levels indicator matrix per group turns the per-level
   # subsetting into two sparse products over the whole matrix.
-  expr <- .convertAsDgCMatrix(expr_matrix)
-  positive <- expr
-  positive@x <- as.numeric(expr@x > 0)
-  genes <- rownames(expr)
-  meta_rows <- match(colnames(expr), rownames(meta))
+  if (is.null(stream)) {
+    expr <- .convertAsDgCMatrix(expr_matrix)
+    positive <- expr
+    positive@x <- as.numeric(expr@x > 0)
+    genes <- rownames(expr)
+    cell_names <- colnames(expr)
+  } else {
+    genes <- stream$genes
+    cell_names <- stream$cells
+  }
+  meta_rows <- match(cell_names, rownames(meta))
+
+  # The levels of every group, with the cells that belong to them
+  plan <- lapply(stats::setNames(groups, groups), function(group_name) {
+    values <- meta[[group_name]]
+    group_values <- unique(values)
+    group_values <- as.character(group_values[!is.na(group_values)])
+    code <- match(as.character(values)[meta_rows], group_values)
+    keep <- which(!is.na(code))
+    members <- Matrix::sparseMatrix(
+      i = keep,
+      j = code[keep],
+      x = 1,
+      dims = c(length(cell_names), length(group_values))
+    )
+    size <- Matrix::colSums(members)
+    present <- which(size > 0)
+    list(
+      group_values = group_values,
+      size = size,
+      present = present,
+      members = members[, present, drop = FALSE]
+    )
+  })
+
+  # A matrix that is streamed (too large to read) is summed over all groups in
+  # one pass through the file
+  streamed <- NULL
+  if (!is.null(stream)) {
+    if (verbose) {
+      message(paste0(
+        "[",
+        format(Sys.time(), "%H:%M:%S"),
+        "] Streaming the matrix for the group summaries..."
+      ))
+    }
+    all_members <- do.call(cbind, lapply(plan, `[[`, "members"))
+    sums <- .h5adStreamGroupSums(stream, all_members)
+    width <- vapply(plan, function(p) length(p$present), integer(1))
+    stop_at <- cumsum(width)
+    streamed <- lapply(seq_along(plan), function(g) {
+      cols <- seq_len(width[[g]]) + stop_at[[g]] - width[[g]]
+      list(
+        pct = sums$positive[, cols, drop = FALSE],
+        mean_expr = sums$sums[, cols, drop = FALSE]
+      )
+    })
+    names(streamed) <- names(plan)
+    rm(sums)
+  }
 
   for (group_name in groups) {
     if (verbose) {
@@ -471,27 +527,22 @@
       ))
     }
 
-    values <- meta[[group_name]]
-    group_values <- unique(values)
-    group_values <- as.character(group_values[!is.na(group_values)])
-    code <- match(as.character(values)[meta_rows], group_values)
-    keep <- which(!is.na(code))
-    members <- Matrix::sparseMatrix(
-      i = keep,
-      j = code[keep],
-      x = 1,
-      dims = c(ncol(expr), length(group_values))
-    )
-    size <- Matrix::colSums(members)
-    present <- which(size > 0)
+    group_values <- plan[[group_name]]$group_values
+    size <- plan[[group_name]]$size
+    present <- plan[[group_name]]$present
     if (!length(present)) {
       misc$most_expressed_genes[[group_name]] <- data.frame()
       misc$mean_expression[[group_name]] <- data.frame()
       next
     }
-    members <- members[, present, drop = FALSE]
-    pct <- as.matrix(positive %*% members)
-    mean_expr <- as.matrix(expr %*% members)
+    members <- plan[[group_name]]$members
+    if (is.null(streamed)) {
+      pct <- as.matrix(positive %*% members)
+      mean_expr <- as.matrix(expr %*% members)
+    } else {
+      pct <- streamed[[group_name]]$pct
+      mean_expr <- streamed[[group_name]]$mean_expr
+    }
 
     # Per level, the genes sorted by the statistic (ties keep the gene order)
     stack <- function(statistic, column) {

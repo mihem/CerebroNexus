@@ -17,7 +17,7 @@ convertSCEToCerebro(
   nGene = "nGene",
   add_all_meta_data = TRUE,
   use_delayed_array = FALSE,
-  expression_matrix_mode = c("embedded", "h5"),
+  expression_matrix_mode = c("auto", "embedded", "h5"),
   codec = c("qs2", "rds"),
   viewer_binary = c("auto", "always", "never"),
   viewer_binary_threshold = 100000L,
@@ -31,7 +31,8 @@ convertSCEToCerebro(
   most_expressed_genes = NULL,
   spatial_split_by = NULL,
   extra_features = NULL,
-  .source_name = NULL
+  .source_name = NULL,
+  .x_stream = NULL
 )
 }
 \arguments{
@@ -98,6 +99,10 @@ the first assay, so check that this is on the same scale as the genes.}
 \item{.source_name}{Internal. Base name used for the output file and the
 default experiment name when \code{sce_file} is an object that was read
 from a file by a caller (see \code{\link{convertH5adToCerebro}}).}
+
+\item{.x_stream}{Internal. Description of an h5ad matrix with more than
+2^31 - 1 non-zero values that is streamed into the h5 expression file
+instead of being held in \code{sce} (see \code{\link{convertH5adToCerebro}}).}
 }
 \value{
 The path of the written \code{.crb}, invisibly.

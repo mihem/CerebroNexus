@@ -32,8 +32,20 @@
   file,
   expression_matrix_mode,
   use_delayed_array,
-  verbose
+  verbose,
+  auto = FALSE
 ) {
+  ## A mode the caller did not choose is named in the errors
+  chosen <- if (isTRUE(auto) && identical(expression_matrix_mode, "h5")) {
+    paste0(
+      " (expression_matrix_mode = \"auto\" chose \"h5\" for more than ",
+      format(.h5CellThreshold(), big.mark = ",", scientific = FALSE),
+      " cells; pass expression_matrix_mode = \"embedded\" to keep the matrix ",
+      "in the file)"
+    )
+  } else {
+    ""
+  }
   if (
     !is.character(file) ||
       length(file) != 1L ||
@@ -49,7 +61,9 @@
     if (!identical(tolower(tools::file_ext(file)), "crb")) {
       stop(
         "External expression backends require `file` to end in .crb so the ",
-        "Cerebro object and its sidecar have distinct portable names. Received: ",
+        "Cerebro object and its sidecar have distinct portable names",
+        chosen,
+        ". Received: ",
         file,
         call. = FALSE
       )
@@ -61,8 +75,9 @@
       !requireNamespace("HDF5Array", quietly = TRUE)
   ) {
     stop(
-      "expression_matrix_mode = \"h5\" requires the HDF5Array package. ",
-      "Install it via BiocManager::install(\"HDF5Array\") and re-run, or ",
+      "expression_matrix_mode = \"h5\" requires the HDF5Array package",
+      chosen,
+      ". Install it via BiocManager::install(\"HDF5Array\") and re-run, or ",
       "switch to expression_matrix_mode = \"embedded\".",
       call. = FALSE
     )
@@ -121,6 +136,39 @@
   export
 }
 
+#' The number of cells above which `expression_matrix_mode = "auto"` writes the
+#' matrix to an H5 file (`cerebro.h5_cell_threshold`, 200,000 by default).
+#' @keywords internal
+#' @noRd
+.h5CellThreshold <- function() {
+  threshold <- getOption("cerebro.h5_cell_threshold", 200000L)
+  if (!is.numeric(threshold) || length(threshold) != 1L || is.na(threshold)) {
+    stop("`cerebro.h5_cell_threshold` must be one number.", call. = FALSE)
+  }
+  threshold
+}
+
+#' `"auto"` as the mode it stands for: `"h5"` for more than `.h5CellThreshold()`
+#' cells, `"embedded"` otherwise. The other modes are returned as they are.
+#' @keywords internal
+#' @noRd
+.resolveExpressionMatrixMode <- function(mode, n_cells, verbose = FALSE) {
+  if (!identical(mode, "auto")) {
+    return(mode)
+  }
+  resolved <- if (isTRUE(n_cells > .h5CellThreshold())) "h5" else "embedded"
+  if (isTRUE(verbose)) {
+    .logStep(
+      "expression_matrix_mode = \"auto\": ",
+      format(n_cells, big.mark = ","),
+      " cells, so \"",
+      resolved,
+      "\"."
+    )
+  }
+  resolved
+}
+
 #' Write a matrix as a TENxMatrix-format group. A `dgCMatrix` already holds the
 #' three arrays of that format, so they are written as they are, into the
 #' datasets HDF5Array creates for its own writer; `writeTENxMatrix()` would cut
@@ -132,7 +180,7 @@
   x,
   path,
   group,
-  level = NULL,
+  level = 1L,
   slice = 2^24
 ) {
   if (!inherits(x, "dgCMatrix")) {
@@ -188,7 +236,7 @@
   export_stage_dir,
   final_file,
   verbose,
-  h5_compression_level = NULL
+  h5_compression_level = 1L
 ) {
   if (expression_matrix_mode == "embedded") {
     expression_data <- .delayedExportExpression(
@@ -218,9 +266,14 @@
     if (file.exists(h5_abs)) {
       file.remove(h5_abs)
     }
+    ## A matrix too large to read (an h5ad, see R/h5ad_stream.R): the object
+    ## holds an empty stand-in and the file is written from the h5ad itself.
+    stream <- getOption("cerebro.expression_stream")
     ## Hashing the matrix pays only for a caller that keeps sidecars to
     ## reuse (the Builder sets the option, if only to an empty list).
-    content_digest <- if (!is.null(getOption("cerebro.expression_sidecars"))) {
+    content_digest <- if (
+      is.null(stream) && !is.null(getOption("cerebro.expression_sidecars"))
+    ) {
       .expressionContentDigest(expression_data, h5_compression_level)
     }
     ## An earlier sidecar written from this very matrix is taken as it is.
@@ -232,7 +285,19 @@
       )
     }
 
-    if (is.null(h5_md5)) {
+    if (!is.null(stream)) {
+      if (verbose) {
+        .logStep("Streaming the expression matrix to TENx HDF5 file: ", h5_abs)
+      }
+      .h5adStreamWriteTENx(
+        stream,
+        h5_abs,
+        group = "expression",
+        dimnames = rev(dimnames(expression_data)),
+        level = h5_compression_level
+      )
+      h5_md5 <- unname(tools::md5sum(h5_abs))
+    } else if (is.null(h5_md5)) {
       ## transpose genes x cells -> cells x genes for storage
       m_disk <- if (
         inherits(expression_data, c("RleMatrix", "DelayedMatrix"))
@@ -246,10 +311,10 @@
         .logStep("Writing expression matrix to TENx HDF5 file: ", h5_abs)
       }
 
-      ## A level of 0 stores the data without compression (the shuffle and
-      ## deflate filters are still applied): on 1.3-1.5M-cell sources single
-      ## genes read ~30% faster than at HDF5Array's default level 6, at roughly
-      ## 7x the file size. NULL leaves HDF5Array's default.
+      ## Gzip level 1 by default: within 3 % of the size at level 6 and written
+      ## about 40 % faster. A level of 0 stores the data without compression
+      ## (the shuffle and deflate filters are still applied), at about 3 times
+      ## the file size.
       .writeTENxExpression(
         m_disk,
         h5_abs,

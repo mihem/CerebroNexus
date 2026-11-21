@@ -289,18 +289,49 @@ test_that("the Viewer opens a data set before its H5 file is hashed", {
       }
     )
   }
+  ## until the background process has the checksum
+  settle <- function(object) {
+    pending <- attr(object, "cerebro_h5_cells_pending", exact = TRUE)
+    waited <- 0
+    while (pending() && waited < 60) {
+      Sys.sleep(0.05)
+      waited <- waited + 0.05
+    }
+    pending()
+  }
   good <- read(h5_checksum_export(h5_checksum_user_dir()))
-  ## optional work waits for the background process instead of the session
+  ## optional work waits for the background process instead of the session,
+  ## and so does a read: it does not wait for the checksum either
   expect_true(good$pending)
   expect_length(good$row(), 80L)
-  expect_false(attr(good$object, "cerebro_h5_cells_pending", exact = TRUE)())
+  expect_false(settle(good$object))
+  expect_length(good$row(), 80L)
+  expect_length(suppressMessages(good$object$getExpressionRow(gene)), 80L)
 
-  ## a file with other values: the data set opens, its expression is refused
+  ## a file with other values: the data set opens, and its expression is
+  ## refused from the first read after the checksum is in
   out <- h5_checksum_export(h5_checksum_user_dir())
   h5_checksum_rewrite(out$h5)
   other <- read(out)
+  expect_false(settle(other$object))
   expect_error(other$row(), "checksum does not match CRB 'pbmc.crb'")
   expect_error(other$row(), "checksum does not match CRB 'pbmc.crb'")
+
+  ## the attached matrix is not handed out before the check is in either: a
+  ## file that does not match is refused although the matrix is asked for
+  ## while the checksum is still being computed
+  out <- h5_checksum_export(h5_checksum_user_dir())
+  h5_checksum_rewrite(out$h5)
+  early <- read(out)
+  expect_true(early$pending)
+  expect_error(
+    suppressMessages(early$object$getExpressionMatrix(genes = gene)),
+    "checksum does not match CRB 'pbmc.crb'"
+  )
+  expect_error(
+    suppressMessages(early$object$getExpressionRow(gene)),
+    "checksum does not match CRB 'pbmc.crb'"
+  )
 })
 
 test_that("process-wide Viewer helpers call only process-wide Viewer helpers", {
