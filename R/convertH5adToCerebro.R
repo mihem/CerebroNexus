@@ -123,7 +123,7 @@ convertH5adToCerebro <- function(
   nGene = NULL,
   add_all_meta_data = TRUE,
   use_delayed_array = FALSE,
-  expression_matrix_mode = c("embedded", "h5"),
+  expression_matrix_mode = c("auto", "embedded", "h5"),
   codec = c("qs2", "rds"),
   viewer_binary = c("auto", "always", "never"),
   viewer_binary_threshold = 100000L,
@@ -172,8 +172,26 @@ convertH5adToCerebro <- function(
     airr_sample = airr_sample,
     spatial_images = spatial_images,
     extra_modalities = extra_modalities,
-    verbose = verbose
+    verbose = verbose,
+    ## "auto" would choose h5 for a matrix this large: the embedded mode
+    ## cannot hold more than 2^31 - 1 values
+    .stream_x = expression_matrix_mode %in%
+      c("h5", "auto") &&
+      identical(assay, "X")
   )
+  ## An X with more than 2^31 - 1 non-zero values was not read: it is streamed
+  ## into the expression file (see R/h5ad_stream.R).
+  x_stream <- sce@metadata$.h5ad_x_stream
+  sce@metadata$.h5ad_x_stream <- NULL
+  expression_matrix_mode <- if (!is.null(x_stream)) {
+    if (identical(expression_matrix_mode, "auto")) {
+      "h5"
+    } else {
+      expression_matrix_mode
+    }
+  } else {
+    .resolveExpressionMatrixMode(expression_matrix_mode, ncol(sce), verbose)
+  }
 
   obs_columns <- names(SummarizedExperiment::colData(sce))
   if (is.null(nUMI)) {
@@ -218,6 +236,7 @@ convertH5adToCerebro <- function(
     add_most_expressed_genes = add_most_expressed_genes,
     most_expressed_genes = most_expressed_genes,
     spatial_split_by = spatial_split_by,
-    .source_name = h5ad_file
+    .source_name = h5ad_file,
+    .x_stream = x_stream
   )
 }

@@ -218,7 +218,8 @@ h5_output <- file.path(legacy_dir, "example.h5")
 HDF5Array::writeTENxMatrix(
   Matrix::t(crb$expression),
   h5_output,
-  group = "expression"
+  group = "expression",
+  level = 1L
 )
 ```
 

@@ -183,10 +183,20 @@ test_that("the first process of an app.R keeps its page after the first session"
 test_that("a later process of an app.R serves the kept page as a file", {
   withr::local_envvar(R_USER_CACHE_DIR = withr::local_tempdir())
   env <- staged_document_env()
+  ## A valid kept document needs a resource path. Do not rely on another
+  ## test having rendered a Shiny page and populated the process registry.
+  prefix <- "stagedstarttestfiles"
+  shiny::addResourcePath(
+    prefix,
+    system.file("www", "shared", package = "shiny")
+  )
+  withr::defer(shiny::removeResourcePath(prefix))
   unlink(env$viewerDocumentBundleDirectory(), recursive = TRUE)
   html <- charToRaw(paste0(
     "<!DOCTYPE html>\n<html><head>",
-    "<script src=\"shiny-javascript-1.0/shiny.min.js\"></script>",
+    "<script src=\"",
+    prefix,
+    "/shiny.min.js\"></script>",
     "</head><body>page</body></html>"
   ))
   expect_false(is.null(env$viewerDocumentKeep("a-key", html)))
@@ -199,6 +209,7 @@ test_that("a later process of an app.R serves the kept page as a file", {
 
   start <- env$viewerStagedStart(character(), function() function(...) NULL)
   document <- env$viewerStagedDocument(start, "a-key")
+  expect_length(document$directory, 1L)
   expect_identical(
     readBin(file.path(document$directory, "index.html"), "raw", n = 1e6),
     html

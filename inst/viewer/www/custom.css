@@ -1889,7 +1889,8 @@ body .modal-title {
 body .modal-body { padding: 22px 24px; color: var(--c-text); }
 body .modal-footer { border-top: 1px solid var(--c-border); padding: 15px 24px; }
 
-#session-timeout-warning {
+#session-timeout-warning,
+.cerebro-session-dialog {
   box-sizing: border-box;
   width: min(420px, calc(100vw - 32px));
   max-width: none;
@@ -1901,14 +1902,17 @@ body .modal-footer { border-top: 1px solid var(--c-border); padding: 15px 24px; 
   color: var(--c-text);
   box-shadow: var(--shadow-4);
 }
-#session-timeout-warning::backdrop {
+#session-timeout-warning::backdrop,
+.cerebro-session-dialog::backdrop {
   background: rgba(28, 28, 30, .48);
 }
-#session-timeout-warning h2 {
+#session-timeout-warning h2,
+.cerebro-session-dialog h2 {
   margin: 0 0 8px;
   font-size: 20px;
 }
-#session-timeout-warning p {
+#session-timeout-warning p,
+.cerebro-session-dialog p {
   margin: 0;
   color: var(--c-text-2);
   line-height: 1.55;
@@ -1919,6 +1923,10 @@ body .modal-footer { border-top: 1px solid var(--c-border); padding: 15px 24px; 
   font-variant-numeric: tabular-nums;
 }
 #session-timeout-continue { margin-top: 18px; }
+#cerebro-access-denied { border-top: 3px solid var(--c-error); }
+#cerebro-access-denied h2 { color: var(--c-error-700); }
+/* The native session dialog owns the blocked state and its backdrop. */
+.cerebro-access-is-denied #shiny-disconnected-overlay { display: none; }
 
 /* -------------------------------------------------------------------------
    Loading / progress / notifications — unified to the warm accent

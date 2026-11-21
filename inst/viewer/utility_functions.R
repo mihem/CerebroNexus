@@ -4127,8 +4127,8 @@ get_or_load_crb <- function(
 .h5ExpressionRows <- function(sidecar, verify) {
   state <- new.env(parent = emptyenv())
   prepare <- function() {
+    verify()
     if (is.null(state$genes)) {
-      verify()
       state$n_cells <- .runtimeH5CellCount(sidecar)
       state$genes <- .runtimeH5Names(sidecar, "barcodes")
     }
@@ -4644,7 +4644,8 @@ get_or_load_crb <- function(
   ## before that record none): a replaced file with the same cell and gene
   ## names must not be painted as this data set. A file that is not known yet
   ## is hashed in the background, and verify_cells() below, which runs before
-  ## the first read of its expression, has the answer or waits for it.
+  ## every read of its expression, refuses the file once the answer is in; a
+  ## read while the hash still runs does not wait for it.
   h5_md5 <- obj$expression_backend$md5
   h5_checksum <- new.env(parent = emptyenv())
   h5_checksum$task <- .verifyRuntimeH5Checksum(
@@ -4680,7 +4681,13 @@ get_or_load_crb <- function(
     crb_h5_cell_check_start(loc_abs, crb_schema$cell_names_hash)
   }
   verify_cells <- function() {
-    if (!isTRUE(h5_checksum$verified)) {
+    ## The background hash of a large file takes tens of seconds, and nothing in
+    ## the first read depends on it: a read does not wait for a hash that is
+    ## still running. Every later call looks again, and the first one after the
+    ## hash is done refuses the file if it does not match the CRB.
+    hash_running <- inherits(h5_checksum$task, "mirai") &&
+      mirai::unresolved(h5_checksum$task)
+    if (!isTRUE(h5_checksum$verified) && !hash_running) {
       tryCatch(
         .verifyRuntimeH5Checksum(loc_abs, h5_md5, crb_path),
         error = function(error) {
@@ -4727,6 +4734,13 @@ get_or_load_crb <- function(
   delayedAssign(
     "expression",
     {
+      ## The attached matrix is read without going through verify_cells()
+      ## again, so it is not handed out before the checksum is in: a file that
+      ## does not match is refused here, however early the matrix is asked for.
+      ## A gene's row (cerebro_h5_rows) does not come this way and does not wait.
+      if (inherits(h5_checksum$task, "mirai")) {
+        mirai::call_mirai(h5_checksum$task)
+      }
       verify_cells()
       message(glue::glue(
         "[{Sys.time()}] Attaching h5 backend (lazy TENxMatrix): {loc_abs}"

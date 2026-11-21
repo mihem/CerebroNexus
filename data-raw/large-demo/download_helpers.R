@@ -1,4 +1,5 @@
-## Shared by the large-demo preparation scripts (Ren, CosMx, T-cell).
+## Shared by the large-demo preparation scripts (mouse brain, Ren, CosMx,
+## T-cell); sourced before them.
 ##
 ## A source file is described by `list(url, size, md5)` or `list(url, size,
 ## sha256)`. The size is always checked; the checksum is checked once, when the
@@ -18,6 +19,61 @@
     return(path)
   }
   file.path(tools::R_user_dir("CerebroNexus", "cache"), "large-examples")
+}
+
+## Where a demo's prepared files live: `<cache>/<name>/prepared`, the same
+## folder whatever made them. What made them is in its stamp (`demo-version`):
+## the CerebroNexus version and a hash of the functions of the demo's script.
+## Files whose stamp differs from what this checkout would write are prepared
+## again, so a changed script or a new release rebuilds the data set without
+## anyone bumping a number.
+.demoPreparedDir <- function(root) {
+  file.path(root, "prepared")
+}
+
+## A hash of the functions of a demo's script: those of `env` (where the script
+## was sourced) whose names start with `.viewer<name>` or `prepareViewer<name>`,
+## without their source references. A script keeps it as `.viewer<name>Recipe`,
+## taken when it is sourced, so that a function replaced afterwards (a test's
+## stand-in) does not change it.
+.demoRecipe <- function(env, name) {
+  pattern <- paste0("^([.]viewer|prepareViewer)", name)
+  functions <- sort(ls(env, all.names = TRUE, pattern = pattern))
+  functions <- functions[vapply(
+    functions,
+    function(f) is.function(get(f, envir = env)),
+    logical(1)
+  )]
+  code <- lapply(functions, function(f) {
+    deparse(utils::removeSource(get(f, envir = env)))
+  })
+  rlang::hash(stats::setNames(code, functions))
+}
+
+## The lines a stamp must have: the package version and the recipe.
+.demoStampKey <- function(recipe) {
+  version <- tryCatch(
+    as.character(utils::packageVersion("CerebroNexus")),
+    error = function(e) "unknown"
+  )
+  c(paste0("package: ", version), paste0("recipe: ", recipe))
+}
+
+## Writes the stamp, with when it was written (not compared).
+.demoStampWrite <- function(stamp, recipe) {
+  writeLines(
+    c(
+      .demoStampKey(recipe),
+      paste0("written: ", format(Sys.time(), "%Y-%m-%d %H:%M:%S"))
+    ),
+    stamp
+  )
+}
+
+## Whether `stamp` exists and holds the lines this checkout would write.
+.demoStampCurrent <- function(stamp, recipe) {
+  file.exists(stamp) &&
+    all(.demoStampKey(recipe) %in% readLines(stamp, warn = FALSE))
 }
 
 .demoRequire <- function(packages, demo) {
