@@ -8,7 +8,8 @@
   medians of 7 alternating rounds) leaves the screen still after 7 ms instead
   of 291 ms. A single result that is updating (dimmed, "Updating this
   result") and the spinner card over a plot wait the same 400 ms, where they
-  came after 120 ms and at once, so a result ready sooner is not even dimmed.
+  came after 120 ms and at once, and so does the spinner of a result area that
+  is still empty, so a result ready sooner is not even dimmed.
 - **The Abundance tab of Immune repertoire opens at once.** Its clone-size
   histogram (0.2 s for 1.46 million cells) is counted shortly after the page
   has drawn, and kept, instead of when the tab is opened: the tab is drawn

@@ -52,3 +52,20 @@ test_that("stored table controls include the first subgroup without another outp
     )
   }
 })
+
+test_that("cards, spinners and dimming wait the same time before they show", {
+  shell <- paste(
+    readLines(viewer_test_path("www", "viewer-shell.js")),
+    collapse = "\n"
+  )
+  css <- paste(
+    readLines(viewer_test_path("www", "custom.css")),
+    collapse = "\n"
+  )
+  js_ms <- as.numeric(sub(".*WAIT_SHOW_MS = ([0-9]+);.*", "\\1", shell))
+  css_ms <- as.numeric(sub(".*--wait-delay: ([0-9]+)ms;.*", "\\1", css))
+  expect_identical(js_ms, css_ms)
+  ## progress card, plot spinner, empty-slot spinner and empty-slot text
+  uses <- gregexpr("var(--wait-delay)", css, fixed = TRUE)[[1]]
+  expect_gte(length(uses), 4L)
+})

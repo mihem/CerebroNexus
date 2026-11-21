@@ -3056,6 +3056,23 @@ body .shiny-bound-output.cerebro-output-waiting {
   content: "Loading controls…";
 }
 .cerebro-result-slot:empty::after { content: "Loading result…"; }
+/* An empty slot that fills within --wait-delay never shows its spinner or its
+   "Loading ..." line, like the page card and the plot spinners. The spinner
+   keeps turning once it shows, so the delay is a second animation next to it. */
+.cerebro-groups-controls:empty::before,
+.cerebro-result-controls:empty::before,
+.cerebro-result-slot:empty::before,
+.cerebro-result-slot .datatables:empty::before {
+  animation:
+    cerebro-progress-late 1ms linear var(--wait-delay) backwards,
+    cerebro-loading-spin .8s linear infinite;
+}
+.cerebro-groups-controls:empty::after,
+.cerebro-result-controls:empty::after,
+.cerebro-result-slot:empty::after,
+.cerebro-result-slot .datatables:empty::after {
+  animation: cerebro-progress-late 1ms linear var(--wait-delay) backwards;
+}
 .cerebro-result-slot .datatables:empty {
   min-height: 300px;
 }
