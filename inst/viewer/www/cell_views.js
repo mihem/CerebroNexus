@@ -10339,6 +10339,13 @@
       return true;
     }
     view.render_token = Number(message.render_token);
+    if (view.directPreview && message.id === 'expression_projection') {
+      // R's state differs from the preview on screen (diagnostic for tests and
+      // benchmarks); the full recolour below replaces it.
+      document.dispatchEvent(new CustomEvent('cerebro:expression-preview-corrected', {
+        detail: {renderKey: message.data && message.data.render_key}
+      }));
+    }
     view.directPreview = false;
     var previousMeta = view.meta || {}, previousData = view.data;
     var data = Object.assign({}, view.data);
@@ -10383,6 +10390,11 @@
     )) {
       return Promise.reject(new Error('Expression identity mismatch'));
     }
+    // Once per Pack, off the critical path: later unseen genes start their
+    // fetch on selection instead of after R's reply.
+    if (typeof window.CerebroExpressionAssets.loadIndex === 'function') {
+      window.CerebroExpressionAssets.loadIndex(resource).catch(function () {});
+    }
     return window.CerebroExpressionAssets.load(resource).then(function (values) {
       message.data.color = values;
       var id = resource.pack_dataset_fingerprint + '|' + resource.gene;
@@ -10420,35 +10432,91 @@
       if (token === expressionFrameToken) expressionResourceFailed(message);
     });
   }
-  function previewCachedExpression(value) {
-    var genes = Array.isArray(value) ? value : value ? [value] : [];
+  // The single-gene, direct-asset view a preview may replace, or null.
+  function expressionPreviewView(genes) {
     var id = 'expression_projection', view = singleView(id);
     if (genes.length !== 1 || singleActive !== id || visibleSingleId() !== id ||
         !view || !view.data || !view.data.expression_resource ||
-        singleSpaceIds.length !== 1 || view.data.z || view.data.panels) return false;
+        singleSpaceIds.length !== 1 || view.data.z || view.data.panels ||
+        !window.CerebroExpressionAssets) return null;
+    return view;
+  }
+  function previewGenes(value) {
+    return Array.isArray(value) ? value : value ? [value] : [];
+  }
+  function previewCachedExpression(value) {
+    var genes = previewGenes(value), view = expressionPreviewView(genes);
+    if (!view) return false;
     var resource = view.data.expression_resource;
     var frame = expressionFrames.get(resource.pack_dataset_fingerprint + '|' + genes[0]);
     if (!frame || !sameDatasetContext(frame.context, view.dataset_context) ||
         frame.controls !== expressionControlsKey()) return false;
     var values = window.CerebroExpressionAssets.peek(frame.data.expression_resource);
     if (!values) return false;
+    return applyExpressionPreview(view, frame.data, frame.meta, values, genes[0]);
+  }
+  // An unseen gene: derive its descriptor from the frame on screen, which R
+  // drew for the same controls, changing only what depends on the gene. R's
+  // reply confirms it without a redraw when the two agree, and repaints if not.
+  function previewUnseenExpression(value, token) {
+    var genes = previewGenes(value), view = expressionPreviewView(genes);
+    if (!view || typeof window.CerebroExpressionAssets.resourceFor !== 'function') {
+      return false;
+    }
+    var current = view.data.expression_resource, gene = String(genes[0]);
+    var shown = expressionFrames.get(current.pack_dataset_fingerprint + '|' + current.gene);
+    var resource = window.CerebroExpressionAssets.resourceFor(current, gene);
+    if (!resource || !shown || shown.controls !== expressionControlsKey() ||
+        !sameDatasetContext(shown.context, view.dataset_context) ||
+        !shown.data.expression_resource ||
+        shown.data.expression_resource.url !== current.url) return false;
+    var data = Object.assign({}, shown.data), meta = Object.assign({}, shown.meta);
+    var render = String(data.render_key || '').split('\x1d');
+    var cacheSuffix = '::' + current.gene + '::' + current.cells;
+    if (render.length < 2 || render[1] !== current.gene ||
+        meta.color_variable !== current.gene ||
+        (data.color_cache_key != null && !String(data.color_cache_key).endsWith(cacheSuffix))) {
+      return false;
+    }
+    render[1] = gene;
+    data.render_key = render.join('\x1d');
+    if (data.color_cache_key != null) {
+      var key = String(data.color_cache_key);
+      data.color_cache_key = key.slice(0, key.length - cacheSuffix.length) +
+        '::' + gene + '::' + resource.cells;
+    }
+    data.color_range = resource.range.slice();
+    data.expression_resource = resource;
+    meta.color_variable = gene;
+    var context = view.dataset_context;
+    window.CerebroExpressionAssets.load(resource).then(function (values) {
+      var now = expressionPreviewView(genes);
+      if (token !== expressionFrameToken || now !== view ||
+          !sameDatasetContext(now.dataset_context, context) ||
+          expressionControlsKey() !== shown.controls) return;
+      applyExpressionPreview(view, data, meta, values, gene);
+    }, function () { /* R's reply takes the existing path */ });
+    return true;
+  }
+  function applyExpressionPreview(view, frameData, frameMeta, values, gene) {
+    var id = 'expression_projection';
     var previousData = view.data, previousMeta = view.meta;
     var data = Object.assign({}, previousData);
     SINGLE_COLOR_FIELDS.forEach(function (name) { delete data[name]; });
     SINGLE_COLOR_FIELDS.forEach(function (name) {
-      if (Object.prototype.hasOwnProperty.call(frame.data, name)) data[name] = frame.data[name];
+      if (Object.prototype.hasOwnProperty.call(frameData, name)) data[name] = frameData[name];
     });
     data.color = values;
-    view.data = data; view.meta = Object.assign({}, view.meta, frame.meta);
+    view.data = data; view.meta = Object.assign({}, view.meta, frameMeta);
     view.directPreview = true;
     if (!updateSingleExpression(id, previousMeta, previousData, {
-      data: frame.data, meta: frame.meta
+      data: frameData, meta: frameMeta
     })) {
       view.data = previousData; view.meta = previousMeta; view.directPreview = false;
       return false;
     }
     document.dispatchEvent(new CustomEvent('cerebro:expression-preview', {
-      detail: {gene: genes[0], time: performance.now()}
+      detail: {gene: gene, time: performance.now()}
     }));
     return true;
   }
@@ -12326,8 +12394,10 @@
     Shiny.addCustomMessageHandler('cell_view_recolor_binary', onSingleRecolorBinary);
     window.jQuery(document).on('shiny:inputchanged.cerebroExpression', function (event) {
       if (event.name === 'expression_genes_input') {
-        ++expressionFrameToken;
-        previewCachedExpression(event.value);
+        var token = ++expressionFrameToken;
+        if (!previewCachedExpression(event.value)) {
+          previewUnseenExpression(event.value, token);
+        }
       }
     });
     Shiny.addCustomMessageHandler('cell_view_aux_binary', onSingleAuxBinary);

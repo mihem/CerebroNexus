@@ -65,6 +65,80 @@ window.viewerScenarios = {
     } finally {window.CerebroExpressionAssets=original;}
     return true;
   },
+  async directExpressionUnseen() {
+    const t = viewerTest; t.dataset();
+    const identity = {cell_count:3, cell_fingerprint:'md5-cell-set-v1:'+'a'.repeat(32),
+      cell_order_fingerprint:'md5-cell-order-v1:'+'b'.repeat(32),
+      pack_dataset_fingerprint:'md5-crb-v1:'+'c'.repeat(32)};
+    const ranges = {A:[0,2],C:[0,7],D:[0,4]}, files = {A:1,C:3,D:4};
+    const resource = gene => ({protocol:'expression-f64-gzip-v1',gene,cells:3,
+      dataset_fingerprint:identity.cell_fingerprint,
+      cell_order_fingerprint:identity.cell_order_fingerprint,
+      pack_dataset_fingerprint:identity.pack_dataset_fingerprint,range:ranges[gene],
+      url:'cerebro-expression-test/00000'+files[gene]+'.bin.gz?v='+'d'.repeat(32)});
+    const rk = gene => 'mean\x1d'+gene+'\x1d\x1c\x1c';
+    const descriptor = gene => ({expression_resource:resource(gene),render_key:rk(gene),
+      color_range:ranges[gene],color_cache_key:'fp::'+gene+'::3'});
+    const arrays = {A:new Float64Array([0,1,2]),C:new Float64Array([7,0,3]),
+      D:new Float64Array([0,4,1])};
+    const releases = {}, loads = [], held = new Set(['C','D']);
+    const original = window.CerebroExpressionAssets;
+    window.CerebroExpressionAssets = {
+      load:r=>{loads.push(r.gene);return !held.has(r.gene)?Promise.resolve(arrays[r.gene])
+        :new Promise(resolve=>{releases[r.gene]=()=>{held.delete(r.gene);resolve(arrays[r.gene]);};});},
+      peek:()=>null, loadIndex:()=>Promise.resolve(null),
+      resourceFor:(base,gene)=>gene==='C'||gene==='D'?resource(gene):null
+    };
+    const select = gene => jQuery(document).trigger(
+      {type:'shiny:inputchanged',name:'expression_genes_input',value:[gene]});
+    const confirm = (gene, data={}) => {
+      const message=t.message('expression_projection');delete message.dataset_identity;
+      message.data={...descriptor(gene),...data};
+      message.meta={color_type:'continuous',color_variable:gene};
+      t.sendWire('cell_view_recolor_binary',message);return message;
+    };
+    try {
+      await t.render(descriptor('A'),{color_variable:'A'},'expression_projection',
+        {dataset_identity:identity});
+      const state=cerebroCellViews.captureState('expression_projection');
+      const acknowledgements=t.requests.length;
+      const previews=[];
+      const onPreview=e=>previews.push(e.detail.gene);
+      document.addEventListener('cerebro:expression-preview',onPreview);
+      let corrections=0;const onCorrected=()=>corrections++;
+      document.addEventListener('cerebro:expression-preview-corrected',onCorrected);
+      select('C');await t.settle();
+      t.check(loads.includes('C'),'An unseen gene is fetched on selection, not after R replies');
+      t.equal(previews.length,0,'Nothing is drawn before its values arrive');
+      releases.C();await t.settle();
+      t.equal(previews.join(),'C','The unseen gene draws before any server response');
+      t.check(document.getElementById('cv-cbar').textContent.includes('C'),'Preview legend names C');
+      t.equal(cerebroCellViews.captureState('expression_projection'),state,'Preview preserves state');
+      t.equal(t.requests.length,acknowledgements,'Preview is not a server readiness acknowledgement');
+      // R's reply for the same gene, controls and range: announced, not redrawn.
+      t.resetPaint();const same=confirm('C');await t.settle();
+      t.check(t.events.some(e=>e.name==='cerebro:cell-view-ready'&&e.renderToken===same.render_token),
+        'Matching confirmation is announced as painted');
+      const skipPaints=t.paints.length;
+      // A reply that disagrees with the derived preview (another range) repaints.
+      select('D');releases.D();await t.settle();
+      t.equal(previews.join(),'C,D','Second unseen gene previews too');
+      t.equal(corrections,0,'Matching confirmations report no correction');
+      t.resetPaint();confirm('D',{color_range:[0,5]});await t.settle();
+      t.equal(corrections,1,'A disagreeing confirmation reports a correction');
+      t.check(t.paints.length>skipPaints,
+        'A disagreeing confirmation repaints ('+t.paints.length+' vs '+skipPaints+')');
+      // A slow unseen fetch cannot draw after the user moved on.
+      delete releases.C;held.add('C');select('C');await t.settle();
+      select('A');confirm('A');await t.settle();
+      if(releases.C)releases.C();await t.settle();
+      t.equal(previews.join(),'C,D','A late unseen fetch draws nothing');
+      t.check(document.getElementById('cv-cbar').textContent.includes('A'),'Late C cannot overwrite A');
+      document.removeEventListener('cerebro:expression-preview',onPreview);
+      document.removeEventListener('cerebro:expression-preview-corrected',onCorrected);
+    } finally {window.CerebroExpressionAssets=original;}
+    return true;
+  },
   async colors() {
     const t=viewerTest;t.dataset();const exact=1+2**-40;
     for(const sparse of [false,true]) {

@@ -1695,12 +1695,32 @@ server <- function(input, output, session) {
     })
     if (is.null(asset)) return(NULL)
     prefix <- viewerStaticResourcePrefix("expression", dirname(asset$file))
-    c(list(
+    resource <- c(list(
       protocol = "expression-f64-gzip-v1", gene = gene,
       url = paste0(prefix, "/", basename(asset$file), "?v=", asset$checksum),
       cells = pack$cell_count, bytes = asset$bytes, checksum = asset$checksum,
       range = c(rows$low[[i]], rows$high[[i]])
     ), viewerCanonicalResourceIdentity(pack))
+    ## The index is verified once per Pack; it only names files in this
+    ## already-served directory, each checked by size and gzip CRC on arrival.
+    index <- NULL
+    if (is.environment(pack$cache)) {
+      if (!exists("expression_index", envir = pack$cache, inherits = FALSE)) {
+        assign("expression_index", viewerPackVerifiedAsset(
+          pack, "expression/index.json", accept = function(asset) {
+            identical(asset$dtype, "expression-index-v1")
+          }
+        ), envir = pack$cache)
+      }
+      index <- get("expression_index", envir = pack$cache, inherits = FALSE)
+    }
+    if (is.list(index) && identical(dirname(index$file), dirname(asset$file))) {
+      resource$index <- list(
+        url = paste0(prefix, "/index.json?v=", index$checksum),
+        bytes = index$bytes
+      )
+    }
+    resource
   }
   viewerProjectionAsset <- function(name, cell_indices = NULL) {
     pack <- viewerPackCurrent()

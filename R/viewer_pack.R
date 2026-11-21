@@ -68,9 +68,26 @@
       low = limits[[1L]], high = limits[[2L]]
     )
   }
-  list(assets = do.call(rbind, assets), rows = if (length(rows)) {
-    do.call(rbind, rows)
-  } else empty)
+  if (!length(rows)) return(list(assets = NULL, rows = empty))
+  assets <- do.call(rbind, assets)
+  rows <- do.call(rbind, rows)
+  ## One small index lets the browser fetch an unseen gene as soon as it is
+  ## selected, in parallel with Shiny, instead of after R names its URL.
+  index_path <- "expression/index.json"
+  index_file <- file.path(stage, index_path)
+  jsonlite::write_json(list(
+    protocol = "expression-index-v1", cells = rows$cells[[1L]],
+    genes = I(rows$gene), files = I(basename(rows$path)),
+    bytes = I(assets$bytes), checksums = I(assets$checksum),
+    low = I(rows$low), high = I(rows$high)
+  ), index_file, auto_unbox = TRUE, digits = NA)
+  assets <- rbind(assets, data.frame(
+    path = index_path, dtype = "expression-index-v1",
+    dimensions = as.character(nrow(rows)),
+    bytes = as.numeric(file.info(index_file)$size),
+    checksum = .viewerPackMd5(index_file)
+  ))
+  list(assets = assets, rows = rows)
 }
 
 .viewerDatasetCapabilities <- function(object) {

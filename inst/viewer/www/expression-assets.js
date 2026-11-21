@@ -75,9 +75,70 @@
     pending.set(id, promise);
     return promise;
   }
+  // gene -> resource maps, one per Pack. Built only from a verified resource
+  // the server handed out, so every derived URL stays in its directory.
+  var indexes = new Map();
+  var INDEX_URL = /^([a-zA-Z0-9_-]+\/)index\.json\?v=[a-f0-9]{32}$/;
+  var FILE = /^[0-9]+\.bin\.gz$/, MD5 = /^[a-f0-9]{32}$/;
+  function indexKey(resource) {
+    var index = resource && resource.index;
+    if (!index || !INDEX_URL.test(index.url)) return null;
+    return [resource.pack_dataset_fingerprint, resource.cell_order_fingerprint,
+      resource.cells, index.url].join('|');
+  }
+  function buildIndex(resource, json) {
+    var dir = INDEX_URL.exec(resource.index.url)[1], genes = new Map();
+    if (!json || json.protocol !== 'expression-index-v1' ||
+        json.cells !== resource.cells || !Array.isArray(json.genes)) {
+      throw new Error('Invalid expression index');
+    }
+    var n = json.genes.length;
+    ['files', 'bytes', 'checksums', 'low', 'high'].forEach(function (name) {
+      if (!Array.isArray(json[name]) || json[name].length !== n) {
+        throw new Error('Invalid expression index');
+      }
+    });
+    for (var i = 0; i < n; i++) {
+      if (!FILE.test(json.files[i]) || !MD5.test(json.checksums[i])) continue;
+      genes.set(String(json.genes[i]), {
+        protocol: 'expression-f64-gzip-v1', gene: String(json.genes[i]),
+        url: dir + json.files[i] + '?v=' + json.checksums[i],
+        cells: resource.cells, bytes: json.bytes[i], checksum: json.checksums[i],
+        range: [json.low[i], json.high[i]],
+        dataset_fingerprint: resource.dataset_fingerprint,
+        cell_order_fingerprint: resource.cell_order_fingerprint,
+        pack_dataset_fingerprint: resource.pack_dataset_fingerprint,
+        index: resource.index
+      });
+    }
+    return genes;
+  }
+  function loadIndex(resource) {
+    var id = indexKey(resource);
+    if (!id) return Promise.resolve(null);
+    var entry = indexes.get(id);
+    if (entry) return entry.promise;
+    entry = {map: null};
+    entry.promise = root.fetch(resource.index.url, { credentials: 'same-origin' })
+      .then(function (response) {
+        if (!response.ok) throw new Error('Expression index HTTP ' + response.status);
+        return response.json();
+      }).then(function (json) {
+        entry.map = buildIndex(resource, json);
+        return entry.map;
+      }).catch(function (error) { indexes.delete(id); throw error; });
+    indexes.set(id, entry);
+    return entry.promise;
+  }
+  // Synchronous: the resource for `gene` in the Pack of `resource`, or null.
+  function resourceFor(resource, gene) {
+    var id = indexKey(resource), entry = id && indexes.get(id);
+    return (entry && entry.map && entry.map.get(String(gene))) || null;
+  }
   root.CerebroExpressionAssets = {
     load: load, peek: peek, decode: decode,
+    loadIndex: loadIndex, resourceFor: resourceFor,
     stats: function () { return Object.assign({ bytes: bytes, budget: budget }, metrics); },
-    clear: function () { cache.clear(); bytes = 0; }
+    clear: function () { cache.clear(); indexes.clear(); bytes = 0; }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

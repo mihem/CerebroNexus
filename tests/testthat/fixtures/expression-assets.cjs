@@ -45,5 +45,44 @@ globalThis.fetch = async url => {
   globalThis.fetch = async () => new Response('missing', {status: 404});
   await assert.rejects(loader.load(resources[0]), /404/);
   assert.equal(loader.peek(resources[0]), null);
+
+  // The index: one request, resources derived in the served directory only.
+  loader.clear();
+  const indexText = fs.readFileSync(`${input.root}/expression/index.json`, 'utf8');
+  const indexUrl = `cerebro-expression-test/index.json?v=${'e'.repeat(32)}`;
+  const base = {...resources[0], index: {url: indexUrl, bytes: indexText.length}};
+  requests = 0;
+  globalThis.fetch = async url => {
+    requests++;
+    if (url === indexUrl) return new Response(indexText);
+    const file = url.replace(/^cerebro-expression-test\//, '').replace(/\?.*$/, '');
+    return new Response(fs.readFileSync(`${input.root}/expression/${file}`));
+  };
+  assert.equal(loader.resourceFor(base, 'dense'), null);
+  const [m1, m2] = await Promise.all([loader.loadIndex(base), loader.loadIndex(base)]);
+  assert.equal(m1, m2);
+  assert.equal(requests, 1);
+  const index = JSON.parse(indexText);
+  const indexed = loader.resourceFor(base, 'dense');
+  assert.equal(indexed.url, `cerebro-expression-test/000002.bin.gz?v=${index.checksums[1]}`);
+  assert.deepEqual(indexed.range, [index.low[1], index.high[1]]);
+  assert.equal(indexed.pack_dataset_fingerprint, base.pack_dataset_fingerprint);
+  assert.equal((await loader.load(indexed))[19], 20 / 7);
+  assert.equal(loader.resourceFor(base, 'missing'), null);
+  assert.equal(loader.resourceFor({...base, cell_order_fingerprint: 'other'}, 'dense'), null);
+  assert.equal(await loader.loadIndex({...base,
+    index: {url: `https://evil.example/index.json?v=${'e'.repeat(32)}`}}), null);
+  assert.equal(await loader.loadIndex({...resources[0]}), null);
+  loader.clear();
+  globalThis.fetch = async () => new Response(JSON.stringify({...index, cells: 21}));
+  await assert.rejects(loader.loadIndex(base), /Invalid expression index/);
+  globalThis.fetch = async () => new Response(indexText);
+  assert.ok(await loader.loadIndex(base), 'A failed index is retried, not cached');
+  loader.clear();
+  globalThis.fetch = async () => new Response(JSON.stringify(
+    {...index, files: ['../../secret.bin.gz', ...index.files.slice(1)]}));
+  await loader.loadIndex(base);
+  assert.equal(loader.resourceFor(base, input.rows[0].gene), null);
+  assert.ok(loader.resourceFor(base, 'dense'));
   console.log('expression assets OK');
 })().catch(error => { console.error(error); process.exitCode = 1; });

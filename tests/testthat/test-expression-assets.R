@@ -50,6 +50,40 @@ test_that("direct expression assets round-trip exact values in canonical order",
   expect_true(validateViewerPack(file)$valid)
 })
 
+test_that("the expression index names every exported gene, also for one gene", {
+  root <- withr::local_tempdir()
+  cells <- paste0("c", 1:4)
+  values <- rbind(G1 = c(0, 1.5, 0, 2), G2 = c(3, 0, 0, 0))
+  colnames(values) <- cells
+  object <- Cerebro$new()
+  object$setExpression(values)
+  object$setMetaData(data.frame(cell_barcode = cells))
+  file <- file.path(root, "test.crb")
+  saveCerebro(object, file)
+  pack <- paste0(sub("[.]crb$", "", file), ".viewer")
+  for (genes in list(NULL, "G2")) {
+    buildViewerPack(file, viewer_binary = "always", expression_genes = genes,
+      overwrite = TRUE)
+    check <- validateViewerPack(file)
+    expect_true(check$valid)
+    rows <- check$manifest$expression_rows
+    assets <- check$manifest$assets
+    index <- jsonlite::read_json(file.path(pack, "expression/index.json"))
+    expect_identical(index$protocol, "expression-index-v1")
+    expect_identical(index$cells, 4L)
+    expect_identical(unlist(index$genes), rows$gene)
+    expect_identical(unlist(index$files), basename(rows$path))
+    expect_identical(unlist(index$checksums),
+      assets$checksum[match(rows$path, assets$path)])
+    expect_equal(unlist(index$low), rows$low)
+    expect_equal(unlist(index$high), rows$high)
+    expect_identical(assets$dtype[assets$path == "expression/index.json"],
+      "expression-index-v1")
+  }
+  buildViewerPack(file, viewer_binary = "always", overwrite = TRUE)
+  expect_false(file.exists(file.path(pack, "expression/index.json")))
+})
+
 test_that("direct expression markers preserve ranges without materializing values", {
   scope <- viewer_runtime_env()
   sys.source(viewer_test_path("core", "func_color_scale.R"), scope)
@@ -60,6 +94,11 @@ test_that("direct expression markers preserve ranges without materializing value
 test_that("direct expression frames and cached previews reject late fetches", {
   skip_on_cran()
   viewer_browser_test("directExpression")
+})
+
+test_that("unseen genes fetch on selection and preview before R replies", {
+  skip_on_cran()
+  viewer_browser_test("directExpressionUnseen")
 })
 
 test_that("a direct marker bypasses source reads and a failed asset falls back", {
