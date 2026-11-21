@@ -81,7 +81,7 @@ spatial_background_edit_target <- reactive({
     preset = spatial_background_preset(
       Cerebro.options,
       viewer_current_dataset_key(),
-      input[["spatial_projection_to_display"]],
+      spatial_projection_single_section(input, availableSpatial()),
       parameters$background_descriptor
     )
   )
@@ -312,7 +312,7 @@ observeEvent(
 )
 
 observeEvent(input[["spatial_projection_background_copy_preset"]], {
-  spatial_name <- input[["spatial_projection_to_display"]]
+  spatial_name <- spatial_projection_single_section(input, availableSpatial())
   dataset_context <- viewer_loaded_dataset_context()
   dataset <- dataset_context$dataset_key
   target <- spatial_background_edit_target()

@@ -1403,9 +1403,10 @@ values into downstream analysis.
       \item{\code{name}}{Name of the spatial data entry (for example a Seurat image or
 Cerebro spatial entry).}
       \item{\code{data}}{\code{list} containing 'coordinates' (data.frame) and
-'expression' (sparse matrix). Embedded backgrounds are stored in
-'histology_images', a uniquely named list of image payloads. Each
-payload contains 'histology_image' (a base64 \code{data:} URI),
+'expression' (sparse matrix, or the reference to the object's matrix
+that \code{getSpatialData(hydrate_expression = FALSE)} returns).
+Embedded backgrounds are stored in 'histology_images', a uniquely
+named list of image payloads. Each payload contains 'histology_image' (a base64 \code{data:} URI),
 'histology_image_bounds' (xmin/xmax/ymin/ymax in coordinate space), and
 may contain a declarative 'histology_alignment'.
 Bounds omitted from a payload are derived from the coordinates. The
@@ -1423,7 +1424,11 @@ rejected.}
   Retrieve spatial data.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{Cerebro$getSpatialData(name, hydrate_molecules = TRUE)}
+    \preformatted{Cerebro$getSpatialData(
+  name,
+  hydrate_molecules = TRUE,
+  hydrate_expression = TRUE
+)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
@@ -1433,6 +1438,10 @@ rejected.}
       \item{\code{hydrate_molecules}}{Whether to read an external molecule table. Set
 to \code{FALSE} for Viewer paths that only consume coordinates,
 expression, or images.}
+      \item{\code{hydrate_expression}}{Whether to return the section's expression
+matrix. A saved CRB keeps it as a reference to the columns of the
+object's expression matrix; set to \code{FALSE} to leave that
+reference in place when only coordinates or images are needed.}
     }
     \if{html}{\out{</div>}}
   }

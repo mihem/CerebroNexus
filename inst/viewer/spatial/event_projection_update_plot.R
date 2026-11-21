@@ -33,10 +33,12 @@ observe({
   # Calling the raw reactive keeps this observer invalidated while replacement
   # renderUI inputs settle.
   ## A new section is one discrete choice: draw it now rather than after the
-  ## debounce that gathers slider and filter changes.
+  ## debounce that gathers slider and filter changes. So is a switch between
+  ## one section and the grid.
+  scene_fields <- c("projection", "grid_sections", "grid_projection")
   section_changed <- !identical(
-    spatial_projection_controls()$projection,
-    spatial_projection_last_render$plot_parameters$projection
+    unname(spatial_projection_controls()[scene_fields]),
+    unname(spatial_projection_last_render$plot_parameters[scene_fields])
   )
   data <- if (dataset_changed || render_requested || section_changed) {
     spatial_projection_data_to_plot_raw()

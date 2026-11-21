@@ -357,6 +357,14 @@
     opacity .16s ease, border-color .16s ease, box-shadow .16s ease;
 }
 .coordviews-page .cv-panes.cv-focus-transitioning canvas { transition: none; }
+/* An enlarged view in its grid (focusGridPacking()): tracks set by JS. */
+.coordviews-page .cv-panes.cv-focus-grid {
+  justify-content: center;
+  align-items: start;
+}
+.coordviews-page .cv-panes.cv-focus-grid > .cv-pane { align-self: stretch; }
+/* A narrow linked panel keeps its title; its "Context" badge gives way. */
+.coordviews-page .cv-pane.cv-narrow.cv-focus-context .cv-role-badge { display: none; }
 .coordviews-page .cv-pane.cv-focus-primary {
   border-color: var(--c-amber);
   box-shadow: 0 0 0 2px var(--c-amber-50), var(--shadow-2);
@@ -526,14 +534,8 @@
   position: relative; margin: auto 0; align-self: center;
   background: var(--c-surface); border-radius: 6px;
 }
-/* Square-mode mat reveals the actual canvas without changing its dimensions,
-   pointer coordinates or exported pixels. Fluid mode uses the normal surface. */
-.coordviews-page .cv-pane.cv-square-plot {
-  background: var(--c-bg);
-}
-.coordviews-page .cv-square-plot .cv-canvas-wrap {
-  outline: 1px solid var(--c-border);
-}
+/* Square mode keeps the canvas at the panel's size; the plot is drawn in a
+   centred square that the canvas outlines (drawSquareFrame()). */
 .coordviews-page canvas {
   /* JS fits the canvas inside its panel without distorting spatial geometry. */
   display: block; background: var(--c-surface);
@@ -873,21 +875,8 @@
 }
 
 /* ---- RGB co-expression channel row -------------------------------------- */
-.coordviews-page .cv-filters > #cv-rgb-ctl {
-  flex: 0 1 408px; width: 408px; min-width: min(408px, 100%);
-}
-.coordviews-page .cv-rgb-ctl .cv-rgb-row {
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px;
-}
-/* Each channel is sized to hold a gene symbol, not stretched to fill — three
-   full-width pickers would hog the bar and push the selection buttons to a new
-   row. Fixed width, no flex-grow. */
-.coordviews-page .cv-rgb-ctl .cv-rgb-row .form-group {
-  margin-bottom: 0; width: auto; min-width: 0;
-}
-.coordviews-page .cv-rgb-ctl .cv-rgb-row .selectize-control {
-  width: 100%; min-width: 0;
-}
+/* The three gene boxes are the shared RGB field (cerebroRgbGeneFields(),
+   custom.css). */
 /* keep the mode-specific gene pickers compact in the top bar */
 .coordviews-page #cv-gene-ctl .form-group,
 .coordviews-page #cv-rgb-ctl .form-group { margin-bottom: 0; }

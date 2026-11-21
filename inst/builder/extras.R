@@ -2230,7 +2230,7 @@ builder_pair_sections <- function(picture, per_section) {
   applied <- intersect(names(collection) %||% character(), available)
   changed <- character()
   for (section_id in available) {
-    spatial <- crb$getSpatialData(section_id)
+    spatial <- crb$getSpatialData(section_id, hydrate_expression = FALSE)
     has_embedded <- length(spatial$histology_images %||% list()) > 0L ||
       !is.null(spatial[["histology_image", exact = TRUE]]) ||
       !is.null(spatial[["histology_image_bounds", exact = TRUE]])

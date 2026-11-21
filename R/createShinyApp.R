@@ -761,7 +761,7 @@
   }
   catalog <- lapply(available, function(spatial_name) {
     data <- tryCatch(
-      object$getSpatialData(spatial_name, hydrate_molecules = FALSE),
+      .spatialRecordWithoutExpression(object, spatial_name),
       error = function(error) {
         stop(
           "Could not read dataset `",

@@ -2393,14 +2393,21 @@ test_that("per-image settings also apply to embedded backgrounds", {
     collapse = "\n"
   )
   expect_match(js, "xRange: sample.x_range || null", fixed = TRUE)
+  ## A section's own size and opacity hold until the reader sets them, on
+  ## Linked views as on a single page; then every panel takes the reader's.
   expect_match(
     js,
-    "(!pointSizeEdited || !singleActive) && sp && sp.builder_point_size",
+    "!pointSizeEdited && sp && sp.builder_point_size",
     fixed = TRUE
   )
   expect_match(
     js,
-    "(!pointOpacityEdited || !singleActive) && sp && sp.builder_point_opacity",
+    "!pointOpacityEdited && sp && sp.builder_point_opacity",
+    fixed = TRUE
+  )
+  expect_match(
+    js,
+    "if (singleActive || pctEdited || !isSpatialSpace(space)) return pctMask;",
     fixed = TRUE
   )
 })

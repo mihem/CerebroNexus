@@ -957,7 +957,7 @@ cv_spatial_data <- function(crb, nm) {
     crb,
     nm
   )
-  crb$getSpatialData(nm, hydrate_molecules = FALSE)
+  viewerGetSpatialData(crb, nm)
 }
 
 ## Canonical rows of a section's cells: the Viewer's section rows (the Viewer

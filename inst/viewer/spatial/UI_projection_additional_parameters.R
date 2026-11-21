@@ -9,7 +9,7 @@ output[["spatial_projection_scatter_parameters_UI"]] <- renderUI({
   section_appearance <- spatialPointAppearance(
     Cerebro.options,
     viewer_current_dataset_key(),
-    input[["spatial_projection_to_display"]]
+    spatial_projection_single_section(input, availableSpatial())
   )
   if (!is.null(section_appearance)) {
     appearance$point_size <- section_appearance$point_size
@@ -18,7 +18,7 @@ output[["spatial_projection_scatter_parameters_UI"]] <- renderUI({
   roi_appearance <- spatialRoiSetting(
     Cerebro.options,
     viewer_current_dataset_key(),
-    input[["spatial_projection_to_display"]],
+    spatial_projection_single_section(input, availableSpatial()),
     spatial_roi_value(input[["spatial_projection_roi"]] %||% "")
   )
   if (!is.null(roi_appearance)) {
@@ -49,7 +49,7 @@ output[["spatial_projection_data_parameters_UI"]] <- renderUI({
   tagList(
     viewerLimitedSlider(
       "spatial_projection_percentage_cells_to_show",
-      label = "Show % of observations",
+      label = "Show % of cells",
       limits = preferences[["cell_percentage_cells_to_show"]],
       value = appearance$percentage_cells_to_show
     )
@@ -72,10 +72,14 @@ output[["spatial_projection_background_parameters_UI"]] <- renderUI({
   tryCatch(
     {
       req(
-        !is.null(input[["spatial_projection_to_display"]]),
-        input[["spatial_projection_to_display"]] %in% availableSpatial()
+        !is.null(spatial_projection_single_section(input, availableSpatial())),
+        spatial_projection_single_section(input, availableSpatial()) %in%
+          availableSpatial()
       )
-      sp <- getSpatialData(input[["spatial_projection_to_display"]])
+      sp <- getSpatialData(spatial_projection_single_section(
+        input,
+        availableSpatial()
+      ))
       co <- sp$coordinates
       x <- co[[1]][is.finite(co[[1]])]
       y <- co[[2]][is.finite(co[[2]])]
@@ -379,7 +383,7 @@ spatial_projection_additional_parameters_info <- list(
     <ul>
       <li><b>Point size:</b> Controls how large the observations should be.</li>
       <li><b>Point opacity:</b> Controls the transparency of the observations.</li>
-      <li><b>Show % of observations:</b> Randomly subsamples cells or spots after the active Sample, FOV / section, ROI, and group filters.</li>
+      <li><b>Show % of cells:</b> Randomly subsamples cells or spots after the active Sample, FOV / section, ROI, and group filters.</li>
     </ul>
     "
   )

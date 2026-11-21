@@ -307,11 +307,11 @@ body.skin-blue .sidebar > .sidebar-menu {
   flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto !important;
 }
 .cerebro-sidebar-preferences {
-  flex: 0 0 auto; margin: 8px 14px 0; padding: 12px 0 14px;
+  flex: 0 0 auto; margin: 6px 12px 0; padding: 8px 0 8px;
   border-top: 1px solid var(--c-border);
 }
 .cerebro-preferences-heading {
-  margin-bottom: 7px; color: var(--c-text-2); font-size: 12px; font-weight: 600;
+  margin-bottom: 2px; color: var(--c-text-2); font-size: 12px; font-weight: 600;
 }
 body .sidebar .cerebro-sidebar-preferences .shiny-input-container {
   width: 100%; min-width: 0; margin: 0; padding: 0;
@@ -319,7 +319,7 @@ body .sidebar .cerebro-sidebar-preferences .shiny-input-container {
 .cerebro-sidebar-preferences .checkbox { margin: 0; }
 .cerebro-sidebar-preferences .checkbox label {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 8px; min-height: 34px; padding: 0; font-size: 13px;
+  gap: 6px; min-height: 28px; padding: 0; font-size: 12.5px;
   color: var(--c-text); font-weight: 400; cursor: pointer;
 }
 .cerebro-sidebar-preferences input[type=checkbox] {
@@ -340,6 +340,39 @@ body .sidebar .cerebro-sidebar-preferences .shiny-input-container {
 @media (prefers-reduced-motion: reduce) {
   .cerebro-sidebar-preferences input[type=checkbox],
   .cerebro-sidebar-preferences input[type=checkbox]::before { transition: none; }
+}
+/* A Preferences switch's "i": a small ring raised to the label's cap height.
+   Its help bubble opens above the row on hover, on focus or after a click. */
+.cerebro-preference { position: relative; }
+.cerebro-pref-label { display: inline-flex; align-items: flex-start; gap: 3px; white-space: nowrap; }
+.cerebro-pref-info {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 12px; height: 12px; margin-top: -3px; border: 1px solid currentColor;
+  border-radius: 50%; color: var(--c-text-3);
+  font: italic 600 8.5px/1 Georgia, "Times New Roman", serif;
+  cursor: help; transition: color .15s ease, background .15s ease;
+}
+.cerebro-pref-info:hover, .cerebro-pref-info:focus-visible,
+.cerebro-preference.is-open .cerebro-pref-info {
+  color: var(--c-amber-700); background: var(--c-amber-50); outline: none;
+}
+.cerebro-pref-tip {
+  position: absolute; left: 0; right: -4px; bottom: calc(100% - 2px); z-index: 1030;
+  padding: 7px 10px; border-radius: 8px;
+  background: rgba(17, 24, 39, .94); color: #f9fafb;
+  font-size: 12px; line-height: 1.45; font-weight: 400;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, .18);
+  opacity: 0; visibility: hidden; transform: translateY(3px); pointer-events: none;
+  transition: opacity .12s ease, transform .12s ease, visibility 0s linear .12s;
+}
+.cerebro-preference:has(.cerebro-pref-info:hover) .cerebro-pref-tip,
+.cerebro-preference:has(.cerebro-pref-info:focus-visible) .cerebro-pref-tip,
+.cerebro-preference.is-open .cerebro-pref-tip {
+  opacity: 1; visibility: visible; transform: none;
+  transition: opacity .12s ease, transform .12s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cerebro-pref-tip, .cerebro-pref-info { transition: none; }
 }
 /* Brand block at the top of the sidebar. The inline SVG wordmark inherits the
    sidebar text colour, with an accent on "Nexus". */
@@ -660,15 +693,20 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
   flex: 3 1 430px;
   min-width: min(430px, 100%);
 }
+/* Red, Green, Blue and RGB layout: four equal fields on one row. */
+.cerebro-viz-toolbar .shiny-panel-conditional:has(> .spatial-rgb-controls) {
+  flex: 4 1 600px;
+  min-width: 0;
+}
 .cerebro-viz-toolbar .spatial-rgb-controls {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 12px;
+  gap: 10px;
 }
 .cerebro-viz-toolbar .spatial-rgb-controls .form-group {
-  flex: 1 1 180px;
-  min-width: min(180px, 100%);
+  flex: 1 1 140px;
+  min-width: min(140px, 100%);
 }
 .cerebro-viz-toolbar .control-label,
 .coordviews-page .cv-ctl > label {
@@ -2975,6 +3013,77 @@ body .shiny-bound-output.cerebro-output-waiting {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+/* Collapse / expand: a small chevron at the end of the card's header. */
+.cerebro-selection-composition-head {
+  grid-template-columns: 16px auto minmax(0, 1fr) 18px;
+}
+.cerebro-selection-composition-toggle {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #a4a8af;
+  cursor: pointer;
+}
+.cerebro-selection-composition-toggle::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 5px;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform .15s ease, top .15s ease;
+}
+.cerebro-selection-composition-toggle:hover {
+  background: var(--c-surface-2);
+  color: var(--c-text-2);
+}
+.cerebro-selection-composition-toggle:focus-visible {
+  outline: 2px solid var(--c-amber);
+  outline-offset: 1px;
+}
+/* Collapsed: a narrow strip, one dot, name and percent per group. */
+body.cerebro-composition-collapsed .cerebro-selection-composition-slot {
+  width: max-content;
+  max-width: calc(100% - 24px);
+}
+body.cerebro-composition-collapsed .cerebro-selection-composition-card {
+  padding: 7px 9px 8px;
+}
+body.cerebro-composition-collapsed .cerebro-selection-composition-head {
+  grid-template-columns: 16px minmax(0, 1fr) 18px;
+  margin-bottom: 5px;
+}
+body.cerebro-composition-collapsed .cerebro-selection-composition-head strong,
+body.cerebro-composition-collapsed .cerebro-selection-composition-head > span,
+body.cerebro-composition-collapsed .cerebro-selection-composition-sub,
+body.cerebro-composition-collapsed .cerebro-selection-composition-track,
+body.cerebro-composition-collapsed .cerebro-selection-composition-count {
+  display: none;
+}
+body.cerebro-composition-collapsed .cerebro-selection-composition-toggle {
+  grid-column: 3;
+}
+body.cerebro-composition-collapsed .cerebro-selection-composition-toggle::before {
+  top: 7px;
+  transform: rotate(-135deg);
+}
+body.cerebro-composition-collapsed .cerebro-selection-composition-rows {
+  gap: 4px;
+}
+body.cerebro-composition-collapsed .cerebro-selection-composition-row {
+  grid-template-columns: minmax(0, auto) auto;
+  gap: 10px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cerebro-selection-composition-toggle::before { transition: none; }
+}
 @media (max-width: 700px) {
   .cerebro-selection-composition-slot {
     position: static;
@@ -3055,6 +3164,90 @@ body .shiny-bound-output.cerebro-output-waiting {
 }
 .cerebro-viz-toolbar .spatial-image-dim-controls .form-group {
   flex: 1 1 180px;
+}
+/* Section grid. Row one: the Layout switch, the single section's scene (when
+   shown), plot type and colouring, then Share/Settings at the end. Row two,
+   in the grid only: the grid's own controls across the full width. */
+.cerebro-viz-toolbar .spatial-layout-control { flex: 0 0 auto; order: -1; }
+.cerebro-viz-toolbar .spatial-layout-control .form-group {
+  flex: 0 0 auto; width: auto; min-width: 0;
+}
+/* The radio buttons drawn as one segmented control, like Linked views'. */
+.cerebro-viz-toolbar .spatial-layout-control .shiny-options-group {
+  display: inline-flex; height: var(--c-toolbar-control-height);
+  box-sizing: border-box; border: 1px solid var(--c-border-2);
+  border-radius: var(--r-sm); overflow: hidden; background: var(--c-surface);
+}
+.cerebro-viz-toolbar .spatial-layout-control .radio-inline {
+  position: relative; display: flex; align-items: center;
+  margin: 0; padding: 0 14px; border-left: 1px solid var(--c-border-2);
+  color: var(--c-text-2); font-size: 14px; cursor: pointer; white-space: nowrap;
+}
+.cerebro-viz-toolbar .spatial-layout-control .radio-inline:first-child { border-left: 0; }
+.cerebro-viz-toolbar .spatial-layout-control .radio-inline:hover { background: var(--c-surface-2); }
+.cerebro-viz-toolbar .spatial-layout-control .radio-inline input {
+  position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none;
+}
+.cerebro-viz-toolbar .spatial-layout-control .radio-inline:has(input:checked) {
+  background: var(--c-amber-50); color: var(--c-amber-700); font-weight: 600;
+}
+.cerebro-viz-toolbar .spatial-layout-control .radio-inline:has(input:focus-visible) {
+  box-shadow: inset 0 0 0 2px var(--c-amber);
+}
+.cerebro-viz-toolbar .shiny-panel-conditional:has(> .spatial-single-controls) {
+  flex: 2 1 380px;
+}
+.cerebro-viz-toolbar .spatial-single-controls {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px;
+}
+.cerebro-viz-toolbar .spatial-single-controls .form-group { flex: 1 1 180px; }
+.cerebro-viz-toolbar .shiny-panel-conditional:has(> .spatial-grid-controls) {
+  order: 50;
+}
+.cerebro-viz-toolbar .spatial-grid-controls .form-group {
+  flex: 0 0 140px; width: auto; min-width: 0;
+}
+.cerebro-viz-toolbar .spatial-grid-controls .form-group:has(select[multiple]) {
+  flex: 1 1 360px;
+}
+.cerebro-viz-toolbar .spatial-grid-controls .form-group:has(#spatial_projection_grid_projection) {
+  flex: 0 0 180px;
+}
+.cerebro-viz-toolbar .spatial-grid-controls .form-group:has(.checkbox) {
+  flex: 0 0 auto; display: flex; align-items: center;
+  height: var(--c-toolbar-control-height);
+}
+.cerebro-viz-toolbar .spatial-grid-controls .checkbox { margin: 0; }
+.cerebro-viz-toolbar .spatial-grid-controls .checkbox label { white-space: nowrap; }
+/* Skeleton of the coming layout while the server prepares it (cell_views.js,
+   showGridSkeleton()): cards over the old panels, which stay laid out. */
+.cv-grid-skeleton {
+  position: absolute; z-index: 6; display: grid; overflow: hidden;
+  align-content: start; background: var(--c-bg, #f7f7f8);
+  animation: cv-skeleton-in 120ms ease-out;
+}
+.cv-grid-skeleton.cv-grid-skeleton-out { opacity: 0; transition: opacity 220ms ease-out; }
+.cv-grid-skeleton-card {
+  box-sizing: border-box; padding: 8px; min-width: 0;
+  border: 1px solid var(--c-border); border-radius: var(--r-md); background: var(--c-surface);
+}
+.cv-grid-skeleton-title {
+  height: 34px; display: flex; align-items: center; padding: 0 4px;
+  font-weight: 600; font-size: 14px; color: var(--c-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cv-grid-skeleton-plot {
+  border-radius: var(--r-sm);
+  background: linear-gradient(100deg, var(--c-surface-2) 30%, #fafafa 50%, var(--c-surface-2) 70%);
+  background-size: 300% 100%;
+  animation: cv-skeleton-shimmer 1.2s linear infinite;
+}
+@keyframes cv-skeleton-shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+@keyframes cv-skeleton-in { from { opacity: 0; } to { opacity: 1; } }
+.cv-panes.cv-panes-pending { visibility: hidden; }
+.cv-panes.cv-panes-enter { animation: cv-skeleton-in 260ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .cv-grid-skeleton, .cv-grid-skeleton-plot, .cv-panes.cv-panes-enter { animation: none; }
 }
 .cerebro-viz-toolbar .spatial-roi-background-picker {
   flex: 0 1 var(--c-control-width);
@@ -3463,4 +3656,229 @@ body .shiny-bound-output.cerebro-output-waiting {
 #about ul.cerebro-about-links {
   list-style: none;
   padding-left: 0;
+}
+
+
+/* =========================================================================
+   Toolbar fields on every page, one rule set.
+   A single choice is as wide as its value needs and never narrower than
+   --c-field-min; a multiple choice starts at --c-multi-min and grows with its
+   chips up to the row. Fields keep that width instead of stretching to fill
+   a row, groups of fields (conditional panels, channel rows) shrink-wrap and
+   flow with the rest, and the page actions (Share, Settings) end the last
+   row. The toolbar is then as low as its fields allow and the plot gets the
+   rest of the window.
+   ========================================================================= */
+:root { --c-field-min: 168px; --c-multi-min: 220px; }
+body .cerebro-viz-toolbar .form-group,
+body .cerebro-viz-toolbar .shiny-conditional--shown:has(> .form-group),
+body .cerebro-viz-primary .ir-flow-control-item {
+  flex: 0 1 auto !important;
+  width: max-content !important;
+  min-width: min(var(--c-field-min), 100%) !important;
+  max-width: 100% !important;
+  margin-bottom: 0;
+}
+body .cerebro-viz-toolbar .form-group:has(select[multiple]),
+body .cerebro-viz-toolbar .form-group:has(.selectize-control.multi) {
+  min-width: min(var(--c-multi-min), 100%) !important;
+}
+body .cerebro-viz-toolbar .form-group .selectize-control,
+body .cerebro-viz-toolbar .form-group > .form-control,
+body .cerebro-viz-toolbar .form-group select {
+  width: 100% !important;
+}
+/* A field as wide as its value keeps room for the dropdown arrow. */
+body .cerebro-viz-toolbar .selectize-control.single .selectize-input {
+  padding-right: 32px !important;
+}
+body .cerebro-viz-toolbar select.form-control { padding-right: 28px !important; }
+/* A checkbox or radio group is as wide as its labels. */
+body .cerebro-viz-toolbar .form-group:has(> .checkbox),
+body .cerebro-viz-toolbar .form-group.shiny-input-checkboxgroup,
+body .cerebro-viz-toolbar .form-group.shiny-input-radiogroup {
+  min-width: 0 !important;
+}
+/* Groups of fields (shown conditional panels, channel rows) are not boxes of
+   their own: their fields join the toolbar's one row flow, so rows pack the
+   same however the page groups its controls. Shiny shows a conditional panel
+   by its class; a hidden one stays hidden. */
+body .cerebro-viz-toolbar .shiny-panel-conditional.shiny-conditional--shown,
+body .cerebro-viz-toolbar .spatial-image-dim-controls,
+body .cerebro-viz-toolbar .spatial-rgb-controls,
+body .cerebro-viz-toolbar .spatial-single-controls,
+body .cerebro-viz-toolbar .spatial-grid-controls,
+body .cerebro-viz-toolbar .cerebro-gene-rgb-row,
+body .cerebro-viz-toolbar .cerebro-gene-rgb-channel,
+body .cerebro-viz-primary .ir-flow-controls {
+  display: contents;
+}
+/* Gene expression's RGB note takes the last row of the fields. */
+body .cerebro-viz-toolbar .cerebro-gene-input-output small {
+  order: 95;
+  flex: 1 1 100%;
+}
+/* RGB co-expression (cerebroRgbGeneFields()): one field whose three gene
+   boxes are marked by their channel's dot and are all as wide as the longest
+   gene in them, an inline grid of equal columns, with no minimum width. */
+body .form-group.cerebro-rgb-field,
+body .coordviews-page .cv-topbar .cv-rgb-ctl {
+  min-width: 0 !important;
+}
+.cerebro-rgb-field > .control-label { display: block; }
+.cerebro-rgb-selects {
+  display: grid;
+  width: max-content;
+  max-width: 100%;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 6px;
+}
+.cerebro-rgb-select { position: relative; min-width: 0; }
+body .cerebro-rgb-select .form-group {
+  flex: none !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  margin: 0 !important;
+}
+body .cerebro-rgb-select .selectize-control {
+  width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+}
+/* No label of its own: nothing above the box. */
+body .cerebro-rgb-select .form-group > .control-label { display: none !important; }
+body .cerebro-rgb-select .selectize-input,
+body .coordviews-page .cv-topbar .cerebro-rgb-select .selectize-input {
+  min-width: 92px;
+  padding-left: 25px !important;
+  padding-right: 28px !important;
+  white-space: nowrap;
+}
+/* Selectize sizes the placeholder when the field is drawn, which for a field
+   still hidden (Linked views) is no width at all: an empty box keeps room for it. */
+body .cerebro-rgb-select .selectize-input:not(.has-items) > input,
+body .coordviews-page .cv-topbar .cerebro-rgb-select .selectize-input:not(.has-items) > input {
+  flex: 0 0 4.5em !important;
+  width: 4.5em !important;
+}
+.cerebro-rgb-select::before {
+  content: '';
+  position: absolute;
+  z-index: 3;
+  left: 11px;
+  top: calc(var(--c-toolbar-control-height, 34px) / 2);
+  width: 8px;
+  height: 8px;
+  margin-top: -4px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.cerebro-rgb-select.is-red::before { background: #dc2626; }
+.cerebro-rgb-select.is-green::before { background: #16a34a; }
+.cerebro-rgb-select.is-blue::before { background: #2563eb; }
+/* An RGB channel panel's title is marked by the channel's dot. */
+.cv-title-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  vertical-align: 1px;
+}
+.cv-rgb-range { color: var(--c-text-3); font-variant-numeric: tabular-nums; }
+/* Spatial: the grid's fields after the plot's, before the actions. */
+body .cerebro-viz-toolbar .spatial-grid-controls > .form-group,
+body .cerebro-viz-toolbar .spatial-grid-controls > .cerebro-groups-switches { order: 50; }
+body .cerebro-viz-toolbar [data-display-if]:not(.shiny-conditional--shown) {
+  display: none !important;
+}
+/* The Spatial background picker joins the fields; the actions end the row. */
+body .cerebro-viz-toolbar .cerebro-spatial-background-row { display: contents; }
+body .cerebro-viz-toolbar .cerebro-toolbar-actions {
+  margin-left: auto;
+  order: 98;
+}
+
+/* Page titles sit at the top of the content area: the title row starts 8px
+   below the window edge (was 18px plus AdminLTE's 15px). */
+@media (min-width: 768px) {
+  body .content-wrapper, body .right-side { padding-top: 8px !important; }
+}
+body section.content { padding-top: 0 !important; }
+.cerebro-viz-page-heading { margin-bottom: 6px; }
+
+/* A grid panel's title shows only its section (cell_views.js). */
+.cv-ptitle.cv-ptitle-link { cursor: pointer; }
+.cv-ptitle.cv-ptitle-link:hover { color: var(--c-amber-700); text-decoration: underline; }
+
+/* Linked views: the same field rules. Its filters and actions rows pass
+   their controls into the bar's one flow; the switches sit on the field
+   baseline and Share/Settings end the last row. */
+body .coordviews-page .cv-topbar .cv-filters,
+body .coordviews-page .cv-topbar .cv-actions-row {
+  display: contents;
+}
+body .coordviews-page .cv-topbar .cv-ctl {
+  flex: 0 1 auto !important;
+  width: max-content !important;
+  min-width: min(var(--c-field-min), 100%) !important;
+  max-width: 100% !important;
+  margin: 0;
+}
+body .coordviews-page .cv-topbar .cv-multiselect-ctl {
+  min-width: min(var(--c-multi-min), 100%) !important;
+}
+body .coordviews-page .cv-topbar .cv-ctl > .selectize-control,
+body .coordviews-page .cv-topbar .cv-ctl > select { width: 100% !important; }
+body .coordviews-page .cv-topbar .selectize-control.single .selectize-input {
+  padding-right: 32px !important;
+}
+body .coordviews-page .cv-topbar .cv-linked-hover {
+  flex: 0 0 auto;
+  align-self: flex-end;
+  display: flex;
+  align-items: center;
+  height: var(--c-toolbar-control-height);
+}
+body .coordviews-page .cv-topbar .cerebro-toolbar-actions {
+  margin-left: auto;
+  order: 98;
+  align-self: flex-end;
+}
+
+/* Stored-result pages (Groups, Marker genes, Most expressed genes, Enriched
+   pathways) take the same toolbar: their Bootstrap rows and columns pass
+   their fields into its one flow. */
+body .cerebro-viz-toolbar.cerebro-result-controls > .row,
+body .cerebro-viz-toolbar.cerebro-groups-controls > .row,
+body .cerebro-viz-toolbar.cerebro-result-controls > .row > [class*="col-"],
+body .cerebro-viz-toolbar.cerebro-groups-controls > .row > [class*="col-"] {
+  display: contents;
+}
+body .cerebro-viz-toolbar.cerebro-groups-controls .form-group:has(.material-switch),
+body .cerebro-viz-toolbar.cerebro-groups-controls .form-group:has(.btn-group-container-sw) {
+  min-width: 0 !important;
+}
+body .cerebro-viz-toolbar .cerebro-groups-switches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  align-self: flex-end;
+  gap: 4px 14px;
+  min-height: var(--c-toolbar-control-height);
+}
+body .cerebro-viz-toolbar .cerebro-groups-switches .form-group { min-width: 0 !important; }
+/* shinyWidgets puts a <br> between a button group and its label. */
+body .cerebro-viz-toolbar .shiny-input-radiogroup > br { display: none; }
+/* A filled result toolbar is as low as its fields. */
+.cerebro-result-controls.cerebro-viz-toolbar:not(:empty) { min-height: 0; }
+/* The toolbar fields in a row of a box (Trajectory: States by group). */
+body .cerebro-viz-toolbar.cerebro-box-toolbar {
+  min-height: 0;
+  margin-bottom: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }

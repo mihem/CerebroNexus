@@ -227,52 +227,45 @@ spatial_projection_update_plot <- function(input) {
   ## Co-expression: colour each cell by blending up to three genes' expression
   ## onto RGB channels. The channel columns were populated in
   ## obj_projection_data_to_plot.R.
-  is_coexpr <- identical(plot_parameters[["plot_type"]], "Co-expression (RGB)")
+  ## Co-expression: one gene per channel, blended in the browser as on the
+  ## Gene expression page (color_type "rgb"): a cell expressing none of them
+  ## is grey, and the legend names each channel's gene. Without any gene the
+  ## frame is the grey "No gene selected" one below.
+  is_coexpr <- identical(
+    plot_parameters[["plot_type"]],
+    "Co-expression (RGB)"
+  ) &&
+    !isTRUE(plot_parameters[["no_gene"]])
   if (is_coexpr) {
-    render_color <- blend_genes_to_rgb(
-      r = if ("coexpr_r" %in% colnames(metadata)) {
-        metadata[["coexpr_r"]]
+    channel_values <- function(column) {
+      values <- if (column %in% colnames(metadata)) {
+        as.numeric(metadata[[column]])
       } else {
-        NULL
-      },
-      g = if ("coexpr_g" %in% colnames(metadata)) {
-        metadata[["coexpr_g"]]
-      } else {
-        NULL
-      },
-      b = if ("coexpr_b" %in% colnames(metadata)) {
-        metadata[["coexpr_b"]]
-      } else {
-        NULL
+        numeric(nrow(metadata))
       }
-    )
-    ## One legend entry per populated channel, kept as parallel label/colour
-    ## vectors so the JS renders a coloured swatch per channel (red/green/blue)
-    ## instead of a single grey blob. An unused channel is dropped from both.
-    coexpr_labels <- c(
-      if (nzchar(plot_parameters[["coexpr_r"]] %||% "")) {
-        paste0("R: ", plot_parameters[["coexpr_r"]])
-      },
-      if (nzchar(plot_parameters[["coexpr_g"]] %||% "")) {
-        paste0("G: ", plot_parameters[["coexpr_g"]])
-      },
-      if (nzchar(plot_parameters[["coexpr_b"]] %||% "")) {
-        paste0("B: ", plot_parameters[["coexpr_b"]])
-      }
-    )
-    coexpr_colors <- c(
-      if (nzchar(plot_parameters[["coexpr_r"]] %||% "")) "rgb(255,0,0)",
-      if (nzchar(plot_parameters[["coexpr_g"]] %||% "")) "rgb(0,255,0)",
-      if (nzchar(plot_parameters[["coexpr_b"]] %||% "")) "rgb(0,0,255)"
-    )
+      values[!is.finite(values)] <- 0
+      values
+    }
+    grid <- plot_parameters[["grid"]]
     output_meta <- c(
       background_meta,
       list(
-        color_type = "coexpression",
-        space_label = plot_parameters[["projection"]],
-        traces = as.list(coexpr_labels),
-        coexpr_colors = as.list(coexpr_colors),
-        color_variable = paste(coexpr_labels, collapse = "  "),
+        color_type = "rgb",
+        ## Separate channels: one panel per channel (and section, in the grid).
+        rgb_layout = if (
+          identical(plot_parameters[["rgb_layout"]], "separate")
+        ) {
+          "separate"
+        } else {
+          "composite"
+        },
+        color_variable = "RGB co-expression",
+        show_color_scale = TRUE,
+        space_label = if (is.list(grid)) {
+          "Section grid"
+        } else {
+          plot_parameters[["projection"]]
+        },
         appearance = list(
           group_labels = FALSE,
           draw_border = isTRUE(plot_parameters[["draw_border"]]),
@@ -281,10 +274,19 @@ spatial_projection_update_plot <- function(input) {
       )
     )
     output_data <- list(
-      x = coordinates[[1]],
-      y = coordinates[[2]],
+      x = as.numeric(coordinates[[1]]),
+      y = as.numeric(coordinates[[2]]),
       selection_key = selection_keys,
-      color = render_color,
+      rgb = list(
+        r = channel_values("coexpr_r"),
+        g = channel_values("coexpr_g"),
+        b = channel_values("coexpr_b")
+      ),
+      rgb_genes = list(
+        r = plot_parameters[["coexpr_r"]] %||% "",
+        g = plot_parameters[["coexpr_g"]] %||% "",
+        b = plot_parameters[["coexpr_b"]] %||% ""
+      ),
       point_size = plot_parameters[["point_size"]],
       point_opacity = plot_parameters[["point_opacity"]],
       point_line = point_line,
@@ -292,6 +294,21 @@ spatial_projection_update_plot <- function(input) {
       y_range = y_range_out,
       reset_axes = reset_axes
     )
+    if (is.list(grid)) {
+      grid$coordinates <- coordinates
+      output_data$panels <- c(
+        spatial_grid_projection_panel(grid$projection),
+        spatial_grid_panels(
+          grid,
+          plot_parameters[["grid_backgrounds"]] %||% list(),
+          if (exists("Cerebro.options")) {
+            Cerebro.options[["cerebro_root"]]
+          } else {
+            NULL
+          }
+        )
+      )
+    }
     output_hover <- list(
       hoverinfo = "skip",
       text = list(),
@@ -356,7 +373,10 @@ spatial_projection_update_plot <- function(input) {
   if (section_codes) {
     payload$data$categorical_resource <- categorical_resource
   }
-  if (identical(plot_parameters[["plot_type"]], "ImageFeaturePlot")) {
+  if (
+    identical(plot_parameters[["plot_type"]], "ImageFeaturePlot") &&
+      !isTRUE(plot_parameters[["no_gene"]])
+  ) {
     settings <- viewerExpressionColorSettings(
       if (exists("Cerebro.options")) Cerebro.options else list(),
       dataset_context$dataset_key
@@ -369,8 +389,53 @@ spatial_projection_update_plot <- function(input) {
     payload[["data"]] <- attach_geometry_resource(payload[["data"]])
   }
 
+  ## A grid: one panel per section over its slice of this frame. The frame's
+  ## single colour vector and range serve every panel.
+  grid <- plot_parameters[["grid"]]
+  if (is.list(grid)) {
+    grid$coordinates <- coordinates
+    payload$data$panels <- c(
+      spatial_grid_projection_panel(grid$projection),
+      spatial_grid_panels(
+        grid,
+        plot_parameters[["grid_backgrounds"]] %||% list(),
+        if (exists("Cerebro.options")) {
+          Cerebro.options[["cerebro_root"]]
+        } else {
+          NULL
+        }
+      )
+    )
+    ## Slices index the frame's rows, so x, y and keys are flat in frame order
+    ## (a small categorical payload nests them by group).
+    payload$data$x <- as.numeric(coordinates[[1L]])
+    payload$data$y <- as.numeric(coordinates[[2L]])
+    payload$data$selection_key <- selection_keys
+    if (is.numeric(color_input)) {
+      payload$data$color_range <- spatial_grid_color_range(color_input)
+    } else {
+      grid_groups <- as.character(color_input)
+      grid_groups[is.na(grid_groups)] <- "(missing)"
+      trace_names <- unlist(payload$meta$traces, use.names = FALSE)
+      payload$data$group_code <- as.integer(
+        match(grid_groups, trace_names) - 1L
+      )
+      payload$data$canonical_group <- NULL
+      payload$data$color <- NULL
+      ## The payload adds "(missing)" with this colour when a cell has none.
+      grid_colors <- unname(color_assignments[trace_names])
+      grid_colors[is.na(grid_colors)] <- "#7b8794"
+      payload$meta$group_colors <- grid_colors
+    }
+    payload$meta$space_label <- "Section grid"
+  }
+
   split_by <- plot_parameters[["split_by"]] %||% ""
-  if (nzchar(split_by) && split_by %in% colnames(metadata)) {
+  if (
+    !is.list(grid) &&
+      nzchar(split_by) &&
+      split_by %in% colnames(metadata)
+  ) {
     cell_index <- if ("cell_index" %in% colnames(metadata)) {
       metadata[["cell_index"]]
     } else {

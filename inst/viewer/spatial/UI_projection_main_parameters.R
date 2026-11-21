@@ -55,7 +55,20 @@ spatial_projection_scene <- reactive({
       logical(1)
     )]
   }
-  requested_spatial <- input[["spatial_projection_to_display"]]
+  ## The single view's section. In the grid the scene keeps the one it had:
+  ## changing among several sections only rearranges the drawn panels.
+  chosen_sections <- spatial_projection_chosen_sections(
+    input,
+    availableSpatial()
+  )
+  requested_spatial <- if (length(chosen_sections) > 1L) {
+    isolate(spatial_projection_scene_state())$current_spatial %||%
+      chosen_sections[[1L]]
+  } else if (length(chosen_sections)) {
+    chosen_sections[[1L]]
+  } else {
+    NULL
+  }
   current_spatial <- if (dataset_changed) {
     NULL
   } else {
@@ -108,12 +121,34 @@ spatial_projection_scene <- reactive({
   if (!selected_split %in% c(spatial_split_none_value, split_columns)) {
     selected_split <- spatial_split_none_value
   }
+  ## The Sections field: one section is the single view, several the grid
+  ## (all of the data set's sections, whatever the sample). A new data set
+  ## starts as its author chose: its first section, or all of them.
+  all_sections <- availableSpatial()
+  sections_default <- if (
+    identical(spatial_projection_default_layout(), "grid")
+  ) {
+    all_sections
+  } else {
+    current_spatial
+  }
   list(
     dataset_changed = dataset_changed,
     colour_groups = colour_groups,
     sample_values = sample_values,
     selected_sample = selected_sample,
     spatial_choices = spatial_choices,
+    grid_choices = stats::setNames(all_sections, all_sections),
+    sections_default = sections_default,
+    ## Without a projection list the grid simply offers no embedding.
+    grid_projections = if (length(all_sections) > 1L) {
+      tryCatch(
+        as.character(availableProjections() %||% character()),
+        error = function(error) character()
+      )
+    } else {
+      character()
+    },
     current_spatial = current_spatial,
     roi_values = roi_values,
     selected_roi = selected_roi,
@@ -150,7 +185,36 @@ spatial_projection_scene_shown <- reactive({
 
 output[["spatial_projection_scene_UI"]] <- renderUI({
   scene <- spatial_projection_scene_shown()
-  tagList(
+  ## Several sections draw the grid; one draws the single view, with its
+  ## sample and ROI controls.
+  grid_js <- paste(
+    "input.spatial_projection_sections &&",
+    "input.spatial_projection_sections.length > 1"
+  )
+  ## What the field holds, in its order (a re-render must not reorder it):
+  ## the chosen sections first, as selectize lists the selected options in
+  ## the order of the choices.
+  selected <- intersect(
+    as.character(isolate(input[["spatial_projection_sections"]]) %||% ""),
+    scene$grid_choices
+  )
+  if (!length(selected)) {
+    selected <- scene$sections_default
+  }
+  ordered <- c(selected, setdiff(scene$grid_choices, selected))
+  sections <- selectizeInput(
+    "spatial_projection_sections",
+    label = "Sections",
+    choices = stats::setNames(ordered, ordered),
+    selected = selected,
+    multiple = TRUE,
+    options = list(
+      plugins = list("remove_button"),
+      closeAfterSelect = FALSE,
+      placeholder = "Pick one or more sections"
+    )
+  )
+  single_controls <- tagList(
     if (length(scene$sample_values) > 1L) {
       selectInput(
         "spatial_projection_sample",
@@ -159,12 +223,6 @@ output[["spatial_projection_scene_UI"]] <- renderUI({
         selected = scene$selected_sample
       )
     },
-    selectInput(
-      "spatial_projection_to_display",
-      label = "FOV / section",
-      choices = scene$spatial_choices,
-      selected = scene$current_spatial
-    ),
     if (length(scene$roi_values)) {
       selectizeInput(
         "spatial_projection_roi",
@@ -179,6 +237,60 @@ output[["spatial_projection_scene_UI"]] <- renderUI({
         selected = scene$selected_roi
       )
     }
+  )
+  if (length(scene$grid_choices) < 2L) {
+    return(tagList(sections, single_controls))
+  }
+  tagList(
+    sections,
+    conditionalPanel(
+      condition = paste0("!(", grid_js, ")"),
+      div(class = "spatial-single-controls", single_controls)
+    ),
+    conditionalPanel(
+      condition = grid_js,
+      div(
+        class = "spatial-grid-controls",
+        selectInput(
+          "spatial_projection_grid_columns",
+          label = "Columns",
+          choices = c(
+            "Auto" = "auto",
+            stats::setNames(
+              seq_len(min(8L, length(scene$grid_choices))),
+              seq_len(min(8L, length(scene$grid_choices)))
+            )
+          ),
+          selected = isolate(input[["spatial_projection_grid_columns"]]) %||%
+            "auto"
+        ),
+        selectInput(
+          "spatial_projection_grid_projection",
+          label = "Embedding",
+          choices = c(
+            "None" = "__none__",
+            stats::setNames(scene$grid_projections, scene$grid_projections)
+          ),
+          selected = isolate(input[["spatial_projection_grid_projection"]]) %||%
+            "__none__"
+        ),
+        ## A switch, as Linked views' Cross-view highlight: zooming or panning
+        ## one section moves the others to the same part of their tissue.
+        div(
+          class = "cerebro-groups-switches",
+          title = "Zoom and pan every section together",
+          shinyWidgets::materialSwitch(
+            inputId = "spatial_projection_grid_sync_zoom",
+            label = "Sync zoom",
+            value = isTRUE(isolate(input[[
+              "spatial_projection_grid_sync_zoom"
+            ]])),
+            status = "primary",
+            inline = TRUE
+          )
+        )
+      )
+    )
   )
 })
 
@@ -217,8 +329,13 @@ output[["spatial_projection_main_parameters_UI"]] <- renderUI({
   tagList(
     selectInput(
       "spatial_projection_plot_type",
-      label = "Plot type",
-      choices = c("ImageDimPlot", "ImageFeaturePlot", "Co-expression (RGB)"),
+      label = "Display mode",
+      ## The values stay Seurat's names; the labels say what is drawn.
+      choices = c(
+        "Groups" = "ImageDimPlot",
+        "Gene expression" = "ImageFeaturePlot",
+        "RGB co-expression" = "Co-expression (RGB)"
+      ),
       selected = plot_type
     ),
     conditionalPanel(
@@ -231,11 +348,14 @@ output[["spatial_projection_main_parameters_UI"]] <- renderUI({
           choices = colour_groups$choices,
           selected = colour_groups$selected
         ),
-        selectizeInput(
-          "spatial_projection_split_by",
-          label = "Split by",
-          choices = scene$split_choices,
-          selected = scene$selected_split
+        conditionalPanel(
+          condition = "!(input.spatial_projection_sections && input.spatial_projection_sections.length > 1)",
+          selectizeInput(
+            "spatial_projection_split_by",
+            label = "Split by",
+            choices = scene$split_choices,
+            selected = scene$selected_split
+          )
         )
       )
     ),
@@ -243,7 +363,7 @@ output[["spatial_projection_main_parameters_UI"]] <- renderUI({
       condition = "input.spatial_projection_plot_type == 'ImageFeaturePlot'",
       selectizeInput(
         "spatial_projection_feature_to_display",
-        label = "Feature/Gene",
+        label = "Gene",
         choices = NULL,
         multiple = FALSE,
         options = list(
@@ -260,38 +380,19 @@ output[["spatial_projection_main_parameters_UI"]] <- renderUI({
       condition = "input.spatial_projection_plot_type == 'Co-expression (RGB)'",
       div(
         class = "spatial-rgb-controls",
-        selectizeInput(
-          "spatial_projection_coexpr_r",
-          label = "Red channel gene",
-          choices = NULL,
-          options = list(
-            maxOptions = 1000,
-            placeholder = 'Gene for red...',
-            create = FALSE,
-            loadThrottle = 300
-          )
+        cerebroRgbGeneFields(
+          paste0("spatial_projection_coexpr_", c("r", "g", "b"))
         ),
-        selectizeInput(
-          "spatial_projection_coexpr_g",
-          label = "Green channel gene",
-          choices = NULL,
-          options = list(
-            maxOptions = 1000,
-            placeholder = 'Gene for green...',
-            create = FALSE,
-            loadThrottle = 300
-          )
-        ),
-        selectizeInput(
-          "spatial_projection_coexpr_b",
-          label = "Blue channel gene",
-          choices = NULL,
-          options = list(
-            maxOptions = 1000,
-            placeholder = 'Gene for blue...',
-            create = FALSE,
-            loadThrottle = 300
-          )
+        ## As on Gene expression; in the grid, every section splits.
+        selectInput(
+          "spatial_projection_rgb_layout",
+          "RGB layout",
+          choices = c(
+            "Composite RGB" = "composite",
+            "Separate channels" = "separate"
+          ),
+          selected = isolate(input[["spatial_projection_rgb_layout"]]) %||%
+            "composite"
         )
       )
     )
@@ -321,7 +422,10 @@ spatial_background_scope <- reactive({
     selected_sample <- if (length(samples) > 1L) samples[[1L]] else ""
   }
   selected_sample <- selected_sample %||% ""
-  current_spatial <- input[["spatial_projection_to_display"]]
+  current_spatial <- spatial_projection_single_section(
+    input,
+    availableSpatial()
+  )
   if (is.null(current_spatial) || !(current_spatial %in% spatial_names)) {
     shown <- tryCatch(
       spatial_sample_sections(selected_sample)$sections,

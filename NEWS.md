@@ -1,3 +1,121 @@
+# CerebroNexus 8.5.0
+
+- **Spatial shows all sections side by side.** A data set with more than one
+  spatial entry (tissue sections, FOVs, capture areas) can show several of
+  them at once: the Spatial page's **Sections** field takes one section (the
+  single view as before) or several (a grid with one panel per section;
+  clicking a panel's title shows only that section). All sections are
+  coloured by the same metadata column or gene. A group has one colour in
+  every section, and a gene has one colour scale whose range covers all
+  sections, so a value has the same colour in each section. RGB
+  co-expression works in the grid too, as one composite panel per section or,
+  with *RGB layout: Separate channels*, one panel per section and channel.
+  Each section shows the first histology image bound to it, and a section
+  without one shows its cells without an image. The order of **Sections** is
+  the order of the panels, **Columns** fixes the number of columns, and
+  **Sync zoom** moves the other sections with the one being zoomed or panned;
+  none of them reloads data. **Embedding** adds a UMAP (or another
+  projection) panel: selecting cells in it highlights them in every section,
+  and the selected-cells plot and table list the cells of all sections. All
+  panels have one size, so the sections are drawn at one scale, and the
+  number of columns is chosen to show as much tissue as the window holds. A
+  switch between one section and several shows the coming panels at once,
+  titled, while the server prepares them, and the sections the grid will need
+  are read while the session is quiet. The panels share one copy of the
+  cells' positions instead of one per panel. Like the UMAP pages, Spatial has
+  a switch at the top right, **Panel shape**: *Fit tissue* (the default)
+  shapes the plot to the tissue, and *Square* draws every panel as a square.
+  With 1.2 million cells in 12 sections (Windows, Chrome, WebGPU), the grid
+  opens in 1.2 to 1.8 s, recolouring by a gene takes 1.4 to 2.1 s, and a
+  synced zoom 13 to 31 ms; with the 800,000 cells of the 8 sections of CosMx
+  NSCLC, 0.9 s to open and to recolour. Exports are unchanged. ROIs and region
+  outlines stay single-section views.
+- **Toolbars pack tighter on every page.** A single-choice field is as wide
+  as its value needs (at least 168 px), a multiple choice starts at 220 px and
+  grows with its selections, fields no longer stretch to fill a row, and
+  Share and Settings end the last row, so the controls take fewer rows and the
+  plot more of the window. Page titles sit closer to the top of the window.
+  Groups, Marker genes, Most expressed genes, Enriched pathways and Linked
+  views use the same toolbar. The composition plots of Groups and of
+  Trajectory's States by group pick *Plot type* and *Bars show* (number or
+  percent of cells) in fields instead of a button group and a switch.
+- **Every page names and orders its fields the same way.** A toolbar reads
+  data (Projection, Sections, Method, Receptor), then *Display mode* or
+  *Colour by*, then the genes, then that mode's options (Panel colours, RGB
+  layout). Spatial's Plot type is *Display mode* with the options *Groups*,
+  *Gene expression* and *RGB co-expression* (the values, and so shared
+  links, are unchanged); Linked views lists Gene expression's three modes
+  under the same names; Feature/Gene is *Gene*, Spatial data *Sections*,
+  Choose a method / trajectory *Method* / *Trajectory*, the switch at the
+  top right is *Panel shape* on every page (was UMAP layout or Trajectory
+  layout), and labels lose their colons. Settings drawers read Appearance (point size and opacity,
+  group labels, region outlines, borders, square plots), Data (*Show % of
+  cells*, on Spatial and Immune repertoire too), Analysis, then Group
+  filters, on HLA & TCR Motifs as well.
+- **Square keeps the canvas.** The *Square* layout of the cell views draws
+  the plot in the largest centred square of a canvas that keeps the panel's
+  size, outlined by a light grey frame, instead of shrinking the canvas to a
+  square on a grey mat.
+- **Point size, opacity and % of cells reach every panel.** On Linked views
+  each section kept the point size, opacity and share of cells of its Spatial
+  settings whatever the sliders said, so the sliders moved only the
+  embedding. A section's own settings now hold until the reader moves a
+  slider, as on the other pages, and then every panel follows it.
+- **Dragging Point size, Point opacity or Show % of cells no longer stalls.**
+  The server's echo of each step set the dragged slider and the drawing back
+  to an older step mid-drag, and every step filtered all cells of every panel
+  again (0.6 s a step on Linked views with a million cells). While a slider
+  is held, echoes are left out, the plot redraws once per frame (or, when a
+  draw is slow, without the GPU, once the slider rests or is let go), and
+  "% of cells" is applied when the slider rests or is let go.
+- **An enlarged panel fills the window with the others.** Enlarge in Linked
+  views or the Spatial grid puts the enlarged panel beside a grid of the
+  others or above a row of them, whichever draws its content (a wide section,
+  a square embedding) largest while the others stay readable, instead of
+  wrapping them into rows with empty space around. Spatial's *Sync zoom* is a
+  switch, as Linked views' Cross-view highlight, with a short help on hover.
+- **Linked views fills the window.** Its panels have one size and their rows
+  share the window's height, so the views end at the window's bottom edge
+  instead of leaving it empty.
+- **Highest expression on top in Preferences, on by default.** The sidebar's
+  Preferences have a *Highest expression on top* switch, the same setting as
+  the one in Gene expression's settings: changing either changes the other.
+  Gene expression now draws the highest values on top by default; authors who
+  want the input order choose it in the Builder (*Input order*), as before.
+  Each Preferences switch has a small *i* that shows a short help on hover or
+  click, and the block takes less height.
+- **The Builder chooses how Spatial opens.** Its Viewer display settings have
+  *Open Spatial with: The first section | All sections* in the Spatial card,
+  stored as `spatial_layout` with the other page defaults; a data set with one
+  section always opens as one section, and Apps and projects without the
+  setting open as before. The card's square option reads *Square panels*, as
+  the Viewer's Panel shape switch does.
+- **A CRB no longer stores each spatial section's expression twice.** Every
+  section kept a copy of the expression matrix's columns for its cells. A CRB
+  now stores a reference to those columns instead, and
+  `getSpatialData()` rebuilds the section's matrix from the object's matrix
+  (`hydrate_expression = FALSE` leaves the reference, as the Viewer, the
+  Builder and `createShinyApp()` do). A section matrix that differs from the
+  object's matrix is still stored. For the Visium demos below, the CRBs are
+  half as large and are read in a third to a quarter of the time (DLPFC, 12
+  sections: 314 to 156 MB, 1.5 to 0.47 s). CRBs written before keep their
+  copies and read as before.
+- **Switching data sets no longer fetches the histology pictures again.** The
+  Viewer keeps decoded pictures by file (up to about 100 million pixels), so
+  returning to a data set shows its sections' pictures with its cells, and the
+  App sends pictures without gzip, which took 110 ms for a 6.7 MB PNG and made
+  it larger.
+- **Multi-section Visium demos for the Builder.** `Rscript run-demo.R
+  --data=dlpfc,mouse_brain,breast,prostate` downloads four public 10x Visium
+  data sets with the H&E picture of every section (human DLPFC, 12 sections;
+  mouse brain, 4; breast cancer, 2; prostate cancer and normal, 2), checks
+  each file's size and MD5, and writes one SingleCellExperiment file per data
+  set. The Builder's own build steps then turn each file into a CRB, every
+  section with its own picture and Spatial opening as the grid. The data sets
+  open in the same Viewer as the other large demos (`--data=1m,dlpfc` works),
+  and the file can still be imported in the Builder. Sources and licences are
+  in `data-raw/large-demo/visium.ATTRIBUTION.md`.
+
 # CerebroNexus 8.4.3
 
 - **CI formatting uses the latest official Air binary.** The formatting workflow

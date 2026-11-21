@@ -581,3 +581,50 @@ test_that("auxiliary data delivered at once is named by renders of the same cell
   expect_null(wire_header(tail(sent, 1L)[[1L]]$payload)$aux_key)
   expect_identical(render("#abcdef")$aux_reuse, token)
 })
+
+test_that("a frame of panels names its cells through the cell-name resource", {
+  skip_if_not_installed("jsonlite")
+  runtime <- viewer_runtime_env()
+  sent <- list()
+  runtime$session <- list(
+    sendBinaryMessage = function(type, payload) {
+      sent[[length(sent) + 1L]] <<- list(type = type, payload = payload)
+    },
+    sendCustomMessage = function(type, payload) NULL
+  )
+  context <- runtime$viewerDatasetContext("wire-test", "dataset-a", 1L)
+  runtime$viewer_loaded_dataset_context <- function() context
+  n <- 5000L
+  ## A grid of two sections: panels are not sent progressively, so the
+  ## frame carries its cells' names itself. With a cell-name resource they
+  ## are canonical rows (here contiguous, sent as their range) and the
+  ## resource; without them the browser had no keys and drew empty panels.
+  runtime$cerebroCellViewRender(
+    "spatial_projection",
+    meta = list(color_type = "continuous", color_variable = "value"),
+    data = list(
+      x = as.numeric(seq_len(n)),
+      y = as.numeric(seq_len(n)),
+      color = as.numeric(seq_len(n)),
+      selection_key = seq_len(n),
+      panels = list(
+        list(id = "section-1", label = "A", start = 0L, count = 2000L),
+        list(id = "section-2", label = "B", start = 2000L, count = 3000L)
+      )
+    ),
+    deferred_aux = function() {
+      list(
+        selection_index = list(kind = "range", start = 0L, length = n),
+        cell_names_resource = list(url = "names"),
+        hover = list(hoverinfo = "skip", columns = list())
+      )
+    },
+    dataset_context = context
+  )
+  data <- wire_header(tail(sent, 1L)[[1L]]$payload)$data
+  expect_null(data$selection_key)
+  expect_identical(data$selection_index$kind, "range")
+  expect_identical(as.integer(data$selection_index$length), n)
+  expect_identical(data$cell_names_resource$url, "names")
+  expect_length(data$panels, 2L)
+})

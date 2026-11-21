@@ -3,12 +3,12 @@ test_that("display defaults resolve per page and fall back when invalid", {
   sys.source(viewer_test_path("core", "viewer_content_contract.R"), env)
   defaults <- env$viewerDisplayDefaults(list(), "dataset")
   expect_false(defaults$group_labels)
-  expect_identical(defaults$gene_plotting_order, "Input order")
+  expect_identical(defaults$gene_plotting_order, "Highest expression on top")
   options <- list(
     viewer_content = list(
       dataset = list(
         display = list(
-          gene_plotting_order = "Highest expression on top",
+          gene_plotting_order = "Input order",
           trajectory_show_trend_line = FALSE,
           projection_draw_border = TRUE
         )
@@ -17,7 +17,7 @@ test_that("display defaults resolve per page and fall back when invalid", {
   )
   expect_identical(
     env$viewerPageDisplayDefaults(options, "dataset", "gene")$plotting_order,
-    "Highest expression on top"
+    "Input order"
   )
   expect_false(
     env$viewerPageDisplayDefaults(

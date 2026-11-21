@@ -148,13 +148,16 @@ builderViewerDisplayDefaults <- function(value = NULL) {
     projection_keep_square = FALSE,
     gene_draw_border = FALSE,
     gene_keep_square = FALSE,
-    gene_plotting_order = "Input order",
+    gene_plotting_order = "Highest expression on top",
     gene_show_trend_line = TRUE,
     gene_trend_line_width = 2,
     spatial_group_labels = FALSE,
     spatial_draw_border = FALSE,
     spatial_keep_square = FALSE,
     spatial_region_outlines = FALSE,
+    ## A data set with several spatial entries opens Spatial as one section
+    ## or as the grid of all of them; one entry always opens as one section.
+    spatial_layout = "single",
     trajectory_group_labels = FALSE,
     trajectory_draw_border = TRUE,
     trajectory_keep_square = FALSE,
@@ -207,6 +210,7 @@ builderViewerDisplayDefaults <- function(value = NULL) {
     gene_panel_mode = c("shared", "distinct"),
     gene_panel_palette = c("default", "soft"),
     gene_plotting_order = c("Input order", "Highest expression on top"),
+    spatial_layout = c("single", "grid"),
     hla_legend_mode = c("auto", "always", "never")
   )
   ranges <- list(

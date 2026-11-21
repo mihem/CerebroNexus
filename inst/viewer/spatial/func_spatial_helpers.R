@@ -1373,3 +1373,344 @@ authorized_spatial_image_path <- function(
 
   image_path
 }
+
+##----------------------------------------------------------------------------##
+## Section grid: every section of the shown sample side by side.
+##
+## The grid is one frame of the cells of all sections, section after section,
+## and one panel per section that draws its rows [start, start + count) of the
+## frame (cell_views.js, buildSpecialistPanels()). The panels therefore share
+## the frame's colour values and colour scale, and the browser's selection,
+## which is by cell, spans the sections. Each panel carries the background
+## image of its own section only.
+##
+## These helpers take their data through arguments, so tests can call them
+## without a session.
+##----------------------------------------------------------------------------##
+
+## The layout Spatial opens with: the author's (Builder's display setting
+## `spatial_layout`, read here without its page prefix), and the grid only
+## for a data set with more than one section.
+spatial_default_layout <- function(display, sections) {
+  layout <- if (is.list(display)) display[["layout"]] else NULL
+  if (identical(layout, "grid") && length(sections) > 1L) "grid" else "single"
+}
+
+## The sections the Sections field names, in its order: one is the single
+## view, several the grid. `input` is the session's, `sections` the data
+## set's. Before the field binds, the single section the older FOV input
+## names (still set by saved views and test harnesses), or the author's
+## default (spatial_projection_default_layout()).
+spatial_projection_chosen_sections <- function(input, sections) {
+  chosen <- input[["spatial_projection_sections"]]
+  if (is.null(chosen)) {
+    chosen <- input[["spatial_projection_to_display"]]
+  }
+  chosen <- as.character(chosen %||% character())
+  chosen <- chosen[chosen %in% sections]
+  if (
+    !length(chosen) &&
+      !"spatial_projection_sections" %in% shiny::isolate(names(input)) &&
+      identical(spatial_projection_default_layout(), "grid")
+  ) {
+    chosen <- as.character(sections)
+  }
+  chosen
+}
+## The section of the single view (the first chosen), or NULL.
+spatial_projection_single_section <- function(input, sections) {
+  chosen <- spatial_projection_chosen_sections(input, sections)
+  if (length(chosen)) chosen[[1L]] else NULL
+}
+
+## The layout the author chose for the session's data set. A Viewer without
+## page display settings (or a test harness) opens one section.
+spatial_projection_default_layout <- function() {
+  display <- tryCatch(
+    current_page_display_defaults("spatial"),
+    error = function(error) list()
+  )
+  sections <- tryCatch(availableSpatial(), error = function(error) character())
+  spatial_default_layout(display, sections)
+}
+
+## ImageFeaturePlot before a gene is chosen colours every cell by this one
+## placeholder group, in light grey (hover reads "Gene: No gene selected").
+spatial_no_gene_variable <- "Gene"
+spatial_no_gene_label <- "No gene selected"
+spatial_no_gene_color <- "#d5d9dd"
+
+## Adds the placeholder column to `metadata` when the frame colours by it.
+spatial_with_no_gene_column <- function(metadata, color_variable) {
+  if (
+    identical(color_variable, spatial_no_gene_variable) && !is.null(metadata)
+  ) {
+    metadata[[spatial_no_gene_variable]] <- factor(
+      rep(spatial_no_gene_label, nrow(metadata)),
+      levels = spatial_no_gene_label
+    )
+  }
+  metadata
+}
+
+## The grid colours by a metadata column, one gene or the RGB blend of up to
+## three genes.
+spatial_grid_plot_types <- c(
+  "ImageDimPlot",
+  "ImageFeaturePlot",
+  "Co-expression (RGB)"
+)
+
+## Whether a frame is a grid: asked for, for a plot type the grid draws, with
+## more than one section to show.
+spatial_grid_active <- function(layout, sections, plot_type) {
+  identical(layout, "grid") &&
+    length(sections) > 1L &&
+    isTRUE(plot_type %in% spatial_grid_plot_types)
+}
+
+## The cells of a grid frame: the canonical rows of each section in turn,
+## narrowed by `keep` (sample scope and group filters), each section sampled
+## on its own to `percentage`. The sections and their cell counts travel as
+## the "spatial_grid" attribute of the result.
+spatial_grid_cells <- function(
+  sections,
+  index_of,
+  keep = function(rows) rows,
+  percentage = 100
+) {
+  sections <- as.character(sections)
+  parts <- lapply(sections, function(section) {
+    rows <- as.integer(keep(as.integer(index_of(section))))
+    if (length(rows) && is.finite(percentage) && percentage < 100) {
+      take <- ceiling(length(rows) * percentage / 100)
+      rows <- rows[sort(sample.int(length(rows), take))]
+    }
+    rows
+  })
+  cells <- as.integer(unlist(parts, use.names = FALSE))
+  attr(cells, "spatial_grid") <- list(
+    sections = sections,
+    counts = as.integer(lengths(parts))
+  )
+  cells
+}
+
+## The sections and counts of a grid frame's cells, or NULL for a frame of
+## one section.
+spatial_grid_of <- function(cells) {
+  grid <- attr(cells, "spatial_grid", exact = TRUE)
+  if (
+    !is.list(grid) ||
+      length(grid$sections) != length(grid$counts) ||
+      sum(grid$counts) != length(cells)
+  ) {
+    return(NULL)
+  }
+  grid
+}
+
+## The x and y columns of a section's coordinates.
+spatial_grid_xy <- function(coordinates) {
+  columns <- if (all(c("x", "y") %in% colnames(coordinates))) {
+    c("x", "y")
+  } else {
+    1:2
+  }
+  data.frame(
+    x = as.numeric(coordinates[[columns[[1L]]]]),
+    y = as.numeric(coordinates[[columns[[2L]]]])
+  )
+}
+
+## The extent of a section with a 2% margin, as the single-section frame pins
+## its axes (spatial_projection_full_ranges()).
+spatial_grid_range <- function(values) {
+  values <- values[is.finite(values)]
+  if (!length(values)) {
+    return(NULL)
+  }
+  extent <- range(values)
+  margin <- if (diff(extent) > 0) diff(extent) * 0.02 else 1
+  c(extent[[1L]] - margin, extent[[2L]] + margin)
+}
+
+## Coordinates of a grid frame, in the frame's row order, each section rotated
+## by its own rotation, with every section's full extent (all its cells, not
+## only the sampled ones) for its panel's axes.
+##   coordinates_of(section): the section's coordinates (rows in index order)
+##   index_of(section): canonical rows of those coordinates
+##   rotation_of(section): degrees
+spatial_grid_coordinates <- function(
+  cells,
+  coordinates_of,
+  index_of,
+  rotation_of = function(section) 0
+) {
+  grid <- spatial_grid_of(cells)
+  stopifnot(!is.null(grid))
+  ends <- cumsum(grid$counts)
+  starts <- ends - grid$counts
+  frames <- vector("list", length(grid$sections))
+  x_ranges <- y_ranges <- vector("list", length(grid$sections))
+  for (i in seq_along(grid$sections)) {
+    section <- grid$sections[[i]]
+    full <- spatial_grid_xy(coordinates_of(section))
+    full <- rotateSpatialCoordinates(full, rotation_of(section))
+    x_ranges[i] <- list(spatial_grid_range(full$x))
+    y_ranges[i] <- list(spatial_grid_range(full$y))
+    rows <- if (grid$counts[[i]]) {
+      cells[(starts[[i]] + 1L):ends[[i]]]
+    } else {
+      integer()
+    }
+    at <- match(rows, as.integer(index_of(section)))
+    if (anyNA(at)) {
+      stop("Grid cells are not in their section: ", section)
+    }
+    frames[[i]] <- full[at, , drop = FALSE]
+  }
+  coordinates <- do.call(rbind, frames)
+  rownames(coordinates) <- NULL
+  list(
+    coordinates = coordinates,
+    sections = grid$sections,
+    starts = as.integer(starts),
+    counts = grid$counts,
+    x_ranges = x_ranges,
+    y_ranges = y_ranges
+  )
+}
+
+## The background a section starts with on its own page: its first image,
+## embedded or configured, for the whole section (no ROI). NULL without one.
+spatial_grid_section_background <- function(
+  options,
+  dataset,
+  spatial_name,
+  spatial_data
+) {
+  embedded <- if (is.null(spatial_data)) {
+    list()
+  } else {
+    embedded_spatial_images(spatial_data, "")
+  }
+  external <- configured_spatial_images(options, dataset, spatial_name, "")
+  choices <- spatial_background_choices(embedded, external)
+  if (!length(choices)) {
+    return(NULL)
+  }
+  descriptor <- resolve_spatial_background(
+    unname(choices[[1L]]),
+    embedded,
+    external
+  )
+  if (is.null(descriptor)) {
+    return(NULL)
+  }
+  list(
+    descriptor = descriptor,
+    identity = spatial_background_identity(dataset, spatial_name, descriptor),
+    preset = spatial_background_preset(
+      options,
+      dataset,
+      spatial_name,
+      descriptor
+    ),
+    image_allowlist = vapply(external, `[[`, character(1), "path")
+  )
+}
+
+## The image fields of one panel from its configured background (see
+## spatial_grid_section_background()), placed over `coordinates`. An empty
+## list draws the panel without an image.
+spatial_panel_background <- function(configured, coordinates, cerebro_root) {
+  if (is.null(configured) || is.null(configured$descriptor)) {
+    return(list())
+  }
+  rendered <- spatial_background_render_payload(
+    configured$descriptor,
+    configured$image_allowlist,
+    configured$identity,
+    configured$preset,
+    coordinates,
+    cerebro_root
+  )
+  if (is.null(rendered$background_image)) {
+    return(list())
+  }
+  list(
+    background_image = rendered$background_image,
+    image_bounds = rendered$image_bounds,
+    image_identity = rendered$background_identity,
+    image_label = configured$descriptor$label,
+    image_preset = configured$preset
+  )
+}
+
+## One panel per section, drawing its slice of the frame. `backgrounds` is
+## named by section; a section without one has no image fields.
+spatial_grid_panels <- function(
+  layout,
+  backgrounds = list(),
+  cerebro_root = NULL
+) {
+  lapply(seq_along(layout$sections), function(i) {
+    section <- layout$sections[[i]]
+    rows <- layout$starts[[i]] + seq_len(layout$counts[[i]])
+    image <- spatial_panel_background(
+      backgrounds[[section]],
+      layout$coordinates[rows, , drop = FALSE],
+      cerebro_root
+    )
+    c(
+      list(
+        id = paste0("section-", i),
+        label = section,
+        section = section,
+        start = as.integer(layout$starts[[i]]),
+        count = as.integer(layout$counts[[i]]),
+        spatial = TRUE,
+        preserve_aspect = TRUE,
+        x_range = layout$x_ranges[[i]],
+        y_range = layout$y_ranges[[i]]
+      ),
+      image
+    )
+  })
+}
+
+## The embedding panel of a grid (a list of one panel, or none): its own x
+## and y for every row of the frame, so a selection in it is a selection of
+## the cells in every section, and the reverse.
+spatial_grid_projection_panel <- function(projection) {
+  if (
+    !is.list(projection) ||
+      !length(projection$x) ||
+      length(projection$x) != length(projection$y)
+  ) {
+    return(list())
+  }
+  list(list(
+    id = "projection",
+    label = projection$label,
+    projection = TRUE,
+    x = as.numeric(projection$x),
+    y = as.numeric(projection$y),
+    x_range = spatial_grid_range(projection$x),
+    y_range = spatial_grid_range(projection$y)
+  ))
+}
+
+## The colour range shared by all panels: the finite range of the frame's
+## values over every section, so one value reads as one colour in each.
+spatial_grid_color_range <- function(values) {
+  if (!is.numeric(values)) {
+    return(NULL)
+  }
+  values <- values[is.finite(values)]
+  if (!length(values)) {
+    return(NULL)
+  }
+  range(values)
+}

@@ -17,7 +17,7 @@ Cerebro.options <- list(
   ## Keep the source demo runnable directly from inst/ without requiring an
   ## installed CerebroNexus package. Exported apps receive this value in
   ## cerebro_config.rds when createShinyApp() builds them.
-  "cerebro_version" = "8.4.3",
+  "cerebro_version" = "8.5.0",
   ## This bundled app ships several distinct demo data sets so the sidebar
   ## "Select dataset:" switcher is visible out of the box: switching changes
   ## the UMAP, the cell-type composition, and the conditional tabs (Immune
@@ -235,6 +235,7 @@ Cerebro.options <- viewerAddMillionCellDemo(Cerebro.options)
 Cerebro.options <- viewerAddRenDemo(Cerebro.options)
 Cerebro.options <- viewerAddCosMxDemo(Cerebro.options)
 Cerebro.options <- viewerAddTcellDemo(Cerebro.options)
+Cerebro.options <- viewerAddVisiumDemos(Cerebro.options)
 
 options(shiny.maxRequestSize = 6 * 1024^2)
 

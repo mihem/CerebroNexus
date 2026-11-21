@@ -1,6 +1,12 @@
 ##----------------------------------------------------------------------------##
 ## Custom functions.
 ##----------------------------------------------------------------------------##
+## Shared by the page and the server's controls (and the tests' runtime).
+source(
+  file.path(Cerebro.options[["cerebro_root"]], "viewer/ui_rgb_fields.R"),
+  local = TRUE
+)
+
 cerebroIcon <- function(name) {
   result <- icon(name)
   result$attribs[["aria-label"]] <- NULL
@@ -51,7 +57,10 @@ boxTitle <- function(title) {
 cerebroResultPage <- function(title, controls_id, result_id, info_id) {
   tagList(
     div(class = "cerebro-viz-page-heading", h1(title)),
-    uiOutput(controls_id, class = "cerebro-result-controls"),
+    uiOutput(
+      controls_id,
+      class = "cerebro-result-controls cerebro-viz-toolbar"
+    ),
     fluidRow(cerebroBox(
       title = tagList(boxTitle(title), cerebroInfoButton(info_id)),
       div(

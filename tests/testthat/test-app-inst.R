@@ -228,7 +228,7 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
   expect_identical(
     retry_get_value(
       app,
-      input = "spatial_projection_to_display",
+      input = "spatial_projection_sections",
       timeout = 30000,
       validate = function(value) identical(value, "anterior1")
     ),
@@ -285,7 +285,7 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
   wait_for_input(app, "spatial_projection_background_image", timeout = 30000)
   app$wait_for_js(
     paste0(
-      "document.getElementById('spatial_projection_to_display')?.",
+      "document.getElementById('spatial_projection_sections')?.",
       "selectize?.options.fov_colour !== undefined"
     ),
     timeout = 30000
@@ -297,7 +297,7 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
     ),
     timeout = 30000
   )
-  app$set_inputs(spatial_projection_to_display = "fov_colour", wait_ = FALSE)
+  app$set_inputs(spatial_projection_sections = "fov_colour", wait_ = FALSE)
   app$wait_for_js(
     paste0(
       "document.getElementById('spatial_projection_background_image').value === ",
@@ -337,7 +337,7 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
   expect_identical(
     retry_get_value(
       app,
-      input = "spatial_projection_to_display",
+      input = "spatial_projection_sections",
       timeout = 30000,
       validate = function(value) identical(value, "image")
     ),
@@ -707,7 +707,7 @@ test_that("{shinytest2} recording: groups", {
   expect_equal(app$get_js(hidden_legend), 0)
 
   ## switch to percent view
-  app$set_inputs(groups_by_other_group_show_as_percent = TRUE)
+  app$set_inputs(groups_by_other_group_show_as_percent = "TRUE")
   app$wait_for_idle(timeout = 10000)
   ## The browser switches to the percentages without a new value.
   app$wait_for_js(
@@ -729,17 +729,12 @@ test_that("{shinytest2} recording: groups", {
       )
     )$input,
     list(
-      groups_by_other_group_show_as_percent = TRUE,
+      groups_by_other_group_show_as_percent = "TRUE",
       groups_by_other_group_show_table = TRUE
     )
   )
 
-  app$run_js(paste0(
-    "document.querySelector(",
-    "'input[name=\"groups_by_other_group_plot_type\"]",
-    "[value=\"Sankey plot\"]'",
-    ").parentElement.click();"
-  ))
+  app$set_inputs(groups_by_other_group_plot_type = "Sankey plot", wait_ = FALSE)
   app$wait_for_js(
     paste0(
       "document.querySelectorAll(",
@@ -957,12 +952,12 @@ test_that("{shinytest2} recording: gene_expression", {
     wait_ = FALSE
   )
   app$wait_for_js(
-    "document.querySelectorAll('.cerebro-gene-rgb-channel').length === 3",
+    "document.querySelectorAll('#shiny-tab-geneExpression .cerebro-rgb-select').length === 3",
     timeout = 10000
   )
   rgb_animations <- app$get_js(
     paste0(
-      "Array.from(document.querySelectorAll('.cerebro-gene-rgb-channel'))",
+      "Array.from(document.querySelectorAll('#shiny-tab-geneExpression .cerebro-rgb-select'))",
       ".map(e=>getComputedStyle(e).animationName)"
     )
   )

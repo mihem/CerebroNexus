@@ -102,10 +102,10 @@ output[["groups_by_other_group_table"]] <- viewerLazyRender(function() {
     ## generate table
     composition_df <- groupsCompositionTable(
       mode = "wide",
-      percent = groups_by_other_group_show_as_percent()
+      percent = isTRUE(as.logical(groups_by_other_group_show_as_percent()))
     )
     ## get indices of columns that should be formatted as percent
-    if (groups_by_other_group_show_as_percent() == TRUE) {
+    if (isTRUE(as.logical(groups_by_other_group_show_as_percent()))) {
       columns_percentage <- c(3:ncol(composition_df))
     } else {
       columns_percentage <- NULL

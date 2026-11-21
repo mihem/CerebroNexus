@@ -1945,7 +1945,7 @@ cerebroFeedbackControls <- function(id, input, overrides = list()) {
     id,
     overview_projection = "^overview_projection_(to_display|point_color|point_size|point_opacity|point_border|group_labels|keep_square|percentage_cells_to_show|group_filter_.+)$",
     expression_projection = "^expression_projection_(to_display|point_size|point_opacity|point_border|group_labels|keep_square|percentage_cells_to_show|group_filter_.+)$",
-    spatial_projection = "^spatial_projection_(to_display|plot_type|point_color|point_size|point_opacity|group_labels|point_border|keep_square|percentage_cells_to_show|feature_to_display|coexpr_[rgb]|show_region_outlines|background_image|group_filter_.+)$",
+    spatial_projection = "^spatial_projection_(to_display|plot_type|point_color|point_size|point_opacity|group_labels|point_border|keep_square|percentage_cells_to_show|feature_to_display|coexpr_[rgb]|rgb_layout|show_region_outlines|background_image|group_filter_.+)$",
     trajectory_projection = "^trajectory_(selected_method|selected_name|point_color|point_size|point_opacity|projection_group_labels|projection_point_border|projection_keep_square|percentage_cells_to_show|projection_group_filter_.+)$",
     hla_motif_network = "^hla_(chain|scope|color_by|color_allele|pair_allele_i|pair_allele_ii|min_nodes|by_v|show_isolated|node_scale|legend_mode|group_filter_.+)$",
     "a^"
@@ -2089,6 +2089,11 @@ cerebroCellViewRender <- function(
   } else if (is.function(deferred_aux)) {
     auxiliary <- deferred_aux()
     message$data$selection_key <- auxiliary$selection_key
+    ## With a cell-name resource the cells are named by canonical row; the
+    ## browser reads their names before it draws the frame
+    ## (resolveFrameCellNames()). Without these a frame of panels had no keys.
+    message$data$selection_index <- auxiliary$selection_index
+    message$data$cell_names_resource <- auxiliary$cell_names_resource
     message$hover <- auxiliary$hover
   }
 
@@ -2651,12 +2656,14 @@ cerebroSelectionSummary <- function(
         ),
         shiny::tags$span(
           class = "cerebro-selection-composition-value",
-          paste0(
-            formatC(count, format = "f", big.mark = ",", digits = 0),
-            " · ",
-            round(percent),
-            "%"
-          )
+          shiny::tags$span(
+            class = "cerebro-selection-composition-count",
+            paste0(
+              formatC(count, format = "f", big.mark = ",", digits = 0),
+              " · "
+            )
+          ),
+          paste0(round(percent), "%")
         )
       )
     })
@@ -2681,7 +2688,13 @@ cerebroSelectionSummary <- function(
           formatC(n_selected, format = "f", big.mark = ",", digits = 0),
           " / ",
           formatC(total, format = "f", big.mark = ",", digits = 0)
-        ))
+        )),
+        shiny::tags$button(
+          type = "button",
+          class = "cerebro-selection-composition-toggle",
+          `aria-label` = "Collapse or expand the composition card",
+          title = "Collapse / expand"
+        )
       ),
       shiny::tags$div(
         class = "cerebro-selection-composition-sub",
@@ -5154,9 +5167,22 @@ viewerReadSpatialData <- function(ds, name) {
     name
   )
   tryCatch(
-    ds$getSpatialData(name, hydrate_molecules = FALSE),
+    viewerGetSpatialData(ds, name),
     error = function(e) NULL
   )
+}
+
+## A section's spatial record as the Viewer reads it: no molecule table, and
+## the expression left as the CRB's reference to the object's matrix (the
+## Viewer reads genes from that matrix). A CRB written before the reference
+## existed has a getter without `hydrate_expression`.
+viewerGetSpatialData <- function(ds, name) {
+  getter <- ds$getSpatialData
+  if ("hydrate_expression" %in% names(formals(getter))) {
+    getter(name, hydrate_molecules = FALSE, hydrate_expression = FALSE)
+  } else {
+    getter(name, hydrate_molecules = FALSE)
+  }
 }
 
 ## Coordinate-only Spatial consumers run after spatial_projection_parameters_plot
@@ -6448,6 +6474,9 @@ viewerPrivateImageUrl <- function(path, session = NULL, expected_md5 = NULL) {
           "Cache-Control" = "private, max-age=31536000, immutable",
           "ETag" = paste0('"', data$md5, '"'),
           "X-Content-Type-Options" = "nosniff",
+          ## httpuv would gzip every response: 110 ms for a 6.7 MB PNG that
+          ## comes out larger, 8 ms without.
+          "Content-Encoding" = "identity",
           ## An SVG opened as a document must not run script, whatever its
           ## markup; as an image it is unaffected.
           "Content-Security-Policy" = paste(

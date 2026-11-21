@@ -186,11 +186,6 @@ tab_coordinated_views <- tabItem(
       class = "cv-topbar",
       div(
         class = "cv-filters",
-        div(
-          class = "cv-ctl",
-          tags$label("Colour by", `for` = "cv-pick-color"),
-          tags$select(id = "cv-pick-color")
-        ),
         ## Projections are a multi-select. Every selected embedding receives its
         ## own linked card in the same responsive grid as Spatial, Trekker and TCR.
         ## All coordinates already travel in the bundle, so this stays client-side.
@@ -207,8 +202,14 @@ tab_coordinated_views <- tabItem(
           class = "cv-ctl cv-multiselect-ctl",
           id = "cv-spatial-ctl",
           style = "display:none",
-          tags$label("Spatial data"),
+          tags$label("Sections"),
           tags$select(id = "cv-pick-spatial", multiple = "multiple")
+        ),
+        ## Data, then what colours it: the order of every page's toolbar.
+        div(
+          class = "cv-ctl",
+          tags$label("Colour by", `for` = "cv-pick-color"),
+          tags$select(id = "cv-pick-color")
         ),
         ## Mean/per-gene expression picker. Per-gene mode expands the linked
         ## spaces into a gene x space grid; the client enforces a 12-panel cap.
@@ -248,28 +249,7 @@ tab_coordinated_views <- tabItem(
           class = "cv-ctl cv-rgb-ctl",
           id = "cv-rgb-ctl",
           style = "display:none",
-          tags$label("Co-expression (R / G / B)"),
-          div(
-            class = "cv-rgb-row",
-            Map(
-              function(channel, colour) {
-                selectizeInput(
-                  paste0("coordviews_gene_", channel),
-                  label = NULL,
-                  choices = NULL,
-                  options = list(
-                    maxOptions = 1000,
-                    placeholder = paste0(colour, " gene..."),
-                    create = FALSE,
-                    loadThrottle = 300
-                  )
-                )
-              },
-              c("r", "g", "b"),
-              c("red", "green", "blue"),
-              USE.NAMES = FALSE
-            )
-          )
+          cerebroRgbGeneFields(paste0("coordviews_gene_", c("r", "g", "b")))
         ),
         ## Clonal-panel layout switch. Shown only when the data set carries an
         ## immune axis (a "clone" space). The clone panel's X/Y are abstract, so

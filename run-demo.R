@@ -1,13 +1,28 @@
 #!/usr/bin/env Rscript
 
-## Prepares the large demo data sets and opens them in this checkout's Viewer.
+## Prepares the large demo data sets and opens them together in this
+## checkout's Viewer.
 ##
-##   Rscript run-demo.R [--data=1m,ren,cosmx,tcell] [--prepare-only]
+##   Rscript run-demo.R [--data=1m,ren,cosmx,tcell,dlpfc,mouse_brain,...]
+##                      [--prepare-only]
 ##
-## --data names the data sets to prepare (default: 1m, the mouse brain). Each
-## prepared data set also gets a compressed twin of its H5 file, listed in the
-## menu as "<name> [compressed]". --prepare-only downloads and converts without
+## --data names the data sets to prepare (default: 1m, the mouse brain), any
+## mix of the two kinds below. --prepare-only downloads and converts without
 ## starting the Viewer.
+##
+## 1m, ren, cosmx and tcell are written as CRBs directly. Each also gets a
+## compressed twin of its H5 file, listed in the menu as "<name> [compressed]".
+##
+## The Visium data sets are real tissue with their H&E photographs, several
+## sections each (data-raw/large-demo/prepare_builder_visium_data.R):
+##   dlpfc        human prefrontal cortex, 12 sections, cortical layers
+##   mouse_brain  mouse brain, 4 sagittal sections
+##   breast       human breast cancer, 2 sections
+##   prostate     human prostate, cancer and normal, 2 sections
+## Each becomes a SingleCellExperiment file, which the Builder's own build
+## steps turn into a CRB, every section with its own photograph and Spatial
+## opening as the grid. The file's path is printed: import it in the Builder
+## (launchCerebroBuilder()) to build it there yourself.
 
 script_arg <- grep("^--file=", commandArgs(FALSE), value = TRUE)
 repo_root <- if (length(script_arg)) {
@@ -46,6 +61,12 @@ demos <- list(
     version = function() .viewerTcellVersion
   )
 )
+## Built by the Builder from the file prepareBuilderVisiumDemoData() writes.
+visium_demos <- c("dlpfc", "mouse_brain", "breast", "prostate")
+usage <- paste0(
+  "Usage: Rscript run-demo.R [--data=1m,ren,cosmx,tcell,",
+  "dlpfc,mouse_brain,breast,prostate] [--prepare-only]"
+)
 
 args <- commandArgs(trailingOnly = TRUE)
 data_arg <- grep("^--data=", args, value = TRUE)
@@ -58,12 +79,9 @@ if (
   length(setdiff(args, c(data_arg, "--prepare-only"))) ||
     length(data_arg) > 1L ||
     !length(selected) ||
-    !all(selected %in% names(demos))
+    !all(selected %in% c(names(demos), visium_demos))
 ) {
-  stop(
-    "Usage: Rscript run-demo.R [--data=1m,ren,cosmx,tcell] [--prepare-only]",
-    call. = FALSE
-  )
+  stop(usage, call. = FALSE)
 }
 if (!requireNamespace("pkgload", quietly = TRUE)) {
   stop("Install pkgload first: install.packages('pkgload')", call. = FALSE)
@@ -80,7 +98,8 @@ for (script in c(
   "prepare_viewer_cosmx_data.R",
   "prepare_viewer_tcell_data.R",
   "prepare_viewer_pack.R",
-  "h5_compressed_variant.R"
+  "h5_compressed_variant.R",
+  "prepare_builder_visium_data.R"
 )) {
   source(file.path(repo_root, "data-raw", "large-demo", script), local = TRUE)
 }
@@ -100,19 +119,33 @@ for (name in names(demos)) {
   )
   message(name, " data version ", demo$version(), ": ", crb)
 }
-if ("--prepare-only" %in% args) {
-  quit(save = "no", status = 0)
+visium <- intersect(visium_demos, selected)
+built <- vapply(
+  visium,
+  function(id) {
+    demo <- prepareViewerVisiumDemoData(id, repo_root)
+    message(
+      id,
+      ": built by the Builder from ",
+      normalizePath(prepareBuilderVisiumDemoData(id), winslash = "/")
+    )
+    normalizePath(demo, winslash = "/", mustWork = TRUE)
+  },
+  character(1)
+)
+Sys.setenv(CEREBRO_VISIUM_DEMOS = paste(built, collapse = .Platform$path.sep))
+
+if (!"--prepare-only" %in% args) {
+  port <- tryCatch(
+    httpuv::randomPort(min = 7451L, max = 7451L, n = 1L),
+    error = function(error) httpuv::randomPort()
+  )
+  message(sprintf("Opening CerebroNexus at http://127.0.0.1:%d", port))
+
+  shiny::runApp(
+    file.path(repo_root, "inst"),
+    host = "127.0.0.1",
+    port = port,
+    launch.browser = TRUE
+  )
 }
-
-port <- tryCatch(
-  httpuv::randomPort(min = 7451L, max = 7451L, n = 1L),
-  error = function(error) httpuv::randomPort()
-)
-message(sprintf("Opening CerebroNexus at http://127.0.0.1:%d", port))
-
-shiny::runApp(
-  file.path(repo_root, "inst"),
-  host = "127.0.0.1",
-  port = port,
-  launch.browser = TRUE
-)
