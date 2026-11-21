@@ -22,6 +22,12 @@
   value always lands. Colouring the Projection of 1.3 million cells by
   another column is drawn after 7 ms instead of 193 ms (medians of 7
   alternating rounds).
+- **The table of selected cells and the HLA hints work from the keyboard.**
+  The column headers of the table sort on Enter or Space and say how they are
+  sorted, the menu buttons say whether their menu is open, and Escape closes a
+  menu. The info marker beside an HLA control can take the focus, shows its
+  hint then, and a screen reader reads it. Text of the data set placed in the
+  Viewer's pages now has its single quotes escaped as well.
 
 # CerebroNexus 8.4.7
 
