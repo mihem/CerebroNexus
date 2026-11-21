@@ -206,7 +206,10 @@ The checksum is tagged `xxh3-128-cell-order-v1:`. Its input is the cell names
 in their original order, encoded as UTF-8, each followed by a zero byte,
 including the last name. R strings cannot contain an embedded zero byte, so
 the boundaries are unambiguous. XXH3-128 with seed 0 hashes those raw bytes
-directly (`digest`, with serialization disabled). Unlike an R-object hash,
+directly (`digest`, with serialization disabled). `digest` is optional:
+without a supported version, the existing `rlang::hash_file()` hashes a
+temporary file containing exactly the same bytes and produces the same value.
+That fallback never passes an R object to `rlang::hash()`. Unlike an R-object hash,
 this specifies both the bytes and the algorithm independently of `rlang`.
 Native encoding and in-memory hashing avoid per-cell text-prefix allocations
 and temporary files. One temporary raw buffer is proportional to the total

@@ -26,7 +26,8 @@ test_that("ordered-name checksums have fixed, portable UTF-8 bytes", {
   )
   expect_error(hash(NA_character_), "must not contain missing values")
 
-  ## The stable format does not call either rlang hashing API.
+  ## The accelerator does not call either rlang hashing API.
+  skip_if_not_installed("digest", minimum_version = "0.6.39")
   testthat::local_mocked_bindings(
     hash = function(...) stop("object hashing is not a file format"),
     hash_file = function(...) stop("the new checksum must not call rlang"),
@@ -39,6 +40,7 @@ test_that("ordered-name checksums have fixed, portable UTF-8 bytes", {
 })
 
 test_that("the fast checksum hashes explicit raw bytes, never an R object", {
+  skip_if_not_installed("digest", minimum_version = "0.6.39")
   digest_bytes <- digest::digest
   testthat::local_mocked_bindings(
     digest = function(object, algo, serialize, seed) {
@@ -52,6 +54,58 @@ test_that("the fast checksum hashes explicit raw bytes, never an R object", {
   )
   expect_identical(
     .cerebroCellNamesHash(c("AA", "B")),
+    "xxh3-128-cell-order-v1:f183324cf31f5adc606566c2648e3481"
+  )
+})
+
+test_that("the existing-dependency fallback gives exactly the same checksum", {
+  hash <- .crbContract()$.runtimeCellNamesHash
+  for (cells in list(
+    character(),
+    c("cell1", "cell2"),
+    c("AA", "B"),
+    c("caf\u00e9", "\u03b2:1"),
+    c("a\nb", "c")
+  )) {
+    expect_identical(hash(cells, .use_digest = FALSE), hash(cells))
+  }
+  expect_identical(
+    hash(c("AA", "B"), .use_digest = FALSE),
+    "xxh3-128-cell-order-v1:f183324cf31f5adc606566c2648e3481"
+  )
+})
+
+test_that("ordinary checksum calculation works without digest installed", {
+  contract <- .crbContract()
+  rlang::local_bindings(
+    requireNamespace = function(package, ...) {
+      if (identical(package, "digest")) {
+        FALSE
+      } else {
+        base::requireNamespace(package, ...)
+      }
+    },
+    .env = contract
+  )
+  expect_identical(
+    contract$.runtimeCellNamesHash(c("AA", "B")),
+    "xxh3-128-cell-order-v1:f183324cf31f5adc606566c2648e3481"
+  )
+  expect_true(contract$.runtimeCellNamesMatch(
+    c("cell1", "cell2"),
+    "xxh3-128-cell-order-v1:172c476c1d6a9824bc3a3c2e962541c9"
+  ))
+})
+
+test_that("an older optional digest uses the existing-dependency fallback", {
+  contract <- .crbContract()
+  rlang::local_bindings(
+    requireNamespace = function(...) TRUE,
+    getNamespaceVersion = function(...) "0.6.38",
+    .env = contract
+  )
+  expect_identical(
+    contract$.runtimeCellNamesHash(c("AA", "B")),
     "xxh3-128-cell-order-v1:f183324cf31f5adc606566c2648e3481"
   )
 })
@@ -162,13 +216,7 @@ test_that("raw checksums preserve cell boundaries in long vectors", {
     contract$.runtimeCellNamesHash(cells),
     paste0(
       "xxh3-128-cell-order-v1:",
-      digest::digest(
-        path,
-        algo = "xxh3_128",
-        serialize = FALSE,
-        file = TRUE,
-        seed = 0L
-      )
+      unname(rlang::hash_file(path))
     )
   )
   ## A character-vector walker reference with one name per write, independent

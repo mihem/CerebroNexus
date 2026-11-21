@@ -26,7 +26,6 @@
 #  > "base64enc",
 #  > "biomaRt",
 #  > "colourpicker",
-#  > "digest",
 #  > "dplyr",
 #  > "DT",
 #  > "fs",
@@ -87,7 +86,6 @@ let
       chromote
       colourpicker
       devtools
-      digest
       dplyr
       DT
       fs

@@ -3,9 +3,12 @@
 - H5-backed data sets no longer falsely report mismatched cell names when
   exported and opened with different `rlang` versions. New thin CRBs use
   schema 5 with an explicitly versioned XXH3-128 checksum of the ordered
-  UTF-8 names, separated by zero bytes. Raw-byte encoding and hashing run in
-  native code without R-object serialization, decimal prefix allocation or
-  temporary files, keeping large-data validation fast.
+  UTF-8 names, separated by zero bytes. The optional `digest` accelerator
+  encodes and hashes raw bytes in native code without R-object serialization,
+  decimal prefix allocation or temporary files.
+  `digest` remains optional in Suggests; without a supported version, the
+  existing file hasher checks a temporary file of the same bytes with the
+  same checksum. No new required Imports are added.
   Ordinary readers now require schema 5 and reject schema-3/4 files immediately
   with a `convertCerebro()` message, without historical-hash retries on app
   restart. The explicit converter verifies either historical `rlang` checksum

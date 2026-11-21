@@ -10,20 +10,33 @@
 ## code; unlike serialize(), it adds no object/R-version/encoding headers.
 ## Unlike the cell-set fingerprint, this must NEVER sort the names. XXH3-128
 ## (seed 0) is selected explicitly, never digest's object-serialization default.
-.runtimeCellNamesHash <- function(cells) {
+## digest is optional acceleration, not an additional Import. Without it the
+## existing rlang file hasher reads the same bytes, not an R object. Both paths
+## must produce identical checksums; .use_digest lets tests force the fallback.
+.runtimeCellNamesHash <- function(cells, .use_digest = TRUE) {
   cells <- enc2utf8(as.character(cells))
   if (anyNA(cells)) {
     stop("Cell names must not contain missing values.", call. = FALSE)
   }
-  paste0(
-    "xxh3-128-cell-order-v1:",
+  value <- if (
+    isTRUE(.use_digest) &&
+      requireNamespace("digest", quietly = TRUE) &&
+      numeric_version(getNamespaceVersion("digest")) >= "0.6.39"
+  ) {
     digest::digest(
       writeBin(cells, raw()),
       algo = "xxh3_128",
       serialize = FALSE,
       seed = 0L
     )
-  )
+  } else {
+    path <- tempfile("cerebro-cell-order-")
+    on.exit(unlink(path), add = TRUE)
+    connection <- file(path, "wb")
+    tryCatch(writeBin(cells, connection), finally = close(connection))
+    unname(rlang::hash_file(path))
+  }
+  paste0("xxh3-128-cell-order-v1:", value)
 }
 
 .runtimeCellNamesMatch <- function(cells, expected) {

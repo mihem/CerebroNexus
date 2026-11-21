@@ -63,7 +63,6 @@ rix(
     "base64enc",
     "biomaRt",
     "colourpicker",
-    "digest",
     "dplyr",
     "DT",
     "fs",

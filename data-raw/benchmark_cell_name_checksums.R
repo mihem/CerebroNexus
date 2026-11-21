@@ -38,10 +38,14 @@ cat(
   "\nrlang:",
   as.character(utils::packageVersion("rlang")),
   "; digest:",
-  as.character(utils::packageVersion("digest")),
+  if (requireNamespace("digest", quietly = TRUE)) {
+    as.character(utils::packageVersion("digest"))
+  } else {
+    "not installed (file-hash fallback)"
+  },
   "\nCells:",
   length(cells),
-  "; temporary raw buffer (MiB):",
+  "; encoded-name size (MiB):",
   round(sum(nchar(enc2utf8(cells), type = "bytes") + 1) / 1024^2, 2),
   "\nChecksum:",
   expected_portable,
