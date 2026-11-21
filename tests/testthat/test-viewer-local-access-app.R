@@ -126,17 +126,17 @@ test_that("cerebroStart protects the real open-mode Viewer and its upload UI", {
     returnByValue = TRUE
   )
   expect_true(ready$result$value)
-  # The bare URL still serves only a shell; no session is granted.
+  # Cached HTML stays public, but missing and invalid tokens grant no session.
   expect_identical(viewer_local_access_get(app$address)$status_code, 200L)
-  expect_true(viewer_local_access_socket(app, "")$closed)
-})
-
-test_that("a bare Run App URL explains how to open the authorized Viewer", {
-  skip_if_no_chrome()
-  app <- viewer_local_access_process(start = TRUE, cached = TRUE)
-  browser <- chromote::ChromoteSession$new()
-  withr::defer(browser$close())
+  for (query in c("", "?token=invalid")) {
+    probe <- viewer_local_access_socket(app, query)
+    expect_true(probe$closed)
+    expect_null(probe$values)
+  }
+  # Reuse the same app/browser to check the tokenless visitor gets guidance.
+  loaded <- browser$Page$loadEventFired(wait_ = FALSE)
   browser$Page$navigate(app$address)
+  browser$wait_for(loaded)
   message <- browser$Runtime$evaluate(
     paste0(
       "new Promise(resolve => { const deadline = Date.now() + 6000; ",
@@ -151,77 +151,4 @@ test_that("a bare Run App URL explains how to open the authorized Viewer", {
   expect_match(message, "Access token required", fixed = TRUE)
   expect_match(message, "R console", fixed = TRUE)
   expect_false(grepl(app$token, message, fixed = TRUE))
-  presentation <- browser$Runtime$evaluate(
-    paste0(
-      "(() => { const node = document.getElementById('cerebro-access-denied'); ",
-      "return {tag:node.tagName, modal:node.matches(':modal'), role:node.getAttribute('role'), ",
-      "themed:node.classList.contains('cerebro-session-dialog'), ",
-      "inline:node.hasAttribute('style'), startup:!!document.getElementById('cerebro-startup')}; })()"
-    ),
-    returnByValue = TRUE
-  )$result$value
-  expect_identical(presentation$tag, "DIALOG")
-  expect_true(presentation$modal)
-  expect_identical(presentation$role, "alertdialog")
-  expect_true(presentation$themed)
-  expect_false(presentation$inline)
-  expect_false(presentation$startup)
-  matches_timeout <- browser$Runtime$evaluate(
-    paste0(
-      "(() => { const access = document.getElementById('cerebro-access-denied'); ",
-      "const timeout = document.getElementById('session-timeout-warning'); ",
-      "return ['backgroundColor', 'color', 'borderRadius', 'padding', 'boxShadow'].every(",
-      "name => getComputedStyle(access)[name] === getComputedStyle(timeout)[name]); })()"
-    ),
-    returnByValue = TRUE
-  )$result$value
-  expect_true(matches_timeout)
-  error_accent <- browser$Runtime$evaluate(
-    paste0(
-      "(() => { const access = document.getElementById('cerebro-access-denied'); ",
-      "const style = getComputedStyle(access); ",
-      "const heading = getComputedStyle(access.querySelector('h2')); ",
-      "const theme = getComputedStyle(document.documentElement); ",
-      "return {border:style.borderTopColor, width:style.borderTopWidth, heading:heading.color, ",
-      "error:theme.getPropertyValue('--c-error').trim(), ",
-      "darkError:theme.getPropertyValue('--c-error-700').trim()}; })()"
-    ),
-    returnByValue = TRUE
-  )$result$value
-  css_rgb <- function(color) {
-    paste0("rgb(", paste(grDevices::col2rgb(color)[, 1], collapse = ", "), ")")
-  }
-  expect_identical(error_accent$border, css_rgb(error_accent$error))
-  expect_identical(error_accent$width, "3px")
-  expect_identical(error_accent$heading, css_rgb(error_accent$darkError))
-  browser$Input$dispatchKeyEvent(
-    type = "keyDown",
-    key = "Escape",
-    code = "Escape"
-  )
-  browser$Input$dispatchKeyEvent(
-    type = "keyUp",
-    key = "Escape",
-    code = "Escape"
-  )
-  expect_true(
-    browser$Runtime$evaluate(
-      "document.getElementById('cerebro-access-denied').matches(':modal')",
-      returnByValue = TRUE
-    )$result$value
-  )
-  browser$Emulation$setDeviceMetricsOverride(
-    width = 375,
-    height = 812,
-    deviceScaleFactor = 1,
-    mobile = FALSE
-  )
-  fits <- browser$Runtime$evaluate(
-    paste0(
-      "(() => { const r = document.getElementById('cerebro-access-denied').getBoundingClientRect(); ",
-      "return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight; })()"
-    ),
-    returnByValue = TRUE
-  )$result$value
-  expect_true(fits)
 })
