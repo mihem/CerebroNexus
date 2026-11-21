@@ -14,6 +14,7 @@ launchCerebro(
   point_opacity = 1,
   percentage_cells_to_show = 100,
   projections_show_hover_info = TRUE,
+  require_token = NULL,
   ...
 )
 ```
@@ -68,6 +69,22 @@ launchCerebro(
   Show hover information in projections. This setting can be changed in
   the UI; defaults to TRUE.
 
+- require_token:
+
+  Require a fresh per-run access token. The default, `NULL`, enables it
+  for open-mode Viewers bound to a loopback address (for example
+  `127.0.0.1`). The authorized URL is printed in the R console and used
+  when the App opens its browser. `TRUE` requires a token on any
+  address; `FALSE` explicitly disables it, for example behind an
+  authenticated reverse proxy. Loopback binding alone is not
+  authentication. Tokens travel in the URL: keep it private and use
+  HTTPS for remote access. Closed-mode and generated standalone Viewers
+  are unchanged by default. This default is a breaking change for
+  open-mode launches behind a reverse proxy that also binds to loopback.
+  Set `require_token = FALSE` for an intentionally public or externally
+  authenticated deployment; proxy headers are not used to disable
+  protection automatically.
+
 - ...:
 
   Further parameters that are used by
@@ -90,6 +107,20 @@ sends the page of the previous run, its files and the first view of the
 Projection page, and then runs `launchCerebro()` behind it; the App
 keeps the address it was given. The first start of an installation has
 no page to send yet and starts as `launchCerebro()` does.
+
+The cached HTML interface remains public, including the early page
+served by `cerebroStart()`. Without the token it cannot start a working
+Shiny session: uploads, analyses and session data remain inaccessible.
+Cached plot previews contain data, so their URLs remain private. No
+token needs to be entered manually; it is included in the browser URL
+automatically. If you start the returned App yourself with
+`shiny::runApp(..., launch.browser = TRUE)`, use the authorized URL
+printed in the console instead of the bare address. To control browser
+opening while retaining the automatic authorized URL, pass
+`options = list(launch.browser = FALSE)` (or a browser function) to
+`launchCerebro()`. `cerebroStart()` accepts `require_token` too; its
+command-line equivalent is `--require-token=auto`,
+`--require-token=true` or `--require-token=false`.
 
 ## Examples
 

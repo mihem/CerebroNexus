@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.5</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -93,6 +93,7 @@
 <span>  point_opacity <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  percentage_cells_to_show <span class="op">=</span> <span class="fl">100</span>,</span>
 <span>  projections_show_hover_info <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  require_token <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -151,6 +152,22 @@ defaults to 100.</p></dd>
 setting can be changed in the UI; defaults to TRUE.</p></dd>
 
 
+<dt id="arg-require-token">require_token<a class="anchor" aria-label="anchor" href="#arg-require-token"></a></dt>
+<dd><p>Require a fresh per-run access token. The default,
+<code>NULL</code>, enables it for open-mode Viewers bound to a loopback address
+(for example <code>127.0.0.1</code>). The authorized URL is printed in the R
+console and used when the App opens its browser. <code>TRUE</code> requires a
+token on any address; <code>FALSE</code> explicitly disables it, for example
+behind an authenticated reverse proxy. Loopback binding alone is not
+authentication. Tokens travel in the URL: keep it private and use HTTPS
+for remote access. Closed-mode and generated standalone Viewers are
+unchanged by default.
+This default is a breaking change for open-mode launches behind a reverse
+proxy that also binds to loopback. Set <code>require_token = FALSE</code> for an
+intentionally public or externally authenticated deployment; proxy headers
+are not used to disable protection automatically.</p></dd>
+
+
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
 <dd><p>Further parameters that are used by <code><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">shiny::runApp</a></code>, e.g.
 <code>host</code> or <code>port</code>.</p></dd>
@@ -173,6 +190,19 @@ its files and the first view of the Projection page, and then runs
 <code>launchCerebro()</code> behind it; the App keeps the address it was given.
 The first start of an installation has no page to send yet and starts as
 <code>launchCerebro()</code> does.</p>
+<p>The cached HTML interface remains public, including the early page served
+by <code>cerebroStart()</code>. Without the token it cannot start a working Shiny
+session: uploads, analyses and session data remain inaccessible. Cached
+plot previews contain data, so their URLs remain private. No token needs
+to be entered manually; it is included in the browser URL automatically.
+If you start the returned App yourself with
+<code>shiny::runApp(..., launch.browser = TRUE)</code>, use the authorized URL
+printed in the console instead of the bare address. To control browser
+opening while retaining the automatic authorized URL, pass
+<code>options = list(launch.browser = FALSE)</code> (or a browser function) to
+<code>launchCerebro()</code>. <code>cerebroStart()</code> accepts <code>require_token</code>
+too; its command-line equivalent is <code>--require-token=auto</code>,
+<code>--require-token=true</code> or <code>--require-token=false</code>.</p>
     </div>
 
     <div class="section level2">

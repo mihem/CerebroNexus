@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.5</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -77,6 +77,13 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="8.4.5" id="cerebronexus-845">CerebroNexus 8.4.5<a class="anchor" aria-label="anchor" href="#cerebronexus-845"></a></h2>
+<ul><li>
+<strong>Local open-mode Viewers require a per-run access token.</strong> <code><a href="../reference/launchCerebro.html">launchCerebro()</a></code> automatically opens and prints an authorized URL when the effective bind address is loopback. Shiny sessions reject missing or incorrect tokens before any Viewer server code runs. <code>require_token = TRUE</code> forces protection on any address; <code>FALSE</code> explicitly opts out, for example behind an authenticated reverse proxy. <code>cerebroStart()</code> and <code>start.R</code> support the same setting (<code>--require-token=auto|true|false</code>). The generic HTML interface stays public and keeps its original cached-page and early-start shortcuts; without the token it cannot start a working session or accept uploads. Data-bearing plot previews use private per-run URLs, published once the token is available, while datasets load. Tokens are supplied automatically in the browser URL; no password entry or secret HTML filename is needed. Closed-mode and generated standalone Viewers keep their existing defaults. Opening a bare Run App URL without the token shows an explanation pointing to the authorized link in the R console. This is local access hardening, not a replacement for HTTPS and deployment authentication.</li>
+<li>
+<strong>Breaking change for loopback-backed proxies serving an open-mode Viewer.</strong> An open-mode <code><a href="../reference/launchCerebro.html">launchCerebro()</a></code> / <code>cerebroStart()</code> behind nginx, Shiny Server, or a Docker loopback mapping can also bind to localhost, so the automatic token rule applies there too. For an intentionally public deployment, or one already protected by proxy authentication and HTTPS, explicitly set <code>require_token = FALSE</code> (<code>--require-token=false</code> with <code>start.R</code>). The bind address alone does not distinguish a personal Viewer from a proxy-backed deployment; untrusted proxy headers do not disable protection.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="8.4.4" id="cerebronexus-844">CerebroNexus 8.4.4<a class="anchor" aria-label="anchor" href="#cerebronexus-844"></a></h2>
 <ul><li>

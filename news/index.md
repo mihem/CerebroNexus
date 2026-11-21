@@ -1,5 +1,38 @@
 # Changelog
 
+## CerebroNexus 8.4.5
+
+- **Local open-mode Viewers require a per-run access token.**
+  [`launchCerebro()`](https://www.mheming.com/CerebroNexus/reference/launchCerebro.md)
+  automatically opens and prints an authorized URL when the effective
+  bind address is loopback. Shiny sessions reject missing or incorrect
+  tokens before any Viewer server code runs. `require_token = TRUE`
+  forces protection on any address; `FALSE` explicitly opts out, for
+  example behind an authenticated reverse proxy. `cerebroStart()` and
+  `start.R` support the same setting
+  (`--require-token=auto|true|false`). The generic HTML interface stays
+  public and keeps its original cached-page and early-start shortcuts;
+  without the token it cannot start a working session or accept uploads.
+  Data-bearing plot previews use private per-run URLs, published once
+  the token is available, while datasets load. Tokens are supplied
+  automatically in the browser URL; no password entry or secret HTML
+  filename is needed. Closed-mode and generated standalone Viewers keep
+  their existing defaults. Opening a bare Run App URL without the token
+  shows an explanation pointing to the authorized link in the R console.
+  This is local access hardening, not a replacement for HTTPS and
+  deployment authentication.
+- **Breaking change for loopback-backed proxies serving an open-mode
+  Viewer.** An open-mode
+  [`launchCerebro()`](https://www.mheming.com/CerebroNexus/reference/launchCerebro.md)
+  / `cerebroStart()` behind nginx, Shiny Server, or a Docker loopback
+  mapping can also bind to localhost, so the automatic token rule
+  applies there too. For an intentionally public deployment, or one
+  already protected by proxy authentication and HTTPS, explicitly set
+  `require_token = FALSE` (`--require-token=false` with `start.R`). The
+  bind address alone does not distinguish a personal Viewer from a
+  proxy-backed deployment; untrusted proxy headers do not disable
+  protection.
+
 ## CerebroNexus 8.4.4
 
 - **The Builder needs an access token.**
