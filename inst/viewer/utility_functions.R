@@ -681,6 +681,17 @@ cachePlot <- function(x, ...) {
 ## as `active`: returning to the page then reads the source immediately instead
 ## of first replaying the value held from before the page was left.
 debounceAfterFirst <- function(reactive, millis, active = NULL) {
+  ## The clock shiny::debounce() reads: the session's own, so that the quiet
+  ## spell below is measured on the same time as the debounce delay (a test
+  ## moves it with session$elapse()), and the system clock without a session.
+  domain <- shiny::getDefaultReactiveDomain()
+  now_ms <- function() {
+    if (!is.null(domain) && is.function(domain$.now)) {
+      domain$.now()
+    } else {
+      as.numeric(Sys.time()) * 1000
+    }
+  }
   initialized <- FALSE
   current <- NULL
   revision <- shiny::reactiveVal(0L)
@@ -712,17 +723,15 @@ debounceAfterFirst <- function(reactive, millis, active = NULL) {
       ## section) is taken at once; one that follows another sooner (a slider
       ## dragged, controls redrawn by the first change) waits for the burst to
       ## settle, and its last value is taken then.
-      last_change <- Sys.time()
+      last_change <- now_ms()
       shiny::observeEvent(reactive(), {
         next_value <- reactive()
         ## Its first run sees the value taken above, unless it changed since.
         if (identical(current, next_value)) {
           return()
         }
-        now <- Sys.time()
-        quiet <- as.numeric(difftime(now, last_change, units = "secs")) *
-          1000 >=
-          millis
+        now <- now_ms()
+        quiet <- now - last_change >= millis
         last_change <<- now
         if (quiet) publish(next_value)
       })

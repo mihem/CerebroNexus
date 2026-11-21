@@ -235,7 +235,7 @@ test_that("a lone change after the delay passes debounce at once", {
   shiny::testServer(server, {
     session$setInputs(value = "first")
     expect_identical(ready(), "first")
-    Sys.sleep(0.1)
+    session$elapse(100)
     session$setInputs(value = "second")
     expect_identical(ready(), "second")
     ## One that follows it within the delay waits for the burst to settle.
