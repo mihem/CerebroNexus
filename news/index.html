@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.6</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.7</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -77,6 +77,13 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="8.4.7" id="cerebronexus-847">CerebroNexus 8.4.7<a class="anchor" aria-label="anchor" href="#cerebronexus-847"></a></h2>
+<ul><li>H5-backed data sets no longer falsely report mismatched cell names when exported and opened with different <code>rlang</code> versions. New thin CRBs use schema 5 with an explicitly versioned XXH3-128 checksum of the ordered UTF-8 names, separated by zero bytes. The optional <code>digest</code> accelerator encodes and hashes raw bytes in native code without R-object serialization, decimal prefix allocation or temporary files. Byte writes explicitly disable native-encoding translation, so non-ASCII names produce the same checksum in UTF-8 and C/ASCII locales. <code>digest</code> remains optional in Suggests; without a supported version, the existing file hasher checks a temporary file of the same bytes with the same checksum. No new required Imports are added. Ordinary readers now require schema 5 and reject schema-3/4 files immediately with a <code><a href="../reference/convertCerebro.html">convertCerebro()</a></code> message, without historical-hash retries on app restart. The explicit converter verifies either historical <code>rlang</code> checksum once and rewrites the CRB while reusing its existing H5 matrix. Reordered or foreign cells remain rejected.</li>
+<li>
+<strong>Migration required for older thin H5 CRBs, regardless of dataset size.</strong> Stop apps using the export and run <code>convertCerebro("dataset.crb")</code> once with the updated package before deploying the updated Viewer. Rebuild any Viewer Pack if conversion did not already rebuild it. Embedded-expression CRBs are unaffected. New schema-5 exports require an updated reader.</li>
+<li>Normal ordered-cell checks still run before expression access in a new app process and are cached for that process/file version; conversion does not disable integrity checks. Cell-name validation errors are caught at the shared Viewer sidecar boundary, including gene summaries, Spatial, Linked views and Trekker, without disconnecting Shiny or painting replacement values.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="8.4.6" id="cerebronexus-846">CerebroNexus 8.4.6<a class="anchor" aria-label="anchor" href="#cerebronexus-846"></a></h2>
 <ul><li>

@@ -10,6 +10,9 @@ one without an expression-backend descriptor, or one with a singular
 spatial image or an embedded spatial molecule table) is rejected with a
 pointer to
 [`convertCerebro`](https://www.mheming.com/CerebroNexus/reference/convertCerebro.md).
+Thin H5-backed CRBs require schema 5. Convert schema-3/4 files once with
+[`convertCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertCerebro.md);
+historical checksum retries are not performed here.
 
 ## Usage
 

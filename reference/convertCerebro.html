@@ -4,6 +4,9 @@ also how a CRB from an older release is brought up to date: a missing
 expression-backend descriptor is set to embedded, receptor data in the retired
 bcr_data / tcr_data fields is merged into the unified immune
 repertoire, and an H5-backed CRB written without a thin schema is thinned.
+Thin schema-3/4 CRBs are checked using their historical ordered-name
+checksum and rewritten as schema 5 with a portable checksum. This one-time
+conversion reuses the H5 matrix; ordinary readers require schema 5.
 An object written before spatial, HLA typing, Trekker or enriched-pathways
 support is rebuilt on the current class, so the accessors it lacked exist.
 A spatial entry with the singular histology_image fields becomes
@@ -16,6 +19,9 @@ also how a CRB from an older release is brought up to date: a missing
 expression-backend descriptor is set to embedded, receptor data in the retired
 bcr_data / tcr_data fields is merged into the unified immune
 repertoire, and an H5-backed CRB written without a thin schema is thinned.
+Thin schema-3/4 CRBs are checked using their historical ordered-name
+checksum and rewritten as schema 5 with a portable checksum. This one-time
+conversion reuses the H5 matrix; ordinary readers require schema 5.
 An object written before spatial, HLA typing, Trekker or enriched-pathways
 support is rebuilt on the current class, so the accessors it lacked exist.
 A spatial entry with the singular histology_image fields becomes
@@ -31,7 +37,7 @@ re-export it with exportFromSeurat."><meta property="og:image" content="https://
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.6</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.7</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -108,6 +114,9 @@ also how a CRB from an older release is brought up to date: a missing
 expression-backend descriptor is set to embedded, receptor data in the retired
 <code>bcr_data</code> / <code>tcr_data</code> fields is merged into the unified immune
 repertoire, and an H5-backed CRB written without a thin schema is thinned.
+Thin schema-3/4 CRBs are checked using their historical ordered-name
+checksum and rewritten as schema 5 with a portable checksum. This one-time
+conversion reuses the H5 matrix; ordinary readers require schema 5.
 An object written before spatial, HLA typing, Trekker or enriched-pathways
 support is rebuilt on the current class, so the accessors it lacked exist.
 A spatial entry with the singular <code>histology_image</code> fields becomes

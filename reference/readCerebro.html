@@ -5,13 +5,17 @@ its cell names back from the H5 file; spatial molecule tables stay lazy until
 their FOV is requested. A CRB from an older release that this version no
 longer reads (for example one without an expression-backend descriptor,
 or one with a singular spatial image or an embedded spatial molecule table)
-is rejected with a pointer to convertCerebro."><meta property="og:description" content="Reads a CRB written by saveCerebro() or the export functions, as RDS or
+is rejected with a pointer to convertCerebro.
+Thin H5-backed CRBs require schema 5. Convert schema-3/4 files once with
+convertCerebro(); historical checksum retries are not performed here."><meta property="og:description" content="Reads a CRB written by saveCerebro() or the export functions, as RDS or
 qs2. An H5-backed expression matrix is attached lazily and a thin CRB gets
 its cell names back from the H5 file; spatial molecule tables stay lazy until
 their FOV is requested. A CRB from an older release that this version no
 longer reads (for example one without an expression-backend descriptor,
 or one with a singular spatial image or an embedded spatial molecule table)
-is rejected with a pointer to convertCerebro."><meta property="og:image" content="https://www.mheming.com/CerebroNexus/logo.png"></head><body>
+is rejected with a pointer to convertCerebro.
+Thin H5-backed CRBs require schema 5. Convert schema-3/4 files once with
+convertCerebro(); historical checksum retries are not performed here."><meta property="og:image" content="https://www.mheming.com/CerebroNexus/logo.png"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -19,7 +23,7 @@ is rejected with a pointer to convertCerebro."><meta property="og:image" content
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.6</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.7</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -97,7 +101,9 @@ its cell names back from the H5 file; spatial molecule tables stay lazy until
 their FOV is requested. A CRB from an older release that this version no
 longer reads (for example one without an expression-backend descriptor,
 or one with a singular spatial image or an embedded spatial molecule table)
-is rejected with a pointer to <code><a href="convertCerebro.html">convertCerebro</a></code>.</p>
+is rejected with a pointer to <code><a href="convertCerebro.html">convertCerebro</a></code>.
+Thin H5-backed CRBs require schema 5. Convert schema-3/4 files once with
+<code><a href="convertCerebro.html">convertCerebro()</a></code>; historical checksum retries are not performed here.</p>
     </div>
 
     <div class="section level2">

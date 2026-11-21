@@ -178,10 +178,48 @@ An H5-backed export stores the matrix cells by genes, in the layout of
 [`HDF5Array::writeTENxMatrix()`](https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html),
 so the file’s `/expression/genes` dataset holds the **cell** names and
 `/expression/barcodes` the **gene** names. The `.crb` (thin-CRB schema
-version 3) then drops `meta_data$cell_barcode` and the row names of
+version 5) then drops `meta_data$cell_barcode` and the row names of
 every projection that carries the same cell names, and records a
 checksum of the cell names (`cell_names_hash`), the cell count, and
 which projections were compacted in its `crb_schema` field.
+
+The checksum is tagged `xxh3-128-cell-order-v1:`. Its input is the cell
+names in their original order, encoded as UTF-8, each followed by a zero
+byte, including the last name. R strings cannot contain an embedded zero
+byte, so the boundaries are unambiguous. XXH3-128 with seed 0 hashes
+those raw bytes directly (`digest`, with serialization disabled).
+`digest` is optional: without a supported version, the existing
+[`rlang::hash_file()`](https://rlang.r-lib.org/reference/hash.html)
+hashes a temporary file containing exactly the same bytes and produces
+the same value. That fallback never passes an R object to
+[`rlang::hash()`](https://rlang.r-lib.org/reference/hash.html). Unlike
+an R-object hash, this specifies both the bytes and the algorithm
+independently of `rlang`. Both checksum paths explicitly use
+`writeBin(..., useBytes = TRUE)` after UTF-8 normalization: non-ASCII
+names are never translated to the session’s native encoding, including
+when R starts with `LC_ALL=C`. Native-code byte encoding and in-memory
+hashing on the accelerated path avoid per-cell text-prefix allocations
+and temporary files. One temporary raw buffer is proportional to the
+total UTF-8 name bytes plus one byte per cell. Schema 5 also supports
+the `cell_indexed` fields introduced by schema 4. Ordinary readers
+require schema 5: schema-3/4 files are rejected with a
+[`convertCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertCerebro.md)
+message before reading H5 names or trying historical hashes. The
+explicit converter verifies either historical ordered-name hash format
+once and writes schema 5, reusing the H5 matrix. Stop apps using the
+export before conversion; rebuild its Viewer Pack if conversion did not
+already rebuild it. This applies to every thin H5 CRB, not only large
+datasets. Embedded-expression CRBs do not need this migration. Older
+releases that do not support schema 5 refuse new files explicitly.
+
+Conversion does not turn off validation: normal ordered-name checks
+still run before expression access in a new Viewer process and are
+cached for that process and file version. Historical-format retries
+happen only in conversion. In a Viewer session, a cell-name mismatch
+notifies the user and aborts the current reactive read at the shared
+sidecar boundary, so all expression pages remain connected and never
+substitute synthetic expression values. Outside Shiny, the runtime and
+package readers still raise a hard mismatch error.
 
 When the `.crb` is loaded,
 [`readCerebro()`](https://www.mheming.com/CerebroNexus/reference/readCerebro.md)
@@ -201,7 +239,8 @@ The readers accept only the current layout.
 and the Viewer all reject a `.crb` that
 
 - has no `expression_backend` descriptor;
-- has a thin schema other than version 3;
+- has a thin schema other than version 5 (versions 3/4 require
+  conversion);
 - still stores receptors in non-empty `bcr_data` / `tcr_data` fields;
 - records an immune repertoire sidecar of any type other than `"file"`;
 - predates spatial support (the Cerebro v1.3 class), HLA typing support,

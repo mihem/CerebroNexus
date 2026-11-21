@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.6</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.7</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -210,7 +210,7 @@ application.</p>
 <code>/expression/barcodes</code> the <strong>gene</strong> names (the
 axis names follow the 10x convention for a genes-by-cells matrix, which
 is transposed here). The <code>.crb</code> itself is <em>thin</em>
-(schema version 3). It drops <code>meta_data$cell_barcode</code> and the
+(schema version 5). It drops <code>meta_data$cell_barcode</code> and the
 row names of the projections, and instead stores a checksum of the cell
 names (<code>cell_names_hash</code>) together with the cell count.
 <code><a href="../reference/readCerebro.html">readCerebro()</a></code> and the Viewer read the cell names back from
@@ -223,6 +223,19 @@ you work with is identical to an embedded one:</p>
 example because the H5 file was re-exported with a different cell order,
 loading stops with an error instead of attaching expression values to
 the wrong cells.</p>
+<p>Schema 5 uses a versioned XXH3-128 checksum (seed 0) of the ordered
+UTF-8 names, each terminated by a zero byte, independently of
+<code>rlang</code> and R-object serialization. Raw-byte encoding and
+hashing run in native code without temporary files. Existing schema-3/4
+files require a one-time <code>convertCerebro("dataset.crb")</code> with
+the updated package; stop apps using the export first. Conversion
+validates the old checksum and reuses the H5 matrix without re-exporting
+expression. Rebuild its Viewer Pack if conversion did not already
+rebuild it. This applies to any thin H5 CRB, not just large datasets;
+embedded-expression CRBs are unaffected. Normal ordered-name validation
+still runs before expression access in each new Viewer process, without
+legacy-hash retries. Opening a schema-5 file requires an updated reader,
+including updated standalone apps.</p>
 </div>
 </div>
 <div class="section level2">
@@ -329,7 +342,7 @@ remains the preferred, less error-prone route.</p>
 <p>Only the current layout is read. <code><a href="../reference/readCerebro.html">readCerebro()</a></code>,
 <code><a href="../reference/launchCerebro.html">launchCerebro()</a></code>, <code><a href="../reference/createShinyApp.html">createShinyApp()</a></code> and the
 Viewer reject a <code>.crb</code> that has no expression-backend
-descriptor, uses a thin schema other than version 3, still stores
+descriptor, uses a thin schema other than version 5, still stores
 receptors in the <code>bcr_data</code> / <code>tcr_data</code> fields,
 or records an immune repertoire sidecar of another type than
 <code>"file"</code>, with</p>
@@ -337,10 +350,11 @@ or records an immune repertoire sidecar of another type than
 Convert it once with CerebroNexus::convertCerebro().</code></pre>
 <p><code><a href="../reference/convertCerebro.html">convertCerebro()</a></code> is the only migration path. It sets a
 missing descriptor to <code>embedded</code>, merges the old receptor
-fields into the unified immune repertoire, and rewrites an H5-backed
-<code>.crb</code> from CerebroNexus 5.1.x (which carried its cell names
-in the <code>.crb</code>) as a thin one next to its existing H5
-file:</p>
+fields into the unified immune repertoire, updates the ordered-name
+checksum of schema-3/4 files to portable schema 5, and rewrites an
+H5-backed <code>.crb</code> from CerebroNexus 5.1.x (which carried its
+cell names in the <code>.crb</code>) as a thin one next to its existing
+H5 file:</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/convertCerebro.html">convertCerebro</a></span><span class="op">(</span><span class="st">"old_dataset.crb"</span><span class="op">)</span></span></code></pre></div>
 <p>A <code>.crb</code> whose expression storage this version cannot read

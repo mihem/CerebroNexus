@@ -108,7 +108,7 @@ matrix to the application.
 The cell names are kept once, in the H5 file: `/expression/genes` holds
 the **cell** names and `/expression/barcodes` the **gene** names (the
 axis names follow the 10x convention for a genes-by-cells matrix, which
-is transposed here). The `.crb` itself is *thin* (schema version 3). It
+is transposed here). The `.crb` itself is *thin* (schema version 5). It
 drops `meta_data$cell_barcode` and the row names of the projections, and
 instead stores a checksum of the cell names (`cell_names_hash`) together
 with the cell count.
@@ -126,6 +126,20 @@ If the `.crb` and the H5 file do not belong together, for example
 because the H5 file was re-exported with a different cell order, loading
 stops with an error instead of attaching expression values to the wrong
 cells.
+
+Schema 5 uses a versioned XXH3-128 checksum (seed 0) of the ordered
+UTF-8 names, each terminated by a zero byte, independently of `rlang`
+and R-object serialization. Raw-byte encoding and hashing run in native
+code without temporary files. Existing schema-3/4 files require a
+one-time `convertCerebro("dataset.crb")` with the updated package; stop
+apps using the export first. Conversion validates the old checksum and
+reuses the H5 matrix without re-exporting expression. Rebuild its Viewer
+Pack if conversion did not already rebuild it. This applies to any thin
+H5 CRB, not just large datasets; embedded-expression CRBs are
+unaffected. Normal ordered-name validation still runs before expression
+access in each new Viewer process, without legacy-hash retries. Opening
+a schema-5 file requires an updated reader, including updated standalone
+apps.
 
 ## Launch or bundle the result
 
@@ -242,7 +256,7 @@ Only the current layout is read.
 [`launchCerebro()`](https://www.mheming.com/CerebroNexus/reference/launchCerebro.md),
 [`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
 and the Viewer reject a `.crb` that has no expression-backend
-descriptor, uses a thin schema other than version 3, still stores
+descriptor, uses a thin schema other than version 5, still stores
 receptors in the `bcr_data` / `tcr_data` fields, or records an immune
 repertoire sidecar of another type than `"file"`, with
 
@@ -253,9 +267,11 @@ Convert it once with CerebroNexus::convertCerebro().
 
 [`convertCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertCerebro.md)
 is the only migration path. It sets a missing descriptor to `embedded`,
-merges the old receptor fields into the unified immune repertoire, and
-rewrites an H5-backed `.crb` from CerebroNexus 5.1.x (which carried its
-cell names in the `.crb`) as a thin one next to its existing H5 file:
+merges the old receptor fields into the unified immune repertoire,
+updates the ordered-name checksum of schema-3/4 files to portable schema
+5, and rewrites an H5-backed `.crb` from CerebroNexus 5.1.x (which
+carried its cell names in the `.crb`) as a thin one next to its existing
+H5 file:
 
 ``` r
 convertCerebro("old_dataset.crb")
