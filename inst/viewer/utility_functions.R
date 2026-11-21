@@ -724,14 +724,18 @@ debounceAfterFirst <- function(reactive, millis, active = NULL) {
       ## dragged, controls redrawn by the first change) waits for the burst to
       ## settle, and its last value is taken then.
       last_change <- now_ms()
+      first_run <- TRUE
       shiny::observeEvent(reactive(), {
         next_value <- reactive()
         ## Its first run sees the value taken above, unless it changed since.
-        if (identical(current, next_value)) {
+        if (first_run && identical(current, next_value)) {
+          first_run <<- FALSE
           return()
         }
+        first_run <<- FALSE
         now <- now_ms()
         quiet <- now - last_change >= millis
+        ## A return to the value on show is a change too: it extends the burst.
         last_change <<- now
         if (quiet) publish(next_value)
       })

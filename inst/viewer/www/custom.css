@@ -2621,6 +2621,20 @@ body .shiny-bound-output.cerebro-output-waiting {
     animation: none !important;
     transition: none !important;
   }
+  /* The wait delay moves nothing, so it stays: a short wait still shows no
+     card. Its spinner stands still. */
+  body .shiny-spinner-output-container > .load-container:not(.shiny-spinner-hidden),
+  body .shiny-notification:has(.shiny-progress-notification),
+  .cerebro-groups-controls:empty::before,
+  .cerebro-result-controls:empty::before,
+  .cerebro-result-slot:empty::before,
+  .cerebro-result-slot .datatables:empty::before,
+  .cerebro-groups-controls:empty::after,
+  .cerebro-result-controls:empty::after,
+  .cerebro-result-slot:empty::after,
+  .cerebro-result-slot .datatables:empty::after {
+    animation: cerebro-progress-late 1ms linear var(--wait-delay) backwards !important;
+  }
 }
 
 /* Selection workspace / Active cohort share one slot so selecting cells does

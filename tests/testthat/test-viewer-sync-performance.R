@@ -244,6 +244,34 @@ test_that("a lone change after the delay passes debounce at once", {
   })
 })
 
+test_that("returning to the value on show still extends the debounce burst", {
+  utility_env <- viewer_runtime_env()
+  server <- function(input, output, session) {
+    raw <- shiny::reactive({
+      shiny::req(input$value)
+      input$value
+    })
+    ready <- utility_env$debounceAfterFirst(raw, 100)
+  }
+
+  shiny::testServer(server, {
+    session$setInputs(value = "first")
+    session$elapse(200)
+    session$setInputs(value = "second")
+    expect_identical(ready(), "second")
+    session$elapse(60)
+    session$setInputs(value = "first")
+    session$elapse(60)
+    ## Back to the value on show: nothing to draw, but the burst goes on.
+    session$setInputs(value = "second")
+    session$elapse(60)
+    session$setInputs(value = "third")
+    expect_identical(ready(), "second")
+    session$elapse(1000)
+    expect_identical(ready(), "third")
+  })
+})
+
 test_that("page-gated debounced values stay idle off the page", {
   utility_env <- viewer_runtime_env()
   compute_count <- 0L
