@@ -213,6 +213,20 @@
     object$addGroup(group, levels(section$metadata[[group]]))
   }
   object$addProjection("umap", section$umap)
+  ## The composite travels in the CRB (the embedded-image contract MERFISH
+  ## uses): the Viewer serves external images only from inside the app, and
+  ## serves an embedded one through a private per-session URL.
+  png_uri <- paste0(
+    "data:image/png;base64,",
+    gsub(
+      "\n",
+      "",
+      jsonlite::base64_enc(
+        readBin(paths$image, "raw", file.info(paths$image)$size)
+      ),
+      fixed = TRUE
+    )
+  )
   object$addSpatialData(
     "coronal",
     list(
@@ -224,7 +238,12 @@
         dims = dim(expression),
         dimnames = list(rownames(expression), NULL)
       ),
-      histology_images = list()
+      histology_images = list(
+        "Four-stain morphology" = list(
+          histology_image = png_uri,
+          histology_image_bounds = unlist(b[c("xmin", "xmax", "ymin", "ymax")])
+        )
+      )
     )
   )
   object$addExtraTable(

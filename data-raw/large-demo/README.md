@@ -112,9 +112,14 @@ The transcript clouds, boundaries and 3D morphology stack are not extracted.
 
 The prepared directory contains:
 
-- `cerebro_xenium_prime.crb`: metadata, spatial coordinates and published UMAP.
+- `cerebro_xenium_prime.crb`: metadata, spatial coordinates, published UMAP
+  and the microscopy composite, **embedded** as the section's background image
+  (about 20 MB; the Viewer serves it through a private per-session URL, not
+  inline). The Viewer only serves *external* image files from inside its own
+  app folders, so a PNG left in the cache would be refused.
 - `cerebro_xenium_prime.h5`: log-normalised expression, read on demand.
-- `morphology.png`: a four-stain RGB composite, at most 4,096 pixels per side.
+- `morphology.png`: the same four-stain RGB composite (at most 4,096 pixels per
+  side), kept for inspection; it is not read when the Viewer opens.
 - `morphology.json`: full-resolution physical extent, source pixel sizes,
   display dimensions, channel colours and contrast windows.
 - `demo-version` and the Viewer Pack.
@@ -133,8 +138,8 @@ demo-specific preparation, not a general calibration/import change.
 Choose **Mouse brain (Xenium Prime 5K)** in the data set menu, then Spatial.
 Its background is selected automatically and the cell overlay starts faint.
 Cached prepared data can also be opened with the source app by setting
-`CEREBRO_XENIUM_PRIME_DEMO_CRB` to the `.crb` path; keep its H5, PNG and JSON
-beside it. Python is not needed to reopen a current prepared cache.
+`CEREBRO_XENIUM_PRIME_DEMO_CRB` to the `.crb` path; keep its H5 beside it.
+Python is not needed to reopen a current prepared cache.
 
 No data are added to the repository or installed package. This source-checkout
 demo is not registered in `downloadDemoData()` (which downloads small, already

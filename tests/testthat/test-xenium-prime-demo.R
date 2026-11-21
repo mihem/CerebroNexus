@@ -247,12 +247,21 @@ test_that("a Prime 5K build opens its H5 expression and keeps missing UMAP cells
   spatial <- object$getSpatialData("coronal")
   expect_identical(rownames(spatial$coordinates), cells)
   expect_equal(spatial$coordinates$y, -(1:3))
+  image <- spatial$histology_images[["Four-stain morphology"]]
+  expect_match(image$histology_image, "^data:image/png;base64,")
+  expect_equal(
+    unname(image$histology_image_bounds[c("xmin", "xmax", "ymin", "ymax")]),
+    c(0, 4, -4, 0)
+  )
+  ## The Viewer builds its Spatial background list from exactly this payload.
+  embedded <- embedded_spatial_images(spatial)
+  expect_named(embedded, "Four-stain morphology")
   pack <- buildViewerPack(paths$crb, viewer_binary = "always")
   expect_true(validateViewerPack(paths$crb, full = TRUE)$valid)
   expect_true(dir.exists(pack))
 })
 
-test_that("the optional Prime 5K menu entry configures its own calibrated PNG only", {
+test_that("the optional Prime 5K menu entry adds the dataset and a faint cell overlay", {
   env <- new.env(parent = baseenv())
   sys.source(viewer_test_path("million_cell_demo.R"), env)
   original <- list(
@@ -265,34 +274,21 @@ test_that("the optional Prime 5K menu entry configures its own calibrated PNG on
   expect_identical(env$viewerAddXeniumPrimeDemo(original, ""), original)
   root <- withr::local_tempdir()
   crb <- file.path(root, "prime.crb")
-  file.create(crb, file.path(root, c("prime.h5", "morphology.png")))
-  bounds <- list(xmin = 0, xmax = 100, ymin = -50, ymax = 0)
-  info <- file.path(root, "morphology.json")
-  jsonlite::write_json(list(bounds = bounds), info, auto_unbox = TRUE)
+  file.create(crb, file.path(root, "prime.h5"))
   configured <- env$viewerAddXeniumPrimeDemo(original, crb)
   label <- "Mouse brain (Xenium Prime 5K)"
   expect_identical(names(configured$crb_file_to_load), c("Small", label))
-  image <- configured$spatial_images[[label]]$coronal[["Four-stain morphology"]]
-  expect_identical(image$path, file.path(normalizePath(root), "morphology.png"))
-  expect_equal(image$bounds, bounds)
-  expect_identical(
-    configured$spatial_images$Small,
-    original$spatial_images$Small
-  )
+  ## The microscopy is embedded in the CRB: nothing outside the app's own
+  ## folders is configured, since the Viewer refuses to serve such files.
+  expect_identical(configured$spatial_images, original$spatial_images)
   expect_null(configured$spatial_image_settings)
   appearance <- configured$viewer_content[[
     label
   ]]$spatial_point_appearance$coronal
   expect_identical(appearance, list(point_size = 1, point_opacity = 0.1))
-  bounds$xmax <- -1
-  jsonlite::write_json(list(bounds = bounds), info, auto_unbox = TRUE)
+  unlink(file.path(root, "prime.h5"))
   expect_error(
     env$viewerAddXeniumPrimeDemo(original, crb),
-    "bounds are invalid"
-  )
-  unlink(info)
-  expect_error(
-    env$viewerAddXeniumPrimeDemo(original, crb),
-    "needs morphology.png and morphology.json"
+    "CEREBRO_XENIUM_PRIME_DEMO_CRB must name a .crb with an adjacent .h5 file."
   )
 })

@@ -108,8 +108,10 @@ viewerAddTcellDemo <- function(
   )
 }
 
-## A fixed four-stain PNG with source-derived bounds, using the existing image
-## renderer. Preparation stores both beside the CRB, outside the package.
+## The four-stain microscopy composite is embedded in the CRB itself, so the
+## menu entry only adds the dataset and makes the image, not a dense field of
+## cell dots, the backdrop. (External images are served only from inside the
+## app's own folders, so a cache-resident PNG would be silently refused.)
 viewerAddXeniumPrimeDemo <- function(
   options,
   path = Sys.getenv("CEREBRO_XENIUM_PRIME_DEMO_CRB", unset = "")
@@ -124,36 +126,6 @@ viewerAddXeniumPrimeDemo <- function(
     "CEREBRO_XENIUM_PRIME_DEMO_CRB",
     label
   )
-  image <- file.path(
-    dirname(normalizePath(path, mustWork = TRUE)),
-    "morphology.png"
-  )
-  info <- file.path(dirname(image), "morphology.json")
-  if (!file.exists(image) || !file.exists(info)) {
-    stop(
-      "The Prime 5K demo needs morphology.png and morphology.json beside its .crb. ",
-      "Run Rscript run-demo.R --data=xenium-prime --prepare-only.",
-      call. = FALSE
-    )
-  }
-  bounds <- jsonlite::fromJSON(info)$bounds
-  values <- unlist(bounds, use.names = FALSE)
-  if (
-    !identical(names(bounds), c("xmin", "xmax", "ymin", "ymax")) ||
-      !is.numeric(values) ||
-      length(values) != 4L ||
-      any(!is.finite(values)) ||
-      bounds$xmin >= bounds$xmax ||
-      bounds$ymin >= bounds$ymax
-  ) {
-    stop("The Prime 5K microscopy bounds are invalid.", call. = FALSE)
-  }
-  options[["spatial_images"]][[label]] <- list(
-    coronal = list(
-      "Four-stain morphology" = list(path = image, bounds = bounds)
-    )
-  )
-  ## The image, rather than a dense field of opaque cell dots, is the backdrop.
   options[["viewer_content"]][[label]][["spatial_point_appearance"]] <- list(
     coronal = list(point_size = 1, point_opacity = 0.1)
   )

@@ -51,4 +51,5 @@ files. The software's MIT licence does not replace the source data's terms.
   side, without changing its physical bounds. The JSON records the exact
   windows and dimensions used.
 - Transcript points, cell/nucleus boundaries and the 3D morphology stack are
-  not imported. This demo uses CerebroNexus' existing PNG background renderer.
+  not imported. The composite is embedded in the CRB and drawn by CerebroNexus'
+  existing background-image renderer.

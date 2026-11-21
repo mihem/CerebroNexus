@@ -3,8 +3,8 @@
 - The source-checkout demo launcher accepts `--data=xenium-prime`: the
   optional 10x Xenium Prime 5K fresh-frozen mouse brain, with all panel genes,
   published clusters and UMAP, and a four-stain composite microscopy PNG.
-  Expression uses an H5 sidecar; source-derived image bounds keep the
-  background aligned without manual offsets. Data stay in the user cache,
+  Expression uses an H5 sidecar; the composite is embedded in the CRB with
+  source-derived bounds, so it is aligned without manual offsets. Data stay in the user cache,
   outside the package/CRAN tarball. This uses the existing image renderer;
   interactive channels and tiled microscopy are not added.
 
