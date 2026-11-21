@@ -196,17 +196,23 @@ test_that("trajectory preparation emits the first frame and coalesces rapid chan
       session$flushReact()
       session$elapse(1000)
       expect_length(scope$seen, frames)
+      ## A lone change after a quiet spell is drawn at once.
       trajectory_projection_appearance$percentage_cells_to_show <- 60
+      session$flushReact()
+      expect_equal(percentage(tail(scope$seen, 1)[[1]]), "60")
+      ## Changes that follow it within the delay wait for the burst to settle.
+      session$elapse(50)
+      trajectory_projection_appearance$percentage_cells_to_show <- 55
       session$flushReact()
       session$elapse(50)
       trajectory_projection_appearance$percentage_cells_to_show <- 50
       session$flushReact()
-      expect_equal(percentage(tail(scope$seen, 1)[[1]]), "100")
+      expect_equal(percentage(tail(scope$seen, 1)[[1]]), "60")
       session$elapse(1000)
       expect_equal(percentage(tail(scope$seen, 1)[[1]]), "50")
       expect_false(any(vapply(
         scope$seen,
-        function(frame) identical(percentage(frame), "60"),
+        function(frame) identical(percentage(frame), "55"),
         logical(1)
       )))
       trajectory_projection_appearance$percentage_cells_to_show <- 100

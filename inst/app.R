@@ -17,7 +17,7 @@ Cerebro.options <- list(
   ## Keep the source demo runnable directly from inst/ without requiring an
   ## installed CerebroNexus package. Exported apps receive this value in
   ## cerebro_config.rds when createShinyApp() builds them.
-  "cerebro_version" = "8.4.1",
+  "cerebro_version" = "8.4.10",
   ## This bundled app ships several distinct demo data sets so the sidebar
   ## "Select dataset:" switcher is visible out of the box: switching changes
   ## the UMAP, the cell-type composition, and the conditional tabs (Immune
@@ -139,7 +139,9 @@ Cerebro.options <- list(
     )
   ),
   ## Plot rotation is independent of per-image alignment above and is resolved
-  ## for one exact dataset + spatial entry.
+  ## for one exact dataset + spatial entry. To turn an aligned image with its
+  ## cells, give the image the same `rotation`; its offsets and flips stay as
+  ## found on the unrotated section (they are applied before the rotation).
   "spatial_plot_rotation" = list(
     "Mouse ileum (MERFISH)" = c("fov" = 90)
   ),
@@ -147,13 +149,13 @@ Cerebro.options <- list(
   "welcome_message" = custom_welcome_message,
   ## One appearance per dataset, shared by every cell scatter page.
   "point_size" = c(
-    "PBMC - Full (T+B)" = 6,
+    "PBMC - Full (T+B)" = 5,
     "Mouse brain (Visium)" = 5,
     "Mouse hippocampus (Slide-seq v2)" = 5,
     "Mouse ileum (MERFISH)" = 5,
     "Mouse brain (Xenium)" = 5,
-    "Mouse brain (Trekker)" = 4.4,
-    "HLA & TCR" = 1
+    "Mouse brain (Trekker)" = 5,
+    "HLA & TCR" = 5
   ),
   "point_opacity" = c(
     "PBMC - Full (T+B)" = 1,
@@ -161,8 +163,8 @@ Cerebro.options <- list(
     "Mouse hippocampus (Slide-seq v2)" = 1,
     "Mouse ileum (MERFISH)" = 1,
     "Mouse brain (Xenium)" = 1,
-    "Mouse brain (Trekker)" = 0.85,
-    "HLA & TCR" = 0.3
+    "Mouse brain (Trekker)" = 1,
+    "HLA & TCR" = 1
   ),
   "percentage_cells_to_show" = 100,
   "projections_show_hover_info" = TRUE

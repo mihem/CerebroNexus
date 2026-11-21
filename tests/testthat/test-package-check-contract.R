@@ -115,3 +115,13 @@ test_that("later remains declared because bundled runtime code uses it", {
   expect_match(description, "later")
   expect_true("importFrom(later,later)" %in% namespace)
 })
+
+test_that("cell-name checksum acceleration does not add a required Import", {
+  skip_if_not_source_tree()
+  description <- read.dcf(source_file("DESCRIPTION"))
+  imports <- trimws(strsplit(description[1L, "Imports"], ",", fixed = TRUE)[[
+    1L
+  ]])
+  expect_false(any(grepl("^digest($|[[:space:]])", imports)))
+  expect_match(description[1L, "Suggests"], "digest")
+})

@@ -386,7 +386,7 @@
   // so everything interpolated into innerHTML goes through here.
   function esc(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
   // Colours reach a `style` attribute rather than a text node, and they are as
   // data-driven as the labels are: the group colours are seeded from the object
@@ -1342,14 +1342,8 @@
   }
 
   // Draw the histology image behind the points of the spatial panel. The image's
-  // data-space bounds are mapped to screen with the SAME transform as the cells,
-  // so it aligns; opacity/offset/scale/flip/rotate then adjust it on top.
-  function rotateDataPoint(x, y, degrees) {
-    if (!degrees) return [x, y];
-    var theta = degrees * Math.PI / 180;
-    return [x * Math.cos(theta) - y * Math.sin(theta),
-      x * Math.sin(theta) + y * Math.cos(theta)];
-  }
+  // data-space corners (alignment applied, see CerebroBackgroundModel.corners)
+  // are mapped to screen with the SAME transform as the cells, so it aligns.
   function drawImage(p, context) {
     if (!singleActive && !linkedBackgroundsOn) return;
     var sp = spaceById[p.spaceId];
@@ -1360,37 +1354,16 @@
     if (!b) return;
     // Embedded images already carry their saved calibration in the pixels.
     state = imageRenderState(cimg, state);
-    // Rotate the image in DATA space about the origin, exactly as R rotates the
-    // cell coordinates (rotateSpatialCoordinates). Rotating on screen about the
-    // image centre instead moves the image away from the cells it belongs to.
-    var tlData = rotateDataPoint(b.xmin, b.ymax, state.rotate);
-    var trData = rotateDataPoint(b.xmax, b.ymax, state.rotate);
-    var blData = rotateDataPoint(b.xmin, b.ymin, state.rotate);
-    var centerData = rotateDataPoint(
-      (Number(b.xmin) + Number(b.xmax)) / 2,
-      (Number(b.ymin) + Number(b.ymax)) / 2,
-      state.rotate
-    );
-    var tl = dataToScreen(p, tlData[0], tlData[1]);
-    var tr = dataToScreen(p, trData[0], trData[1]);
-    var bl = dataToScreen(p, blData[0], blData[1]);
-    var center = dataToScreen(p, centerData[0], centerData[1]);
-    if (!tl || !tr || !bl || !center) return;
-    // Convert the DATA-unit offset to screen pixels by mapping two points through
-    // the same projection the cells use (handles scale + the y-axis inversion).
-    var o1 = dataToScreen(p, centerData[0] + state.offsetX,
-      centerData[1] + state.offsetY);
-    var offSX = o1 ? (o1[0] - center[0]) : 0;
-    var offSY = o1 ? (o1[1] - center[1]) : 0;
+    var corners = backgrounds.corners(b, state);
+    var tl = dataToScreen(p, corners[0][0], corners[0][1]);
+    var tr = dataToScreen(p, corners[1][0], corners[1][1]);
+    var bl = dataToScreen(p, corners[2][0], corners[2][1]);
+    if (!tl || !tr || !bl) return;
     var c = context || p.ctx;
     c.save();
     c.globalAlpha = state.opacity;
-    c.translate(center[0] + offSX, center[1] + offSY);
-    c.scale(state.scaleX * (state.flipX ? -1 : 1),
-      state.scaleY * (state.flipY ? -1 : 1));
     c.transform(tr[0] - tl[0], tr[1] - tl[1],
-      bl[0] - tl[0], bl[1] - tl[1],
-      tl[0] - center[0], tl[1] - center[1]);
+      bl[0] - tl[0], bl[1] - tl[1], tl[0], tl[1]);
     c.drawImage(sp._imgEl, 0, 0, 1, 1);
     c.restore();
     c.globalAlpha = 1;
@@ -11775,7 +11748,9 @@
     });
     return {
       schema: 'cerebronexus-linked-view',
-      version: 1,
+      // Version 2: background offsets and flips are read in the image's own
+      // unrotated frame (backgrounds.corners); version 1 is converted on load.
+      version: 2,
       created_at: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
       dataset: {
         cell_count: D.n,
@@ -11838,6 +11813,45 @@
     return Math.max(min, Math.min(max, value));
   }
 
+  function savedAlignmentState(saved) {
+    var alignment = saved.alignment;
+    return {
+      show: alignment.show !== false,
+      opacity: finiteNumber(saved.opacity, .6, 0, 1),
+      offsetX: finiteNumber(alignment.offset_x, 0, -1e9, 1e9),
+      offsetY: finiteNumber(alignment.offset_y, 0, -1e9, 1e9),
+      scaleX: finiteNumber(alignment.scale_x, 1, .000001, 1e6),
+      scaleY: finiteNumber(alignment.scale_y, 1, .000001, 1e6),
+      rotate: finiteNumber(alignment.rotation, 0, -1e6, 1e6),
+      flipX: !!alignment.flip_x,
+      flipY: !!alignment.flip_y,
+      lock: alignment.lock_aspect !== false
+    };
+  }
+
+  // A version-1 file kept its background alignments in the old geometry.
+  // Convert each one so the image lands where it was saved, and refuse the
+  // file rather than restore a background that no longer matches its cells.
+  function legacyBackgroundStates(config, samples) {
+    var states = {};
+    if (config.version !== 1) return states;
+    (config.view.spatial_backgrounds || []).forEach(function (saved) {
+      if (!saved.alignment || saved.mode === 'none') return;
+      var sample = samples.filter(function (s) { return s.name === saved.section; })[0];
+      var images = (sample && sample.images) || [];
+      if (!images.length) return;
+      var wanted = saved.image_id || images[0].id;
+      var image = images.filter(function (img) { return img.id === wanted; })[0] || images[0];
+      var state = backgrounds.legacyState(image, savedAlignmentState(saved));
+      if (!state) {
+        configError('The background of ' + saved.section + ' was saved with an ' +
+          'uneven scale at an angle that this version cannot redraw. Save the view again.');
+      }
+      states[saved.section] = state;
+    });
+    return states;
+  }
+
   function validateWorkspace(config) {
     if (!D) configError('Load a data set before opening a linked view.');
     if (!config || !config.dataset ||
@@ -11885,7 +11899,7 @@
     if (!indices || indices.some(function (index) {
       return !Number.isInteger(index) || index < 0 || index >= D.n;
     })) configError('The file selects cells that are unavailable here.');
-    return { indices: indices };
+    return { indices: indices, legacy: legacyBackgroundStates(config, samples) };
   }
 
   function restoreWorkspace(config) {
@@ -11903,21 +11917,11 @@
         ? IMG_NONE
         : (saved.image_id || ((images[0] && images[0].id) || IMG_NONE));
       imgChoice[backgroundStateKey(space)] = space._customImageId;
-      var alignment = saved.alignment;
-      if (alignment) {
+      if (saved.alignment) {
         var image = currentImage(space), key = imgKey(space, image);
-        if (key) imgStates[key] = {
-          show: alignment.show !== false,
-          opacity: finiteNumber(saved.opacity, .6, 0, 1),
-          offsetX: finiteNumber(alignment.offset_x, 0, -1e9, 1e9),
-          offsetY: finiteNumber(alignment.offset_y, 0, -1e9, 1e9),
-          scaleX: finiteNumber(alignment.scale_x, 1, .000001, 1e6),
-          scaleY: finiteNumber(alignment.scale_y, 1, .000001, 1e6),
-          rotate: finiteNumber(alignment.rotation, 0, -1e6, 1e6),
-          flipX: !!alignment.flip_x,
-          flipY: !!alignment.flip_y,
-          lock: alignment.lock_aspect !== false
-        };
+        if (key) {
+          imgStates[key] = validated.legacy[saved.section] || savedAlignmentState(saved);
+        }
       }
       loadSpaceImage(space);
     });

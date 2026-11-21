@@ -21,11 +21,17 @@
 #' people to upload data to: it reads whatever path it is given, and reading an
 #' `.rds` runs whatever code is inside it.
 #'
+#' Each run gets a random access token. The page opens with it in its address
+#' (\code{?token=...}), which is also printed in the R console; without it the
+#' page is refused and no session starts, so neither a web page you visit nor
+#' another user of a shared machine can drive the Builder.
+#'
 #' @param host Address to bind; defaults to \code{127.0.0.1}, i.e. this machine
 #'   only. Any other address (for example \code{0.0.0.0}) gives a warning,
 #'   because other machines could then reach the Builder.
 #' @param port Port to bind; defaults to a free one chosen by Shiny.
-#' @param launch_browser Open a browser; defaults to \code{TRUE}.
+#' @param launch_browser Open a browser at the address with the access
+#'   token; defaults to \code{TRUE}. The address is printed either way.
 #' @param max_file_size Optional maximum size in MB for each local upload;
 #'   defaults to \code{Inf}, so the local Builder does not impose an upload-size
 #'   limit. The corresponding Shiny process option is restored when the Builder
@@ -108,20 +114,56 @@ launchCerebroBuilder <- function(
     warning(
       "The Builder is listening on '",
       host,
-      "', so other machines may reach it. It reads any path it is given ",
-      "and runs the code inside `.rds` files; use host = \"127.0.0.1\" ",
-      "unless this network is trusted.",
+      "', so other machines may reach it. Its access token travels ",
+      "unencrypted, and whoever has it can read files and run the code ",
+      "inside `.rds` files; use host = \"127.0.0.1\" unless this network ",
+      "is trusted.",
       call. = FALSE,
       immediate. = TRUE
     )
   }
 
+  # The page and every session need this token (inst/builder/access.R): Shiny
+  # checks neither Origin nor Host, so without it a web page the user visits,
+  # or another user of a shared machine, could drive the Builder.
+  token <- .builderAccessToken()
+  old_token <- getOption("CerebroNexus.builder.access_token")
+  on.exit(
+    options(CerebroNexus.builder.access_token = old_token),
+    add = TRUE
+  )
+  options(CerebroNexus.builder.access_token = token)
+
   shiny::runApp(
     appDir = app_dir,
     host = host,
     port = port,
-    launch.browser = launch_browser
+    launch.browser = .builderOpenWithToken(token, launch_browser)
   )
+}
+
+## A fresh random access token for one Builder run.
+.builderAccessToken <- function(.random_bytes = .builderRandomBytes) {
+  paste(sprintf("%02x", as.integer(.random_bytes(32L))), collapse = "")
+}
+
+## Shiny calls this with the app address once it listens: print the address
+## with the token, and open it if asked.
+.builderOpenWithToken <- function(
+  token,
+  launch_browser,
+  .browse = utils::browseURL
+) {
+  force(token)
+  force(launch_browser)
+  function(url) {
+    url <- paste0(sub("/*$", "/", url), "?token=", token)
+    message("Open the Builder at ", url)
+    if (isTRUE(launch_browser)) {
+      .browse(url)
+    }
+    invisible(url)
+  }
 }
 
 ## TRUE for addresses that only this machine can reach.

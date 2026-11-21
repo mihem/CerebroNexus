@@ -317,10 +317,16 @@ test_that("exportFromSeurat: h5 mode writes a thin v3 CRB whose cell names live 
 
   payload <- readRDS(outf)
   schema <- payload$crb_schema
-  expect_identical(schema$version, 3L)
+  expect_identical(schema$version, 5L)
   expect_named(
     schema,
-    c("version", "cell_names_hash", "projection_rownames", "n_cells"),
+    c(
+      "version",
+      "cell_names_hash",
+      "projection_rownames",
+      "n_cells",
+      "cell_indexed"
+    ),
     ignore.order = TRUE
   )
   expect_identical(schema$n_cells, length(cells))
@@ -399,16 +405,16 @@ test_that("exportFromSeurat: h5 data is written at gzip level 0 by default", {
   default <- h5_data_filter(export_h5("default"))
   expect_true("deflate" %in% default$filters)
 
-  level6 <- h5_data_filter(export_h5("level6", h5_compression_level = 6))
-  expect_true("deflate" %in% level6$filters)
-  expect_lt(level6$stored, default$stored / 2)
+  level0 <- h5_data_filter(export_h5("level0", h5_compression_level = 0))
+  expect_true("deflate" %in% level0$filters)
+  expect_lt(default$stored, level0$stored / 2)
 
   skip_if(
     is.na(default$level),
     "needs h5dump to read the deflate level"
   )
-  expect_identical(default$level, 0L)
-  expect_identical(level6$level, 6L)
+  expect_identical(default$level, 1L)
+  expect_identical(level0$level, 0L)
 })
 
 test_that("exportFromSeurat: rejects an invalid h5_compression_level", {

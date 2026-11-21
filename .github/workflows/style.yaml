@@ -29,14 +29,13 @@ jobs:
           token: ${{ secrets.PAT_TOKEN }}
           ref: master
 
-      - name: Create folder to silence Nix warning
-        run: mkdir -p ~/.nix-defexpr/channels
-
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@main
+      - name: Install latest Air release
+        uses: posit-dev/setup-air@v1
+        with:
+          version: latest
 
       - name: Run Air
-        run: nix-shell --quiet -p air-formatter --run "air format ."
+        run: air format .
 
       - name: Check for changes
         id: diff

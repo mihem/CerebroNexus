@@ -1262,7 +1262,7 @@
   is.character(stored) &&
     identical(length(stored), as.integer(manifest$n_cells)) &&
     identical(length(stored), as.integer(schema$n_cells)) &&
-    identical(.cerebroCellNamesHash(stored), schema$cell_names_hash)
+    .crbContract()$.runtimeCellNamesMatch(stored, schema$cell_names_hash)
 }
 
 #' Validate a Viewer Pack

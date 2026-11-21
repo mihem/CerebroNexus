@@ -388,7 +388,7 @@ test_that("Display options panel exposes scatter params on scatter-type tabs", {
     as.numeric(app$get_js(
       "Number(document.querySelector('#ir_d_point_size').value)"
     )),
-    6
+    5
   )
   expect_identical(
     as.numeric(app$get_js(
@@ -417,14 +417,14 @@ test_that("Linked views shows the dataset point size in More settings", {
   app$wait_for_js(
     paste0(
       "document.querySelector('#cv-ps') !== null && ",
-      "Number(document.querySelector('#cv-ps').value) === 6 && ",
+      "Number(document.querySelector('#cv-ps').value) === 5 && ",
       "Number(document.querySelector('#cv-opacity').value) === 1"
     ),
     timeout = 45000
   )
   expect_identical(
     as.numeric(app$get_js("Number(document.querySelector('#cv-ps').value)")),
-    6
+    5
   )
   expect_identical(
     as.numeric(app$get_js(

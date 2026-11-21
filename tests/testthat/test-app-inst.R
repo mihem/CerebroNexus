@@ -612,7 +612,7 @@ test_that("{shinytest2} recording: main", {
     as.numeric(app$get_js(
       "Number(document.querySelector('#overview_projection_point_size').value)"
     )),
-    6
+    5
   )
   expect_identical(
     as.numeric(app$get_js(

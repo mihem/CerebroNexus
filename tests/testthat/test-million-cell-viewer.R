@@ -64,6 +64,7 @@ test_that("the 1M preparation keeps unique gene symbols", {
     "demo tree not present (expected when checking a built package)"
   )
   env <- new.env(parent = globalenv())
+  sys.source(file.path(dirname(script), "download_helpers.R"), envir = env)
   sys.source(script, envir = env)
 
   expect_identical(
@@ -154,6 +155,7 @@ test_that("the 1M demo adds the marker-guided path and main group", {
     "demo tree not present (expected when checking a built package)"
   )
   env <- new.env(parent = globalenv())
+  sys.source(file.path(dirname(script), "download_helpers.R"), envir = env)
   sys.source(script, envir = env)
 
   metadata <- data.frame(
@@ -657,25 +659,32 @@ test_that("Gene no-gene primary frame defers metadata until auxiliary data", {
   )
 })
 
-test_that("the 1M preparation uses CEREBRO_LARGE_CACHE like the Ren one", {
-  script <- testthat::test_path(
+## The mouse brain script with the helpers it needs, as run-demo.R sources them.
+one_million_env <- function() {
+  scripts <- testthat::test_path(
     "..",
     "..",
     "data-raw",
     "large-demo",
-    "prepare_viewer_1m_data.R"
+    c("download_helpers.R", "prepare_viewer_1m_data.R")
   )
-  skip_if_not(
-    file.exists(script),
+  testthat::skip_if_not(
+    all(file.exists(scripts)),
     "demo tree not present (expected when checking a built package)"
   )
   env <- new.env(parent = globalenv())
-  sys.source(script, envir = env)
+  for (script in scripts) {
+    sys.source(script, envir = env)
+  }
+  env
+}
 
+test_that("the 1M preparation uses CEREBRO_LARGE_CACHE like the Ren one", {
+  env <- one_million_env()
   withr::local_envvar(CEREBRO_LARGE_CACHE = "/data/large")
   expect_identical(
     env$.viewer1mPaths()$crb,
-    "/data/large/1m/cerebro-v3/cerebro_mouse_brain_1m.crb"
+    "/data/large/1m/prepared/cerebro_mouse_brain_1m.crb"
   )
   ## an explicit argument still wins
   expect_identical(
@@ -684,44 +693,35 @@ test_that("the 1M preparation uses CEREBRO_LARGE_CACHE like the Ren one", {
   )
 })
 
-test_that("a mouse brain built by an earlier release is not taken for the current one", {
-  script <- testthat::test_path(
-    "..",
-    "..",
-    "data-raw",
-    "large-demo",
-    "prepare_viewer_1m_data.R"
-  )
-  skip_if_not(
-    file.exists(script),
-    "demo tree not present (expected when checking a built package)"
-  )
-  env <- new.env(parent = globalenv())
-  sys.source(script, envir = env)
+test_that("a mouse brain made by other code is not taken for the current one", {
+  env <- one_million_env()
   root <- withr::local_tempdir()
   paths <- env$.viewer1mPaths(root)
   complete <- function() {
     env$.viewer1mComplete(paths$crb, paths$sidecar, paths$stamp)
   }
 
-  ## version 1 kept its files in `cerebro`, without a stamp
-  old <- file.path(root, "1m", "cerebro")
-  dir.create(old, recursive = TRUE)
-  file.create(file.path(
-    old,
-    c("cerebro_mouse_brain_1m.crb", "cerebro_mouse_brain_1m.h5")
-  ))
-  expect_false(identical(dirname(paths$crb), old))
-  expect_false(complete())
-
-  ## files without the stamp, or with another version, are not finished
+  ## files without a stamp, with the version number earlier scripts wrote, or
+  ## with the stamp of another recipe are not finished
   dir.create(dirname(paths$crb), recursive = TRUE)
   file.create(c(paths$crb, paths$sidecar))
   expect_false(complete())
-  writeLines("1", paths$stamp)
+  writeLines("3", paths$stamp)
   expect_false(complete())
-  writeLines(as.character(env$.viewer1mVersion), paths$stamp)
+  env$.demoStampWrite(paths$stamp, "another recipe")
+  expect_false(complete())
+  env$.demoStampWrite(paths$stamp, env$.viewer1mRecipe)
   expect_true(complete())
+  expect_match(readLines(paths$stamp), "^written: ", all = FALSE)
   file.remove(paths$sidecar)
   expect_false(complete())
+
+  ## a change of the script's functions changes the recipe
+  changed <- one_million_env()
+  body(changed$.viewer1mBuildCrb) <- quote(NULL)
+  expect_false(identical(
+    changed$.demoRecipe(changed, "1m"),
+    env$.viewer1mRecipe
+  ))
+  expect_identical(env$.demoRecipe(env, "1m"), env$.viewer1mRecipe)
 })

@@ -673,13 +673,25 @@ cachePlot <- function(x, ...) {
 }
 
 ## Return the first complete reactive value immediately; debounce only later
-## invalidations caused by interactive controls.
+## invalidations caused by interactive controls, and of those only the ones
+## that follow another within `millis`.
 ##
 ## shiny::debounce() evaluates its source eagerly on every invalidation, so a
 ## page-owned `reactive` should req() its page itself. Pass the same predicate
 ## as `active`: returning to the page then reads the source immediately instead
 ## of first replaying the value held from before the page was left.
 debounceAfterFirst <- function(reactive, millis, active = NULL) {
+  ## The clock shiny::debounce() reads: the session's own, so that the quiet
+  ## spell below is measured on the same time as the debounce delay (a test
+  ## moves it with session$elapse()), and the system clock without a session.
+  domain <- shiny::getDefaultReactiveDomain()
+  now_ms <- function() {
+    if (!is.null(domain) && is.function(domain$.now)) {
+      domain$.now()
+    } else {
+      as.numeric(Sys.time()) * 1000
+    }
+  }
   initialized <- FALSE
   current <- NULL
   revision <- shiny::reactiveVal(0L)
@@ -701,18 +713,34 @@ debounceAfterFirst <- function(reactive, millis, active = NULL) {
     if (!initialized) {
       current <<- reactive()
       initialized <<- TRUE
+      publish <- function(next_value) {
+        if (!identical(current, next_value)) {
+          current <<- next_value
+          revision(shiny::isolate(revision()) + 1L)
+        }
+      }
+      ## A change after `millis` without one (a click: another colour, a
+      ## section) is taken at once; one that follows another sooner (a slider
+      ## dragged, controls redrawn by the first change) waits for the burst to
+      ## settle, and its last value is taken then.
+      last_change <- now_ms()
+      first_run <- TRUE
+      shiny::observeEvent(reactive(), {
+        next_value <- reactive()
+        ## Its first run sees the value taken above, unless it changed since.
+        if (first_run && identical(current, next_value)) {
+          first_run <<- FALSE
+          return()
+        }
+        first_run <<- FALSE
+        now <- now_ms()
+        quiet <- now - last_change >= millis
+        ## A return to the value on show is a change too: it extends the burst.
+        last_change <<- now
+        if (quiet) publish(next_value)
+      })
       delayed <- shiny::debounce(reactive, millis)
-      shiny::observeEvent(
-        delayed(),
-        {
-          next_value <- delayed()
-          if (!identical(current, next_value)) {
-            current <<- next_value
-            revision(shiny::isolate(revision()) + 1L)
-          }
-        },
-        ignoreInit = TRUE
-      )
+      shiny::observeEvent(delayed(), publish(delayed()), ignoreInit = TRUE)
     }
     current
   })
@@ -3648,7 +3676,7 @@ getGroupLevels <- function(group) {
   }
   if (
     is.list(schema) &&
-      isTRUE(schema$version %in% c(3L, 4L)) &&
+      isTRUE(schema$version %in% .runtimeThinSchemaVersions) &&
       is.integer(schema$n_cells) &&
       length(schema$n_cells) == 1L &&
       !is.na(schema$n_cells)
@@ -4128,8 +4156,8 @@ get_or_load_crb <- function(
 .h5ExpressionRows <- function(sidecar, verify) {
   state <- new.env(parent = emptyenv())
   prepare <- function() {
+    verify()
     if (is.null(state$genes)) {
-      verify()
       state$n_cells <- .runtimeH5CellCount(sidecar)
       state$genes <- .runtimeH5Names(sidecar, "barcodes")
     }
@@ -4202,20 +4230,26 @@ get_or_load_crb <- function(
 }
 
 .checkThinCrbCells <- function(cells, schema, crb_path) {
-  if (
-    !identical(
-      rlang::hash(enc2utf8(as.character(cells))),
-      schema$cell_names_hash
-    )
-  ) {
-    stop(
-      "The H5 cell names do not match CRB '",
-      basename(crb_path),
-      "'.",
-      call. = FALSE
-    )
-  }
-  invisible(cells)
+  ## Every Viewer expression path (direct H5 rows, R6 matrix/mean accessors,
+  ## and deferred metadata hydration) passes here. Abort only this reactive,
+  ## not the session; package and non-reactive reads still raise the hard error.
+  tryCatch(
+    .runtimeCheckCellNames(cells, schema, crb_path),
+    cerebro_cell_names_mismatch = function(error) {
+      session <- shiny::getDefaultReactiveDomain()
+      if (is.null(session)) {
+        stop(error)
+      }
+      shiny::showNotification(
+        conditionMessage(error),
+        id = "expression-sidecar-mismatch",
+        type = "error",
+        duration = 15,
+        session = session
+      )
+      shiny::req(FALSE)
+    }
+  )
 }
 
 .validateThinCrbShape <- function(metadata, projections, schema) {
@@ -4639,7 +4673,8 @@ get_or_load_crb <- function(
   ## before that record none): a replaced file with the same cell and gene
   ## names must not be painted as this data set. A file that is not known yet
   ## is hashed in the background, and verify_cells() below, which runs before
-  ## the first read of its expression, has the answer or waits for it.
+  ## every read of its expression, refuses the file once the answer is in; a
+  ## read while the hash still runs does not wait for it.
   h5_md5 <- obj$expression_backend$md5
   h5_checksum <- new.env(parent = emptyenv())
   h5_checksum$task <- .verifyRuntimeH5Checksum(
@@ -4675,7 +4710,13 @@ get_or_load_crb <- function(
     crb_h5_cell_check_start(loc_abs, crb_schema$cell_names_hash)
   }
   verify_cells <- function() {
-    if (!isTRUE(h5_checksum$verified)) {
+    ## The background hash of a large file takes tens of seconds, and nothing in
+    ## the first read depends on it: a read does not wait for a hash that is
+    ## still running. Every later call looks again, and the first one after the
+    ## hash is done refuses the file if it does not match the CRB.
+    hash_running <- inherits(h5_checksum$task, "mirai") &&
+      mirai::unresolved(h5_checksum$task)
+    if (!isTRUE(h5_checksum$verified) && !hash_running) {
       tryCatch(
         .verifyRuntimeH5Checksum(loc_abs, h5_md5, crb_path),
         error = function(error) {
@@ -4698,7 +4739,9 @@ get_or_load_crb <- function(
       tryCatch(
         .thinCrbCellNames(cell_names_state, loc_abs, crb_schema, crb_path),
         error = function(error) {
-          message(glue::glue("[{Sys.time()}] {conditionMessage(error)}"))
+          if (!inherits(error, "shiny.silent.error")) {
+            message(glue::glue("[{Sys.time()}] {conditionMessage(error)}"))
+          }
           stop(error)
         }
       )
@@ -4720,6 +4763,13 @@ get_or_load_crb <- function(
   delayedAssign(
     "expression",
     {
+      ## The attached matrix is read without going through verify_cells()
+      ## again, so it is not handed out before the checksum is in: a file that
+      ## does not match is refused here, however early the matrix is asked for.
+      ## A gene's row (cerebro_h5_rows) does not come this way and does not wait.
+      if (inherits(h5_checksum$task, "mirai")) {
+        mirai::call_mirai(h5_checksum$task)
+      }
       verify_cells()
       message(glue::glue(
         "[{Sys.time()}] Attaching h5 backend (lazy TENxMatrix): {loc_abs}"

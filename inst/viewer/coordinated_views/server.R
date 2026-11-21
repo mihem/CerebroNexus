@@ -1493,7 +1493,12 @@ cv_gene_values <- function(gene, cells = NULL, n = NULL) {
     ## HDF5Array backend; anything else takes the matrix path below.
     v <- tryCatch(
       as.numeric(viewerExpressionRow(data_set(), NULL, gene)),
-      error = function(e) NULL
+      error = function(error) {
+        if (inherits(error, "shiny.silent.error")) {
+          stop(error)
+        }
+        NULL
+      }
     )
     if (length(v) && (is.null(n) || length(v) == as.integer(n))) {
       v[is.na(v)] <- 0
@@ -1502,7 +1507,12 @@ cv_gene_values <- function(gene, cells = NULL, n = NULL) {
   }
   m <- tryCatch(
     data_set()$getExpressionMatrix(cells = cells, genes = gene),
-    error = function(e) NULL
+    error = function(error) {
+      if (inherits(error, "shiny.silent.error")) {
+        stop(error)
+      }
+      NULL
+    }
   )
   if (is.null(m)) {
     return(NULL)

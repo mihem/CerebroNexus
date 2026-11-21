@@ -168,3 +168,24 @@ test_that("HLA tabs retain one allele and use it for both network colours and ov
     }
   )
 })
+
+test_that("the hint marker of an HLA control reaches the keyboard and screen readers", {
+  scope <- new.env(parent = asNamespace("shiny"))
+  viewer_server_load(
+    viewer_server_statements("hla_tcr_motifs", "associations.R"),
+    scope,
+    names = "hla_label_hint"
+  )
+  html <- as.character(scope$hla_label_hint(
+    "Min nodes",
+    "Smallest cluster shown"
+  ))
+  expect_match(html, 'tabindex="0"', fixed = TRUE)
+  expect_match(html, 'aria-label="Smallest cluster shown"', fixed = TRUE)
+  expect_match(html, 'data-tip="Smallest cluster shown"', fixed = TRUE)
+  css <- paste(
+    readLines(viewer_test_path("www", "hla_motifs.css")),
+    collapse = "\n"
+  )
+  expect_match(css, ".hla-hint:focus-visible::after", fixed = TRUE)
+})

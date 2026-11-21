@@ -105,7 +105,7 @@
     dims = length(x),
     storage.mode = storage.mode,
     chunk = max(1L, min(length(x), 65536L)),
-    level = 4L
+    level = 1L
   )
   rhdf5::h5write(x, file, path)
 }
@@ -421,7 +421,7 @@
         path,
         dims = dim(stored),
         H5type = "H5T_NATIVE_UINT8",
-        level = 4L,
+        level = 1L,
         chunk = pmin(dim(stored), c(dim(stored)[[1L]], 256L, 256L))
       )
       rhdf5::h5write(stored, stage, path)

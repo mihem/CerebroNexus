@@ -152,10 +152,12 @@ Each gene is a separate gzip-compressed binary file, using sparse cell indices
 or a dense vector, whichever has fewer uncompressed bytes. Values retain R's
 double precision; no uint8 quantization or normalization is introduced.
 The browser retains up to 64 MiB of decoded rows. Its existing renderer reuses
-coordinates. A cached gene can be previewed immediately when the current view
-and controls remain compatible; Shiny still confirms the selection and computes
-requested summaries. Previously unseen genes still use Shiny's control path,
-but their values come from the asset rather than an R-generated value packet.
+coordinates. A small `expression/index.json` names each exported gene's file,
+size, checksum and value range, so an unseen gene is fetched the moment it is
+selected, in parallel with Shiny, not after R names its URL. A gene is drawn
+from its values as soon as they arrive (or at once from the cache) when the
+current view and controls remain compatible; Shiny still confirms the
+selection, which repaints only if it differs, and computes requested summaries.
 
 The experiment applies to single-gene, full-canonical-cell coloring in public
 configured datasets. Other genes, multi-gene/RGB modes, uploaded datasets,

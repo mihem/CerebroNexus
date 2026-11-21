@@ -1,7 +1,5 @@
-## Version of the prepared mouse brain data, as for the Ren data. Version 1
-## (folder `cerebro`) held 1,000,000 evenly spaced cells and was never stamped;
-## a finished build of an earlier version must not be taken for this one.
-.viewer1mVersion <- 3L
+## Needs download_helpers.R (sourced first): the prepared files live in
+## `1m/prepared`, with a stamp that says what made them (.demoStampKey()).
 
 .viewer1mCacheDir <- function(path = NULL) {
   if (is.null(path)) {
@@ -21,7 +19,7 @@
 
 .viewer1mPaths <- function(cache_dir = NULL) {
   root <- file.path(.viewer1mCacheDir(cache_dir), "1m")
-  prepared <- file.path(root, paste0("cerebro-v", .viewer1mVersion))
+  prepared <- .demoPreparedDir(root)
   list(
     source = file.path(
       root,
@@ -42,8 +40,7 @@
     !dir.exists(file) &&
     file.exists(sidecar) &&
     !dir.exists(sidecar) &&
-    file.exists(stamp) &&
-    identical(readLines(stamp, warn = FALSE), as.character(.viewer1mVersion))
+    .demoStampCurrent(stamp, .viewer1mRecipe)
 }
 
 .viewer1mRequire <- function(packages) {
@@ -666,23 +663,25 @@
   )
 }
 
-.viewerDemoRequireTransposedWriter <- function() {
-  if (!exists(".demoWriteH5Transposed", mode = "function")) {
-    stop(
-      "Source data-raw/large-demo/h5_transposed_write.R before building the demo data.",
-      call. = FALSE
-    )
-  }
-}
-
 ## The CRB for the selected cells. The counts go to `<stem>.h5` (cells x genes,
-## group "expression", uncompressed), and only metadata and the projection are
+## group "expression", gzip level 1), and only metadata and the projection are
 ## kept in the CRB.
 .viewer1mBuildCrb <- function(matrix, analysis, paths) {
   dir.create(dirname(paths$crb), recursive = TRUE, showWarnings = FALSE)
   unlink(c(paths$sidecar, paths$stamp), force = TRUE)
-  .viewerDemoRequireTransposedWriter()
-  .demoWriteH5Transposed(matrix, paths$sidecar)
+  ## The 10x file stores the matrix by cell: the package's streaming writer reads
+  ## its arrays and writes the cells x genes sidecar (writeTENxMatrix() would scan
+  ## the source once per block of genes).
+  CerebroNexus:::.h5adStreamWriteTENx(
+    CerebroNexus:::.h5adStreamFrom10x(
+      paths$source,
+      .viewer1mSourceGroup(paths$source)
+    ),
+    paths$sidecar,
+    group = "expression",
+    dimnames = rev(dimnames(matrix)),
+    level = 1L
+  )
   cells <- analysis$cells
   cluster_levels <- unique(analysis$clusters)
   cluster_levels <- cluster_levels[order(as.integer(cluster_levels))]
@@ -753,9 +752,13 @@ prepareViewer1mBenchmarkData <- function(cache_dir = NULL) {
   message("Preparing the 1M benchmark data from official 10x data.")
   .viewer1mDownload(paths$source)
   .viewer1mBuild(paths)
-  writeLines(as.character(.viewer1mVersion), paths$stamp)
+  .demoStampWrite(paths$stamp, .viewer1mRecipe)
   if (!.viewer1mComplete(paths$crb, paths$sidecar, paths$stamp)) {
     stop("The 1M benchmark CRB is incomplete.", call. = FALSE)
   }
   .viewer1mEnrichDemoCrb(paths$crb)
 }
+
+## What the stamp of these files records (.demoRecipe()), taken now: after the
+## last function of this script.
+.viewer1mRecipe <- .demoRecipe(environment(), "1m")

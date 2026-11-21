@@ -337,7 +337,9 @@
 #'   data to DelayedArray format for memory efficiency; default: \code{FALSE}.
 #'   Ignored when \code{expression_matrix_mode} is set to an external backend.
 #' @param expression_matrix_mode How to persist the expression matrix in the
-#'   generated \code{.crb}. One of \code{"embedded"} (default) or \code{"h5"}.
+#'   generated \code{.crb}. One of \code{"auto"} (default: \code{"h5"} for
+#'   more than 200,000 cells, \code{"embedded"} otherwise), \code{"embedded"}
+#'   or \code{"h5"}.
 #'   See \code{\link{exportFromSeurat}} for details; briefly, \code{"embedded"}
 #'   stores the matrix inside the \code{.crb}, and \code{"h5"} writes a
 #'   TENx-format HDF5 file next to the \code{.crb} that the Viewer loads lazily,
@@ -358,8 +360,8 @@
 #'   Supplied images are embedded in the generated CRB; existing embedded images
 #'   declared by the Seurat object are retained.
 #' @param h5_compression_level,immune_sidecar,immune_sidecar_threshold Passed to
-#'   \code{\link{exportFromSeurat}}: the gzip level of the H5 file (default 0,
-#'   uncompressed), and whether and from which size the immune repertoire is
+#'   \code{\link{exportFromSeurat}}: the gzip level of the H5 file (default 1;
+#'   0 is uncompressed), and whether and from which size the immune repertoire is
 #'   stored in a sibling file.
 #' @param verbose Logical indicating whether to print progress messages; default:
 #'   \code{TRUE}.
@@ -449,7 +451,7 @@ convertSeuratToCerebro <- function(
   nGene = "nFeature_RNA",
   add_all_meta_data = TRUE,
   use_delayed_array = FALSE,
-  expression_matrix_mode = c("embedded", "h5"),
+  expression_matrix_mode = c("auto", "embedded", "h5"),
   codec = c("qs2", "rds"),
   spatial_images = NULL,
   verbose = TRUE,
@@ -460,7 +462,7 @@ convertSeuratToCerebro <- function(
   most_expressed_genes = NULL,
   bcr_file = NULL,
   tcr_file = NULL,
-  h5_compression_level = 0L,
+  h5_compression_level = 1L,
   immune_sidecar = c("auto", "always", "never"),
   immune_sidecar_threshold = 100000L
 ) {

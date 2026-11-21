@@ -93,6 +93,8 @@ test_that("Trekker only prepares payloads for a visible, current dataset", {
       scope <- environment()
       viewer_runtime_env(scope)
       reads <- 0L
+      row_reads <- 0L
+      row_error <- NULL
       sent <- list()
       context <- list(epoch = "session", dataset_key = "tiny", generation = 1L)
       viewer_loaded_dataset_context <- function() context
@@ -106,11 +108,28 @@ test_that("Trekker only prepares payloads for a visible, current dataset", {
         uy = c(1, -1)
       )
       data_set <- function() {
-        list(getTrekker = function() {
-          reads <<- reads + 1L
-          tk
-        })
+        list(
+          getTrekker = function() {
+            reads <<- reads + 1L
+            tk
+          },
+          getExpressionRow = function(...) {
+            row_reads <<- row_reads + 1L
+            tryCatch(
+              .checkThinCrbCells(
+                rev(tk$barcodes),
+                list(cell_names_hash = .runtimeCellNamesHash(tk$barcodes)),
+                "trekker.crb"
+              ),
+              error = function(error) {
+                row_error <<- error
+                stop(error)
+              }
+            )
+          }
+        )
       }
+      trekker_gene_names <- function() "g1"
       current_scatter_defaults <- function() {
         list(point_size = 3, point_opacity = 1, percentage_cells_to_show = 100)
       }
@@ -160,6 +179,16 @@ test_that("Trekker only prepares payloads for a visible, current dataset", {
       expect_length(scope$sent, 2L)
       expect_length(scope$sent[[2]]$data$panels, 1L)
       expect_identical(scope$reads, 1L)
+      ## An invalid sidecar must not be turned into a neutral/zero gene paint
+      ## by the page's generic missing-expression fallback.
+      expect_no_error(session$setInputs(
+        trekker_mode = "gene",
+        trekker_gene_pick = "g1"
+      ))
+      expect_false(session$isClosed())
+      expect_identical(scope$row_reads, 1L)
+      expect_s3_class(scope$row_error, "shiny.silent.error")
+      expect_length(scope$sent, 2L)
     }
   )
 })

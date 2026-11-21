@@ -264,4 +264,18 @@ function replaceTable(s) {
   r.flushBelow(1000);
   check(r.loader.hidden,'a ready page is not covered by a late card');
 }
+{
+  // One output's updating state waits as long as the page card: a result that
+  // is ready within 400 ms is neither dimmed nor announced.
+  const s=scenario();s.start();
+  s.emit('shiny:outputinvalidated',s.table);
+  const wait=s.table.__cerebroWaitTimer;
+  check(wait && wait.ms===400,'an output shows its updating state from 400 ms on');
+  check(!s.table.classList.contains('cerebro-output-waiting'),'an output is not dimmed before then');
+  s.emit('shiny:value',s.table);
+  check(wait.cancel===true && s.table.getAttribute('aria-busy')===null,'a value within 400 ms leaves no trace');
+  s.emit('shiny:outputinvalidated',s.table);
+  s.table.__cerebroWaitTimer.fn();
+  check(s.table.classList.contains('cerebro-output-waiting'),'an output still waiting at 400 ms is dimmed');
+}
 console.log(count+' result page loader assertions passed');

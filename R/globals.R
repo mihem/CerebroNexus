@@ -3,6 +3,8 @@
 ##   created by the Viewer files launchCerebro() sources into its environment.
 ## - `group` is used as a column name in dplyr pipelines (tibble).
 ## - `.` is used in magrittr/dplyr pipe expressions.
+## - `paths` and `task` are named arguments of mirai::everywhere() in
+##   .h5adStreamRun(); the expression sees them in the worker, not here.
 utils::globalVariables(c(
   "ui",
   "server",
@@ -19,6 +21,8 @@ utils::globalVariables(c(
   "viewerDocumentCapture",
   "viewerStartTab",
   "group",
+  "paths",
+  "task",
   "."
 ))
 
