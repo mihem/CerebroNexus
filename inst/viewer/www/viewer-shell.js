@@ -41,6 +41,13 @@
     }).observe(document.body, { childList: true });
   }
 
+  // How long work runs before the page shows any sign of it: a result that
+  // is ready sooner never flashes a card, a dimmed output or a spinner. One
+  // number for the page's loading card and for a single output's updating
+  // state; --wait-delay in custom.css has the same value for the progress card
+  // and the plot spinners.
+  var WAIT_SHOW_MS = 400;
+
   var MOBILE_QUERY = "(max-width: 767px)";
   function ready(fn) {
     if (document.readyState === "loading") {
@@ -602,7 +609,7 @@
             updateAnnounced = true;
             announce("Updating content");
           }
-        }, 120);
+        }, WAIT_SHOW_MS);
       })
       .on("shiny:value.cerebroMotion shiny:error.cerebroMotion", function (event) {
         finish(event.target);
@@ -850,7 +857,7 @@
         loader.hidden = false;
         loader.classList.add("is-visible");
       };
-      showTimer = window.setTimeout(showWhenStillLoading, 400);
+      showTimer = window.setTimeout(showWhenStillLoading, WAIT_SHOW_MS);
       slowTimer = window.setTimeout(function () {
         if (pane === activePane) {
           showDetail("Still loading " + pageLabel(pane) + "…");
