@@ -40,6 +40,64 @@ color_picker <- function(input_id, label, value) {
   )
 }
 
+## The pickers of a group's levels as one piece of HTML: color_picker()'s
+## markup for each (test-viewer-color-config.R compares them), written at once
+## instead of as a tag per level. Building and rendering the tags of the 1,640
+## levels of the Allen atlas took 1.4 s.
+color_pickers_html <- function(input_ids, labels, values) {
+  if (!length(input_ids)) {
+    return(shiny::HTML(""))
+  }
+  values <- vapply(
+    seq_along(input_ids),
+    function(i) {
+      value <- shiny::restoreInput(id = input_ids[[i]], default = values[[i]])
+      if (length(value) != 1L || is.na(value)) {
+        NA_character_
+      } else {
+        as.character(value)
+      }
+    },
+    ""
+  )
+  id <- htmltools::htmlEscape(input_ids, attribute = TRUE)
+  value <- ifelse(
+    is.na(values),
+    "value data-init-value",
+    sprintf(
+      'value="%1$s" data-init-value="%1$s"',
+      htmltools::htmlEscape(values, attribute = TRUE)
+    )
+  )
+  shiny::HTML(paste0(
+    '<div class="form-group shiny-input-container" data-shiny-input-type="colour">\n',
+    '  <label class="control-label" for="',
+    id,
+    '">',
+    htmltools::htmlEscape(labels),
+    "</label>\n",
+    '  <input id="',
+    id,
+    '" type="button" class="form-control cerebro-colour-pending" ',
+    value,
+    ' data-show-colour="both" data-palette="square"/>\n',
+    "</div>",
+    collapse = "\n"
+  ))
+}
+
+## The pickers of `levels` of `variable`, with their colours in `colors`
+## (named by level).
+color_group_pickers <- function(variable, levels, colors) {
+  levels <- as.character(levels)
+  values <- if (is.null(colors)) {
+    rep(NA_character_, length(levels))
+  } else {
+    unname(as.character(colors[levels]))
+  }
+  color_pickers_html(color_input_id(variable, levels), levels, values)
+}
+
 output[["color_assignments_UI"]] <- renderUI({
   req(data_set())
   ## colourpicker is a suggested package; say so instead of failing.
@@ -67,17 +125,11 @@ output[["color_assignments_UI"]] <- renderUI({
               solidHeader = TRUE,
               width = 4,
               collapsible = TRUE,
-              tagList({
-                color_list <- list()
-                for (group_level in getGroupLevels(group_name)) {
-                  color_list[[group_level]] <- color_picker(
-                    input_id = color_input_id(group_name, group_level),
-                    label = group_level,
-                    value = initial_colors[[group_name]][group_level]
-                  )
-                }
-                color_list
-              })
+              color_group_pickers(
+                group_name,
+                getGroupLevels(group_name),
+                initial_colors[[group_name]]
+              )
             )
           }
 
@@ -91,17 +143,11 @@ output[["color_assignments_UI"]] <- renderUI({
                 solidHeader = TRUE,
                 width = 4,
                 collapsible = TRUE,
-                tagList({
-                  color_list <- list()
-                  for (state in unique(as.character(getMetaData()[[column]]))) {
-                    color_list[[state]] <- color_picker(
-                      input_id = color_input_id(column, state),
-                      label = state,
-                      value = initial_colors[[column]][state]
-                    )
-                  }
-                  color_list
-                })
+                color_group_pickers(
+                  column,
+                  unique(as.character(getMetaData()[[column]])),
+                  initial_colors[[column]]
+                )
               )
             }
           }

@@ -231,6 +231,39 @@ test_that("colour input ids are the hex bytes of data set, variable and level", 
   expect_identical(scope$color_input_ids("group", character()), character())
 })
 
+test_that("a group's pickers are written as color_picker() writes each", {
+  ## color_pickers_html() writes a group's pickers at once (1,640 levels of
+  ## the Allen atlas: 9 ms instead of 1.4 s): the markup must stay the same.
+  scope <- new.env(parent = asNamespace("shiny"))
+  for (name in c("color_picker", "color_pickers_html")) {
+    eval(
+      viewer_r_assignment(
+        viewer_test_path("color_management", "server.R"),
+        name
+      ),
+      scope
+    )
+  }
+  ids <- c("colour_a_1", "colour_a_2", "colour_a_3", "colour_a_\"q")
+  labels <- c("a <b> & \"c\"", "plain", "x'y", "q")
+  values <- c("#123456", NA, "#ABCDEF", "#000000")
+  expect_identical(
+    as.character(scope$color_pickers_html(ids, labels, values)),
+    as.character(do.call(
+      htmltools::tagList,
+      unname(Map(scope$color_picker, ids, labels, values))
+    ))
+  )
+  expect_identical(
+    as.character(scope$color_pickers_html(
+      character(),
+      character(),
+      character()
+    )),
+    ""
+  )
+})
+
 test_that("the deferred colour picker is colourpicker::colourInput()'s markup", {
   skip_if_not_installed("colourpicker")
   ## color_picker() builds the picker by hand (see color_management/server.R);
