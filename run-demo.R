@@ -66,11 +66,19 @@ demos <- list(
     variable = "CEREBRO_ALLEN_DEMO_CRB"
   ),
   eae = list(
-    prepare = function() prepareViewerKukanjaDemoData("eae"),
+    prepare = function() {
+      crb <- prepareViewerKukanjaDemoData("eae")
+      prepareViewerPicturesKukanja("eae")
+      crb
+    },
     variable = "CEREBRO_EAE_DEMO_CRB"
   ),
   ms = list(
-    prepare = function() prepareViewerKukanjaDemoData("ms"),
+    prepare = function() {
+      crb <- prepareViewerKukanjaDemoData("ms")
+      prepareViewerPicturesKukanja("ms")
+      crb
+    },
     variable = "CEREBRO_MS_DEMO_CRB"
   ),
   "xenium-prime" = list(
@@ -115,6 +123,7 @@ for (script in c(
   "prepare_viewer_tcell_data.R",
   "prepare_viewer_allen_data.R",
   "prepare_viewer_kukanja_data.R",
+  "prepare_viewer_pictures_kukanja.R",
   "prepare_viewer_xenium_prime_data.R",
   "prepare_viewer_pack.R",
   "prepare_builder_visium_data.R"

@@ -70,7 +70,18 @@ viewerAddLargeDemo <- function(
     point_size,
     point_opacity
   )
-
+  ## Section pictures prepared next to the CRB (<name>.pictures/pictures.rds,
+  ## e.g. prepareViewerPicturesKukanja()).
+  pictures <- file.path(sub("[.]crb$", ".pictures", path), "pictures.rds")
+  if (file.exists(pictures)) {
+    options <- viewerLinkDemoPictures(
+      options,
+      label,
+      readRDS(pictures),
+      dirname(pictures),
+      file.path("demo-large", sub("[.]crb$", "", basename(path)))
+    )
+  }
   options
 }
 
@@ -171,6 +182,34 @@ viewerAddMsDemo <- function(
   )
 }
 
+## The Viewer serves pictures only from its own spatial-assets folder: links
+## (copies where a link cannot be made) the pictures of `images` (section ->
+## label -> list(path, bounds), paths relative to `root`) under
+## spatial-assets/<folder> and names them as the data set `label`'s images.
+viewerLinkDemoPictures <- function(options, label, images, root, folder) {
+  assets <- file.path("spatial-assets", folder)
+  target <- file.path(options[["cerebro_root"]] %||% ".", assets)
+  dir.create(target, recursive = TRUE, showWarnings = FALSE)
+  options[["spatial_images"]][[label]] <- lapply(images, function(section) {
+    lapply(section, function(image) {
+      source <- file.path(root, image$path)
+      linked <- file.path(target, basename(source))
+      if (
+        !file.exists(linked) ||
+          !identical(file.size(linked), file.size(source))
+      ) {
+        unlink(linked)
+        if (!suppressWarnings(file.link(source, linked))) {
+          file.copy(source, linked)
+        }
+      }
+      image$path <- file.path(assets, basename(source))
+      image
+    })
+  })
+  options
+}
+
 ## The multi-section Visium demos run-demo.R built with the Builder: each
 ## demo.rds (prepareViewerVisiumDemoData()) names its CRB, the picture of every
 ## section and the display settings the Builder chose, Spatial opening as the
@@ -195,32 +234,12 @@ viewerAddVisiumDemos <- function(
       demo$point_size %||% 5,
       demo$point_opacity %||% 1
     )
-    assets <- file.path(
-      "spatial-assets",
-      "demo-visium",
-      sub("[.]crb$", "", demo$crb)
-    )
-    target <- file.path(options[["cerebro_root"]] %||% ".", assets)
-    dir.create(target, recursive = TRUE, showWarnings = FALSE)
-    options[["spatial_images"]][[label]] <- lapply(
+    options <- viewerLinkDemoPictures(
+      options,
+      label,
       demo$spatial_images,
-      function(section) {
-        lapply(section, function(image) {
-          source <- file.path(root, image$path)
-          linked <- file.path(target, basename(source))
-          if (
-            !file.exists(linked) ||
-              !identical(file.size(linked), file.size(source))
-          ) {
-            unlink(linked)
-            if (!suppressWarnings(file.link(source, linked))) {
-              file.copy(source, linked)
-            }
-          }
-          image$path <- file.path(assets, basename(source))
-          image
-        })
-      }
+      root,
+      file.path("demo-visium", sub("[.]crb$", "", demo$crb))
     )
     options[["spatial_image_settings"]][[label]] <- demo$spatial_image_settings
     options[["viewer_content"]][[label]] <- demo$viewer_content

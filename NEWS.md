@@ -1,5 +1,12 @@
 # CerebroNexus 8.5.1
 
+- **The Kukanja demos show each section's DAPI picture.** `run-demo.R
+  --data=eae,ms` now also writes the authors' picture of every section
+  (52 for EAE, 6 for MS) next to the CRB, turned into the cells' aligned
+  coordinates: the map from picture pixels to those coordinates is fitted on
+  each section's own cells, and a slide holding two sections is cut to each.
+  The Viewer shows them as the sections' Spatial images, in the single view
+  and in the grid. The CRBs are not rebuilt for this.
 - **Large data sets start with small points.** A data set of more than
   100,000 cells opens every page (Projection, Gene expression, Spatial,
   Linked views, Trajectory, Immune repertoire) with points of size 1, and the

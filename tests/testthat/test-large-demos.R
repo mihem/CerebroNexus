@@ -254,6 +254,81 @@ test_that("the Builder-built Visium demos join the menu with their pictures", {
   )
 })
 
+test_that("a large demo with prepared pictures shows them under its sections", {
+  env <- new.env(parent = baseenv())
+  sys.source(viewer_test_path("million_cell_demo.R"), envir = env)
+  root <- withr::local_tempdir()
+  crb <- file.path(root, "eae.crb")
+  writeLines("crb", crb)
+  writeLines("h5", file.path(root, "eae.h5"))
+  options <- list(
+    crb_file_to_load = c(Small = "small.crb"),
+    cerebro_root = withr::local_tempdir()
+  )
+  ## Without pictures the demo has none.
+  plain <- env$viewerAddLargeDemo(options, crb, "CEREBRO_EAE_DEMO_CRB", "EAE")
+  expect_null(plain$spatial_images)
+  dir.create(file.path(root, "eae.pictures"))
+  writeLines("png", file.path(root, "eae.pictures", "S1.png"))
+  bounds <- c(xmin = 0, xmax = 10, ymin = -5, ymax = 5)
+  saveRDS(
+    list(S1 = list(DAPI = list(path = "S1.png", bounds = bounds))),
+    file.path(root, "eae.pictures", "pictures.rds")
+  )
+  shown <- env$viewerAddLargeDemo(options, crb, "CEREBRO_EAE_DEMO_CRB", "EAE")
+  picture <- shown$spatial_images$EAE$S1$DAPI
+  expect_identical(picture$path, "spatial-assets/demo-large/eae/S1.png")
+  expect_identical(picture$bounds, bounds)
+  expect_identical(
+    readLines(file.path(options$cerebro_root, picture$path)),
+    "png"
+  )
+})
+
+test_that("a Kukanja picture is turned into the Viewer's coordinates", {
+  env <- large_demo_env(c(
+    "prepare_viewer_kukanja_data.R",
+    "prepare_viewer_pictures_kukanja.R"
+  ))
+  ## A 40 x 30 pixel picture (rhdf5 reads it as picture[column, row]) with
+  ## one bright pixel at column 11, row 6, whose centre is (10.5, 5.5).
+  picture <- matrix(10, nrow = 40, ncol = 30)
+  picture[11, 6] <- 255
+  ## Cells over the picture, placed by a mirror, a scale of 2 and a shift.
+  pixels <- cbind(c(2, 38, 20, 5, 35), c(3, 4, 15, 27, 26))
+  place <- function(p) cbind(2 * p[, 1L] + 100, -2 * p[, 2L] + 50)
+  cut <- env$.viewerPicturesKukanjaSection(picture, pixels, place(pixels))
+  expect_false(is.null(cut))
+  bounds <- cut$bounds
+  viewer <- place(pixels)
+  expect_true(all(
+    bounds[["xmin"]] < min(viewer[, 1L]),
+    bounds[["xmax"]] > max(viewer[, 1L]),
+    bounds[["ymin"]] < min(viewer[, 2L]),
+    bounds[["ymax"]] > max(viewer[, 2L])
+  ))
+  ## The bright pixel lands where the map puts (10.5, 5.5): row 1 is the top.
+  grey <- cut$image[,, 1L]
+  spot <- which(grey == max(grey), arr.ind = TRUE)[1L, ]
+  height <- nrow(grey)
+  width <- ncol(grey)
+  x <- bounds[["xmin"]] +
+    (spot[["col"]] - 0.5) * (bounds[["xmax"]] - bounds[["xmin"]]) / width
+  y <- bounds[["ymax"]] -
+    (spot[["row"]] - 0.5) * (bounds[["ymax"]] - bounds[["ymin"]]) / height
+  expected <- place(cbind(10.5, 5.5))
+  expect_lt(abs(x - expected[[1L]]), 2)
+  expect_lt(abs(y - expected[[2L]]), 2)
+  ## Outside the picture nothing is drawn.
+  expect_true(all(cut$image[,, 2L] %in% c(0, 1)))
+  ## Cells the map cannot place give no picture.
+  expect_null(env$.viewerPicturesKukanjaSection(
+    picture,
+    pixels,
+    place(pixels) + cbind(c(0, 40, 0, -30, 0), 0)
+  ))
+})
+
 test_that("a preparation keeps the previous data set until a new one is complete", {
   for (demo in c("CosMx", "Tcell", "Allen", "Kukanja")) {
     env <- large_demo_env(sprintf("prepare_viewer_%s_data.R", tolower(demo)))

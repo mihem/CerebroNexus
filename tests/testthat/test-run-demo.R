@@ -50,7 +50,7 @@ test_that("run-demo prepares the data sets --data names and opens the Viewer", {
     }
   }
   for (run in runs) {
-    prepared <- packs <- character()
+    prepared <- packs <- pictured <- character()
     launched <- NULL
     scope <- new.env(parent = globalenv())
     scope$source <- function(file, local) {
@@ -60,6 +60,9 @@ test_that("run-demo prepares the data sets --data names and opens the Viewer", {
       scope$prepareViewerTcellDemoData <- fake("tcell")
       scope$prepareViewerAllenDemoData <- fake("allen")
       scope$prepareViewerKukanjaDemoData <- function(set) fake(set)()
+      scope$prepareViewerPicturesKukanja <- function(set) {
+        pictured <<- c(pictured, set)
+      }
       scope$prepareViewerXeniumPrimeDemoData <- fake("xenium-prime")
       ## A Viewer Pack for each prepared data set.
       scope$prepareDemoViewerPack <- function(crb) {
@@ -70,6 +73,12 @@ test_that("run-demo prepares the data sets --data names and opens the Viewer", {
     label <- paste(c("run-demo", run$options), collapse = " ")
     expect_identical(loaded, root, label = label)
     expect_identical(prepared, run$expected, label = label)
+    ## The Kukanja sets get their section pictures after their CRBs.
+    expect_identical(
+      pictured,
+      intersect(run$expected, c("eae", "ms")),
+      label = label
+    )
     names <- basename(datasets[run$expected])
     expect_identical(packs, as.vector(names), label = label)
     expect_identical(
