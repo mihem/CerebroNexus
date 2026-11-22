@@ -1,3 +1,14 @@
+# CerebroNexus 8.5.1
+
+- **The GPU draws the highest expression on top.** With WebGPU, a view
+  coloured by a gene keeps its points in cell order and hands the renderer
+  the paint order as a list of indices, so a new gene rebuilds colours and
+  that list, not every point's position. The picture is the same to the
+  pixel. On the Allen atlas (3.9 million cells) the page stalls for 0.7 s
+  instead of 1.4 to 1.7 s on the first gene of Gene expression and 0.4 s
+  instead of 0.7 to 0.9 s on the next; Linked views with all 59 sections
+  for 0.8 s instead of 1.2 to 1.4 s. WebGL keeps the order on the CPU.
+
 # CerebroNexus 8.5.0
 
 - **Linked views has a Columns field.** As on Spatial's grid, *Columns* sets

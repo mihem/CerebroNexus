@@ -25,15 +25,16 @@ struct VertexOutput {
   @location(1) color: vec4f,
 }
 
-@vertex
-fn vertex_main(input: VertexInput) -> VertexOutput {
+// Places one point's quad corner. Both entry points end here: one reads a
+// point from the vertex buffers, the other through the draw order.
+fn place(position: vec2f, color: vec4f, layer: u32, vertexIndex: u32) -> VertexOutput {
   var corners = array<vec2f, 4>(
     vec2f(-1.0, -1.0), vec2f(1.0, -1.0),
     vec2f(-1.0, 1.0), vec2f(1.0, 1.0)
   );
-  let corner = corners[input.vertexIndex];
+  let corner = corners[vertexIndex];
   let outerRadius = uniforms.canvas.z + uniforms.canvas.w * 0.5 + 1.0;
-  let zoomed = (input.position - uniforms.view.xy) / uniforms.view.z + vec2f(0.5);
+  let zoomed = (position - uniforms.view.xy) / uniforms.view.z + vec2f(0.5);
   let screen = vec2f(
     uniforms.rect.x + zoomed.x * uniforms.rect.z,
     uniforms.rect.y + (1.0 - zoomed.y) * uniforms.rect.w
@@ -43,12 +44,31 @@ fn vertex_main(input: VertexInput) -> VertexOutput {
     1.0 - screen.y / uniforms.canvas.y * 2.0
   );
   let hidden = uniforms.style.z >= 0.0 &&
-    f32(input.layer) != uniforms.style.z;
+    f32(layer) != uniforms.style.z;
   var output: VertexOutput;
   output.position = select(vec4f(clip, 0.0, 1.0), vec4f(2.0, 2.0, 0.0, 1.0), hidden);
   output.offset = corner * outerRadius;
-  output.color = input.color;
+  output.color = color;
   return output;
+}
+
+@vertex
+fn vertex_main(input: VertexInput) -> VertexOutput {
+  return place(input.position, input.color, input.layer, input.vertexIndex);
+}
+
+// The k-th point drawn is order[k]: points keep their place in the buffers
+// and a new paint order (highest expression last) is one array of indices.
+@group(1) @binding(0) var<storage, read> points: array<vec2f>;
+@group(1) @binding(1) var<storage, read> colours: array<u32>;
+@group(1) @binding(2) var<storage, read> pointLayers: array<u32>;
+@group(1) @binding(3) var<storage, read> order: array<u32>;
+
+@vertex
+fn vertex_ordered(@builtin(vertex_index) vertexIndex: u32,
+                  @builtin(instance_index) drawn: u32) -> VertexOutput {
+  let i = order[drawn];
+  return place(points[i], unpack4x8unorm(colours[i]), pointLayers[i], vertexIndex);
 }
 
 @fragment
@@ -82,7 +102,8 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
     }
     var count = Number(next.count) || 0;
     if (next.positions.length < count * 2 || next.colors.length < count * 4 ||
-        next.layers.length < count) {
+        next.layers.length < count ||
+        (next.drawOrder && next.drawOrder.length < count)) {
       throw new Error(label + ' point buffers are shorter than count.');
     }
     return {
@@ -90,12 +111,14 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
       colors: next.colors,
       layers: next.layers,
       count: count,
-      foreground: !!next.foreground
+      foreground: !!next.foreground,
+      drawOrder: next.drawOrder || null
     };
   }
   function sameData(a, b) {
     return !!a && a.positions === b.positions && a.colors === b.colors &&
-      a.layers === b.layers && a.count === b.count && a.foreground === b.foreground;
+      a.layers === b.layers && a.count === b.count && a.foreground === b.foreground &&
+      a.drawOrder === b.drawOrder;
   }
 
   var sharedResources = null;
@@ -110,6 +133,25 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
       var device = await adapter.requestDevice();
       var format = navigator.gpu.getPreferredCanvasFormat();
       var module = device.createShaderModule({ code: SHADER_SOURCE });
+      var fragment = {
+        module: module,
+        entryPoint: 'fragment_main',
+        targets: [{
+          format: format,
+          blend: {
+            color: {
+              srcFactor: 'src-alpha',
+              dstFactor: 'one-minus-src-alpha',
+              operation: 'add'
+            },
+            alpha: {
+              srcFactor: 'one',
+              dstFactor: 'one-minus-src-alpha',
+              operation: 'add'
+            }
+          }
+        }]
+      };
       var pipeline = await device.createRenderPipelineAsync({
         layout: 'auto',
         vertex: {
@@ -133,28 +175,34 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
             }
           ]
         },
-        fragment: {
-          module: module,
-          entryPoint: 'fragment_main',
-          targets: [{
-            format: format,
-            blend: {
-              color: {
-                srcFactor: 'src-alpha',
-                dstFactor: 'one-minus-src-alpha',
-                operation: 'add'
-              },
-              alpha: {
-                srcFactor: 'one',
-                dstFactor: 'one-minus-src-alpha',
-                operation: 'add'
-              }
-            }
-          }]
-        },
+        fragment: fragment,
         primitive: { topology: 'triangle-strip' }
       });
-      return { adapter: adapter, device: device, format: format, pipeline: pipeline };
+      // Drawing through an order needs storage buffers in the vertex stage;
+      // without them every order stays on the CPU, as before.
+      var orderedPipeline = null;
+      var limits = device.limits || {};
+      if ((limits.maxStorageBuffersPerShaderStage || 0) >= 4 &&
+          (limits.maxStorageBuffersInVertexStage === undefined ||
+            limits.maxStorageBuffersInVertexStage >= 4)) {
+        try {
+          orderedPipeline = await device.createRenderPipelineAsync({
+            layout: 'auto',
+            vertex: { module: module, entryPoint: 'vertex_ordered', buffers: [] },
+            fragment: fragment,
+            primitive: { topology: 'triangle-strip' }
+          });
+        } catch (error) {
+          orderedPipeline = null;
+        }
+      }
+      return {
+        adapter: adapter, device: device, format: format, pipeline: pipeline,
+        orderedPipeline: orderedPipeline,
+        // Cells one storage binding holds: positions take 8 bytes a cell.
+        orderLimit: orderedPipeline
+          ? Math.floor((limits.maxStorageBufferBindingSize || 0) / 8) : 0
+      };
     })();
     return sharedResources;
   }
@@ -165,11 +213,16 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
     var device = null;
     var context = null;
     var pipeline = null;
+    var orderedPipeline = null;
+    var orderLimit = 0;
     var uniformBuffers = [];
     var bindGroups = [];
+    var orderedBindGroups = [];
     var positionBuffer = null;
     var colorBuffer = null;
     var layerBuffer = null;
+    var orderBuffer = null;
+    var pointsGroup = null;
     var data = null;
     var width = 1;
     var height = 1;
@@ -213,6 +266,8 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
       adapter = resources.adapter;
       device = resources.device;
       pipeline = resources.pipeline;
+      orderedPipeline = resources.orderedPipeline;
+      orderLimit = resources.orderLimit;
       metrics.adapter = adapter.info
         ? [adapter.info.vendor, adapter.info.architecture,
           adapter.info.device, adapter.info.description].filter(Boolean).join(' ')
@@ -240,6 +295,12 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
           entries: [{ binding: 0, resource: { buffer: buffer } }]
         });
       });
+      orderedBindGroups = orderedPipeline ? uniformBuffers.map(function (buffer) {
+        return device.createBindGroup({
+          layout: orderedPipeline.getBindGroupLayout(0),
+          entries: [{ binding: 0, resource: { buffer: buffer } }]
+        });
+      }) : [];
       ready = true;
       metrics.ready = true;
       metrics.initializationMs = performance.now() - initializationStarted;
@@ -248,11 +309,13 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
       throw error;
     });
 
-    function replaceBuffer(current, array) {
+    function replaceBuffer(current, array, usage) {
       if (current) current.destroy();
       var buffer = device.createBuffer({
-        size: Math.max(4, array.byteLength),
-        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+        // 8 bytes: the smallest storage binding of positions (one vec2f).
+        size: Math.max(8, array.byteLength),
+        usage: (usage === undefined ? GPUBufferUsage.VERTEX : usage) |
+          (orderedPipeline ? GPUBufferUsage.STORAGE : 0) | GPUBufferUsage.COPY_DST
       });
       if (array.byteLength) {
         device.queue.writeBuffer(
@@ -281,8 +344,31 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
       if (!data || data.layers !== next.layers) {
         layerBuffer = replaceBuffer(layerBuffer, next.layers);
       }
+      if (next.drawOrder && (!orderedPipeline || next.count > orderLimit)) {
+        throw new Error('WebGPU cannot draw these points in order.');
+      }
+      var groupStale = !data || data.positions !== next.positions ||
+        data.colors !== next.colors || data.layers !== next.layers;
+      if (next.drawOrder && (!data || data.drawOrder !== next.drawOrder)) {
+        orderBuffer = replaceBuffer(orderBuffer, next.drawOrder, 0);
+        groupStale = true;
+      } else if (!next.drawOrder && orderBuffer) {
+        orderBuffer.destroy(); orderBuffer = null;
+      }
+      if (next.drawOrder && (groupStale || !pointsGroup)) {
+        pointsGroup = device.createBindGroup({
+          layout: orderedPipeline.getBindGroupLayout(1),
+          entries: [positionBuffer, colorBuffer, layerBuffer, orderBuffer].map(
+            function (buffer, binding) {
+              return { binding: binding, resource: { buffer: buffer } };
+            })
+        });
+      } else if (!next.drawOrder) {
+        pointsGroup = null;
+      }
       data = next;
       metrics.pointCount = next.count;
+      metrics.orderedDraw = !!next.drawOrder;
       metrics.uploadSubmitMs = performance.now() - started;
     }
 
@@ -324,20 +410,27 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
       options = options || {};
       var started = performance.now();
       submitPass(data.count && Number(options.pointSize) ? function (pass) {
-        pass.setPipeline(pipeline);
-        pass.setVertexBuffer(0, positionBuffer);
-        pass.setVertexBuffer(1, colorBuffer);
-        pass.setVertexBuffer(2, layerBuffer);
+        var groups = bindGroups;
+        if (data.drawOrder) {
+          pass.setPipeline(orderedPipeline);
+          pass.setBindGroup(1, pointsGroup);
+          groups = orderedBindGroups;
+        } else {
+          pass.setPipeline(pipeline);
+          pass.setVertexBuffer(0, positionBuffer);
+          pass.setVertexBuffer(1, colorBuffer);
+          pass.setVertexBuffer(2, layerBuffer);
+        }
         if (data.foreground) {
           device.queue.writeBuffer(uniformBuffers[0], 0, uniforms(options, 0));
           device.queue.writeBuffer(uniformBuffers[1], 0, uniforms(options, 1));
-          pass.setBindGroup(0, bindGroups[0]);
+          pass.setBindGroup(0, groups[0]);
           pass.draw(4, data.count);
-          pass.setBindGroup(0, bindGroups[1]);
+          pass.setBindGroup(0, groups[1]);
           pass.draw(4, data.count);
         } else {
           device.queue.writeBuffer(uniformBuffers[0], 0, uniforms(options, -1));
-          pass.setBindGroup(0, bindGroups[0]);
+          pass.setBindGroup(0, groups[0]);
           pass.draw(4, data.count);
         }
       } : null);
@@ -355,6 +448,11 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
       ready: initialized,
       failed: failed,
       isReady: function () { return ready; },
+      // True when this many points can be drawn through a drawOrder: the
+      // point buffers keep their own order and drawOrder[k] is the k-th drawn.
+      drawsInOrder: function (count) {
+        return ready && !!orderedPipeline && count <= orderLimit;
+      },
       resize: resize,
       setData: setData,
       draw: draw,
@@ -562,6 +660,7 @@ void main() {
     function setData(next) {
       if (!ready) throw new Error('WebGL2 renderer is not ready.');
       next = checkData(next, 'WebGL2');
+      if (next.drawOrder) throw new Error('WebGL2 draws points in buffer order only.');
       if (sameData(data, next)) return;
       lastFrame = null;
       var started = performance.now();
@@ -658,6 +757,7 @@ void main() {
       ready: Promise.resolve(),
       failed: failed,
       isReady: function () { return ready; },
+      drawsInOrder: function () { return false; },
       resize: resize,
       setData: setData,
       draw: draw,
