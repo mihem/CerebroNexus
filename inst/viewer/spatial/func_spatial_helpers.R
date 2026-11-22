@@ -1197,13 +1197,22 @@ spatial_roi_transform_context <- function(
       !is.na(sample$by_cell) & sample$by_cell == sample_value
     ]
   }
-  scoped_coordinates <- coordinates[scoped_cells, , drop = FALSE]
+  ## Every cell of the section (no sample chosen): its rows as they are.
+  ## Looking 66,000 cells up by name, rows and ROIs, took 2 s for the 59
+  ## sections of the Allen atlas in Linked views.
+  whole <- identical(scoped_cells, cells)
+  scoped_coordinates <- if (whole) {
+    coordinates
+  } else {
+    coordinates[scoped_cells, , drop = FALSE]
+  }
+  scoped_roi <- if (whole) unname(roi$by_cell) else roi$by_cell[scoped_cells]
   list(
     roi_by_cell = roi$by_cell,
     scoped_cells = scoped_cells,
     pivots = spatialRoiPivots(
       scoped_coordinates,
-      as.character(roi$by_cell[scoped_cells]),
+      as.character(scoped_roi),
       degrees
     )
   )
