@@ -1,4 +1,4 @@
-# CerebroNexus 8.4.9
+# CerebroNexus 8.4.10
 
 - The source-checkout demo launcher accepts `--data=xenium-prime`: the
   optional 10x Xenium Prime 5K fresh-frozen mouse brain, with all panel genes,
