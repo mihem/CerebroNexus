@@ -1,4 +1,4 @@
-# CerebroNexus 8.5.1
+# CerebroNexus 8.5.0
 
 - **An enlarged view's thumbnails only lead to their panel.** With a panel
   enlarged, a click anywhere on a thumbnail, or on the Enlarge icon at its top
@@ -57,9 +57,6 @@
   of a column's groups are written at once instead of one by one: with the
   1,640 groups of the Allen atlas the page opens in 1.0 to 1.8 s instead of
   3.5 to 4.1 s.
-
-# CerebroNexus 8.5.0
-
 - **Spatial shows all sections side by side.** A data set with more than one
   spatial entry (tissue sections, FOVs, capture areas) can show several of
   them at once: the Spatial page's **Sections** field takes one section (the
