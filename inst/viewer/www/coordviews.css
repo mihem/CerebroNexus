@@ -438,9 +438,26 @@
   overflow-clip-margin: 8px;
 }
 .coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-strip-off { display: none; }
-/* A thumbnail keeps its title, which enlarges it; it needs no Enlarge button. */
-.coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-focus-context .cv-focus-btn { display: none; }
-.coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-focus-context .cv-ptitle { cursor: pointer; }
+/* A thumbnail only leads to its panel: clicking it, or its Enlarge button at
+   the top right (an icon here), enlarges it. Its cells take no hover, selection
+   or zoom, and its toolbar, tooltip, minimap and Moran's I badge are hidden. */
+.coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-focus-context { cursor: zoom-in; }
+.coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-focus-context .cv-canvas-wrap {
+  pointer-events: none;
+}
+.coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-focus-context :is(
+  .cv-panebar, .cv-tip, .cv-mini, .cv-moran-badge
+) { display: none !important; }
+.coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-focus-context .cv-focus-label { display: none; }
+.coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-focus-context .cv-pane-head .cv-focus-btn {
+  flex: none;
+  width: 24px;
+  min-width: 0;
+  padding: 0;
+  gap: 0;
+  justify-content: center;
+}
+.coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-focus-context .cv-ptitle { cursor: zoom-in; }
 .coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-focus-context .cv-ptitle {
   min-width: 0;
   overflow: hidden;
@@ -476,8 +493,6 @@
   height: 36px;
 }
 .coordviews-page .cv-focus-left .cv-strip-glyph { transform: rotate(90deg); }
-/* A narrow linked panel keeps its title; its "Context" badge gives way. */
-.coordviews-page .cv-pane.cv-narrow.cv-focus-context .cv-role-badge { display: none; }
 .coordviews-page .cv-pane.cv-focus-primary {
   border-color: var(--c-amber);
   box-shadow: 0 0 0 2px var(--c-amber-50), var(--shadow-2);

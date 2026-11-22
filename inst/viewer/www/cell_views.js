@@ -3278,17 +3278,13 @@
         var label = btn.querySelector('.cv-focus-label');
         if (label) label.textContent = primary ? 'Restore' : 'Enlarge';
       }
+      // The enlarged panel says so by its size, its frame and its Restore
+      // button, and a thumbnail by its place in the strip: no role badge.
       var role = p.pane.querySelector('.cv-role-badge');
       if (role) {
         role.classList.remove('is-focus', 'is-context');
-        if (focusPanel && p.spaceId) {
-          role.style.display = '';
-          role.textContent = primary ? 'ENLARGED' : 'CONTEXT';
-          role.classList.add(primary ? 'is-focus' : 'is-context');
-        } else {
-          role.style.display = 'none';
-          role.textContent = '';
-        }
+        role.style.display = 'none';
+        role.textContent = '';
       }
     });
     var host = panels[0] && panels[0].pane && panels[0].pane.parentElement;
@@ -6172,7 +6168,7 @@
     });
     brushTarget.addEventListener('mousedown', function (e) {
       if (Date.now() < (p.ignoreMouseUntil || 0)) return;
-      if (interactionIsStatic()) return;
+      if (interactionIsStatic() || isFocusThumbnail(p)) return;
       if (e.target.closest && e.target.closest('button, select, input, a, .cv-tip')) return;
       clearTransientHover();
       requestSingleAux();
@@ -6378,6 +6374,14 @@
     }
   }
 
+  // A panel shown as a thumbnail in the strip of an enlarged view: it takes no
+  // hover, selection or zoom (coordviews.css), only a click that enlarges it.
+  function isFocusThumbnail(p) {
+    var pane = p && p.pane;
+    return !!(focusPanel && pane && p.key !== focusPanel &&
+      pane.classList.contains('cv-focus-context') &&
+      pane.parentElement && pane.parentElement.classList.contains('cv-focus-grid'));
+  }
   // Pane-level gestures: any press in a spatial pane makes its section the
   // active one; its title (click) or plot (double-click) focuses the panel.
   function wirePane(p) {
@@ -6385,9 +6389,14 @@
       if (isSpatialSpace(spaceById[p.spaceId])) activateSpatial(p.spaceId);
     });
     p.pane.addEventListener('click', function (e) {
-      // With a panel enlarged, a thumbnail's title enlarges it on every page.
-      if (e.target.closest('.cv-ptitle') && p.spaceId &&
-          (canFocusPanel() || (focusPanel && focusPanel !== p.key))) {
+      if (!p.spaceId) return;
+      // With a panel enlarged, a thumbnail only leads to its panel: a click
+      // anywhere on it enlarges it (its Enlarge button acts by itself).
+      if (isFocusThumbnail(p)) {
+        if (!e.target.closest('.cv-focus-btn')) setFocusPanel(p.key);
+        return;
+      }
+      if (e.target.closest('.cv-ptitle') && canFocusPanel()) {
         setFocusPanel(p.key);
       }
     });
@@ -12757,13 +12766,6 @@
       if (focusPanel) {
         panel.pane.classList.add('cv-focus-context');
         panel.pane.style.order = '1';
-        var role = panel.pane.querySelector('.cv-role-badge');
-        if (role) {
-          role.style.display = '';
-          role.textContent = 'CONTEXT';
-          role.classList.remove('is-focus');
-          role.classList.add('is-context');
-        }
       }
       if (reappearing) fadeInPane(panel.pane);
     }

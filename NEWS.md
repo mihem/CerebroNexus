@@ -1,5 +1,11 @@
 # CerebroNexus 8.5.1
 
+- **An enlarged view's thumbnails only lead to their panel.** With a panel
+  enlarged, a click anywhere on a thumbnail, or on the Enlarge icon at its top
+  right, enlarges it; its cells no longer take hover, selection or zoom, and
+  its toolbar, tooltip, minimap and Moran's I badge are hidden. The enlarged
+  panel shows its Restore button without the "Enlarged" badge, and thumbnails
+  lose their "Context" badge.
 - **The Kukanja demos show each section's DAPI picture.** `run-demo.R
   --data=eae,ms` now also writes the authors' picture of every section
   (52 for EAE, 6 for MS) next to the CRB, turned into the cells' aligned
