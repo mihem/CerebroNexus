@@ -1,3 +1,34 @@
+# CerebroNexus 8.5.1
+
+- **A large grid reads its sections from the Viewer Pack.** A grid of more
+  than 400,000 cells names the Pack file that holds each whole, unrotated
+  section's positions, and the browser fetches those files side by side and
+  keeps them, so the server's batches carry only colours and names. A failed
+  file turns this off for the session and the batches carry the positions
+  again. On the Allen atlas (3.9 million cells in 59 sections; Windows,
+  Chrome) choosing every section sends 19.7 MB instead of 51.2 MB over the
+  connection; the second time, the first screen of panels is drawn after
+  2.1 s instead of 2.8 s and all 59 after 2.8 s instead of 4.0 s.
+- **Recolouring a grid keeps its panels.** Colouring the Spatial grid by
+  another column or gene updates the colours of the panels in place instead
+  of building them anew, and a gene that few cells express sends those cells
+  only. On the Allen atlas the page's longest stall falls from 1.1 s to 0.3 s
+  for a column and from 1.3 s to 0.7 s for a gene, and colouring by *Vip*
+  sends 7.4 MB instead of 31.5 MB.
+- **Moran's I finds neighbours through buckets.** Each cell's six nearest
+  cells are looked up in a grid of buckets instead of among all cells of its
+  section, with the same neighbours in the same order: 1.6 ms a section
+  instead of 26 ms on the Allen atlas.
+- **Linked views draws its sections first.** The columns a selection needs
+  are read after the sections are drawn, and a section's ROI context reads
+  its rows as they are when it holds all of them. On the Allen atlas Linked
+  views has its sections after 2.4 s instead of 4.1 s and is ready after
+  6.7 s instead of 8.1 s.
+- **Colour management opens faster with many groups.** The colour pickers
+  of a column's groups are written at once instead of one by one: with the
+  1,640 groups of the Allen atlas the page opens in 1.0 to 1.8 s instead of
+  3.5 to 4.1 s.
+
 # CerebroNexus 8.5.0
 
 - **Spatial shows all sections side by side.** A data set with more than one
