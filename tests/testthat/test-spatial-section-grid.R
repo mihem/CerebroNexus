@@ -154,6 +154,88 @@ test_that("grid coordinates come from each cell's own section", {
   )
 })
 
+test_that("the grid's picker chooses one picture per section", {
+  root <- withr::local_tempdir()
+  dir.create(file.path(root, "spatial-assets"))
+  for (file in c("a-he", "a-dapi", "b-he")) {
+    write_dummy_png(file.path(root, "spatial-assets", paste0(file, ".png")))
+  }
+  picture <- function(file) {
+    list(
+      path = file.path("spatial-assets", paste0(file, ".png")),
+      bounds = list(xmin = 0, xmax = 50, ymin = 0, ymax = 20)
+    )
+  }
+  options <- list(
+    cerebro_root = root,
+    spatial_images = list(
+      demo = list(
+        sectionA1 = list(`H&E` = picture("a-he"), DAPI = picture("a-dapi")),
+        sectionB1 = list(`H&E` = picture("b-he"))
+      )
+    )
+  )
+  renderer <- section_grid_renderer(options)
+  data <- section_grid_data()
+  record <- function(section) list(coordinates = data$coordinates[[section]])
+  all_sections <- names(data$index)
+  groups <- renderer$spatial_grid_background_groups(
+    options,
+    "demo",
+    c("sectionB1", "sectionA1", "sectionA2"),
+    all_sections,
+    record
+  )
+  ## A group per section with pictures, in the order shown; "No picture" first.
+  expect_identical(names(groups), c("sectionB1", "sectionA1"))
+  a1 <- match("sectionA1", all_sections)
+  expect_identical(
+    groups$sectionA1$tokens,
+    stats::setNames(
+      paste0("grid-", a1, "-background-", 0:2),
+      c("No picture", "H&E", "DAPI")
+    )
+  )
+  picks <- renderer$spatial_grid_background_picks(
+    c(paste0("grid-", a1, "-background-2"), "grid-99-background-1", "junk"),
+    all_sections
+  )
+  expect_identical(picks, list(sectionA1 = 2L))
+  chosen <- renderer$spatial_grid_section_background(
+    options,
+    "demo",
+    "sectionA1",
+    record("sectionA1"),
+    pick = picks$sectionA1
+  )
+  expect_identical(chosen$descriptor$path, picture("a-dapi")$path)
+  ## No pick: the first picture; 0: none; a pick past the end: the first.
+  first <- renderer$spatial_grid_section_background(
+    options,
+    "demo",
+    "sectionA1",
+    record("sectionA1")
+  )
+  expect_identical(first$descriptor$path, picture("a-he")$path)
+  expect_null(renderer$spatial_grid_section_background(
+    options,
+    "demo",
+    "sectionA1",
+    record("sectionA1"),
+    pick = 0L
+  ))
+  expect_identical(
+    renderer$spatial_grid_section_background(
+      options,
+      "demo",
+      "sectionB1",
+      record("sectionB1"),
+      pick = 2L
+    )$descriptor$path,
+    picture("b-he")$path
+  )
+})
+
 test_that("each grid panel shows its own section's image, and none without one", {
   root <- withr::local_tempdir()
   dir.create(file.path(root, "spatial-assets"))

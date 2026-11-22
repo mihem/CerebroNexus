@@ -1,5 +1,12 @@
 # CerebroNexus 8.5.0
 
+- **The grid chooses each section's picture.** With several sections shown,
+  Spatial's *Background images* field lists the pictures grouped by section,
+  with *No picture* in every group; each section shows the one chosen (its
+  first to start with), and choosing another in its group replaces it. A
+  section keeps its choice while others are added or removed. With more than
+  four sections the field shows one line, such as "11 of 12 sections with a
+  picture", and the list ticks each section's choice.
 - **An enlarged view's thumbnails only lead to their panel.** With a panel
   enlarged, a click anywhere on a thumbnail, or on the Enlarge icon at its top
   right, enlarges it; its cells no longer take hover, selection or zoom, and

@@ -1700,14 +1700,74 @@ spatial_grid_coordinates <- function(
   )
 }
 
-## The background a section starts with on its own page: its first image,
-## embedded or configured, for the whole section (no ROI). NULL without one.
+## The grid's picture picker: one group per shown section that has pictures,
+## offering "No picture" and each of the section's pictures. A token names the
+## section by its place among all sections and the picture by its place in the
+## section (0: none), so it stays the same while sections come and go.
+spatial_grid_background_groups <- function(
+  options,
+  dataset,
+  sections,
+  all_sections,
+  record
+) {
+  groups <- lapply(sections, function(section) {
+    spatial_data <- record(section)
+    embedded <- if (is.null(spatial_data)) {
+      list()
+    } else {
+      embedded_spatial_images(spatial_data, "")
+    }
+    external <- configured_spatial_images(options, dataset, section, "")
+    choices <- spatial_background_choices(embedded, external)
+    if (!length(choices)) {
+      return(NULL)
+    }
+    prefix <- paste0("grid-", match(section, all_sections), "-background-")
+    list(
+      section = section,
+      tokens = stats::setNames(
+        paste0(prefix, c(0L, seq_along(choices))),
+        c("No picture", names(choices))
+      )
+    )
+  })
+  groups <- groups[!vapply(groups, is.null, logical(1))]
+  stats::setNames(groups, vapply(groups, `[[`, character(1), "section"))
+}
+
+## The picker's tokens as section -> picture index (0: no picture).
+spatial_grid_background_picks <- function(tokens, all_sections) {
+  parts <- regmatches(
+    as.character(tokens %||% character()),
+    regexec("^grid-([0-9]+)-background-([0-9]+)$", tokens %||% character())
+  )
+  picks <- list()
+  for (part in parts) {
+    if (length(part) != 3L) {
+      next
+    }
+    section <- all_sections[as.integer(part[[2L]])]
+    if (length(section) == 1L && !is.na(section)) {
+      picks[[section]] <- as.integer(part[[3L]])
+    }
+  }
+  picks
+}
+
+## The background a section shows in the grid: picture `pick` of the section
+## (spatial_grid_background_picks(); its first without a pick), embedded or
+## configured, for the whole section (no ROI). NULL without one or for 0.
 spatial_grid_section_background <- function(
   options,
   dataset,
   spatial_name,
-  spatial_data
+  spatial_data,
+  pick = NULL
 ) {
+  if (identical(pick, 0L)) {
+    return(NULL)
+  }
   embedded <- if (is.null(spatial_data)) {
     list()
   } else {
@@ -1718,8 +1778,9 @@ spatial_grid_section_background <- function(
   if (!length(choices)) {
     return(NULL)
   }
+  index <- if (is.null(pick) || pick > length(choices)) 1L else pick
   descriptor <- resolve_spatial_background(
-    unname(choices[[1L]]),
+    unname(choices[[index]]),
     embedded,
     external
   )

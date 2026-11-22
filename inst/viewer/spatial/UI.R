@@ -46,6 +46,11 @@ tab_spatial <- tabItem(
               condition = "!(input.spatial_projection_sections && input.spatial_projection_sections.length > 1)",
               uiOutput("spatial_projection_background_selector_UI")
             ),
+            ## The grid chooses one picture per section, grouped by section.
+            conditionalPanel(
+              condition = "input.spatial_projection_sections && input.spatial_projection_sections.length > 1",
+              uiOutput("spatial_projection_grid_background_UI")
+            ),
             cerebroToolbarActions(
               cerebroSettingsButton(
                 "spatial_projection_more_button",
