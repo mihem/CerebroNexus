@@ -628,3 +628,51 @@ test_that("a frame of panels names its cells through the cell-name resource", {
   expect_identical(data$cell_names_resource$url, "names")
   expect_length(data$panels, 2L)
 })
+
+test_that("a frame sent at once keeps the cell rows and the cell-name file", {
+  skip_if_not_installed("jsonlite")
+  runtime <- viewer_runtime_env()
+  sent <- list()
+  runtime$viewerDatasetIdentity <- function() NULL
+  runtime$session <- list(sendBinaryMessage = function(type, payload) {
+    sent[[length(sent) + 1L]] <<- list(type = type, payload = payload)
+  })
+  resource <- list(
+    protocol = "canonical-cell-names-v1",
+    url = "cell-names/names.bin",
+    cells = 5L
+  )
+  rows <- c(1L, 3L)
+  ## Split panels are never progressive, so the deferred auxiliary data are
+  ## built at once; with the cell-name file they name rows, not barcodes.
+  runtime$cerebroCellViewRender(
+    "spatial_projection",
+    meta = list(color_type = "categorical", traces = c("A", "B")),
+    data = list(
+      selection_key = seq_along(rows),
+      group = c("A", "B"),
+      panels = list(
+        list(id = "split-1", label = "A", selection_key = "c-1", x = 1, y = 1),
+        list(id = "split-2", label = "B", selection_key = "c-3", x = 2, y = 2)
+      )
+    ),
+    deferred_aux = function() {
+      runtime$cerebroCellViewDeferredAux(
+        selection_rows = seq_along(rows),
+        cell_barcodes = NULL,
+        names_resource = resource,
+        cell_rows = rows
+      )
+    },
+    dataset_context = list(
+      epoch = "wire-test",
+      dataset_key = "A",
+      generation = 1
+    )
+  )
+  frame <- wire_header(sent[[1L]]$payload)
+  expect_null(frame$data$selection_key)
+  expect_identical(unlist(frame$data$selection_index), rows - 1L)
+  expect_identical(frame$data$cell_names_resource$url, resource$url)
+  expect_length(frame$data$panels, 2L)
+})

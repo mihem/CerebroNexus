@@ -3,7 +3,7 @@
 ## Prepares the large demo data sets and opens them together in this
 ## checkout's Viewer.
 ##
-##   Rscript run-demo.R [--data=1m,ren,cosmx,tcell,allen,eae,ms,dlpfc,...]
+##   Rscript run-demo.R [--data=1m,ren,cosmx,tcell,allen,eae,ms,xenium-prime,dlpfc,...]
 ##                      [--prepare-only]
 ##
 ## --data names the data sets to prepare (default: 1m, the mouse brain), any
@@ -72,12 +72,16 @@ demos <- list(
   ms = list(
     prepare = function() prepareViewerKukanjaDemoData("ms"),
     variable = "CEREBRO_MS_DEMO_CRB"
+  ),
+  "xenium-prime" = list(
+    prepare = function() prepareViewerXeniumPrimeDemoData(),
+    variable = "CEREBRO_XENIUM_PRIME_DEMO_CRB"
   )
 )
 ## Built by the Builder from the file prepareBuilderVisiumDemoData() writes.
 visium_demos <- c("dlpfc", "mouse_brain", "breast", "prostate")
 usage <- paste0(
-  "Usage: Rscript run-demo.R [--data=1m,ren,cosmx,tcell,allen,eae,ms,",
+  "Usage: Rscript run-demo.R [--data=1m,ren,cosmx,tcell,allen,eae,ms,xenium-prime,",
   "dlpfc,mouse_brain,breast,prostate] [--prepare-only]"
 )
 
@@ -111,6 +115,7 @@ for (script in c(
   "prepare_viewer_tcell_data.R",
   "prepare_viewer_allen_data.R",
   "prepare_viewer_kukanja_data.R",
+  "prepare_viewer_xenium_prime_data.R",
   "prepare_viewer_pack.R",
   "prepare_builder_visium_data.R"
 )) {

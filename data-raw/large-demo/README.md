@@ -11,12 +11,13 @@ Rscript run-demo.R                             # the mouse brain, then the Viewe
 Rscript run-demo.R --data=ren                  # only the Ren atlas
 Rscript run-demo.R --data=1m,ren,cosmx,tcell   # the four large single-cell data sets
 Rscript run-demo.R --data=allen,eae,ms         # the three spatial data sets with many sections
+Rscript run-demo.R --data=xenium-prime         # Prime 5K with four-stain microscopy
 Rscript run-demo.R --data=ren --prepare-only   # download and convert, do not start the Viewer
 Rscript run-demo.R --data=dlpfc,mouse_brain,breast,prostate  # the four multi-section Visium data sets
 Rscript run-demo.R --data=1m,tcell,dlpfc,breast              # any mix, all in one Viewer
 ```
 
-`--data` takes a comma-separated list of `1m` (the mouse brain), `ren`, `cosmx`, `tcell`, `allen`, `eae`, `ms`, `dlpfc`, `mouse_brain`, `breast` and `prostate`; without it the launcher prepares the mouse brain.
+`--data` takes a comma-separated list of `1m` (the mouse brain), `ren`, `cosmx`, `tcell`, `allen`, `eae`, `ms`, `xenium-prime`, `dlpfc`, `mouse_brain`, `breast` and `prostate`; without it the launcher prepares the mouse brain.
 
 The launcher loads this checkout with `pkgload`, sources the scripts below, prepares each data set (a complete cache is reused, so only the first run downloads and converts), builds the Viewer Pack, and starts the app on `http://127.0.0.1:7451`. It needs `pkgload`, `rhdf5`, `HDF5Array`, `DelayedArray`, `readxl` and `qs2`, plus the packages the Viewer itself uses.
 
@@ -54,6 +55,7 @@ crb <- prepareViewerRenDemoData()   # returns the path of the prepared .crb
 - `prepare_viewer_allen_data.R`: downloads the cell table, the gene table and the log2 expression `.h5ad` of the Allen whole mouse brain MERFISH data set (8.6 GB), computes the joint embedding and builds the `.crb` with one spatial entry per section and the atlas's taxonomy colours. Entry function: `prepareViewerAllenDemoData()`. Source, licence and changes: [`allen.ATTRIBUTION.md`](allen.ATTRIBUTION.md).
 - `prepare_viewer_kukanja_data.R`: downloads the AnnData archive of the Kukanja et al. EAE (`eae`, 0.57 GB) or MS (`ms`, 0.51 GB) data set and builds the `.crb` with one spatial entry per section, the authors' cell types, colours and UMAP. Entry function: `prepareViewerKukanjaDemoData("eae")` or `("ms")`. Source, licence and changes: [`kukanja.ATTRIBUTION.md`](kukanja.ATTRIBUTION.md).
 - `prepare_builder_visium_data.R`: downloads four real multi-section 10x Visium data sets with the H&E photograph of every section (`dlpfc`: 12 sections of human prefrontal cortex with layer labels; `mouse_brain`: 4 sagittal sections; `breast`: 2 breast cancer sections; `prostate`: prostate cancer and normal), and writes one SingleCellExperiment file per data set as Builder input, with a computed PCA, UMAP and clusters. `Rscript run-demo.R --data=dlpfc` prepares that file and then builds it with the Builder's own steps: import, the Builder's settings, every section's picture, Spatial opening as the grid. The resulting CRB opens in the same Viewer as the other data sets. The launcher prints the file's path, so it can also be imported in the Builder (`launchCerebroBuilder()`). This build loads the Builder code the way its end-to-end tests do, so it also needs `testthat` and `withr`. The Viewer shows pictures only from its own `spatial-assets` folder, so each picture is linked or copied into `inst/spatial-assets/demo-visium/`, a folder Git ignores. Entry functions: `prepareBuilderVisiumDemoData(id)` (the Builder input) and `prepareViewerVisiumDemoData(id, repo_root)` (the built data set). Sources, licences and changes: [`visium.ATTRIBUTION.md`](visium.ATTRIBUTION.md).
+- `prepare_viewer_xenium_prime_data.R`: prepares the optional Prime 5K mouse brain with a fixed-colour four-stain microscopy image. Entry function: `prepareViewerXeniumPrimeDemoData()`. See [below](#xenium-prime-5k-mouse-brain) and [`xenium-prime.ATTRIBUTION.md`](xenium-prime.ATTRIBUTION.md).
 - `download_helpers.R`: the cache folder, the checked download (size, then MD5 or SHA256, resumable) and the publish-by-rename shared by the two scripts above. `run-demo.R` sources it before them.
 - `prepare_viewer_pack.R`: builds or reuses the Viewer Pack of a prepared `.crb`. Entry function: `prepareDemoViewerPack()`.
 - The expression matrix of the mouse brain and Ren data sets is written as the cells x genes H5 sidecar by the package's own streaming writer (`R/h5ad_stream.R`, the one `convertH5adToCerebro()` uses for an h5ad with more than 2^31 - 1 non-zero values), not by a script of this folder: `HDF5Array::writeTENxMatrix()` can only write one gene after the other, and a source stored by cells is then scanned from start to end for every block of genes, which takes days for these atlases. The writer reads the CSR arrays directly, in several R processes.
@@ -103,3 +105,90 @@ Notes:
 - Kukanja: the AnnData archive is unpacked into the build folder (4.3 GB for `eae`, 3.5 GB for `ms`) and removed afterwards. The embedding is the authors' UMAP.
 
 Benchmarks and smoke checks live in [CerebroNexus_paper_code](https://github.com/duocang/CerebroNexus_paper_code) (`topics/viewer_performance/` and `topics/expression_backends/`).
+
+## Xenium Prime 5K mouse brain
+
+This is a separate, newer data set, not a replacement for the small Xenium V1
+CTX+HP example. It keeps all 63,173 cells and the 5,006 Gene Expression features
+of the Prime panel. Negative controls are excluded. The published 10x graph
+clusters and UMAP are used, not recomputed; the 11 cells omitted by XOA remain
+available spatially, labelled `Unassigned`, with missing UMAP coordinates.
+
+```bash
+Rscript run-demo.R --data=xenium-prime
+# Or download/prepare without starting the Viewer:
+Rscript run-demo.R --data=xenium-prime --prepare-only
+```
+
+The microscopy is a JPEG 2000 OME-TIFF that R's `tiff` and `EBImage` cannot
+decode, so it is read with Bio-Formats through the Bioconductor package
+`RBioFormats` (as the original Xenium demo does; see `data-raw/spatial.md`).
+That needs `RBioFormats` and `png`, and a Java runtime for `rJava`:
+
+```r
+BiocManager::install("RBioFormats")   # needs a JDK
+```
+
+On Nix, `rPackages.RBioFormats` and `rPackages.rJava` bring their own JDK.
+They are build-time requirements of this script only: `DESCRIPTION` and the
+Viewer do not use them, and the script checks for them before it starts the
+13 GB download.
+
+The first run downloads the **13.3 GB** 10x outs ZIP into
+`large-examples/xenium-prime/source/`. Only the expression matrix, cell table,
+analysis archive and four focus TIFFs (about 2.1 GB combined) are unpacked in a
+temporary build directory. Allow roughly **17 GB free disk** for preparation.
+The transcript clouds, boundaries and 3D morphology stack are not extracted.
+10x also offers the matrix, cell table and analysis archive as separate
+downloads (54, 4 and 22 MB), but the focus TIFFs come only inside the outs
+ZIP, so the microscopy needs the full 13.3 GB download.
+
+The prepared directory contains:
+
+- `cerebro_xenium_prime.crb`: metadata, spatial coordinates, published UMAP
+  and the microscopy composite, **embedded** as the section's background image
+  (19 MB, of which the PNG is 17 MB; the Viewer serves it through a private per-session URL, not
+  inline). The Viewer only serves *external* image files from inside its own
+  app folders, so a PNG left in the cache would be refused.
+- `cerebro_xenium_prime.h5`: log-normalised expression, read on demand.
+- `morphology.png`: the same four-stain RGB composite, kept for inspection; it
+  is not read when the Viewer opens. It is the smallest pyramid level of the
+  scan that is at least 4,096 px on its long side (4,269 x 2,989 px), decoded
+  directly; the 34,154 x 23,912 px scan is never read in full.
+- `morphology.json`: full-resolution physical extent, source pixel sizes,
+  display dimensions, channel colours and contrast windows.
+- `demo-version` and the Viewer Pack.
+
+The PNG combines **DAPI (blue), ATP1A1/CD45/E-Cadherin (green), 18S (magenta) and
+alphaSMA/Vimentin (yellow)**. Each channel is contrast-stretched independently
+before additive compositing. This is measured microscopy, not coloured clusters
+or a tint of DAPI. Channel settings are baked into the PNG; this demo adds no
+interactive multichannel or tiled-image support.
+
+The source's micrometre pixel calibration defines the complete image extent
+even after downsampling. Cell coordinates use `(x_centroid, -y_centroid)`, so the
+native PNG and cells share a frame without hand-tuned offsets or scale. This is
+demo-specific preparation, not a general calibration/import change.
+
+Choose **Mouse brain (Xenium Prime 5K)** in the data set menu, then Spatial.
+Its background is selected automatically. The cell dots are small (size 2) and nearly opaque (90%), so the clusters read clearly while the microscopy shows between them; both can be changed in the page's Settings.
+Cached prepared data can also be opened with the source app by setting
+`CEREBRO_XENIUM_PRIME_DEMO_CRB` to the `.crb` path; keep its H5 beside it.
+`RBioFormats` is not needed to reopen a current prepared cache.
+
+No data are added to the repository or installed package. This source-checkout
+demo is not registered in `downloadDemoData()` (which downloads small, already
+prepared examples). A failed rebuild preserves the previous prepared directory.
+Changing the script (a hash of its functions) or updating CerebroNexus
+prepares the data set again; with the 13 GB ZIP already in `source/` that
+took about 1 minute.
+
+Tests, without downloading the real data:
+
+```bash
+nix-shell --run 'Rscript -e "devtools::test(filter = \"xenium-prime-demo|run-demo\")"'
+```
+
+They cover the contrast window, the colour compositing, the pyramid-level
+choice and the build on tiny stand-in files. The Bio-Formats read itself is
+checked by hand on the real image, because it needs Java.

@@ -239,6 +239,7 @@ Cerebro.options <- viewerAddAllenDemo(Cerebro.options)
 Cerebro.options <- viewerAddEaeDemo(Cerebro.options)
 Cerebro.options <- viewerAddMsDemo(Cerebro.options)
 Cerebro.options <- viewerAddVisiumDemos(Cerebro.options)
+Cerebro.options <- viewerAddXeniumPrimeDemo(Cerebro.options)
 
 options(shiny.maxRequestSize = 6 * 1024^2)
 
