@@ -438,10 +438,10 @@
   overflow-clip-margin: 8px;
 }
 .coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-strip-off { display: none; }
-/* A thumbnail only leads to its panel: clicking it, or its Enlarge button at
-   the top right (an icon here), enlarges it. Its cells take no hover, selection
+/* A thumbnail only leads to its panel (a hand cursor): clicking it, or its
+   Enlarge button at the top right (an icon here), enlarges it. Its cells take no hover, selection
    or zoom, and its toolbar, tooltip, minimap and Moran's I badge are hidden. */
-.coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-focus-context { cursor: zoom-in; }
+.coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-focus-context { cursor: pointer; }
 .coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-focus-context .cv-canvas-wrap {
   pointer-events: none;
 }
@@ -457,7 +457,11 @@
   gap: 0;
   justify-content: center;
 }
-.coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-focus-context .cv-ptitle { cursor: zoom-in; }
+.coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-focus-context .cv-ptitle { cursor: pointer; }
+/* The thumbnail itself says what a click does: its icon needs no tooltip. */
+.coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-focus-context .cv-focus-btn::after {
+  content: none;
+}
 .coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-focus-context .cv-ptitle {
   min-width: 0;
   overflow: hidden;
