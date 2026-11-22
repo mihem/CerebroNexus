@@ -1,5 +1,26 @@
 # Changelog
 
+## CerebroNexus 8.4.9
+
+- **Numbered groups in natural order
+  ([\#284](https://github.com/mihem/CerebroNexus/issues/284)).** Group
+  levels such as “Cluster 1”, “Cluster 2”, …, “Cluster 10” are listed in
+  natural order: numbers compare as numbers, decimals included
+  (“res_0.25” before “res_0.5”), so legends, colours, filters and
+  choices no longer read “Cluster 1, Cluster 10, Cluster 11, …, Cluster
+  2”. Export writes character groups in this order. CRBs written before
+  store plain sorted levels; the Viewer puts those in natural order once
+  when it reads the file (about 10 ms for two reordered groups on 1.3
+  million cells), so they need not be rebuilt. A factor whose levels
+  were chosen in another order, and an ordered factor, keep their order;
+  a trailing “N/A” stays last. Since colours follow the level order, a
+  reordered group of such a CRB gets different colours from “Cluster 2”
+  on (for example, “Cluster 10” no longer takes the second colour).
+- **Split-by panels in level order.** Spatial “Split by” panels follow
+  the column’s levels (natural order for text), with missing values
+  last, instead of the order in which their first cells occur. A saved
+  ROI order still comes first.
+
 ## CerebroNexus 8.4.8
 
 - **A short wait shows no progress card.** A progress notification of
