@@ -12015,9 +12015,62 @@
     hydrateColorPacketMap(view.data, 'packed_rgb', 'packed_rgb_cache_keys', 'rgb');
     view.hiddenGroups = [];
     if (visibleSingleId() === message.id &&
-        !updateSingleExpression(message.id, previousMeta, previousData, message)) {
+        !updateSingleExpression(message.id, previousMeta, previousData, message) &&
+        !updateGridColors(message.id, previousMeta, message)) {
       activateSingle(message.id, false, false, 'primary');
     }
+    return true;
+  }
+
+  // A Spatial grid coloured anew by the same kind of colouring keeps its
+  // panels, their unit positions and the cells' GPU positions: only the
+  // frame's colouring is replaced, and the panels draw again through
+  // updateGpuColors(). Rebuilding the whole view took 0.6 s for the 59
+  // sections of the Allen atlas. A switch between groups and values, or a
+  // frame whose keys are not its cells in order, is activated anew.
+  function updateGridColors(id, previousMeta, message) {
+    var view = singleView(id), data = view && view.data, meta = view && view.meta;
+    if (id !== 'spatial_projection' || singleActive !== id || !D || rebuildingBase ||
+        !sectionGridActive() || !data || !Array.isArray(data.panels) || !meta ||
+        meta.color_type !== previousMeta.color_type ||
+        (meta.color_type !== 'categorical' && meta.color_type !== 'continuous') ||
+        Object.keys(message.data || {}).some(function (key) {
+          return SINGLE_COLOR_FIELDS.indexOf(key) < 0;
+        })) return false;
+    var keys = Array.isArray(data.selection_key) ? data.selection_key : [];
+    if (!keysArePositional(keys)) return false;
+    var mode = singleSpaceModes[singleGridSpaces[0]];
+    if (meta.color_type === 'categorical') {
+      var groupName = '__single_group__' + id;
+      if (mode !== groupName || data.group_code == null) return false;
+      var levels = Array.isArray(meta.traces) ? meta.traces.map(String) : [];
+      var codes = data.group_code, values = emptyVector(-1);
+      for (var row = 0; row < keys.length; row++) {
+        var code = Number(codes[row]);
+        values[row] = code >= 0 && code < levels.length ? code : -1;
+      }
+      (meta.shared_filters ? D.groups : D.cat_extra)[groupName] = {
+        values: values,
+        levels: levels,
+        colors: Array.isArray(meta.group_colors) ? meta.group_colors : []
+      };
+    } else {
+      var fieldName = 'single:' + id + ':value';
+      if (mode !== FIELD_PREFIX + fieldName) return false;
+      D.fields[fieldName] = quantisedField(
+        meta.color_variable || 'Value',
+        (Array.isArray(data.color) || ArrayBuffer.isView(data.color)) ? data.color : [],
+        keys, data, null, true
+      );
+    }
+    hidden = new Set();
+    _ordD = null; _clipD = null; _fldCacheD = null; _fldCacheVal = null;
+    panels.forEach(function (p) { p.miniBg = null; });
+    pick = null; unpinTip(); closeCard(); cardMeta = null;
+    renderLegend(); renderSelbar();
+    _layoutKey = null; if (!resizeAll()) drawAll();
+    updateMoranBadges();
+    reportSinglePainted(id, view, D);
     return true;
   }
 
