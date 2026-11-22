@@ -1079,7 +1079,12 @@ cv_spatial_one <- function(
   embedded <- embedded_spatial_images(sd, roi_value)
   alignment <- sd[["histology_alignment", exact = TRUE]]
   appearance <- cv_alignment_appearance(alignment)
-  section_appearance <- spatialPointAppearance(opts, dataset_name, nm)
+  section_appearance <- spatialPointAppearance(
+    opts,
+    dataset_name,
+    nm,
+    n_cells = length(cells)
+  )
   roi_appearance <- spatialRoiSetting(opts, dataset_name, nm, roi_value)
   if (!is.null(roi_appearance)) {
     section_appearance <- roi_appearance[c("point_opacity", "point_size")]
@@ -1092,7 +1097,12 @@ cv_spatial_one <- function(
       section_appearance <- appearance[c("point_opacity", "point_size")]
     }
   }
-  spatial_defaults <- viewerScatterDefaults(opts, dataset_name, "spatial")
+  spatial_defaults <- viewerScatterDefaults(
+    opts,
+    dataset_name,
+    "spatial",
+    n_cells = length(cells)
+  )
   for (embedded_index in seq_along(embedded)) {
     entry <- embedded[[embedded_index]]
     embedded_names <- names(embedded)

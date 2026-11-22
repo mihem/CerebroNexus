@@ -1,5 +1,15 @@
 # CerebroNexus 8.5.1
 
+- **Large data sets start with small points.** A data set of more than
+  100,000 cells opens every page (Projection, Gene expression, Spatial,
+  Linked views, Trajectory, Immune repertoire) with points of size 1, and the
+  sizes a Builder saved for its Spatial sections are capped the same way; the
+  slider still sets any size. `Cerebro.options$large_data_point_size_cells`
+  moves the threshold (`Inf` turns it off).
+- **Smaller grid panels draw smaller, lighter points.** A panel of the Spatial
+  grid narrower than 640 pixels scales its points down with its width (to 30
+  % at most, never below one pixel) and makes them more transparent, so the
+  tissue picture stays readable in a grid of many sections.
 - **A large grid reads its sections from the Viewer Pack.** A grid of more
   than 400,000 cells names the Pack file that holds each whole, unrotated
   section's positions, and the browser fetches those files side by side and

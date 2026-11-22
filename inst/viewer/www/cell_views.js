@@ -1835,19 +1835,33 @@
   // path fills one path per COLOUR — a path can hold arcs of different radii,
   // but not of different alphas, so shading by opacity would cost the batching
   // exactly where it matters most.
+  // A panel of the Spatial grid shows its section smaller than the single
+  // view does, so its points shrink with it: full size from GRID_POINT_FULL_PX
+  // wide, down to GRID_POINT_MIN_SCALE of it, never below one pixel. They also
+  // turn more transparent, so the tissue picture stays readable under them.
+  var GRID_POINT_FULL_PX = 640, GRID_POINT_MIN_SCALE = 0.3;
+  function gridPointScale(p) {
+    var sp = spaceById[p.spaceId];
+    if (!sp || sp._gridSection == null || !(p.W > 0)) return 1;
+    return Math.max(GRID_POINT_MIN_SCALE, Math.min(1, p.W / GRID_POINT_FULL_PX));
+  }
   function pointSizeOf(p) {
     var sp = spaceById[p.spaceId];
+    var size = ps;
     if (!pointSizeEdited && sp && sp.builder_point_size != null) {
-      return Math.max(1, Math.min(20, Number(sp.builder_point_size)));
+      size = Math.max(1, Math.min(20, Number(sp.builder_point_size)));
     }
-    return ps;
+    var scale = gridPointScale(p);
+    return scale < 1 ? Math.max(1, size * scale) : size;
   }
   function pointOpacityOf(p) {
     var sp = spaceById[p.spaceId];
+    var opacity = pointOpacity;
     if (!pointOpacityEdited && sp && sp.builder_point_opacity != null) {
-      return Math.max(0, Math.min(1, Number(sp.builder_point_opacity)));
+      opacity = Math.max(0, Math.min(1, Number(sp.builder_point_opacity)));
     }
-    return pointOpacity;
+    var scale = gridPointScale(p);
+    return scale < 1 ? opacity * (0.55 + 0.45 * scale) : opacity;
   }
   // Per-view factor on a frame's own point sizes (HLA node size), so a size
   // slider redraws without a new frame. Set by cerebroCellViews.scalePointSizes

@@ -25,6 +25,60 @@ test_that("projection defaults are canonical and spatial defaults independent", 
   )
 })
 
+test_that("a data set of more than 100,000 cells starts every page with size 1", {
+  env <- viewer_runtime_env()
+  options <- list(point_size = c(a = 3), spatial_point_size = c(a = 7))
+  for (page in list(NULL, "spatial")) {
+    expect_identical(
+      env$viewerScatterDefaults(
+        options,
+        "a",
+        page,
+        n_cells = 100001
+      )$point_size,
+      1
+    )
+    expect_identical(
+      env$viewerScatterDefaults(options, "a", page, n_cells = 1e5)$point_size,
+      if (is.null(page)) 3 else 7
+    )
+    ## Opacity and sampling are not touched.
+    expect_identical(
+      env$viewerScatterDefaults(options, "a", page, n_cells = 2e6)[-1L],
+      env$viewerScatterDefaults(options, "a", page)[-1L]
+    )
+  }
+  ## The cell count is not known yet: the configured size.
+  expect_identical(env$viewerScatterDefaults(options, "a")$point_size, 3)
+  ## An author can move the threshold.
+  expect_identical(
+    env$viewerScatterDefaults(
+      c(options, list(large_data_point_size_cells = Inf)),
+      "a",
+      n_cells = 4e6
+    )$point_size,
+    3
+  )
+  ## A section's own Builder appearance is capped as well.
+  section <- list(
+    viewer_content = list(
+      a = list(
+        spatial_point_appearance = list(
+          s1 = list(point_opacity = 0.8, point_size = 6)
+        )
+      )
+    )
+  )
+  expect_identical(
+    env$spatialPointAppearance(section, "a", "s1", n_cells = 3e5),
+    list(point_opacity = 0.8, point_size = 1)
+  )
+  expect_identical(
+    env$spatialPointAppearance(section, "a", "s1", n_cells = 5e4)$point_size,
+    6
+  )
+})
+
 test_that("function coordinate settings validate dataset, FOV and numeric bounds", {
   catalogs <- list(a = list(section = list()), b = list(other = list()))
   points <- list(a = list(section = list(point_size = 4, point_opacity = .6)))

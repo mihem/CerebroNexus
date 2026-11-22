@@ -12,6 +12,7 @@
   "viewerDatasetName",
   "viewerDatasetPath",
   "viewerScatterDefaults",
+  "viewerLargePointData",
   "viewerPublishChanged",
   "spatialImagePreset",
   "spatialImageSettingPreset",

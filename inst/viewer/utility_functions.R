@@ -367,7 +367,27 @@ viewerColourGroupChoices <- function(
   )
 }
 
-viewerScatterDefaults <- function(options, dataset = NULL, page = NULL) {
+## Above this many cells (option `large_data_point_size_cells`, 100,000 by
+## default) every page starts with points of size 1: at five pixels the cells
+## of a large data set cover each other and the tissue under them.
+viewerLargePointData <- function(options, n_cells) {
+  threshold <- suppressWarnings(as.numeric(
+    if (is.list(options)) options[["large_data_point_size_cells"]]
+  ))
+  if (length(threshold) != 1L || is.na(threshold) || threshold < 0) {
+    threshold <- 1e5
+  }
+  n_cells <- suppressWarnings(as.numeric(n_cells))
+  length(n_cells) == 1L && !is.na(n_cells) && n_cells > threshold
+}
+
+viewerScatterDefaults <- function(
+  options,
+  dataset = NULL,
+  page = NULL,
+  n_cells = NULL
+) {
+  large <- viewerLargePointData(options, n_cells)
   resolve <- function(key, fallback, minimum, maximum) {
     value <- options[[key]]
     if (!is.null(dataset) && !is.null(names(value))) {
@@ -398,10 +418,13 @@ viewerScatterDefaults <- function(options, dataset = NULL, page = NULL) {
   )
   # Ordinary projection views share one author configuration.
   if (!identical(page, "spatial")) {
+    if (large) {
+      defaults$point_size <- 1
+    }
     return(defaults)
   }
   list(
-    point_size = resolve("spatial_point_size", 5, 1, 20),
+    point_size = if (large) 1 else resolve("spatial_point_size", 5, 1, 20),
     point_opacity = resolve("spatial_point_opacity", 1, 0.1, 1),
     percentage_cells_to_show = resolve(
       "spatial_percentage_cells_to_show",
@@ -548,7 +571,12 @@ spatialPlotRotation <- function(options, dataset, spatial_name) {
   }
 }
 
-spatialPointAppearance <- function(options, dataset, spatial_name) {
+spatialPointAppearance <- function(
+  options,
+  dataset,
+  spatial_name,
+  n_cells = NULL
+) {
   setting <- if (
     is.list(options) &&
       .runtimeIsString(dataset) &&
@@ -560,7 +588,11 @@ spatialPointAppearance <- function(options, dataset, spatial_name) {
   } else {
     NULL
   }
-  viewerSpatialPointSetting(setting)
+  appearance <- viewerSpatialPointSetting(setting)
+  if (!is.null(appearance) && viewerLargePointData(options, n_cells)) {
+    appearance$point_size <- 1
+  }
+  appearance
 }
 
 spatialRoiSettings <- function(options, dataset, spatial_name) {
