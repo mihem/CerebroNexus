@@ -1587,6 +1587,16 @@ spatial_grid_of <- function(cells) {
   grid
 }
 
+## A data frame of x and y. data.frame() deparses a vector argument to name
+## it: 0.5 s of a grid of the 3.9 million cells of the Allen atlas.
+spatial_grid_xy_frame <- function(x, y) {
+  structure(
+    list(x = x, y = y),
+    class = "data.frame",
+    row.names = c(NA_integer_, -length(x))
+  )
+}
+
 ## The x and y columns of a section's coordinates.
 spatial_grid_xy <- function(coordinates) {
   columns <- if (all(c("x", "y") %in% colnames(coordinates))) {
@@ -1594,9 +1604,9 @@ spatial_grid_xy <- function(coordinates) {
   } else {
     1:2
   }
-  data.frame(
-    x = as.numeric(coordinates[[columns[[1L]]]]),
-    y = as.numeric(coordinates[[columns[[2L]]]])
+  spatial_grid_xy_frame(
+    as.numeric(coordinates[[columns[[1L]]]]),
+    as.numeric(coordinates[[columns[[2L]]]])
   )
 }
 
@@ -1628,7 +1638,7 @@ spatial_grid_coordinates <- function(
   stopifnot(!is.null(grid))
   ends <- cumsum(grid$counts)
   starts <- ends - grid$counts
-  frames <- vector("list", length(grid$sections))
+  xs <- ys <- vector("list", length(grid$sections))
   x_ranges <- y_ranges <- vector("list", length(grid$sections))
   for (i in seq_along(grid$sections)) {
     section <- grid$sections[[i]]
@@ -1637,18 +1647,29 @@ spatial_grid_coordinates <- function(
     x_ranges[i] <- list(spatial_grid_range(full$x))
     y_ranges[i] <- list(spatial_grid_range(full$y))
     rows <- if (grid$counts[[i]]) {
-      cells[(starts[[i]] + 1L):ends[[i]]]
+      as.integer(cells[(starts[[i]] + 1L):ends[[i]]])
     } else {
       integer()
     }
-    at <- match(rows, as.integer(index_of(section)))
+    index <- as.integer(index_of(section))
+    ## Every cell of the section in its own order (no filter, no sampling):
+    ## its positions as they are.
+    if (identical(rows, index)) {
+      xs[[i]] <- full$x
+      ys[[i]] <- full$y
+      next
+    }
+    at <- match(rows, index)
     if (anyNA(at)) {
       stop("Grid cells are not in their section: ", section)
     }
-    frames[[i]] <- full[at, , drop = FALSE]
+    xs[[i]] <- full$x[at]
+    ys[[i]] <- full$y[at]
   }
-  coordinates <- do.call(rbind, frames)
-  rownames(coordinates) <- NULL
+  coordinates <- spatial_grid_xy_frame(
+    as.numeric(unlist(xs, use.names = FALSE)),
+    as.numeric(unlist(ys, use.names = FALSE))
+  )
   list(
     coordinates = coordinates,
     sections = grid$sections,
@@ -1790,4 +1811,154 @@ spatial_grid_color_range <- function(values) {
     return(NULL)
   }
   range(values)
+}
+
+## A grid frame of many cells streams (cell_views.js, onGridRows()): the first
+## message holds every panel and the cells' names, but the positions and
+## colours of the first sections shown only; the others follow a batch of
+## sections at a time, so the first panels draw while the rest are on their
+## way. All 59 sections of the Allen atlas (3.9 million cells) drew only after
+## their 51 MB frame had arrived and been read, about 5 s.
+spatial_grid_stream_min <- 4e5
+## The cells of the first batch (a few sections, drawn about 1.5 s sooner than
+## the whole grid) and of every other.
+spatial_grid_stream_first <- 1.5e5
+spatial_grid_stream_step <- 4e5
+
+## The batches of a streaming grid: lists of indices into `counts` (the cells
+## of each section panel, in frame order). `order` names the panels in the
+## order they show; the others follow in frame order. The first batch ends at
+## `first` cells, every other at `step`; a batch is at least one section.
+spatial_grid_stream_batches <- function(
+  counts,
+  order = seq_along(counts),
+  first = spatial_grid_stream_first,
+  step = spatial_grid_stream_step
+) {
+  panels <- seq_along(counts)
+  order <- unique(as.integer(order))
+  order <- c(order[order %in% panels], setdiff(panels, order))
+  batches <- list()
+  current <- integer()
+  total <- 0
+  limit <- first
+  for (i in order) {
+    current <- c(current, i)
+    total <- total + counts[[i]]
+    if (total >= limit) {
+      batches[[length(batches) + 1L]] <- current
+      current <- integer()
+      total <- 0
+      limit <- step
+    }
+  }
+  if (length(current)) {
+    batches[[length(batches) + 1L]] <- current
+  }
+  batches
+}
+
+## The frame rows (1-based) of the section panels `batch`, given each panel's
+## 0-based `starts` and `counts`.
+spatial_grid_stream_rows <- function(batch, starts, counts) {
+  as.integer(unlist(
+    lapply(batch, function(i) starts[[i]] + seq_len(counts[[i]])),
+    use.names = FALSE
+  ))
+}
+
+## Splits the data of a grid frame (`data`, flat x, y and colours over the
+## frame's rows, one panel per section) for streaming: the first batch as the
+## head, with `grid_stream` naming its sections' rows, and part(k) the
+## positions and colours of batch k. `shown` names the sections in the order
+## they show. NULL for a frame too small to stream, or one whose colours do not
+## travel per cell (RGB, sparse or packed colours).
+spatial_grid_stream_split <- function(
+  data,
+  shown = character(),
+  min_cells = spatial_grid_stream_min,
+  ...
+) {
+  n <- length(data$x)
+  panels <- data$panels
+  if (
+    n < min_cells ||
+      !is.list(panels) ||
+      length(data$y) != n ||
+      !is.null(data$rgb) ||
+      !is.null(data$sparse_color) ||
+      !is.null(data$packed_colors)
+  ) {
+    return(NULL)
+  }
+  section_at <- which(vapply(
+    panels,
+    function(panel) !is.null(panel$section) && !is.null(panel$start),
+    logical(1)
+  ))
+  if (length(section_at) < 2L) {
+    return(NULL)
+  }
+  sections <- vapply(
+    panels[section_at],
+    function(panel) as.character(panel$section),
+    ""
+  )
+  starts <- vapply(
+    panels[section_at],
+    function(panel) as.integer(panel$start),
+    0L
+  )
+  counts <- vapply(
+    panels[section_at],
+    function(panel) as.integer(panel$count),
+    0L
+  )
+  batches <- spatial_grid_stream_batches(counts, match(shown, sections), ...)
+  if (length(batches) < 2L) {
+    return(NULL)
+  }
+  per_cell <- Filter(
+    function(field) length(data[[field]]) == n,
+    intersect(c("x", "y", "group_code", "color"), names(data))
+  )
+  projection_at <- which(vapply(
+    panels,
+    function(panel) isTRUE(panel$projection) && length(panel$x) == n,
+    logical(1)
+  ))
+  part <- function(k) {
+    batch <- batches[[k]]
+    rows <- spatial_grid_stream_rows(batch, starts, counts)
+    out <- list(
+      section = sections[batch],
+      start = starts[batch],
+      count = counts[batch]
+    )
+    for (field in per_cell) {
+      out[[field]] <- unclass(data[[field]])[rows]
+    }
+    if (length(projection_at)) {
+      projection <- panels[[projection_at[[1L]]]]
+      out$projection <- list(x = projection$x[rows], y = projection$y[rows])
+    }
+    out
+  }
+  first <- part(1L)
+  head <- data
+  for (field in per_cell) {
+    head[[field]] <- first[[field]]
+  }
+  if (length(projection_at)) {
+    head$panels[[projection_at[[1L]]]]$x <- first$projection$x
+    head$panels[[projection_at[[1L]]]]$y <- first$projection$y
+  }
+  head$grid_stream <- list(
+    rows = n,
+    section = I(first$section),
+    start = I(first$start),
+    count = I(first$count),
+    batches = length(batches)
+  )
+  list(head = head, batches = length(batches), part = part)
 }

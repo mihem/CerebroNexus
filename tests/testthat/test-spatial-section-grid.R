@@ -397,6 +397,78 @@ test_that("a grid frame holds every section, or as many as its budget takes", {
   )
 })
 
+test_that("a grid of many cells streams its sections in batches, shown first", {
+  counts <- c(30L, 20L, 40L, 10L, 50L)
+  ## The first batch ends at `first` cells, the others at `step`; sections
+  ## shown first, then the rest in frame order.
+  expect_identical(
+    spatial_grid_stream_batches(counts, c(3L, 1L), first = 50, step = 60),
+    list(c(3L, 1L), c(2L, 4L, 5L))
+  )
+  expect_identical(
+    spatial_grid_stream_batches(counts, integer(), first = 25, step = 45),
+    list(1L, c(2L, 3L), c(4L, 5L))
+  )
+  expect_identical(
+    spatial_grid_stream_batches(counts, c(9L, NA, 2L), first = 1e6),
+    list(c(2L, 1L, 3L, 4L, 5L))
+  )
+  ## A batch's rows: each section's slice of the frame in turn.
+  expect_identical(
+    spatial_grid_stream_rows(c(3L, 1L), c(0L, 30L, 50L), c(30L, 20L, 40L)),
+    c(51:90, 1:30)
+  )
+
+  ## Through the frame builder: section B1 (4 cells) is shown first, the two
+  ## of sample A follow as the second batch.
+  renderer <- section_grid_renderer()
+  renderer$spatial_grid_stream_min <- 5
+  renderer$spatial_grid_stream_first <- 4
+  renderer$spatial_grid_stream_step <- 10
+  renderer$spatial_grid_shown_sections <- function() c("sectionB1", "sectionA2")
+  streams <- list()
+  renderer$spatial_grid_stream_send <- function(stream, render_token, ...) {
+    streams[[length(streams) + 1L]] <<- stream
+  }
+  groups <- c("T", "B", "NK", "T", "B", "NK", "T", "B", "NK")
+  head <- render_section_grid(groups, renderer = renderer)
+  expect_length(streams, 1L)
+  expect_identical(
+    head$data$grid_stream[c("rows", "batches")],
+    list(rows = 9L, batches = 2L)
+  )
+  expect_identical(unclass(head$data$grid_stream$section), "sectionB1")
+  expect_identical(unclass(head$data$grid_stream$start), 5L)
+  ## The first frame carries every panel and every cell's key, but the
+  ## positions and colours of section B1 only.
+  expect_length(head$data$panels, 3L)
+  expect_length(head$data$selection_key, 9L)
+  expect_identical(as.numeric(head$data$x), c(10, 20, 30, 40) + 1000)
+  traces <- unlist(head$meta$traces)
+  frame_rows <- c(1L, 4L, 7L, 2L, 5L, 3L, 6L, 8L, 9L)
+  expect_identical(traces[head$data$group_code + 1L], groups[frame_rows][6:9])
+  rest <- streams[[1L]]$part(2L)
+  expect_identical(rest$section, c("sectionA2", "sectionA1"))
+  expect_identical(rest$start, c(3L, 0L))
+  expect_identical(rest$count, c(2L, 3L))
+  expect_identical(rest$x, c(510, 520, 10, 20, 30))
+  expect_identical(
+    traces[rest$group_code + 1L],
+    groups[frame_rows][c(4:5, 1:3)]
+  )
+  ## Until its last batch is sent a new colouring gets a whole frame.
+  again <- render_section_grid(rev(groups), renderer = renderer)
+  expect_null(again$recolor)
+  expect_length(streams, 2L)
+
+  ## A frame of fewer cells, or of one section, is sent whole.
+  renderer$spatial_grid_stream_min <- 100
+  whole <- render_section_grid(groups, renderer = renderer)
+  expect_null(whole$data$grid_stream)
+  expect_length(whole$data$x, 9L)
+  expect_length(streams, 2L)
+})
+
 test_that("a grid frame colours every section on one continuous scale", {
   ## Section A2 holds the extremes: one scale means the other sections are
   ## read against them, not stretched over their own range.
@@ -456,6 +528,14 @@ test_that("the browser shares, arranges and zooms the section grid", {
     "spatial-section-grid.js",
     viewer_test_path("www", "cell_views.js"),
     pass = "PASS synced zoom gives every shown section the same relative view"
+  )
+})
+
+test_that("the browser draws a streaming grid batch by batch", {
+  expect_node_fixture(
+    "spatial-section-grid.js",
+    viewer_test_path("www", "cell_views.js"),
+    pass = "PASS a streaming grid draws each batch of sections as it comes"
   )
 })
 

@@ -2670,6 +2670,7 @@
   }
   function draw(p, shownMask, shownCount) {
     p._resizedUndrawn = false;
+    markGridPending(p);
     var c = p.ctx; clearPanelLayers(p);
     if (needsUnderlay(p)) attachUnderlay(p);
     var underlay = p.underlayCtx || c;
@@ -2894,6 +2895,23 @@
     var state = shownState(p);
     draw(p, state.mask, state.count);
     updateResetButtons();
+  }
+  // A section of a streaming grid whose cells are still on their way shimmers;
+  // it fades in when they come.
+  function markGridPending(p) {
+    if (!p.pane) return;
+    var space = spaceById[p.spaceId];
+    var pending = !!(space && space._gridPending);
+    var was = p.pane.classList.contains('cv-pane-pending');
+    if (pending === was) return;
+    p.pane.classList.toggle('cv-pane-pending', pending);
+    if (!pending) {
+      p.pane.classList.add('cv-pane-arrived');
+      clearTimeout(p._arrivedTimer);
+      p._arrivedTimer = setTimeout(function () {
+        p.pane.classList.remove('cv-pane-arrived');
+      }, 400);
+    }
   }
   // Drop any committed lasso outlines when an interaction deliberately changes
   // what the region means (for example a new selection or selection zoom).
@@ -6770,11 +6788,13 @@
     }
     return weight ? (n / weight) * num / denom : null;
   }
-  function updateMoranBadges() {
+  // `only` (spaces by id): the panels of those spaces alone, such as the
+  // sections a streaming grid has just received.
+  function updateMoranBadges(only) {
     var continuous = continuousValues();
     panels.forEach(function (p) {
       var badge = $('cv-moran-' + p.key.toLowerCase());
-      if (!badge) return;
+      if (!badge || (only && !only[p.spaceId])) return;
       var sp = spaceById[p.spaceId];
       if (!isSpatialSpace(sp)) {
         badge.style.display = 'none'; badge.textContent = '';
@@ -8886,7 +8906,14 @@
   function singlePayloadCells(payload) {
     var keys = payload && payload.data && payload.data.selection_key;
     if (!Array.isArray(keys)) return [];
-    if (!keys.length || !Array.isArray(keys[0])) return keys.map(String);
+    if (!keys.length || !Array.isArray(keys[0])) {
+      // Names read from a cell-name resource are strings already: copying
+      // the 3.9 million of the Allen atlas took 0.3 s. Nothing writes D.cells.
+      for (var at = 0; at < keys.length; at++) {
+        if (typeof keys[at] !== 'string') return keys.map(String);
+      }
+      return keys;
+    }
     return keys.reduce(function (cells, group) {
       return cells.concat((group || []).map(String));
     }, []);
@@ -10192,6 +10219,203 @@
       return held[String(name)];
     });
   }
+  // ---- A streaming grid ----------------------------------------------------
+  // A grid of many cells comes in parts (spatial_grid_stream_split() in R): a
+  // first frame with every panel and the cells' names, but the positions and
+  // colours of the first sections shown only, then a cell_view_grid_rows
+  // message per batch of sections. The first frame is padded here to the
+  // frame's length (no position, no colour); a batch writes its rows into the
+  // stored frame and, when its frame is the one on screen, into the drawn
+  // panels, which then draw again. A batch that comes before its frame is
+  // drawn waits for it.
+  var GRID_ROW_FIELDS = { x: NaN, y: NaN, color: NaN, group_code: -1 };
+  var gridRowsWaiting = [];
+  var gridLive = null;
+  function gridStreamProjection(data) {
+    return (data.panels || []).filter(function (panel) {
+      return panel && panel.projection;
+    })[0] || null;
+  }
+  function gridStreamArray(values, n, fill) {
+    var Vector = fill === -1 ? Int32Array
+      : values instanceof Float32Array ? Float32Array : Float64Array;
+    return new Vector(n).fill(fill);
+  }
+  // Writes the rows of `part` (its sections' starts and counts, and their
+  // values in that order) into the frame `data`.
+  function gridStreamWrite(data, part) {
+    var stream = data.grid_stream;
+    var sections = [].concat(part.section), starts = [].concat(part.start),
+      counts = [].concat(part.count);
+    var projection = gridStreamProjection(data);
+    var write = function (target, values) {
+      if (!target || !values) return;
+      for (var s = 0, offset = 0; s < starts.length; s++) {
+        var start = Number(starts[s]), count = Number(counts[s]);
+        for (var k = 0; k < count; k++) target[start + k] = values[offset + k];
+        offset += count;
+      }
+    };
+    Object.keys(GRID_ROW_FIELDS).forEach(function (field) {
+      if (part[field] != null) write(data[field], part[field]);
+    });
+    if (projection && part.projection) {
+      write(projection.x, part.projection.x);
+      write(projection.y, part.projection.y);
+    }
+    sections.forEach(function (section) { stream.loaded[String(section)] = true; });
+    if (part.done) stream.done = true;
+  }
+  // The first frame of a stream, at full length: its own rows in place.
+  function gridStreamExpand(data) {
+    var stream = data && data.grid_stream;
+    if (!stream || stream.loaded) return;
+    var n = Number(stream.rows);
+    var projection = gridStreamProjection(data);
+    var part = { section: stream.section, start: stream.start, count: stream.count };
+    Object.keys(GRID_ROW_FIELDS).forEach(function (field) {
+      if (data[field] == null) return;
+      part[field] = data[field];
+      data[field] = gridStreamArray(data[field], n, GRID_ROW_FIELDS[field]);
+    });
+    if (projection) {
+      part.projection = { x: projection.x, y: projection.y };
+      projection.x = gridStreamArray(projection.x, n, NaN);
+      projection.y = gridStreamArray(projection.y, n, NaN);
+    }
+    stream.loaded = {};
+    stream.done = Number(stream.batches) <= 1;
+    gridStreamWrite(data, part);
+  }
+  function gridStreamPending(data, section) {
+    var stream = data && data.grid_stream;
+    return !!(stream && stream.loaded && !stream.done &&
+      !stream.loaded[String(section)]);
+  }
+  // Batches waiting for the frame `view` now holds go into it; those of
+  // older frames are dropped.
+  function drainGridRows(id, view) {
+    var token = Number(view.render_token);
+    gridRowsWaiting = gridRowsWaiting.filter(function (part) {
+      if (part.id !== id) return true;
+      var partToken = Number(part.render_token);
+      if (partToken === token && view.data && view.data.grid_stream) {
+        gridStreamWrite(view.data, part);
+        return false;
+      }
+      return partToken > token;
+    });
+  }
+  // The drawn panels of the batch's sections take its rows and draw again.
+  function gridStreamPaint(part) {
+    var live = gridLive;
+    if (!live || live.D !== D || singleActive !== part.id) return;
+    var group = catOf(live.mode), field = fieldForMode(live.mode);
+    var levels = group ? group.levels.length : 0;
+    var starts = [].concat(part.start), counts = [].concat(part.count);
+    var map = live.rows, touched = {};
+    // Each value of the batch at its cell of the view.
+    var copy = function (target, values) {
+      if (!target || !values) return;
+      for (var s = 0, offset = 0; s < starts.length; s++) {
+        var start = Number(starts[s]), count = Number(counts[s]), k, at;
+        if (!map) {
+          for (k = 0; k < count; k++) target[start + k] = values[offset + k];
+        } else {
+          for (k = 0; k < count; k++) {
+            at = map[start + k];
+            if (at != null) target[at] = values[offset + k];
+          }
+        }
+        offset += count;
+      }
+    };
+    var written = [];
+    [].concat(part.section).forEach(function (section) {
+      (live.spaces[String(section)] || []).forEach(function (spaceId) {
+        var space = spaceById[spaceId];
+        if (!space) return;
+        // Sections share one pair of arrays (sharedSliceGeometry()).
+        if (space.x !== live.data.x && written.indexOf(space.x) < 0) {
+          written.push(space.x);
+          copy(space.x, part.x);
+          copy(space.y, part.y);
+        }
+        space._gridPending = false;
+        space._unit = null;
+        touched[spaceId] = true;
+      });
+    });
+    if (group && part.group_code) {
+      var codes = part.group_code;
+      if (ArrayBuffer.isView(codes)) {
+        // Codes out of range read as no group (-1), as the frame's do.
+        var clean = new Int32Array(codes.length);
+        for (var c = 0; c < codes.length; c++) {
+          var code = codes[c];
+          clean[c] = code >= 0 && code < levels ? code : -1;
+        }
+        codes = clean;
+      } else {
+        codes = Array.prototype.map.call(codes, function (value) {
+          var code = Number(value);
+          return code >= 0 && code < levels ? code : -1;
+        });
+      }
+      copy(group.values, codes);
+    }
+    if (field && part.color && field.v) {
+      var span = (field.max - field.min) || 1, scale = field.scale || 1000;
+      var quantised = new Array(part.color.length);
+      for (var q = 0; q < part.color.length; q++) {
+        var value = Number(part.color[q]);
+        quantised[q] = isFinite(value)
+          ? Math.round(Math.max(0, Math.min(1, (value - field.min) / span)) * scale)
+          : null;
+      }
+      if (field.raw && field.raw !== live.data.color) copy(field.raw, part.color);
+      copy(field.v, quantised);
+    }
+    var projection = live.projection && spaceById[live.projection];
+    if (projection && part.projection) {
+      if (projection.x !== gridStreamProjection(live.data).x) {
+        copy(projection.x, part.projection.x);
+        copy(projection.y, part.projection.y);
+      }
+      // Every cell is in the embedding: it draws again only now and then.
+      live.projectionRows = (live.projectionRows || 0) + 1;
+      if (part.done || live.projectionRows % 4 === 0) {
+        projection._unit = null;
+        touched[live.projection] = true;
+      }
+    }
+    if (part.done && group) legendCounts.delete(group.values);
+    panels.forEach(function (p) {
+      if (!p.spaceId || !touched[p.spaceId]) return;
+      p.gpuDataState = null; p.miniBg = null;
+      project(p);
+      drawPanel(p);
+    });
+    updateMoranBadges(touched);
+    if (part.done) {
+      gridLive = null;
+      renderLegend();
+    }
+  }
+  function onGridRows(buffer) {
+    var part = window.CBViewWire.unpack(buffer);
+    if (!part || !part.id || !datasetMessageFresh(part)) return;
+    var view = singleView(part.id, part.dataset_context);
+    var token = Number(part.render_token);
+    if (!view || !view.data || Number(view.render_token) < token ||
+        !view.data.grid_stream) {
+      gridRowsWaiting.push(part);
+      return;
+    }
+    if (Number(view.render_token) !== token) return;
+    gridStreamWrite(view.data, part);
+    gridStreamPaint(part);
+  }
   // Columns asked for, or null for the automatic packing.
   function gridColumnsChoice(count) {
     if (!sectionGridActive()) return null;
@@ -10670,7 +10894,10 @@
       };
       if (slice) space._cells = sharedSlice || sliceCells();
       // A section of the Spatial grid: the browser orders and hides these.
-      if (panel.section != null) space._gridSection = String(panel.section);
+      if (panel.section != null) {
+        space._gridSection = String(panel.section);
+        if (gridStreamPending(data, panel.section)) space._gridPending = true;
+      }
       if (cellBoundaries.length) {
         var panelCells = new Set(panelKeys.map(String));
         space.cellBoundaries = cellBoundaries.filter(function (boundary) {
@@ -10745,6 +10972,20 @@
       spaces.push(spaceId);
       modes[spaceId] = mode;
     });
+    gridLive = null;
+    if (data.grid_stream && !data.grid_stream.done && !channelModes) {
+      gridLive = { data: data, D: D, mode: mode, spaces: {}, projection: null,
+        rows: positional ? null : (frameRows || alignedRows(keys)) };
+      spaces.forEach(function (spaceId) {
+        var space = spaceById[spaceId];
+        if (space._gridSection != null) {
+          (gridLive.spaces[space._gridSection] =
+            gridLive.spaces[space._gridSection] || []).push(spaceId);
+        } else if (space._projectionName) {
+          gridLive.projection = spaceId;
+        }
+      });
+    }
     return { spaces: spaces, modes: modes };
   }
   function buildSingleSpaces(id, payload) {
@@ -11290,6 +11531,7 @@
     var hover = message.hover || {};
     var extra = message.extra || {};
     meta = meta || {}; data = data || {};
+    gridStreamExpand(data);
     var host = singleHost(id), keys = data.selection_key || [];
     var pointCount = data.n != null ? Number(data.n) : (Array.isArray(keys[0])
       ? keys.reduce(function (total, values) { return total + values.length; }, 0)
@@ -11324,6 +11566,7 @@
       background_identity_value: backgroundIdentityValue
     });
     singleViews[cacheKey].unrequested = unrequested;
+    drainGridRows(id, singleViews[cacheKey]);
     if (changedGroup) singleViews[cacheKey].hiddenGroups = [];
     if (data.reset_axes) singleViews[cacheKey].lenses = [];
     var pending = singleViews[cacheKey].pendingSavedState;
@@ -11566,6 +11809,10 @@
     return Object.freeze({
       sections: singleGridSpaces.map(label),
       shown: singleSpaceIds.map(label),
+      // Shown sections whose cells a streaming grid has still to send.
+      pending: singleSpaceIds.filter(function (spaceId) {
+        return !!(spaceById[spaceId] && spaceById[spaceId]._gridPending);
+      }).map(label),
       cells: singleSpaceIds.map(function (spaceId) {
         var space = spaceById[spaceId];
         return space && space._cells ? space._cells.length : D.n;
@@ -13476,6 +13723,7 @@
       recolorSingle(window.CBViewWire.unpack(buffer));
     });
     Shiny.addCustomMessageHandler('cell_view_aux_binary', onSingleAuxBinary);
+    Shiny.addCustomMessageHandler('cell_view_grid_rows', onGridRows);
     Shiny.addCustomMessageHandler(
       'cell_view_resource_catalog',
       function (message) {

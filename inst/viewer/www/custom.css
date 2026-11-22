@@ -3303,8 +3303,22 @@ body.cerebro-composition-collapsed .cerebro-selection-composition-row {
 @keyframes cv-skeleton-in { from { opacity: 0; } to { opacity: 1; } }
 .cv-panes.cv-panes-pending { visibility: hidden; }
 .cv-panes.cv-panes-enter { animation: cv-skeleton-in 260ms ease-out; }
+/* A section of a streaming grid whose cells are on their way (cell_views.js,
+   markGridPending()) shimmers like the skeleton, and its points fade in. */
+.coordviews-page .cv-pane.cv-pane-pending .cv-canvas-wrap::after {
+  content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(100deg, var(--c-surface-2) 30%, #fafafa 50%, var(--c-surface-2) 70%);
+  background-size: 300% 100%;
+  animation: cv-skeleton-shimmer 1.2s linear infinite;
+}
+.coordviews-page .cv-pane.cv-pane-arrived .cv-canvas-wrap {
+  animation: cv-skeleton-in 300ms ease-out;
+}
 @media (prefers-reduced-motion: reduce) {
-  .cv-grid-skeleton, .cv-grid-skeleton-plot, .cv-panes.cv-panes-enter { animation: none; }
+  .cv-grid-skeleton, .cv-grid-skeleton-plot, .cv-panes.cv-panes-enter,
+  .coordviews-page .cv-pane.cv-pane-pending .cv-canvas-wrap::after,
+  .coordviews-page .cv-pane.cv-pane-arrived .cv-canvas-wrap { animation: none; }
 }
 .cerebro-viz-toolbar .spatial-roi-background-picker {
   flex: 0 1 var(--c-control-width);

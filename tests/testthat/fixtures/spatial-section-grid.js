@@ -264,3 +264,66 @@ assert.strictEqual(square.thumb, square.side + 58);
 assert.strictEqual(focusGridPacking(6, 900, 1300, 18, 58, 8, 0.5).place, 'left');
 assert.strictEqual(focusGridPacking(6, 900, 1300, 18, 58, 8, 2).place, 'below');
 console.log('PASS an enlarged panel is a photo with a scrolling strip below or to the left');
+
+// ---- a streaming grid ----------------------------------------------------------
+// The first frame holds section B's rows only; A and C follow as batches.
+var streamed = {
+  x: Float32Array.from([40, 50]), y: Float32Array.from([4, 5]),
+  group_code: Int8Array.from([1, 0]),
+  panels: [
+    { id: 'projection', projection: true, x: [0.4, 0.5], y: [-4, -5] },
+    { section: 'A', start: 0, count: 3 }, { section: 'B', start: 3, count: 2 },
+    { section: 'C', start: 5, count: 4 }
+  ],
+  grid_stream: { rows: 9, section: ['B'], start: [3], count: [2], batches: 3 }
+};
+gridStreamExpand(streamed);
+assert.strictEqual(streamed.x.length, 9, 'the first frame takes the frame length');
+assert.ok(streamed.x instanceof Float32Array, 'in the precision sent');
+assert.deepStrictEqual(Array.from(streamed.x.slice(3, 5)), [40, 50]);
+assert.ok(isNaN(streamed.x[0]) && isNaN(streamed.x[8]), 'cells still to come have no position');
+assert.deepStrictEqual(Array.from(streamed.group_code), [-1, -1, -1, 1, 0, -1, -1, -1, -1]);
+assert.strictEqual(streamed.panels[0].x.length, 9, 'the embedding too');
+assert.deepStrictEqual(Array.from(streamed.panels[0].x.slice(3, 5)), [0.4, 0.5]);
+assert.strictEqual(gridStreamPending(streamed, 'A'), true);
+assert.strictEqual(gridStreamPending(streamed, 'B'), false);
+gridStreamExpand(streamed);
+assert.strictEqual(streamed.x[3], 40, 'a frame is padded once');
+// Batches of an older frame are dropped, those of another view kept, those
+// of this frame written.
+var partA = { id: 'spatial_projection', render_token: 5, section: 'A', start: 0, count: 3,
+  x: [10, 20, 30], y: [1, 2, 3], group_code: [2, 2, 0], projection: { x: [0.1, 0.2, 0.3], y: [-1, -2, -3] } };
+gridRowsWaiting = [partA, { id: 'spatial_projection', render_token: 4 }, { id: 'expression_projection', render_token: 1 }];
+drainGridRows('spatial_projection', { render_token: 5, data: streamed });
+assert.deepStrictEqual(gridRowsWaiting.map(function (part) { return part.id; }), ['expression_projection']);
+assert.deepStrictEqual(Array.from(streamed.x.slice(0, 5)), [10, 20, 30, 40, 50]);
+assert.deepStrictEqual(Array.from(streamed.group_code.slice(0, 3)), [2, 2, 0]);
+assert.strictEqual(gridStreamPending(streamed, 'A'), false);
+assert.strictEqual(gridStreamPending(streamed, 'C'), true);
+// The last batch, drawn: the panel of C takes its positions and group codes,
+// draws again and no longer waits; the legend counts every cell.
+var groupValues = new Array(9).fill(-1), groupC = { values: groupValues, levels: ['a', 'b', 'c'] };
+var catOf = function () { return groupC; }, fieldForMode = function () { return null; };
+var legendCounts = new Map([[groupValues, 'stale']]);
+function renderLegend() { calls.push('legend'); }
+function updateMoranBadges(only) { calls.push('moran:' + Object.keys(only).join(',')); }
+var sharedX = new Float32Array(9).fill(NaN), sharedY = new Float32Array(9).fill(NaN);
+spaceById = { sC: { x: sharedX, y: sharedY, _gridPending: true, _unit: {} } };
+panels = [{ key: 'C', spaceId: 'sC' }];
+gridLive = { data: streamed, D: D, mode: 'g', spaces: { C: ['sC'] }, projection: null, rows: null };
+calls = [];
+var partC = { id: 'spatial_projection', render_token: 5, section: 'C', start: 5, count: 4,
+  x: [60, 70, 80, 90], y: [6, 7, 8, 9], group_code: Int8Array.from([1, 9, -1, 0]), done: true };
+gridStreamWrite(streamed, partC);
+gridStreamPaint(partC);
+assert.deepStrictEqual(Array.from(sharedX.slice(5)), [60, 70, 80, 90]);
+assert.strictEqual(spaceById.sC._gridPending, false);
+assert.strictEqual(spaceById.sC._unit, null, 'its extent is measured anew');
+assert.deepStrictEqual(groupValues.slice(5), [1, -1, -1, 0], 'a code beyond the levels is no group');
+assert.deepStrictEqual(calls, ['project:C', 'draw:C', 'moran:sC', 'legend'],
+  "its Moran's I is measured once its cells are in");
+assert.strictEqual(legendCounts.has(groupValues), false);
+assert.strictEqual(gridLive, null, 'the stream is over');
+assert.strictEqual(streamed.grid_stream.done, true);
+assert.strictEqual(gridStreamPending(streamed, 'C'), false);
+console.log('PASS a streaming grid draws each batch of sections as it comes');

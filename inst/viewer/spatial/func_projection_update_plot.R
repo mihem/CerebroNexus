@@ -21,6 +21,9 @@ spatial_projection_drawn_hulls <- list()
 ## (NULL for any other frame): a new colouring of the same grid sends only its
 ## colours.
 spatial_grid_drawn_geometry <- NULL
+## Counts the frames sent; the batches of a streaming grid stop once it moves
+## on (spatial_grid_stream_send()).
+spatial_grid_stream_serial <- 0L
 
 ##----------------------------------------------------------------------------##
 ## Function that updates projections.
@@ -95,6 +98,8 @@ spatial_background_render_payload <- function(
 }
 
 spatial_projection_update_plot <- function(input) {
+  ## A new frame ends the batches of a grid still streaming.
+  spatial_grid_stream_serial <<- spatial_grid_stream_serial + 1L
   ## assign input data to new variables
   dataset_context <- input[["dataset_context"]]
   metadata <- input[['cells_df']]
@@ -625,7 +630,17 @@ spatial_projection_update_plot <- function(input) {
     return(invisible(NULL))
   }
   spatial_grid_drawn_geometry <<- grid_geometry
-  cerebroCellViewRender(
+  ## A grid of many cells streams: the sections shown first draw at once, the
+  ## others as their batches arrive. Until the last is sent a new colouring
+  ## gets a whole frame, since a recolour holds the colours of every cell.
+  stream <- if (is.list(grid)) {
+    spatial_grid_stream_split(payload$data, spatial_grid_shown_sections())
+  }
+  if (!is.null(stream)) {
+    payload$data <- stream$head
+    spatial_grid_drawn_geometry <<- NULL
+  }
+  render_token <- cerebroCellViewRender(
     "spatial_projection",
     payload[["meta"]],
     payload[["data"]],
@@ -638,4 +653,87 @@ spatial_projection_update_plot <- function(input) {
     feedback = input[["feedback"]],
     aux_key = aux_key(aux_rows)
   )
+  if (!is.null(stream)) {
+    spatial_grid_stream_send(
+      stream,
+      render_token,
+      input[["dataset_context"]],
+      grid_geometry
+    )
+  }
+  invisible(render_token)
+}
+
+## The sections the Sections field shows, in its order (the browser lays the
+## grid out by it).
+spatial_grid_shown_sections <- function() {
+  tryCatch(
+    as.character(
+      shiny::isolate(
+        session$input[["spatial_projection_sections"]]
+      ) %||%
+        character()
+    ),
+    error = function(error) character()
+  )
+}
+
+## Sends batches 2, 3, ... of a streaming grid (spatial_grid_stream_split()),
+## each in its own turn of the event loop so that the session answers its
+## inputs in between. A newer frame of the page stops them; the browser drops
+## the rows of a frame it no longer shows. After the last, a new colouring of
+## the grid sends only its colours.
+spatial_grid_stream_send <- function(
+  stream,
+  render_token,
+  dataset_context,
+  geometry
+) {
+  serial <- spatial_grid_stream_serial
+  context <- viewerDatasetContext(
+    dataset_context$epoch,
+    dataset_context$dataset_key,
+    dataset_context$generation
+  )
+  send <- function(k) {
+    if (
+      !identical(serial, spatial_grid_stream_serial) ||
+        isTRUE(tryCatch(session$isClosed(), error = function(error) TRUE))
+    ) {
+      return(invisible(NULL))
+    }
+    part <- stream$part(k)
+    last <- k >= stream$batches
+    message <- list(
+      id = "spatial_projection",
+      dataset_context = context,
+      render_token = render_token,
+      batch = k,
+      done = last,
+      section = I(part$section),
+      start = I(part$start),
+      count = I(part$count)
+    )
+    for (field in intersect(
+      c("x", "y", "group_code", "color", "projection"),
+      names(part)
+    )) {
+      message[[field]] <- if (is.list(part[[field]])) {
+        lapply(part[[field]], function(values) I(unname(values)))
+      } else {
+        I(unname(part[[field]]))
+      }
+    }
+    session$sendBinaryMessage(
+      "cell_view_grid_rows",
+      cv_wire_pack_message(message)
+    )
+    if (last) {
+      spatial_grid_drawn_geometry <<- geometry
+    } else {
+      later::later(function() send(k + 1L), 0)
+    }
+    invisible(NULL)
+  }
+  later::later(function() send(2L), 0)
 }
