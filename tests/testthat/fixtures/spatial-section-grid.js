@@ -390,3 +390,43 @@ var sequence = panelPaintSequence(own, allOrder);
 assert.deepStrictEqual(Array.from(sequence).map(function (slot) { return own[slot]; }), [11, 7, 2, 5]);
 assert.strictEqual(panelPaintSequence(own, allOrder), sequence, 'kept for the same order');
 console.log('PASS a panel of some cells keeps its maps over its own cells');
+
+// ---- Moran's I finds each cell's six nearest through buckets ---------------------
+eval(between('  function sixNearest(', '  function spatialMoran('));
+// What comparing every pair gives: nearest first, the lower index first at
+// one distance.
+function sixNearestPairs(px, py) {
+  var n = px.length, out = [];
+  for (var i = 0; i < n; i++) {
+    var nearest = [];
+    for (var j = 0; j < n; j++) {
+      if (j === i) continue;
+      var dx = px[i] - px[j], dy = py[i] - py[j], d = dx * dx + dy * dy;
+      var at = nearest.length;
+      while (at > 0 && nearest[at - 1].d > d) at--;
+      nearest.splice(at, 0, { j: j, d: d });
+      if (nearest.length > 6) nearest.pop();
+    }
+    out.push(nearest);
+  }
+  return out;
+}
+var seed = 7;
+function random() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+[
+  // scattered, on a lattice (many equal distances), clumped, and a line
+  { n: 1000, at: function () { return [random() * 900, random() * 400]; } },
+  { n: 600, at: function () { return [Math.floor(random() * 30), Math.floor(random() * 20)]; } },
+  { n: 400, at: function () { var c = random() < 0.5 ? 0 : 1000; return [c + random(), c + random()]; } },
+  { n: 50, at: function () { return [Math.floor(random() * 10), 0]; } },
+  { n: 7, at: function () { return [1, 1]; } }
+].forEach(function (shape) {
+  var px = new Float64Array(shape.n), py = new Float64Array(shape.n);
+  for (var k = 0; k < shape.n; k++) { var p = shape.at(); px[k] = p[0]; py[k] = p[1]; }
+  var fast = sixNearest(px, py), pairs = sixNearestPairs(px, py);
+  for (var q = 0; q < shape.n; q++) {
+    assert.deepStrictEqual(fast[q].map(function (e) { return e.j; }),
+      pairs[q].map(function (e) { return e.j; }), 'point ' + q + ' of ' + shape.n);
+  }
+});
+console.log("PASS Moran's I finds each cell's six nearest through buckets");

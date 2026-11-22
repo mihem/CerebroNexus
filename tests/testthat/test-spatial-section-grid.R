@@ -638,6 +638,14 @@ test_that("a panel of some cells keeps its maps over its own cells", {
   )
 })
 
+test_that("Moran's I finds each cell's six nearest as comparing every pair does", {
+  expect_node_fixture(
+    "spatial-section-grid.js",
+    viewer_test_path("www", "cell_views.js"),
+    pass = "PASS Moran's I finds each cell's six nearest through buckets"
+  )
+})
+
 test_that("the author's Spatial layout is a display setting, grid only with sections", {
   ## Older projects and Apps carry no layout: they open one section.
   expect_identical(builderViewerDisplayDefaults()$spatial_layout, "single")
