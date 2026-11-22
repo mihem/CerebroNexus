@@ -107,3 +107,30 @@ viewerAddTcellDemo <- function(
     "Zheng et al. pan-cancer T cells (398K + TCR)"
   )
 }
+
+## The four-stain microscopy composite is embedded in the CRB itself, so the
+## menu entry only adds the dataset and sizes the cell dots for 63,000 cells:
+## small and nearly opaque, so the clusters read clearly while the tissue still
+## shows between them. (External images are served only from inside the app's
+## own folders, so a cache-resident PNG would be silently refused.)
+viewerAddXeniumPrimeDemo <- function(
+  options,
+  path = Sys.getenv("CEREBRO_XENIUM_PRIME_DEMO_CRB", unset = "")
+) {
+  if (!nzchar(path)) {
+    return(options)
+  }
+  label <- "Mouse brain (Xenium Prime 5K)"
+  options <- viewerAddLargeDemo(
+    options,
+    path,
+    "CEREBRO_XENIUM_PRIME_DEMO_CRB",
+    label,
+    point_size = 2,
+    point_opacity = 0.8
+  )
+  options[["viewer_content"]][[label]][["spatial_point_appearance"]] <- list(
+    coronal = list(point_size = 2, point_opacity = 0.9)
+  )
+  options
+}

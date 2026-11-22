@@ -8476,9 +8476,18 @@
     var data = message && message.data;
     if (!frameNeedsCellNames(message)) return Promise.resolve(message);
     return fetchCellNames(data.cell_names_resource, message.dataset_identity).then(function (entry) {
-      var rows = data.selection_index;
+      // Contiguous rows travel as a range, rows of the frame's Viewer Pack
+      // subset as a mark (cerebroCellViewDeferredAux()).
+      var rows = expandRowRange(data.selection_index);
+      if (rows && String(rows.kind) === 'frame_subset') {
+        rows = frameSubsetRows(message, entry.names.length, Number(rows.length));
+      }
+      var nested = Array.isArray(rows) && rows.length && typeof rows[0] !== 'number';
       var resolved = Object.assign({}, data, {
-        selection_key: namesAt(entry.names, rows), selection_rows: rows
+        selection_key: nested
+          ? rows.map(function (group) { return namesAt(entry.names, group); })
+          : namesAt(entry.names, rows),
+        selection_rows: rows
       });
       delete resolved.selection_index;
       delete resolved.cell_names_resource;
