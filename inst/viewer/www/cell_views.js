@@ -2234,6 +2234,59 @@
       (space.hulls && space.hulls.length)));
   }
 
+  // A panel of some of the cells (a section) keeps its vertex map over its own
+  // cells, in the order of `_cells` (canonical order): slot `k` is the cell
+  // `_cells[k]`. A map over every cell was 15.6 MB a panel for the 3.9 million
+  // cells of the Allen atlas, 0.9 GB for its 59 sections.
+  function sortedIndexOf(sorted, value) {
+    var lo = 0, hi = sorted.length - 1;
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1, at = sorted[mid];
+      if (at === value) return mid;
+      if (at < value) lo = mid + 1; else hi = mid - 1;
+    }
+    return -1;
+  }
+  // Calls fn(slot, cell) for each cell of `selection` the panel holds.
+  function forEachHeldCell(selection, cells, fn) {
+    if (!cells) { selection.forEach(function (cell) { fn(cell, cell); }); return; }
+    // Few selected cells: look each up; many: walk the panel's own cells.
+    if (selection.size * 16 < cells.length) {
+      selection.forEach(function (cell) {
+        var slot = sortedIndexOf(cells, cell);
+        if (slot >= 0) fn(slot, cell);
+      });
+      return;
+    }
+    for (var slot = 0; slot < cells.length; slot++) {
+      if (selection.has(cells[slot])) fn(slot, cells[slot]);
+    }
+  }
+  // The order a panel of some cells draws them in under a paint order (the
+  // highest values last): positions into its `_cells`, by their rank in the
+  // order of every cell. Visiting every cell of the data set in each panel
+  // took 59 x 3.9 million steps to colour the Allen sections by a gene.
+  var paintRank = { order: null, rank: null };
+  var paintSequences = typeof WeakMap === 'function' ? new WeakMap() : null;
+  function panelPaintSequence(cells, order) {
+    var cached = paintSequences && paintSequences.get(cells);
+    if (cached && cached.order === order) return cached.seq;
+    if (paintRank.order !== order) {
+      var rank = new Int32Array(D.n);
+      for (var r = 0; r < order.length; r++) rank[order[r]] = r;
+      paintRank = { order: order, rank: rank };
+    }
+    var ranks = paintRank.rank, k = cells.length, pos;
+    // rank * k + position sorts numerically, without a comparator.
+    var keys = new Float64Array(k);
+    for (pos = 0; pos < k; pos++) keys[pos] = ranks[cells[pos]] * k + pos;
+    keys.sort();
+    var seq = new Int32Array(k);
+    for (pos = 0; pos < k; pos++) seq[pos] = keys[pos] % k;
+    if (paintSequences) paintSequences.set(cells, { order: order, seq: seq });
+    return seq;
+  }
+
   function updateGpuSelection(p, state, hiSet) {
     var previous = p.gpuData, oldState = p.gpuDataState;
     if (!previous || !oldState || !previous.opaque || !previous.vertexIndex ||
@@ -2248,8 +2301,8 @@
     var alpha = Math.round(255 * (hiSet ? 0.05 : pointOpacityOf(p)));
     for (var i = 0; i < previous.count; i++) colors[i * 4 + 3] = alpha;
     var foreground = false;
-    if (hiSet) hiSet.forEach(function (cell) {
-      var vertex = previous.vertexIndex[cell] - 1;
+    if (hiSet) forEachHeldCell(hiSet, previous.vertexCells, function (slot) {
+      var vertex = previous.vertexIndex[slot] - 1;
       if (!(vertex >= 0)) return;
       colors[vertex * 4 + 3] = Math.round(255 * 0.95);
       layers[vertex] = 1; foreground = true;
@@ -2257,7 +2310,8 @@
     p.gpuDataState = state;
     p.gpuData = {positions: previous.positions, colors: colors, layers: layers,
       count: previous.count, foreground: foreground, opaque: true,
-      vertexIndex: previous.vertexIndex, ordered: previous.ordered};
+      vertexIndex: previous.vertexIndex, vertexCells: previous.vertexCells,
+      ordered: previous.ordered};
     return p.gpuData;
   }
 
@@ -2276,11 +2330,12 @@
         })) return null;
     var n = D.n, vertexIndex = previous.vertexIndex, space = spaceById[p.spaceId];
     var cells = space && space._cells && space._cells.length <= n ? space._cells : null;
+    if ((previous.vertexCells || null) !== cells) return null;
     var visits = cells ? cells.length : n, drawn = 0, at, i;
     for (at = 0; at < visits; at++) {
       i = cells ? cells[at] : at;
       var shown = !!(unit.ok[i] && shownMask[i]);
-      if (shown !== (vertexIndex[i] > 0)) return null;
+      if (shown !== (vertexIndex[at] > 0)) return null;
       if (shown) drawn++;
     }
     if (drawn !== previous.count) return null;
@@ -2301,7 +2356,7 @@
     var opacity = pointOpacityOf(p), opaque = true, foreground = false;
     for (at = 0; at < visits; at++) {
       i = cells ? cells[at] : at;
-      var vertex = vertexIndex[i] - 1;
+      var vertex = vertexIndex[at] - 1;
       if (vertex < 0) continue;
       var fg = !!(hiSet && hiSet.has(i));
       var alpha = hiSet ? (fg ? 0.95 : 0.05) : opacity;
@@ -2330,7 +2385,7 @@
     p.gpuDataState = state;
     p.gpuData = {positions: previous.positions, colors: colors, layers: layers,
       count: previous.count, foreground: foreground, opaque: opaque,
-      vertexIndex: vertexIndex, ordered: false};
+      vertexIndex: vertexIndex, vertexCells: cells, ordered: false};
     return p.gpuData;
   }
 
@@ -2347,12 +2402,15 @@
     var shared = window.CerebroSharedDatasetState;
     var sharedName = null;
     var currentSpace = spaceById[p.spaceId];
-    // A spatial scene's panel visits and uploads only the scene's cells.
-    var cells = !order && currentSpace && currentSpace._cells &&
+    // A spatial scene's panel visits and uploads only the scene's cells, in
+    // a paint order through its own list (panelPaintSequence()). A vertex
+    // slot is a position in that list, else the cell itself.
+    var cells = currentSpace && currentSpace._cells &&
       currentSpace._cells.length <= n ? currentSpace._cells : null;
-    var visits = cells ? cells.length : n;
+    var seq = cells && order ? panelPaintSequence(cells, order) : null;
+    var visits = cells ? cells.length : n, slot;
     var capacity = cells ? Math.min(shownCount, cells.length) : shownCount;
-    if (shared && shownCount === n && !order && currentSpace) {
+    if (shared && shownCount === n && !order && !cells && currentSpace) {
       Object.keys(shared.projections || {}).some(function (name) {
         var projection = shared.projections[name];
         if (projection.x !== currentSpace.x || projection.y !== currentSpace.y) return false;
@@ -2378,7 +2436,7 @@
           PAL[index % PAL.length]);
       }) : null;
     var missingCategoricalRgba = categoricalGroup ? gpuColor('#cccccc') : null;
-    var vertexIndex = rgb ? null : new Int32Array(n), opaque = true;
+    var vertexIndex = rgb ? null : new Int32Array(cells ? cells.length : n), opaque = true;
     var foreground = false, out = 0;
     var pending = unit._pending, cmx = 0, cmy = 0, validCount = 0;
     var singleGroup = !order && !hiSet && !rgb && shownCount === n &&
@@ -2397,6 +2455,7 @@
       } else {
         for (var visit = 0; visit < visits; visit++) {
           var i = cells ? cells[visit] : visit;
+          slot = visit;
           if (pending) {
             var x = pending.x[i], y = pending.y[i];
             if (x != null && y != null && isFinite(x) && isFinite(y)) {
@@ -2408,7 +2467,7 @@
             }
           }
           if (!unit.ok[i]) continue;
-          if (vertexIndex) vertexIndex[i] = out + 1;
+          if (vertexIndex) vertexIndex[slot] = out + 1;
           positions[out * 2] = unit.nx[i];
           positions[out * 2 + 1] = unit.ny[i];
           out++;
@@ -2436,7 +2495,8 @@
       var levelCount = levelWords.length, words = new Uint32Array(colors.buffer);
       var levelValues = categoricalGroup.values;
       for (var cat_at = 0; cat_at < visits; cat_at++) {
-        i = order ? order[cat_at] : cells ? cells[cat_at] : cat_at;
+        slot = cells ? (seq ? seq[cat_at] : cat_at) : (order ? order[cat_at] : cat_at);
+        i = cells ? cells[slot] : slot;
         if (pending) {
           x = pending.x[i]; y = pending.y[i];
           if (x != null && y != null && isFinite(x) && isFinite(y)) {
@@ -2448,7 +2508,7 @@
           }
         }
         if (!unit.ok[i] || !shownMask[i]) continue;
-        vertexIndex[i] = out + 1;
+        vertexIndex[slot] = out + 1;
         positions[out * 2] = unit.nx[i];
         positions[out * 2 + 1] = unit.ny[i];
         var level = levelValues[i];
@@ -2473,7 +2533,8 @@
           (Math.round(rgba[3] * stepAlpha) << 24)) >>> 0;
       };
       for (var step_at = 0; step_at < visits; step_at++) {
-        i = order ? order[step_at] : cells ? cells[step_at] : step_at;
+        slot = cells ? (seq ? seq[step_at] : step_at) : (order ? order[step_at] : step_at);
+        i = cells ? cells[slot] : slot;
         if (pending) {
           x = pending.x[i]; y = pending.y[i];
           if (x != null && y != null && isFinite(x) && isFinite(y)) {
@@ -2485,7 +2546,7 @@
           }
         }
         if (!unit.ok[i] || !shownMask[i]) continue;
-        vertexIndex[i] = out + 1;
+        vertexIndex[slot] = out + 1;
         positions[out * 2] = unit.nx[i];
         positions[out * 2 + 1] = unit.ny[i];
         var value = scale.values[i];
@@ -2509,7 +2570,8 @@
       }
     } else {
       for (var at = 0; at < visits; at++) {
-        i = order ? order[at] : cells ? cells[at] : at;
+        slot = cells ? (seq ? seq[at] : at) : (order ? order[at] : at);
+        i = cells ? cells[slot] : slot;
         if (pending) {
           x = pending.x[i]; y = pending.y[i];
           if (x != null && y != null && isFinite(x) && isFinite(y)) {
@@ -2521,7 +2583,7 @@
           }
         }
         if (!unit.ok[i] || !shownMask[i]) continue;
-        if (vertexIndex) vertexIndex[i] = out + 1;
+        if (vertexIndex) vertexIndex[slot] = out + 1;
         positions[out * 2] = unit.nx[i];
         positions[out * 2 + 1] = unit.ny[i];
         var packedRgb = rgb
@@ -2569,6 +2631,7 @@
       count: out,
       opaque: !rgb && opaque,
       vertexIndex: vertexIndex,
+      vertexCells: cells,
       foreground: foreground,
       ordered: !!order
     };
@@ -5593,7 +5656,10 @@
     orderedSpaces().forEach(function (id) {
       var sp = spaceById[id];
       if (!sp) return;
-      var x = sp.x[cardCell], y = sp.y[cardCell];
+      // Sections share their position arrays: a cell of another section has
+      // a position in them but none in this one.
+      var held = !sp._cells || sortedIndexOf(sp._cells, cardCell) >= 0;
+      var x = held ? sp.x[cardCell] : NaN, y = held ? sp.y[cardCell] : NaN;
       rows.push([sp.label, (x == null || isNaN(x)) ? 'not positioned'
         : (fmtVal(x) + ',  ' + fmtVal(y))]);
     });
@@ -6917,36 +6983,66 @@
     }
     return weight ? (n / weight) * num / denom : null;
   }
-  // `only` (spaces by id): the panels of those spaces alone, such as the
-  // sections a streaming grid has just received.
+  // Moran's I of each spatial panel, for the continuous values drawn. A score
+  // is kept per values array and space, and the panels are scored a slice of
+  // the main thread at a time: the 59 sections of the Allen atlas took 1.7 s
+  // in one task each time a gene was chosen. `only` (spaces by id) adds those
+  // panels alone, such as the sections a streaming grid has just received.
+  var moranScores = typeof WeakMap === 'function' ? new WeakMap() : null;
+  var moranQueue = [], moranTimer = 0, MORAN_SLICE_MS = 16;
+  // Kept while the space keeps its unit positions: cells that arrive later
+  // (a streaming grid) give it new ones. A panel without enough cells yet
+  // (no score) is scored again.
+  function moranScore(sp, values) {
+    var byValues = moranScores && moranScores.get(values);
+    var kept = byValues && byValues.get(sp);
+    if (kept && kept.unit === sp._unit) return kept.score;
+    var score = spatialMoran(sp, values);
+    if (moranScores && score != null) {
+      if (!byValues) { byValues = new Map(); moranScores.set(values, byValues); }
+      byValues.set(sp, { unit: sp._unit, score: score });
+    }
+    return score;
+  }
+  function hideMoranBadge(badge) {
+    badge.style.display = 'none'; badge.textContent = '';
+    delete badge.dataset.value; delete badge.dataset.field;
+  }
+  function scoreMoranPanel(p, continuous) {
+    var badge = $('cv-moran-' + p.key.toLowerCase());
+    if (!badge) return;
+    var sp = spaceById[p.spaceId];
+    if (!isSpatialSpace(sp) || !continuous) { hideMoranBadge(badge); return; }
+    var score = moranScore(sp, continuous.values);
+    if (score == null || !isFinite(score)) {
+      badge.style.display = 'none'; return;
+    }
+    var value = Math.max(-1, Math.min(1, score));
+    badge.dataset.value = value.toFixed(6);
+    badge.dataset.field = continuous.label;
+    badge.textContent = "Moran's I " + value.toFixed(3);
+    badge.title = continuous.label +
+      " · each cell's six nearest spatial neighbours · click for details";
+    badge.style.display = '';
+  }
   function updateMoranBadges(only) {
-    var continuous = continuousValues();
-    panels.forEach(function (p) {
-      var badge = $('cv-moran-' + p.key.toLowerCase());
-      if (!badge || (only && !only[p.spaceId])) return;
-      var sp = spaceById[p.spaceId];
-      if (!isSpatialSpace(sp)) {
-        badge.style.display = 'none'; badge.textContent = '';
-        delete badge.dataset.value; delete badge.dataset.field;
-        return;
+    var add = panels.filter(function (p) { return !only || only[p.spaceId]; });
+    moranQueue = only ? moranQueue.concat(add.filter(function (p) {
+      return moranQueue.indexOf(p) < 0;
+    })) : add;
+    clearTimeout(moranTimer);
+    var run = function () {
+      moranTimer = 0;
+      var continuous = continuousValues(), began = performance.now();
+      while (moranQueue.length) {
+        scoreMoranPanel(moranQueue.shift(), continuous);
+        if (moranQueue.length && performance.now() - began > MORAN_SLICE_MS) {
+          moranTimer = setTimeout(run, 0);
+          return;
+        }
       }
-      if (!continuous) {
-        badge.style.display = 'none'; badge.textContent = '';
-        delete badge.dataset.value; delete badge.dataset.field;
-        return;
-      }
-      var score = spatialMoran(sp, continuous.values);
-      if (score == null || !isFinite(score)) {
-        badge.style.display = 'none'; return;
-      }
-      var value = Math.max(-1, Math.min(1, score));
-      badge.dataset.value = value.toFixed(6);
-      badge.dataset.field = continuous.label;
-      badge.textContent = "Moran's I " + value.toFixed(3);
-      badge.title = continuous.label +
-        " · each cell's six nearest spatial neighbours · click for details";
-      badge.style.display = '';
-    });
+    };
+    run();
   }
   function openMoranDialog(badge) {
     if (!badge || !badge.dataset.value) return;
@@ -7614,6 +7710,8 @@
         images: images,
         _sampleName: sample.name,
         _cells: sample._cells || null,
+        // Read after x and y, which place the scene in its pool.
+        _unitArrays: sample._cells ? sample._unitArrays || null : null,
         _spatialSample: true,
         _fitToData: true,
         _customImageId: custom,
@@ -12264,6 +12362,36 @@
     });
     return scenes;
   }
+  // Scenes of different cells (the sections of a data set) share one pair of
+  // position arrays over every cell, and one pair of unit positions, each
+  // scene writing its own cells only (as the sections of the Spatial grid
+  // do, sharedSliceGeometry()). A scene that shares a cell with every pool so
+  // far (an ROI inside its section) starts a pool of its own. A pair per scene
+  // was 31 MB for the Allen atlas, 3.6 GB with its unit positions for its 59
+  // sections.
+  function scenePool(rows, n) {
+    // The pools of the current data set (D), kept on the function.
+    var pools = scenePool.pools;
+    if (!pools || pools.data !== D) pools = scenePool.pools = { data: D, list: [] };
+    var pool = null;
+    for (var p = 0; p < pools.list.length && !pool; p++) {
+      var candidate = pools.list[p], free = true;
+      for (var j = 0; j < rows.length; j++) {
+        if (candidate.taken[rows[j]]) { free = false; break; }
+      }
+      if (free) pool = candidate;
+    }
+    if (!pool) {
+      pool = {
+        x: new Float32Array(n).fill(NaN), y: new Float32Array(n).fill(NaN),
+        taken: new Uint8Array(n),
+        unit: { nx: new Float32Array(n), ny: new Float32Array(n) }
+      };
+      pools.list.push(pool);
+    }
+    for (var k = 0; k < rows.length; k++) pool.taken[rows[k]] = 1;
+    return pool;
+  }
   function hydrateSpatialScenes(extra) {
     linkedSpatialScenes(extra).forEach(function (scene) {
       var rows = scene.rows;
@@ -12287,11 +12415,13 @@
       var dense = null;
       var expand = function () {
         if (!dense) {
-          dense = {x: new Float32Array(n).fill(NaN), y: new Float32Array(n).fill(NaN)};
+          var pool = scenePool(rows, n);
+          dense = {x: pool.x, y: pool.y};
           for (var j = 0; j < rows.length; j++) {
             dense.x[rows[j]] = xs[j];
             dense.y[rows[j]] = ys[j];
           }
+          scene._unitArrays = pool.unit;
           rows = xs = ys = null;
         }
         return dense;

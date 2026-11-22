@@ -157,6 +157,17 @@
   screen of panels after 2.1 s instead of 5.5 s and draws all 59 after 3.3 s;
   the first message is 2 MB instead of 51 MB, and the page's longest stall
   falls from 1.3 s to 0.4 s.
+- **Many sections no longer fill the browser's memory.** Every panel of a
+  section kept maps over all cells of the data set, and Linked views kept its
+  own copy of every cell's position per section. A panel now keeps them over
+  its own cells, sections share their positions, a gene's order of drawing is
+  taken per section, and Moran's I of each section is worked out a slice at a
+  time. On the Allen atlas (Windows, Chrome) the browser holds 1.0 GB instead
+  of 1.7 to 2.5 GB for the grid of all 59 sections, and Linked views with all
+  59 holds 1.4 GB instead of 5.5 GB. Colouring that Linked views by a gene
+  freezes the page for 1.9 s instead of 9.7 s and no longer grows it to
+  9.2 GB. A cell's card no longer gives it a position in sections it is not
+  in, and a frame that arrives during a lasso no longer breaks the drag.
 - **Long legends and many sections stay compact.** A colouring by more than
   24 groups shows three rows of its legend and a *Show all* button. The
   Sections field keeps its chosen sections in two scrolling rows, counts them

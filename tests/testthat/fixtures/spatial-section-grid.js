@@ -365,3 +365,28 @@ assert.strictEqual(unitArraysOf({ _unitArrays: pair }, 5), pair);
 assert.strictEqual(unitArraysOf({ _unitArrays: pair }, 6), null, 'only at the frame length');
 assert.strictEqual(unitArraysOf({}, 5), null);
 console.log('PASS a streaming grid names its cells batch by batch');
+
+// ---- a panel of some cells keeps its maps over its own cells --------------------
+eval(between('  function sortedIndexOf(', '  function updateGpuSelection('));
+var own = Int32Array.from([2, 5, 7, 11]);
+assert.strictEqual(sortedIndexOf(own, 7), 2);
+assert.strictEqual(sortedIndexOf(own, 6), -1);
+assert.strictEqual(sortedIndexOf(own, 11), 3);
+// The selected cells the panel holds, by slot: looked up when few, walked when many.
+var held = [];
+forEachHeldCell(new Set([7, 99]), own, function (slot, cell) { held.push([slot, cell]); });
+assert.deepStrictEqual(held, [[2, 7]]);
+held = [];
+var many = new Set(); for (var c = 0; c < 200; c++) many.add(c);
+forEachHeldCell(many, own, function (slot, cell) { held.push([slot, cell]); });
+assert.deepStrictEqual(held, [[0, 2], [1, 5], [2, 7], [3, 11]]);
+held = [];
+forEachHeldCell(new Set([3]), null, function (slot, cell) { held.push([slot, cell]); });
+assert.deepStrictEqual(held, [[3, 3]], 'a panel of every cell: the slot is the cell');
+// Its paint order: its own cells, lowest value first, as in the order of all.
+D = { n: 12 };
+var allOrder = Uint32Array.from([11, 0, 7, 1, 2, 3, 4, 6, 8, 9, 10, 5]);
+var sequence = panelPaintSequence(own, allOrder);
+assert.deepStrictEqual(Array.from(sequence).map(function (slot) { return own[slot]; }), [11, 7, 2, 5]);
+assert.strictEqual(panelPaintSequence(own, allOrder), sequence, 'kept for the same order');
+console.log('PASS a panel of some cells keeps its maps over its own cells');
