@@ -3948,8 +3948,17 @@
     var context = view ? view.dataset_context : D && D.dataset_context;
     var identity = view ? view.datasetIdentity : D && linkedBundleResourceIdentity(D);
     if (message.unavailable || !context || !sameDatasetContext(context, message.dataset_context)) return;
+    var waits = 0;
     var prefetch = function () {
       if (selectionSpec !== message) return;
+      // Linked views asks the same server for its second message (its
+      // sections and other projections) at the same time: reading these
+      // columns first held it back (three numeric columns of the Allen atlas,
+      // 47 MB). They wait for it, up to 30 s.
+      if (!singleActive && D && D.progressive && waits++ < 60) {
+        setTimeout(function () { whenIdle(prefetch); }, 500);
+        return;
+      }
       (message.metadata_columns || []).forEach(function (name) {
         clientColumn(message, name, identity).catch(function () {});
       });
