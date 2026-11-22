@@ -3,7 +3,8 @@ gene_expression_test_function <- function(file, name) {
     viewer_test_path("gene_expression", file),
     name
   )
-  scope <- new.env(parent = globalenv())
+  ## The Viewer's shared helpers (cerebroSparseColorPacket()) are its parent.
+  scope <- new.env(parent = viewer_runtime_env())
   eval(assignment, envir = scope)
   scope[[name]]
 }

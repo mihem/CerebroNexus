@@ -639,6 +639,14 @@ spatial_projection_update_plot <- function(input) {
       !isTRUE(input[["fresh_render"]]) &&
       !isTRUE(reset_axes)
   ) {
+    ## A gene expressed in under half the cells travels as those cells and
+    ## their values (cerebroSparseColorPacket()): Vip over the 3.9 million
+    ## cells of the Allen atlas is 7.4 MB instead of 31.5 MB.
+    sparse <- cerebroSparseColorPacket(payload$data$color)
+    if (!is.null(sparse)) {
+      payload$data$color <- NULL
+      payload$data$sparse_color <- sparse
+    }
     cerebroCellViewRecolor(
       "spatial_projection",
       payload[["meta"]],

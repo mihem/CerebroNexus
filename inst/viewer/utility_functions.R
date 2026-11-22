@@ -1704,6 +1704,27 @@ cv_wire_pack_message <- function(message, min_length = 4096L) {
 ## later render with the same cells lets the browser reuse those barcodes.
 .cerebro_cell_view_aux_served <- new.env(parent = emptyenv())
 
+## Continuous colours as the sparse packet the browser expands
+## (hydrateColorPacket() in cell_views.js): the cells whose value is not 0
+## (missing and infinite values included) and their values, in double
+## precision. NULL for fewer than 4096 values, or when at least `max_density`
+## of the cells have a value: the dense vector is then no larger.
+cerebroSparseColorPacket <- function(values, max_density = 0.5) {
+  if (!is.numeric(values) || length(values) < 4096L) {
+    return(NULL)
+  }
+  present <- which(is.na(values) | !is.finite(values) | values != 0)
+  if (length(present) >= length(values) * max_density) {
+    return(NULL)
+  }
+  list(
+    protocol = "sparse-f64-v1",
+    length = length(values),
+    index = as.integer(present - 1L),
+    color = unname(values[present])
+  )
+}
+
 ## With a cell-name resource, `cell_rows` (canonical rows of the points) are
 ## sent instead of `cell_barcodes`, and the browser looks the names up.
 ## Contiguous 0-based rows as list(kind = "range", start, length), else NULL.
