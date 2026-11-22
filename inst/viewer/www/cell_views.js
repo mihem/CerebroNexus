@@ -6184,6 +6184,9 @@
         return;
       }
       if (!p.drag) return;
+      // A frame that lands mid-drag (a late section, a new colouring) clears
+      // the outline under the pointer: the drag ends there.
+      if (!p.lasso) { p.drag = false; p.moved = false; return; }
       var q = pos(e);
       if (selectMode === 'box') {
         // rectangle from the drag origin to the cursor; inPoly treats it as a
