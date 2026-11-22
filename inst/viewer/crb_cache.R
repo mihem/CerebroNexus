@@ -55,6 +55,60 @@ crb_prefetch_abandon <- function(key) {
   cached
 }
 
+## CRBs written before 8.4.9 stored the levels of character groups in plain
+## sorted order ("Cluster 1", "Cluster 10", "Cluster 2"). Put such levels of
+## the registered groups, and of their factor columns in the metadata, in
+## natural order (.runtimeNaturalLevels() in core/crb_contract.R) once, before
+## the prototype is cached, so legends, colours, filters and split panels of
+## every page follow it. Only groups: their levels are few (conversion caps
+## them), while other factor columns can have a level per cell. Factor codes
+## are remapped, not rebuilt from strings.
+.naturalCrbLevels <- function(prototype) {
+  if (!is.environment(prototype)) {
+    return(prototype)
+  }
+  groups <- get0("groups", envir = prototype, inherits = FALSE)
+  metadata <- get0("meta_data", envir = prototype, inherits = FALSE)
+  if (!is.list(groups) || !length(groups) || !is.data.frame(metadata)) {
+    return(prototype)
+  }
+  groups_changed <- FALSE
+  metadata_changed <- FALSE
+  for (name in intersect(names(groups), names(metadata))) {
+    values <- metadata[[name]]
+    ## An ordered factor's order was chosen: keep it for the group too.
+    if (is.ordered(values)) {
+      next
+    }
+    old <- as.character(groups[[name]])
+    new <- .runtimeNaturalLevels(old)
+    if (!identical(old, new)) {
+      groups[[name]] <- new
+      groups_changed <- TRUE
+    }
+    if (!is.factor(values)) {
+      next
+    }
+    old <- levels(values)
+    new <- .runtimeNaturalLevels(old)
+    if (!identical(old, new)) {
+      metadata[[name]] <- structure(
+        match(old, new)[as.integer(values)],
+        levels = new,
+        class = "factor"
+      )
+      metadata_changed <- TRUE
+    }
+  }
+  if (groups_changed) {
+    prototype$groups <- groups
+  }
+  if (metadata_changed) {
+    prototype$meta_data <- metadata
+  }
+  prototype
+}
+
 .cacheCrbPrototype <- function(path, prototype, backend_identity) {
   cache_key <- normalizePath(path, winslash = "/", mustWork = FALSE)
   .checkCrbBackendIdentity(cache_key, backend_identity)
@@ -62,6 +116,7 @@ crb_prefetch_abandon <- function(key) {
   if (!is.null(cached)) {
     return(invisible(cached))
   }
+  prototype <- .naturalCrbLevels(prototype)
   cached <- list(
     object = prototype,
     backend_identity = backend_identity,

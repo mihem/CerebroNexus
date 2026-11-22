@@ -781,11 +781,16 @@ cv_clone <- function(
 }
 
 ## The levels a categorical column is coloured by: a factor's levels, else its
-## sorted distinct values; never NA. Every path that sends a grouping's levels
-## (cv_build_groups(), cv_build_deferred_metadata(), cv_attribute_resource() in
-## server.R) uses these, so the codes each path sends decode to the same values.
+## distinct values in natural order ("Cluster 2" before "Cluster 10"); never
+## NA. Every path that sends a grouping's levels (cv_build_groups(),
+## cv_build_deferred_metadata(), cv_attribute_resource() in server.R) uses
+## these, so the codes each path sends decode to the same values.
 cv_group_levels <- function(v) {
-  lev <- if (is.factor(v)) levels(v) else sort(unique(as.character(v)))
+  lev <- if (is.factor(v)) {
+    levels(v)
+  } else {
+    .runtimeNaturalSort(unique(as.character(v)))
+  }
   lev[!is.na(lev)]
 }
 

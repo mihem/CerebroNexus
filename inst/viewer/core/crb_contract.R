@@ -424,3 +424,63 @@
   }
   list(type = backend$type, mode = "bundled", location = backend$location)
 }
+
+## Group levels in natural order: numbers compare as numbers, so "Cluster 2"
+## comes before "Cluster 10" and "res_0.25" before "res_0.5". A number is a
+## run of digits with an optional decimal part. In the sort key its whole part
+## is padded with leading zeros and its decimal part with trailing zeros to a
+## common width, and the point is dropped, so the key compares digit by digit.
+## Equal keys ("01", "1"; "1", "1.0") fall back to the plain order. Missing
+## values come last.
+.runtimeNaturalOrder <- function(x) {
+  x <- as.character(x)
+  key <- x
+  known <- !is.na(x)
+  numbers <- gregexpr("[0-9]+(\\.[0-9]+)?", x[known])
+  runs <- regmatches(x[known], numbers)
+  all_runs <- unlist(runs, use.names = FALSE)
+  if (length(all_runs)) {
+    whole_part <- function(run) sub("\\..*$", "", run)
+    decimal_part <- function(run) substring(run, nchar(whole_part(run)) + 2L)
+    width <- max(nchar(whole_part(all_runs)))
+    places <- max(nchar(decimal_part(all_runs)))
+    padded <- x[known]
+    regmatches(padded, numbers) <- lapply(runs, function(run) {
+      whole <- whole_part(run)
+      decimal <- decimal_part(run)
+      paste0(
+        strrep("0", width - nchar(whole)),
+        whole,
+        decimal,
+        strrep("0", places - nchar(decimal))
+      )
+    })
+    key[known] <- padded
+  }
+  order(key, x)
+}
+
+.runtimeNaturalSort <- function(x) {
+  x <- as.character(x)
+  x[.runtimeNaturalOrder(x)]
+}
+
+## The levels of a group in natural order, when they are in the plain sorted
+## order that CRBs written before 8.4.9 stored for character columns (a
+## trailing "N/A" level stays last). Any other order was chosen and is kept.
+.runtimeNaturalLevels <- function(levels) {
+  levels <- as.character(levels)
+  n <- length(levels)
+  if (n < 2L || anyNA(levels)) {
+    return(levels)
+  }
+  missing <- identical(levels[[n]], "N/A")
+  body <- if (missing) levels[-n] else levels
+  if (
+    !identical(body, sort(body)) &&
+      !identical(body, sort(body, method = "radix"))
+  ) {
+    return(levels)
+  }
+  c(.runtimeNaturalSort(body), if (missing) "N/A")
+}

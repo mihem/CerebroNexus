@@ -773,13 +773,14 @@ test_that("renderer uses selected descriptor bounds without changing cell axes",
   params$plot_type <- "ImageDimPlot"
   params$split_by <- "sample_roi"
   call_renderer(params, c(C1 = "#111111", C2 = "#eeeeee"))
+  ## Panels follow the sorted labels, not the order of their first cells.
   expect_identical(
     vapply(rendered$data$panels, `[[`, character(1), "label"),
-    c("lesion", "border")
+    c("border", "lesion")
   )
   expect_identical(
     lapply(rendered$data$panels, `[[`, "selection_key"),
-    list("cell-1", "cell-2")
+    list("cell-2", "cell-1")
   )
   expect_true(nzchar(rendered$meta$background_image))
   expect_true(all(vapply(
