@@ -539,8 +539,7 @@ spatial_projection_parameters_plot_current <- reactive({
     )
   }
   ## Each grid panel shows the picture chosen for its section in the grid's
-  ## picker (its first until one is chosen), and a section without one shows
-  ## none. The frame itself carries no image.
+  ## picker, and none until one is chosen. The frame itself carries no image.
   grid_backgrounds <- list()
   if (grid) {
     options <- if (exists("Cerebro.options")) Cerebro.options else NULL
@@ -555,7 +554,7 @@ spatial_projection_parameters_plot_current <- reactive({
           dataset,
           section,
           spatial_grid_section_record(section),
-          pick = picks[[section]]
+          pick = picks[[section]] %||% 0L
         )
       }),
       grid_sections

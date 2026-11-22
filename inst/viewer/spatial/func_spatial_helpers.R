@@ -1701,9 +1701,9 @@ spatial_grid_coordinates <- function(
 }
 
 ## The grid's picture picker: one group per shown section that has pictures,
-## offering "No picture" and each of the section's pictures. A token names the
-## section by its place among all sections and the picture by its place in the
-## section (0: none), so it stays the same while sections come and go.
+## offering each of the section's pictures. A token names the section by its
+## place among all sections and the picture by its place in the section, so it
+## stays the same while sections come and go.
 spatial_grid_background_groups <- function(
   options,
   dataset,
@@ -1727,8 +1727,8 @@ spatial_grid_background_groups <- function(
     list(
       section = section,
       tokens = stats::setNames(
-        paste0(prefix, c(0L, seq_along(choices))),
-        c("No picture", names(choices))
+        paste0(prefix, seq_along(choices)),
+        names(choices)
       )
     )
   })

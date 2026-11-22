@@ -3338,13 +3338,6 @@ body.cerebro-composition-collapsed .cerebro-selection-composition-row {
 .cerebro-spatial-background-row > div > #spatial_projection_grid_background_UI {
   display: block; flex: 1 1 280px; min-width: min(280px, 100%);
 }
-/* The grid's picker: with more than four sections, one summary line instead
-   of an item per section; the list shows each section's choice with a tick. */
-.spatial-grid-background-picker .selectize-input.is-summary > .item { display: none; }
-.spatial-grid-background-picker .selectize-input.is-summary::before {
-  content: attr(data-summary); margin-right: 6px; color: var(--c-text-2, #555);
-}
-.spatial-grid-background-picker .selectize-dropdown .is-chosen { font-weight: 600; }
 .cerebro-viz-toolbar .cerebro-spatial-background-row .spatial-grid-background-picker,
 .cerebro-viz-toolbar .cerebro-spatial-background-row .spatial-roi-background-picker,
 .cerebro-viz-toolbar .cerebro-spatial-background-row .form-group {

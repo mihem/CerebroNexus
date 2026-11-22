@@ -186,14 +186,14 @@ test_that("the grid's picker chooses one picture per section", {
     all_sections,
     record
   )
-  ## A group per section with pictures, in the order shown; "No picture" first.
+  ## A group per section with pictures, in the order shown.
   expect_identical(names(groups), c("sectionB1", "sectionA1"))
   a1 <- match("sectionA1", all_sections)
   expect_identical(
     groups$sectionA1$tokens,
     stats::setNames(
-      paste0("grid-", a1, "-background-", 0:2),
-      c("No picture", "H&E", "DAPI")
+      paste0("grid-", a1, "-background-", 1:2),
+      c("H&E", "DAPI")
     )
   )
   picks <- renderer$spatial_grid_background_picks(

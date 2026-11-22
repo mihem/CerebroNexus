@@ -679,12 +679,11 @@ outputOptions(
   suspendWhenHidden = TRUE
 )
 
-## The grid's picture picker: the pictures grouped by section, one item per
-## section ("No picture" or one of its pictures; selecting another replaces
-## it), each section starting with its first picture. A section keeps its
-## choice while others are added or removed; another data set starts over.
-## With more than four sections the field shows one summary line instead of
-## an item per section (see spatial_grid_background_js).
+## The grid's picture picker: the pictures grouped by section, as the Sections
+## field and Linked views' Colour by look. No picture is shown until one is
+## chosen; a section shows at most one (choosing another in its group replaces
+## it) and keeps it while other sections come and go; another data set starts
+## over. Each chosen picture is a removable chip named "section: picture".
 spatial_grid_background_dataset <- reactiveVal(NULL)
 spatial_grid_background_js <- list(
   on_item_add = paste0(
@@ -694,38 +693,15 @@ spatial_grid_background_js <- list(
     "if (item !== value && item.replace(/-background-.*/, '') === group) ",
     "this.removeItem(item, true);",
     "}, this);",
-    "this.clearCache('option'); this.refreshOptions(false);",
+    "this.refreshItems();",
     "}"
   ),
   render = paste0(
     "{",
     "item: function(item, escape) {",
-    "return '<div class=\"item\">' + escape(item.optgroup || '') + ': ' + escape(item.label) + '</div>';",
-    "},",
-    "option: function(item, escape) {",
-    "var on = this.items.indexOf(item.value) >= 0;",
-    "return '<div class=\"option' + (on ? ' is-chosen' : '') + '\">' +",
-    "(on ? '\u2713 ' : '') + escape(item.label) + '</div>';",
+    "return '<div class=\"item\">' + escape(item.optgroup || '') + ': ' +",
+    "escape(item.label) + '</div>';",
     "}",
-    "}"
-  ),
-  summarise = paste0(
-    "function() {",
-    "var self = this, control = self.$control;",
-    "var update = function() {",
-    "var items = self.items.slice();",
-    "var shown = items.filter(function(item) { return !/-background-0$/.test(item); });",
-    "var many = items.length > 4;",
-    "control.toggleClass('is-summary', many);",
-    "control.attr('data-summary', many ? shown.length + ' of ' + items.length +",
-    "' sections with a picture' : '');",
-    "};",
-    "self.on('change', function() { self.clearCache('option'); update(); });",
-    "self.$control.on('mousedown', function(event) {",
-    "if (!self.$control.hasClass('is-summary') || event.target === self.$control_input[0]) return;",
-    "setTimeout(function() { self.focus(); self.open(); }, 0);",
-    "});",
-    "update();",
     "}"
   )
 )
@@ -750,14 +726,7 @@ output[["spatial_projection_grid_background_UI"]] <- renderUI({
     previous <- NULL
     spatial_grid_background_dataset(dataset)
   }
-  selected <- unname(vapply(
-    groups,
-    function(group) {
-      kept <- intersect(unname(group$tokens), previous %||% character())
-      if (length(kept)) kept[[1L]] else unname(group$tokens[[2L]])
-    },
-    character(1)
-  ))
+  tokens <- unlist(lapply(groups, function(group) unname(group$tokens)))
   div(
     class = "spatial-grid-background-picker",
     selectizeInput(
@@ -766,13 +735,11 @@ output[["spatial_projection_grid_background_UI"]] <- renderUI({
       choices = lapply(groups, function(group) {
         stats::setNames(unname(group$tokens), names(group$tokens))
       }),
-      selected = selected,
+      selected = intersect(previous %||% character(), tokens),
       multiple = TRUE,
       options = list(
-        hideSelected = FALSE,
-        closeAfterSelect = FALSE,
+        plugins = list("remove_button"),
         onItemAdd = I(spatial_grid_background_js$on_item_add),
-        onInitialize = I(spatial_grid_background_js$summarise),
         render = I(spatial_grid_background_js$render)
       )
     ),
