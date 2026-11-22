@@ -424,3 +424,48 @@
   }
   list(type = backend$type, mode = "bundled", location = backend$location)
 }
+
+## Group levels in natural order: runs of digits compare as numbers, so
+## "Cluster 2" comes before "Cluster 10". Equal keys ("01", "1") fall back to
+## the plain order. Missing values come last.
+.runtimeNaturalOrder <- function(x) {
+  x <- as.character(x)
+  key <- x
+  known <- !is.na(x)
+  digits <- gregexpr("[0-9]+", x[known])
+  runs <- regmatches(x[known], digits)
+  width <- max(0L, nchar(unlist(runs, use.names = FALSE)))
+  if (width > 0L) {
+    padded <- x[known]
+    regmatches(padded, digits) <- lapply(runs, function(run) {
+      paste0(strrep("0", width - nchar(run)), run)
+    })
+    key[known] <- padded
+  }
+  order(key, x)
+}
+
+.runtimeNaturalSort <- function(x) {
+  x <- as.character(x)
+  x[.runtimeNaturalOrder(x)]
+}
+
+## The levels of a group in natural order, when they are in the plain sorted
+## order that CRBs written before 8.4.11 stored for character columns (a
+## trailing "N/A" level stays last). Any other order was chosen and is kept.
+.runtimeNaturalLevels <- function(levels) {
+  levels <- as.character(levels)
+  n <- length(levels)
+  if (n < 2L || anyNA(levels)) {
+    return(levels)
+  }
+  missing <- identical(levels[[n]], "N/A")
+  body <- if (missing) levels[-n] else levels
+  if (
+    !identical(body, sort(body)) &&
+      !identical(body, sort(body, method = "radix"))
+  ) {
+    return(levels)
+  }
+  c(.runtimeNaturalSort(body), if (missing) "N/A")
+}

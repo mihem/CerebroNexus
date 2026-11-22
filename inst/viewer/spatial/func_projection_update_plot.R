@@ -399,7 +399,21 @@ spatial_projection_update_plot <- function(input) {
     panel_order <- panel_order[
       !is.na(panel_order) & nzchar(panel_order) & panel_order %in% panel_labels
     ]
-    panel_order <- c(panel_order, setdiff(unique(panel_labels), panel_order))
+    ## The other panels follow the column's levels (natural order for
+    ## character columns), not the order in which their cells come; missing
+    ## values last.
+    split_values <- metadata[[split_by]]
+    label_order <- if (is.factor(split_values)) {
+      levels(split_values)
+    } else {
+      .runtimeNaturalSort(unique(panel_labels))
+    }
+    label_order <- c(
+      setdiff(label_order[label_order %in% panel_labels], "N/A"),
+      setdiff(unique(panel_labels), c(label_order, "N/A")),
+      "N/A"
+    )
+    panel_order <- c(panel_order, setdiff(label_order, panel_order))
     panel_indices <- split(
       seq_along(panel_labels),
       factor(panel_labels, levels = panel_order),
