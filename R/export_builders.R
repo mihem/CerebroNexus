@@ -97,10 +97,13 @@
   }
 }
 
-## Character groups become factors and NA values a trailing 'N/A' level.
+## Character groups become factors, with levels in natural order ("Cluster 2"
+## before "Cluster 10"), and NA values a trailing 'N/A' level.
 .exportGroupColumn <- function(values, group, verbose) {
   if (!is.factor(values) && is.character(values)) {
-    levels <- sort(unique(values), na.last = NA)
+    levels <- .crbContract()$.runtimeNaturalSort(
+      unique(values[!is.na(values)])
+    )
     if (anyNA(values)) {
       values[is.na(values)] <- 'N/A'
       levels <- unique(c(levels, 'N/A'))
