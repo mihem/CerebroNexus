@@ -1,13 +1,15 @@
 # CerebroNexus 8.5.0
 
-- **Multi-select fields keep one row.** On every page, a field with more
-  chosen items than fit (Sections, Background images, genes) shows them in
-  one row up to its edge, with a badge such as "12+" at the right; opened, its
-  list starts with every chosen item, each with its cross. The list opens
-  over the page, so the toolbar keeps its height. Spatial's Sections and
-  Background images and Linked views' Sections show "12 of 12" with *All* and
-  *One* beside their label; in Background images, *All* gives each section
-  its first picture.
+- **Multi-select fields show one item and a count.** On every page, a field
+  with more than one item chosen (Sections, Background images, genes) shows
+  its first item and a badge with the count, such as "12+", and is only as
+  wide as the two. Clicking the field or the badge opens the list, which
+  starts with every chosen item and its cross and shows everything when the
+  window is tall enough; clicking elsewhere closes it. The list opens over the
+  page, so the toolbar keeps its height and the field its width. Spatial's
+  Sections and Background images and Linked views' Sections show "12 of 12"
+  with *All* and *One* beside their label; in Background images, *All* gives
+  each section its first picture.
 - **The grid chooses each section's picture.** With several sections shown,
   Spatial's *Background images* field lists the pictures grouped by section,
   as the Sections field and Linked views' Colour by do. No picture is shown

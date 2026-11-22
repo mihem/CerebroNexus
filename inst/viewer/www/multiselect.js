@@ -15,6 +15,9 @@
         "--cerebro-select-menu-max-height",
         available + "px"
       );
+      // A collapsed multi-select's list (chosen items, then the options)
+      // scrolls as one, as tall as the window allows.
+      dropdown.style.setProperty("--cerebro-ms-menu-max-height", available + "px");
     });
   }
 
@@ -41,20 +44,33 @@
     if (COUNTED.indexOf(select.id) >= 0) countTools(select, instance);
   }
 
-  // Every multi-select keeps one row: its chips stop at the field's edge and
-  // a badge at the right ("12+") says that some are out of sight. Open, the
-  // field shows only what is typed, and its list starts with every chosen
-  // item, each with its cross. The list is an overlay, so opening the field
-  // never changes the height of the controls around it.
+  // A multi-select with more than one item shows only its first, and a badge
+  // with the count ("12+"); the field is as wide as those two (or its minimum
+  // width), so no other chip runs under the badge. Clicking the field or the
+  // badge opens the list, which starts with every chosen item and its cross
+  // (also when no option is left to offer) and shows everything when the
+  // window is tall enough; clicking elsewhere closes it. The list is an
+  // overlay, so the controls around the field keep their height.
   function collapse(instance) {
     var wrapper = instance.$wrapper[0];
     var control = instance.$control[0];
     if (!wrapper || !control || wrapper._cerebroCollapse) return;
     wrapper._cerebroCollapse = true;
     wrapper.classList.add("cerebro-ms-collapse");
+    instance.$dropdown.addClass("cerebro-ms-dropdown");
     var badge = document.createElement("span");
     badge.className = "cerebro-ms-more";
-    badge.setAttribute("aria-hidden", "true");
+    badge.setAttribute("role", "button");
+    badge.setAttribute("tabindex", "-1");
+    badge.addEventListener("mousedown", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (instance.isFocused) {
+        openChosen();
+      } else {
+        instance.focus();
+      }
+    });
     wrapper.appendChild(badge);
     var chosen = document.createElement("div");
     chosen.className = "cerebro-ms-chosen";
@@ -74,10 +90,9 @@
         return "&#" + c.charCodeAt(0) + ";";
       });
     };
+    var many = function () { return instance.items.length > 1; };
     var fillChosen = function () {
-      var open = wrapper.classList.contains("is-open") &&
-        wrapper.classList.contains("is-overflowing");
-      if (!open || !instance.items.length) {
+      if (!wrapper.classList.contains("is-open") || !many()) {
         if (chosen.parentNode) chosen.parentNode.removeChild(chosen);
         return;
       }
@@ -91,26 +106,27 @@
       var dropdown = instance.$dropdown[0];
       if (chosen.parentNode !== dropdown) dropdown.insertBefore(chosen, dropdown.firstChild);
     };
-    var measure = function () {
-      var items = control.querySelectorAll(":scope > .item");
-      var hidden = false;
-      if (items.length && !wrapper.classList.contains("is-open")) {
-        var right = control.getBoundingClientRect().right -
-          parseFloat(getComputedStyle(control).paddingRight || 0);
-        hidden = items[items.length - 1].getBoundingClientRect().right > right + 0.5;
-      }
-      if (!wrapper.classList.contains("is-open")) {
-        wrapper.classList.toggle("is-overflowing", hidden);
-        badge.textContent = hidden ? items.length + "+" : "";
-      }
+    var update = function () {
+      var isMany = many();
+      wrapper.classList.toggle("is-many", isMany);
+      badge.textContent = isMany ? instance.items.length + "+" : "";
+      badge.setAttribute("aria-label", isMany ? "Show all " + instance.items.length : "");
       fillChosen();
+      if (instance.isOpen || forced) sizeDropdown(instance);
     };
-    var later = function () { window.requestAnimationFrame(measure); };
     // With every option chosen the list has nothing to offer and Selectize
-    // keeps it shut; a field whose chips are hidden still opens to show them.
+    // keeps it shut; a field with hidden items still opens to show them.
     var forced = false;
+    // Open, the field hides its chip for typing: it keeps the width it had, so
+    // the controls beside it stay where they are.
+    var holdWidth = function () {
+      if (!wrapper.style.getPropertyValue("width")) {
+        wrapper.style.setProperty("width", wrapper.getBoundingClientRect().width + "px", "important");
+      }
+    };
     var openChosen = function () {
-      if (!instance.isFocused || !wrapper.classList.contains("is-overflowing")) return;
+      if (!instance.isFocused || !many()) return;
+      holdWidth();
       wrapper.classList.add("is-open");
       fillChosen();
       if (!instance.isOpen && chosen.parentNode) {
@@ -118,25 +134,29 @@
         instance.$dropdown.css({ display: "block", visibility: "visible" });
         forced = true;
       }
+      sizeDropdown(instance);
     };
     var closeChosen = function () {
       if (forced) instance.$dropdown.hide();
       forced = false;
+      wrapper.style.removeProperty("width");
       wrapper.classList.remove("is-open");
-      later();
+      update();
     };
-    instance.on("change", later);
-    instance.on("item_add", later);
+    instance.on("change", update);
+    instance.on("item_add", update);
     instance.on("item_remove", function () {
-      later();
+      update();
       if (instance.isFocused) window.setTimeout(openChosen, 0);
     });
     instance.on("focus", function () { window.setTimeout(openChosen, 0); });
     instance.on("blur", closeChosen);
     instance.on("dropdown_open", function () {
       forced = false;
+      if (many()) holdWidth();
       wrapper.classList.add("is-open");
       fillChosen();
+      sizeDropdown(instance);
     });
     instance.on("dropdown_close", function () {
       if (instance.isFocused) {
@@ -145,8 +165,7 @@
         closeChosen();
       }
     });
-    if (window.ResizeObserver) new ResizeObserver(later).observe(control);
-    later();
+    update();
   }
 
   // Fields that hold sections count them in their label and offer every
