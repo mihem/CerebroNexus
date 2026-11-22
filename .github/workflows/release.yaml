@@ -1,62 +1,27 @@
-# Checks the version on every PR and creates the GitHub release of a version
-# once it reaches master.
+# Creates the GitHub release of a version once it reaches master.
 #
 # A PR bumps the version (DESCRIPTION, inst/app.R) and opens its NEWS
-# section. The version job checks, on PRs and on master, that the three name
-# the same version. When master has a version without a tag v<version>, the
-# release job tags the pushed commit and creates the release: the NEWS
-# section of that version, followed by GitHub's generated "What's Changed"
-# list and the "Full Changelog" link since the previous tag. A push without a
-# new version (docs, CI, update-nix, ...) creates no release.
+# section; tests/testthat/test-app-version-contract.R, part of the required
+# checks, makes sure the three agree. When master has a version without a tag
+# v<version>, this workflow tags the pushed commit and creates the release:
+# the NEWS section of that version, followed by GitHub's generated "What's
+# Changed" list and the "Full Changelog" link since the previous tag. A push
+# without a new version (docs, CI, update-nix, ...) does nothing.
+#
+# No concurrency group: GitHub keeps only one pending run per group, which
+# could drop the release of a version merged right after another.
 
 name: release
 
 on:
   push:
     branches: [master]
-  pull_request:
-    branches: [master]
   workflow_dispatch:
 
 permissions: read-all
 
 jobs:
-  version:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      tag: ${{ steps.version.outputs.tag }}
-      release: ${{ steps.version.outputs.release }}
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Check that DESCRIPTION, inst/app.R and NEWS name the same version
-        id: version
-        run: |
-          version=$(sed -n 's/^Version: *//p' DESCRIPTION)
-          app=$(sed -n 's/.*"cerebro_version" = "\([^"]*\)".*/\1/p' inst/app.R)
-          news=$(sed -n 's/^# CerebroNexus *//p' NEWS.md | head -n 1)
-          if [ "$app" != "$version" ] || [ "$news" != "$version" ]; then
-            echo "::error::Version mismatch: DESCRIPTION $version, inst/app.R $app, first NEWS section $news"
-            exit 1
-          fi
-          echo "Version $version in DESCRIPTION, inst/app.R and NEWS.md"
-
-          tag="v$version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
-            echo "Tag $tag exists: no new release."
-            echo "release=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "Tag $tag does not exist yet: merging this releases $version."
-            echo "release=true" >> "$GITHUB_OUTPUT"
-          fi
-
   release:
-    needs: version
-    if: github.event_name != 'pull_request' && needs.version.outputs.release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -64,9 +29,24 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Look for a version without a tag
+        id: version
+        run: |
+          version=$(sed -n 's/^Version: *//p' DESCRIPTION)
+          tag="v$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            echo "Tag $tag exists, nothing to release."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Take the NEWS section of this version
+        if: steps.version.outputs.release == 'true'
         env:
-          VERSION: ${{ needs.version.outputs.version }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           awk -v h="# CerebroNexus $VERSION" '
             $0 == h { on = 1; print; next }
@@ -76,9 +56,10 @@ jobs:
           cat "$RUNNER_TEMP/notes.md"
 
       - name: Tag and create the release
+        if: steps.version.outputs.release == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ needs.version.outputs.tag }}
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
           gh release create "$TAG" \
             --target "$GITHUB_SHA" \
