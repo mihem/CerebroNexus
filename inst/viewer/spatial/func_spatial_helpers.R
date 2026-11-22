@@ -1636,18 +1636,23 @@ spatial_grid_range <- function(values) {
 ##   coordinates_of(section): the section's coordinates (rows in index order)
 ##   index_of(section): canonical rows of those coordinates
 ##   rotation_of(section): degrees
+##   geometry_of(section, rows): the Viewer Pack file of the section's
+##     positions for these rows, or NULL. A section with one has no positions
+##     in the frame (NA): the browser reads them from the file
+##     (`layout$geometry`, one entry per section).
 spatial_grid_coordinates <- function(
   cells,
   coordinates_of,
   index_of,
-  rotation_of = function(section) 0
+  rotation_of = function(section) 0,
+  geometry_of = function(section, rows) NULL
 ) {
   grid <- spatial_grid_of(cells)
   stopifnot(!is.null(grid))
   ends <- cumsum(grid$counts)
   starts <- ends - grid$counts
   xs <- ys <- vector("list", length(grid$sections))
-  x_ranges <- y_ranges <- vector("list", length(grid$sections))
+  x_ranges <- y_ranges <- geometry <- vector("list", length(grid$sections))
   for (i in seq_along(grid$sections)) {
     section <- grid$sections[[i]]
     full <- spatial_grid_xy(coordinates_of(section))
@@ -1658,6 +1663,12 @@ spatial_grid_coordinates <- function(
       as.integer(cells[(starts[[i]] + 1L):ends[[i]]])
     } else {
       integer()
+    }
+    file <- if (length(rows)) geometry_of(section, rows)
+    if (!is.null(file)) {
+      geometry[i] <- list(file)
+      xs[[i]] <- ys[[i]] <- rep(NA_real_, length(rows))
+      next
     }
     index <- as.integer(index_of(section))
     ## Every cell of the section in its own order (no filter, no sampling):
@@ -1684,7 +1695,8 @@ spatial_grid_coordinates <- function(
     starts = as.integer(starts),
     counts = grid$counts,
     x_ranges = x_ranges,
-    y_ranges = y_ranges
+    y_ranges = y_ranges,
+    geometry = geometry
   )
 }
 
@@ -1781,6 +1793,9 @@ spatial_grid_panels <- function(
         x_range = layout$x_ranges[[i]],
         y_range = layout$y_ranges[[i]]
       ),
+      if (!is.null(layout$geometry[[i]])) {
+        list(geometry_resource = layout$geometry[[i]])
+      },
       image
     )
   })
@@ -1948,7 +1963,15 @@ spatial_grid_stream_split <- function(
     0L
   )
   batches <- spatial_grid_stream_batches(counts, match(shown, sections), ...)
-  if (length(batches) < 2L) {
+  ## Sections whose positions come from a Viewer Pack file carry none here,
+  ## and a frame with such sections always streams: its first message names
+  ## the files.
+  from_file <- vapply(
+    panels[section_at],
+    function(panel) is.list(panel$geometry_resource),
+    logical(1)
+  )
+  if (length(batches) < 2L && !any(from_file)) {
     return(NULL)
   }
   per_cell <- Filter(
@@ -1969,8 +1992,12 @@ spatial_grid_stream_split <- function(
       start = starts[batch],
       count = counts[batch]
     )
+    positioned <- batch[!from_file[batch]]
+    xy_rows <- spatial_grid_stream_rows(positioned, starts, counts)
     for (field in per_cell) {
-      out[[field]] <- unclass(data[[field]])[rows]
+      out[[field]] <- unclass(data[[field]])[
+        if (field %in% c("x", "y")) xy_rows else rows
+      ]
     }
     if (length(projection_at)) {
       projection <- panels[[projection_at[[1L]]]]

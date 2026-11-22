@@ -495,6 +495,79 @@ test_that("a grid of many cells streams its sections in batches, shown first", {
   expect_length(streams, 2L)
 })
 
+test_that("a grid section read from a Viewer Pack file carries no positions", {
+  data <- section_grid_data()
+  cells <- spatial_grid_cells(
+    names(data$index),
+    function(section) data$index[[section]]
+  )
+  file <- list(
+    protocol = "spatial-geometry-v1",
+    url = "pack/002.bin",
+    cells = 2L
+  )
+  layout <- spatial_grid_coordinates(
+    cells,
+    function(section) data$coordinates[[section]],
+    function(section) data$index[[section]],
+    geometry_of = function(section, rows) {
+      if (identical(section, "sectionA2")) file
+    }
+  )
+  ## Its rows have no position; its extent is still its own.
+  expect_equal(layout$coordinates$x[1:3], c(10, 20, 30))
+  expect_true(all(is.na(layout$coordinates$x[4:5])))
+  expect_equal(layout$x_ranges[[2]], c(509.8, 520.2))
+  expect_identical(layout$geometry[[2]], file)
+  expect_null(layout$geometry[[1]])
+  panels <- spatial_grid_panels(layout)
+  expect_identical(panels[[2]]$geometry_resource, file)
+  expect_false("geometry_resource" %in% names(panels[[1]]))
+
+  ## Its batch carries the section's keys and colours but no positions.
+  frame <- list(
+    x = layout$coordinates$x,
+    y = layout$coordinates$y,
+    group_code = 0:8,
+    panels = panels
+  )
+  stream <- spatial_grid_stream_split(
+    frame,
+    character(),
+    min_cells = 5,
+    first = 4,
+    step = 10
+  )
+  expect_identical(
+    unclass(stream$head$grid_stream$section),
+    c("sectionA1", "sectionA2")
+  )
+  expect_equal(stream$head$x, c(10, 20, 30))
+  expect_identical(stream$head$group_code, 0:4)
+  expect_equal(stream$part(2L)$x, c(1010, 1020, 1030, 1040))
+
+  ## A frame whose positions are all in files streams even as one batch.
+  every <- spatial_grid_coordinates(
+    cells,
+    function(section) data$coordinates[[section]],
+    function(section) data$index[[section]],
+    geometry_of = function(section, rows) file
+  )
+  one <- spatial_grid_stream_split(
+    list(
+      x = every$coordinates$x,
+      y = every$coordinates$y,
+      group_code = 0:8,
+      panels = spatial_grid_panels(every)
+    ),
+    character(),
+    min_cells = 5,
+    first = 100
+  )
+  expect_identical(one$batches, 1L)
+  expect_length(one$head$x, 0L)
+})
+
 test_that("a streaming grid's cells travel as runs of rows when they are", {
   ## One block of the data set: its start and length.
   expect_identical(
@@ -643,6 +716,14 @@ test_that("Moran's I finds each cell's six nearest as comparing every pair does"
     "spatial-section-grid.js",
     viewer_test_path("www", "cell_views.js"),
     pass = "PASS Moran's I finds each cell's six nearest through buckets"
+  )
+})
+
+test_that("the browser draws a section read from a file once its batch and file are in", {
+  expect_node_fixture(
+    "spatial-section-grid.js",
+    viewer_test_path("www", "cell_views.js"),
+    pass = "PASS sections read from files wait for their file and their batch"
   )
 })
 

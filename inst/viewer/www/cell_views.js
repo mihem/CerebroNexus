@@ -10542,9 +10542,10 @@
       return panel && panel.projection;
     })[0] || null;
   }
-  function gridStreamArray(values, n, fill) {
+  function gridStreamArray(values, n, fill, field) {
     var Vector = fill === -1 ? Int32Array
-      : values instanceof Float32Array ? Float32Array : Float64Array;
+      : field === 'x' || field === 'y' || values instanceof Float32Array
+        ? Float32Array : Float64Array;
     return new Vector(n).fill(fill);
   }
   // Writes the rows of `part` (its sections' starts and counts, and their
@@ -10562,8 +10563,19 @@
         offset += count;
       }
     };
+    // A batch carries no positions for the sections read from files.
+    var writeXY = part.fromFile ? write : function (target, values) {
+      if (!target || !values) return;
+      for (var s = 0, offset = 0; s < starts.length; s++) {
+        if (gridStreamFromFile(stream, sections[s])) continue;
+        var start = Number(starts[s]), count = Number(counts[s]);
+        for (var k = 0; k < count; k++) target[start + k] = values[offset + k];
+        offset += count;
+      }
+    };
     Object.keys(GRID_ROW_FIELDS).forEach(function (field) {
-      if (part[field] != null) write(data[field], part[field]);
+      if (part[field] == null) return;
+      (field === 'x' || field === 'y' ? writeXY : write)(data[field], part[field]);
     });
     if (projection && part.projection) {
       write(projection.x, part.projection.x);
@@ -10585,8 +10597,64 @@
       }
     }
     if (part.selection_key != null) write(data.selection_key, part.selection_key);
-    sections.forEach(function (section) { stream.loaded[String(section)] = true; });
+    var arrived = part.fromFile ? stream.filesLoaded : stream.loaded;
+    sections.forEach(function (section) { arrived[String(section)] = true; });
     if (part.done) stream.done = true;
+  }
+  // Sections whose positions a Viewer Pack file holds (the panel names it):
+  // the browser fetches them, the batches carry none.
+  function gridStreamFromFile(stream, section) {
+    return !!(stream && stream.files && stream.files[String(section)]);
+  }
+  // Every batch in and every file read.
+  function gridStreamComplete(stream) {
+    return !!stream && !!stream.done &&
+      Object.keys(stream.files || {}).every(function (section) {
+        return stream.filesLoaded[section];
+      });
+  }
+  // The positions of the sections in files: all fetched at once, in parallel
+  // (the browser keeps them), and written in as they come, the panels drawing
+  // again once an animation frame. A file that cannot be read tells the
+  // server, which sends this session's grids with their positions again.
+  var gridFileParts = [], gridFileFrame = 0;
+  function gridStreamFetchFiles(id, view, message) {
+    var data = view && view.data, stream = data && data.grid_stream;
+    if (!stream || !stream.files || stream.fetching) return;
+    stream.fetching = true;
+    Object.keys(stream.files).forEach(function (section) {
+      var panel = stream.files[section], count = Number(panel.count);
+      fetchValidatedSingleGeometryResource(panel.geometry_resource, message, count)
+        .then(function (result) {
+          var coordinates = result && result.coordinates;
+          if (!coordinates || coordinates.x.length !== count) {
+            throw new Error('Spatial geometry length mismatch');
+          }
+          var current = singleView(id, view.dataset_context);
+          if (!current || !current.data || current.data.grid_stream !== stream) return;
+          var part = { id: id, fromFile: true, section: [section],
+            start: [Number(panel.start)], count: [count],
+            x: coordinates.x, y: coordinates.y };
+          gridStreamWrite(current.data, part);
+          gridFileParts.push(part);
+          if (!gridFileFrame) {
+            gridFileFrame = requestAnimationFrame(function () {
+              gridFileFrame = 0;
+              var parts = gridFileParts;
+              gridFileParts = [];
+              parts.forEach(gridStreamPaint);
+            });
+          }
+        })
+        .catch(function () {
+          if (stream.failed) return;
+          stream.failed = true;
+          if (typeof Shiny !== 'undefined' && Shiny.setInputValue) {
+            Shiny.setInputValue(id + '_projection_resource_failed',
+              String(panel.geometry_resource.url || ''), { priority: 'event' });
+          }
+        });
+    });
   }
   // The first frame of a stream, at full length: its own rows in place.
   function gridStreamExpand(data) {
@@ -10598,7 +10666,7 @@
     Object.keys(GRID_ROW_FIELDS).forEach(function (field) {
       if (data[field] == null) return;
       part[field] = data[field];
-      data[field] = gridStreamArray(data[field], n, GRID_ROW_FIELDS[field]);
+      data[field] = gridStreamArray(data[field], n, GRID_ROW_FIELDS[field], field);
     });
     if (projection) {
       part.projection = { x: projection.x, y: projection.y };
@@ -10616,13 +10684,23 @@
       data.selection_rows = new Int32Array(n).fill(-1);
     }
     stream.loaded = {};
+    stream.files = {};
+    stream.filesLoaded = {};
+    (data.panels || []).forEach(function (panel) {
+      if (panel && panel.section != null && panel.geometry_resource) {
+        stream.files[String(panel.section)] = panel;
+      }
+    });
     stream.done = Number(stream.batches) <= 1;
     gridStreamWrite(data, part);
   }
+  // A section waits for its batch and, when its positions are in a file, for
+  // the file.
   function gridStreamPending(data, section) {
-    var stream = data && data.grid_stream;
-    return !!(stream && stream.loaded && !stream.done &&
-      !stream.loaded[String(section)]);
+    var stream = data && data.grid_stream, key = String(section);
+    if (!stream || !stream.loaded) return false;
+    return (!stream.done && !stream.loaded[key]) ||
+      (gridStreamFromFile(stream, key) && !stream.filesLoaded[key]);
   }
   // Batches waiting for the frame `view` now holds go into it; those of
   // older frames are dropped.
@@ -10665,20 +10743,37 @@
         offset += count;
       }
     };
+    var stream = live.data.grid_stream;
+    // A batch's positions skip the sections read from files.
+    var copyXY = part.fromFile ? copy : function (target, values) {
+      if (!target || !values) return;
+      var sections = [].concat(part.section);
+      for (var s = 0, offset = 0; s < starts.length; s++) {
+        if (gridStreamFromFile(stream, sections[s])) continue;
+        var start = Number(starts[s]), count = Number(counts[s]), k, at;
+        for (k = 0; k < count; k++) {
+          at = map ? map[start + k] : start + k;
+          if (at != null) target[at] = values[offset + k];
+        }
+        offset += count;
+      }
+    };
     var written = [];
     [].concat(part.section).forEach(function (section) {
       (live.spaces[String(section)] || []).forEach(function (spaceId) {
         var space = spaceById[spaceId];
         if (!space) return;
         // Sections share one pair of arrays (sharedSliceGeometry()).
-        if (space.x !== live.data.x && written.indexOf(space.x) < 0) {
+        if (part.x && space.x !== live.data.x && written.indexOf(space.x) < 0) {
           written.push(space.x);
-          copy(space.x, part.x);
-          copy(space.y, part.y);
+          copyXY(space.x, part.x);
+          copyXY(space.y, part.y);
         }
-        space._gridPending = false;
+        space._gridPending = gridStreamPending(live.data, section);
         space._unit = null;
-        touched[spaceId] = true;
+        // A section still waiting for its batch or its file draws once both
+        // are in: drawing it from half its data was done twice.
+        if (!space._gridPending) touched[spaceId] = true;
       });
     });
     if (group && part.group_code) {
@@ -10732,10 +10827,8 @@
       drawPanel(p);
     });
     updateMoranBadges(touched);
-    if (part.done) {
-      gridLive = null;
-      renderLegend();
-    }
+    if (part.done) renderLegend();
+    if (gridStreamComplete(stream)) gridLive = null;
   }
   function onGridRows(buffer) {
     var part = window.CBViewWire.unpack(buffer);
@@ -11312,7 +11405,7 @@
       modes[spaceId] = mode;
     });
     gridLive = null;
-    if (data.grid_stream && !data.grid_stream.done && !channelModes) {
+    if (data.grid_stream && !gridStreamComplete(data.grid_stream) && !channelModes) {
       gridLive = { data: data, D: D, mode: mode, spaces: {}, projection: null,
         rows: positional ? null : (frameRows || alignedRows(keys)) };
       spaces.forEach(function (spaceId) {
@@ -11906,6 +11999,7 @@
     });
     singleViews[cacheKey].unrequested = unrequested;
     drainGridRows(id, singleViews[cacheKey]);
+    gridStreamFetchFiles(id, singleViews[cacheKey], message);
     if (changedGroup) singleViews[cacheKey].hiddenGroups = [];
     if (data.reset_axes) singleViews[cacheKey].lenses = [];
     var pending = singleViews[cacheKey].pendingSavedState;

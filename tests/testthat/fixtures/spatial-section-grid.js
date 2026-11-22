@@ -430,3 +430,30 @@ function random() { seed = (seed * 16807) % 2147483647; return seed / 2147483647
   }
 });
 console.log("PASS Moran's I finds each cell's six nearest through buckets");
+
+// ---- sections whose positions are in Viewer Pack files ---------------------------
+// Section A's positions come from a file; B's and C's travel in the batches.
+// A waits for both its batch and its file.
+var filed = {
+  x: [7, 8], y: [7, 8], group_code: [0, 1, 1, 0],
+  panels: [{ section: 'A', start: 0, count: 2, geometry_resource: { url: 'a.bin' } },
+    { section: 'B', start: 2, count: 2 }, { section: 'C', start: 4, count: 1 }],
+  grid_stream: { rows: 5, section: ['A', 'B'], start: [0, 2], count: [2, 2], batches: 2 }
+};
+gridStreamExpand(filed);
+assert.ok(filed.x instanceof Float32Array, 'positions are single precision');
+assert.deepStrictEqual(Array.from(filed.x).map(function (v) { return isNaN(v) ? null : v; }),
+  [null, null, 7, 8, null], "the batch's positions go to B; A's wait for its file");
+assert.deepStrictEqual(Array.from(filed.group_code), [0, 1, 1, 0, -1], 'its colours do not');
+assert.strictEqual(gridStreamFromFile(filed.grid_stream, 'A'), true);
+assert.strictEqual(gridStreamPending(filed, 'A'), true, 'its batch is in, its file is not');
+assert.strictEqual(gridStreamPending(filed, 'B'), false);
+gridStreamWrite(filed, { fromFile: true, section: ['A'], start: [0], count: [2],
+  x: Float32Array.from([1, 2]), y: Float32Array.from([3, 4]) });
+assert.deepStrictEqual(Array.from(filed.x.slice(0, 4)), [1, 2, 7, 8]);
+assert.strictEqual(gridStreamPending(filed, 'A'), false);
+assert.strictEqual(gridStreamComplete(filed.grid_stream), false, 'C is still to come');
+gridStreamWrite(filed, { section: ['C'], start: [4], count: [1], x: [9], y: [9], group_code: [0], done: true });
+assert.strictEqual(filed.x[4], 9);
+assert.strictEqual(gridStreamComplete(filed.grid_stream), true);
+console.log('PASS sections read from files wait for their file and their batch');

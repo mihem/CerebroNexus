@@ -165,6 +165,37 @@ spatial_projection_coexpression_columns <- function(
   metadata
 }
 
+## The Viewer Pack files of a large grid's sections, for
+## spatial_grid_coordinates(): a grid that streams (spatial_grid_stream_split())
+## takes each whole, unrotated section's positions from its file
+## (viewerSpatialGeometryAsset()), which the browser fetches and keeps, so
+## neither R nor the websocket carries them (31 MB for the Allen atlas). A
+## section with a background image keeps its positions in the frame, where they
+## place the image. Once the browser could not read such a file, the session's
+## grids send their positions again.
+spatial_grid_geometry_files <- function(plot_parameters, cells, rotation_of) {
+  none <- function(section, rows) NULL
+  failed <- input[["spatial_projection_projection_resource_failed"]]
+  if (
+    length(cells) < spatial_grid_stream_min ||
+      identical(plot_parameters[["plot_type"]], "Co-expression (RGB)") ||
+      (length(failed) == 1L && !is.na(failed) && nzchar(failed)) ||
+      !exists("viewerSpatialGeometryAsset", mode = "function")
+  ) {
+    return(none)
+  }
+  backgrounds <- plot_parameters[["grid_backgrounds"]] %||% list()
+  function(section, rows) {
+    if (!is.null(backgrounds[[section]])) {
+      return(NULL)
+    }
+    tryCatch(
+      viewerSpatialGeometryAsset(section, rows, rotation_of(section)),
+      error = function(error) NULL
+    )
+  }
+}
+
 spatial_projection_grid_data <- function(
   dataset_context,
   plot_parameters,
@@ -172,11 +203,15 @@ spatial_projection_grid_data <- function(
 ) {
   dataset <- dataset_context$dataset_key
   options <- if (exists("Cerebro.options")) Cerebro.options else NULL
+  rotation_of <- function(section) {
+    spatialPlotRotation(options, dataset, section)
+  }
   layout <- spatial_grid_coordinates(
     cells_to_extract,
     spatial_grid_section_xy,
     spatial_grid_section_index,
-    function(section) spatialPlotRotation(options, dataset, section)
+    rotation_of,
+    spatial_grid_geometry_files(plot_parameters, cells_to_extract, rotation_of)
   )
   cells <- c(cells_to_extract)
   columns <- spatial_projection_metadata_columns(plot_parameters)
@@ -224,8 +259,15 @@ spatial_projection_grid_data <- function(
       y = as.numeric(embedding[cells, 2L])
     )
   }
-  plot_parameters[["x_range"]] <- spatial_grid_range(layout$coordinates$x)
-  plot_parameters[["y_range"]] <- spatial_grid_range(layout$coordinates$y)
+  ## With positions read from files the frame has none of theirs: its
+  ## extent is that of its sections.
+  from_files <- any(!vapply(layout$geometry, is.null, logical(1)))
+  plot_parameters[["x_range"]] <- spatial_grid_range(
+    if (from_files) unlist(layout$x_ranges) else layout$coordinates$x
+  )
+  plot_parameters[["y_range"]] <- spatial_grid_range(
+    if (from_files) unlist(layout$y_ranges) else layout$coordinates$y
+  )
   list(
     dataset_context = dataset_context,
     cells_df = metadata,

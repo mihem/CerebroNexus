@@ -774,5 +774,10 @@ spatial_grid_stream_send <- function(
     }
     invisible(NULL)
   }
+  ## A frame of one batch (its sections' positions all in files) is sent.
+  if (stream$batches < 2L) {
+    spatial_grid_drawn_geometry <<- geometry
+    return(invisible(NULL))
+  }
   later::later(function() send(2L), 0)
 }
