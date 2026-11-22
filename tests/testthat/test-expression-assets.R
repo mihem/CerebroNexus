@@ -107,7 +107,7 @@ test_that("the first gene of a session is fetched in parallel with R", {
 })
 
 test_that("a direct marker bypasses source reads and a failed asset falls back", {
-  scope <- new.env(parent = globalenv())
+  scope <- new.env(parent = asNamespace("shiny"))
   scope$input <- list(sidebar = "other")
   scope$expression_projection_render_key <- function() "key"
   scope$expression_projection_coordinates <- function() data.frame(x = 1:3, y = 3:1)
