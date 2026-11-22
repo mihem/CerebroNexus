@@ -10337,7 +10337,14 @@
 
   // Direct assets replace only the values, never geometry or selection state.
   // Token checks apply again after asynchronous IO: an older fetch cannot win.
-  var expressionFrameToken = 0, expressionFrames = new Map();
+  // Only a newer frame from R may drop R's frame, because only that frame is
+  // sure to replace it: a selection, or a gene list that becomes ready, need
+  // not make R send anything. Selections and frames both cancel a preview
+  // (expressionFrameToken); any later frame drops a recolor
+  // (expressionMessageToken); only a later full frame drops a full frame,
+  // which is what creates the view (expressionFullToken).
+  var expressionFrameToken = 0, expressionMessageToken = 0;
+  var expressionFullToken = 0, expressionFrames = new Map();
   // Controls that can change how the projection is coloured. The summary
   // plot's group selector fills in after the first gene is drawn; counting it
   // made the second gene of every session miss its preview.
@@ -10421,16 +10428,14 @@
     var message = window.CBViewWire.unpack(buffer);
     if (!message || !datasetMessageFresh(message)) return;
     if (message.id !== 'expression_projection') return recolorSingle(message);
-    if (!message.data.expression_resource) {
-      ++expressionFrameToken;
-      return recolorSingle(message);
-    }
-    var token = ++expressionFrameToken;
+    ++expressionFrameToken;
+    var token = ++expressionMessageToken;
+    if (!message.data.expression_resource) return recolorSingle(message);
     hydrateExpressionResource(message).then(function (hydrated) {
-      if (token !== expressionFrameToken || !datasetMessageFresh(hydrated)) return;
+      if (token !== expressionMessageToken || !datasetMessageFresh(hydrated)) return;
       recolorSingle(hydrated);
     }).catch(function () {
-      if (token === expressionFrameToken) expressionResourceFailed(message);
+      if (token === expressionMessageToken) expressionResourceFailed(message);
     });
   }
   // The single-gene, direct-asset view a preview may replace, or null.
@@ -11207,8 +11212,11 @@
         return;
       }
       if (!datasetMessageFresh(message)) return;
-      var expressionToken = message.id === 'expression_projection'
-        ? ++expressionFrameToken : null;
+      var expressionToken = null;
+      if (message.id === 'expression_projection') {
+        ++expressionFrameToken; ++expressionMessageToken;
+        expressionToken = ++expressionFullToken;
+      }
       var namesFailed = false;
       (frameNeedsCellNames(message)
         ? resolveFrameCellNames(message).then(hydrateSingleProjectionResource, function (error) {
@@ -11217,7 +11225,7 @@
         })
          : hydrateSingleProjectionResource(message)).then(hydrateExpressionResource).then(function (hydrated) {
          if (!datasetMessageFresh(hydrated)) return;
-         if (expressionToken !== null && expressionToken !== expressionFrameToken) return;
+         if (expressionToken !== null && expressionToken !== expressionFullToken) return;
         if (hydrated.dataset_identity) {
           window.cerebroSavedViewDataset = hydrated.dataset_identity;
         }
@@ -11225,7 +11233,7 @@
       }).catch(function () {
          if (!datasetMessageFresh(message)) return;
          if (message.data.expression_resource) {
-           if (expressionToken === expressionFrameToken) expressionResourceFailed(message);
+           if (expressionToken === expressionFullToken) expressionResourceFailed(message);
            return;
          }
         if (namesFailed) {

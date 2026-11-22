@@ -102,6 +102,50 @@ window.viewerScenarios = {
     } finally {window.CerebroExpressionAssets=original;}
     return true;
   },
+  // On a slow link the first frame's downloads finish only after the gene list
+  // has become ready. That event makes R send nothing, so it must not drop the
+  // frame that creates the view: the page would stay empty.
+  async directExpressionSlowFirstFrame() {
+    const t = viewerTest; t.dataset('slow', 7);
+    const identity = {cell_count:3, cell_fingerprint:'md5-cell-set-v1:'+'a'.repeat(32),
+      cell_order_fingerprint:'md5-cell-order-v1:'+'b'.repeat(32),
+      pack_dataset_fingerprint:'md5-crb-v1:'+'c'.repeat(32)};
+    const resource = gene => ({protocol:'expression-f64-gzip-v1',gene,cells:3,
+      dataset_fingerprint:identity.cell_fingerprint,
+      cell_order_fingerprint:identity.cell_order_fingerprint,
+      pack_dataset_fingerprint:identity.pack_dataset_fingerprint,
+      url:'cerebro-expression-test/00000'+(gene==='A'?1:2)+'.bin.gz?v='+'d'.repeat(32)});
+    const arrays = {A:new Float64Array([0,1,2]),B:new Float64Array([5,0,1])};
+    const releases = {};
+    const original = window.CerebroExpressionAssets;
+    window.CerebroExpressionAssets = {
+      load:r=>new Promise(resolve=>{releases[r.gene]=()=>resolve(arrays[r.gene]);}),
+      peek:()=>null, loadIndex:()=>Promise.resolve(null), resourceFor:()=>null
+    };
+    const select = value => jQuery(document).trigger(
+      {type:'shiny:inputchanged',name:'expression_genes_input',value});
+    const drawn = token => t.events.some(e=>e.name==='cerebro:cell-view-ready'&&e.renderToken===token);
+    try {
+      t.resetPaint();
+      const first=await t.render({expression_resource:resource('A'),render_key:'A'},
+        {color_variable:'A'},'expression_projection',{dataset_identity:identity});
+      select('');select([]);await t.settle();
+      releases.A();await t.settle();
+      t.check(drawn(first.render_token),'The first frame is drawn although the gene list became ready meanwhile');
+      t.check(document.getElementById('cv-cbar').textContent.includes('A'),'First frame legend names A');
+      // Control: a newer full frame still wins over an older one still loading.
+      t.resetPaint();
+      const older=await t.render({expression_resource:resource('A'),render_key:'A2'},
+        {color_variable:'A'},'expression_projection',{dataset_identity:identity});
+      const releaseOlder=releases.A;
+      const newer=await t.render({expression_resource:resource('B'),render_key:'B'},
+        {color_variable:'B'},'expression_projection',{dataset_identity:identity});
+      releases.B();await t.settle();releaseOlder();await t.settle();
+      t.check(drawn(newer.render_token)&&!drawn(older.render_token),'An older full frame cannot win over a newer one');
+      t.check(document.getElementById('cv-cbar').textContent.includes('B'),'Newer frame legend names B');
+    } finally {window.CerebroExpressionAssets=original;}
+    return true;
+  },
   async directExpressionUnseen() {
     const t = viewerTest; t.dataset();
     const identity = {cell_count:3, cell_fingerprint:'md5-cell-set-v1:'+'a'.repeat(32),

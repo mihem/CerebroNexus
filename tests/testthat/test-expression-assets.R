@@ -101,6 +101,11 @@ test_that("unseen genes fetch on selection and preview before R replies", {
   viewer_browser_test("directExpressionUnseen")
 })
 
+test_that("a slow first frame is drawn although the gene list became ready meanwhile", {
+  skip_on_cran()
+  viewer_browser_test("directExpressionSlowFirstFrame")
+})
+
 test_that("the first gene of a session is fetched in parallel with R", {
   skip_on_cran()
   viewer_browser_test("directExpressionPrefetch")
