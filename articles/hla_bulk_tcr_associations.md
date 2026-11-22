@@ -454,12 +454,12 @@ key is `v_gene+cdr3` rather than CDR3 alone.
 
 ``` r
 sessionInfo()
-#> R version 4.6.1 (2026-06-24)
+#> R version 4.6.2 (2026-10-29)
 #> Platform: x86_64-pc-linux-gnu
 #> Running under: Ubuntu 26.04.1 LTS
 #> 
 #> Matrix products: default
-#> BLAS/LAPACK: /nix/store/25fsigqyn8wpkjavqf74zcvlcrfzma4c-blas-3/lib/libblas.so.3;  LAPACK version 3.12.0
+#> BLAS/LAPACK: /nix/store/rcqarsssrqbj4js5rxppiabc2d6hjfm0-blas-3/lib/libblas.so.3;  LAPACK version 3.12.0
 #> 
 #> locale:
 #>  [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C              
@@ -477,10 +477,10 @@ sessionInfo()
 #> 
 #> loaded via a namespace (and not attached):
 #>  [1] digest_0.6.39     desc_1.4.3        R6_2.6.1          fastmap_1.2.0    
-#>  [5] xfun_0.61         cachem_1.1.0      knitr_1.52        htmltools_0.5.9  
+#>  [5] xfun_0.62         cachem_1.1.0      knitr_1.52        htmltools_0.5.9  
 #>  [9] rmarkdown_2.32    lifecycle_1.0.5   cli_3.6.6         sass_0.4.10      
-#> [13] pkgdown_2.2.1     textshaping_1.0.5 jquerylib_0.1.4   systemfonts_1.3.2
-#> [17] compiler_4.6.1    tools_4.6.1       ragg_1.5.2        bslib_0.12.0     
-#> [21] evaluate_1.0.5    yaml_2.3.12       otel_0.2.0        jsonlite_2.0.0   
+#> [13] pkgdown_2.2.1     textshaping_1.0.5 jquerylib_0.1.4   systemfonts_1.3.3
+#> [17] compiler_4.6.2    tools_4.6.2       ragg_1.5.2        bslib_0.12.0     
+#> [21] evaluate_1.0.5    yaml_2.3.12       otel_0.3.0        jsonlite_2.0.0   
 #> [25] rlang_1.3.0       fs_2.1.0          htmlwidgets_1.6.4
 ```

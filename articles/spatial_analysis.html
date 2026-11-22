@@ -102,7 +102,7 @@
                         <h4 data-toc-skip class="author">Xuesong
 Wang</h4>
             
-            <h4 data-toc-skip class="date">21 November, 2026</h4>
+            <h4 data-toc-skip class="date">22 November, 2026</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/articles/spatial_analysis.Rmd" class="external-link"><code>vignettes/articles/spatial_analysis.Rmd</code></a></small>
       <div class="d-none name"><code>spatial_analysis.Rmd</code></div>
@@ -263,13 +263,13 @@ is loaded.</p>
 <h3 id="xenium-and-10x-atera-objects">Xenium and 10x Atera objects<a class="anchor" aria-label="anchor" href="#xenium-and-10x-atera-objects"></a>
 </h3>
 <p>Objects from Seurat’s imaging readers (<code><a href="https://satijalab.org/seurat/reference/ReadXenium.html" class="external-link">LoadXenium()</a></code>, and
-in Seurat 6 <code>LoadAtera()</code> for 10x Atera) keep their counts in
+in Seurat 6 <code><a href="https://satijalab.org/seurat/reference/ReadAtera.html" class="external-link">LoadAtera()</a></code> for 10x Atera) keep their counts in
 an assay named after the platform, not <code>RNA</code>, and Seurat
 names the per-cell totals after it (<code>nCount_Xenium</code>,
 <code>nCount_Atera</code>). Pass the assay and these two columns; the
 Builder picks them on its own. The readers add no dimensional reduction,
 so run e.g. <code><a href="https://satijalab.org/seurat/reference/RunPCA.html" class="external-link">RunPCA()</a></code> and <code><a href="https://satijalab.org/seurat/reference/RunUMAP.html" class="external-link">RunUMAP()</a></code> first.</p>
-<p><code>LoadAtera()</code> needs the <code>blosc</code>,
+<p><code><a href="https://satijalab.org/seurat/reference/ReadAtera.html" class="external-link">LoadAtera()</a></code> needs the <code>blosc</code>,
 <code>jsonlite</code> and <code>data.table</code> packages, and by
 default reads the cell centroids only. Whatever the FOV holds is
 exported, so ask for the rest when reading:</p>
@@ -288,7 +288,7 @@ reach the FOV or the <code>.crb</code>.</li>
 <code><a href="https://satijalab.github.io/seurat-object/reference/Misc.html" class="external-link">Misc()</a></code> is not exported; supply a background through
 <code>spatial_images</code> like any other.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">atera</span> <span class="op">&lt;-</span> <span class="fu">Seurat</span><span class="fu">::</span><span class="fu">LoadAtera</span><span class="op">(</span></span>
+<code class="sourceCode R"><span><span class="va">atera</span> <span class="op">&lt;-</span> <span class="fu">Seurat</span><span class="fu">::</span><span class="fu"><a href="https://satijalab.org/seurat/reference/ReadAtera.html" class="external-link">LoadAtera</a></span><span class="op">(</span></span>
 <span>  <span class="st">"path/to/atera_outs"</span>,</span>
 <span>  segmentations <span class="op">=</span> <span class="st">"cell"</span>,</span>
 <span>  molecule.coordinates <span class="op">=</span> <span class="cn">TRUE</span>,</span>

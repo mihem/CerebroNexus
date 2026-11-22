@@ -765,13 +765,15 @@ standard (`measure_session.R`).
   Seurat 6 keeps the v5 object and assay classes, and the Seurat,
   spatial and Builder tests give the same results on Seurat 6.0.0 as on
   5.5.1. The Spatial analysis article shows how to export a 10x Atera
-  object read with Seurat 6’s `LoadAtera()`, the same way as a Xenium
-  object, and which `LoadAtera()` arguments bring the cell outlines and
-  molecules along. Checked with 10x’s tiny Atera dataset: centroids,
-  cell outlines and molecules reach the `.crb`. A test exports an
-  in-memory object of the same shape and checks the cells, counts,
-  expression and spatial data that come back, and that the Builder picks
-  `nCount_Atera`/`nFeature_Atera`.
+  object read with Seurat 6’s
+  [`LoadAtera()`](https://satijalab.org/seurat/reference/ReadAtera.html),
+  the same way as a Xenium object, and which
+  [`LoadAtera()`](https://satijalab.org/seurat/reference/ReadAtera.html)
+  arguments bring the cell outlines and molecules along. Checked with
+  10x’s tiny Atera dataset: centroids, cell outlines and molecules reach
+  the `.crb`. A test exports an in-memory object of the same shape and
+  checks the cells, counts, expression and spatial data that come back,
+  and that the Builder picks `nCount_Atera`/`nFeature_Atera`.
 
 ## CerebroNexus 8.0.1
 

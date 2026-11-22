@@ -125,18 +125,21 @@ loaded.
 
 Objects from Seurat’s imaging readers
 ([`LoadXenium()`](https://satijalab.org/seurat/reference/ReadXenium.html),
-and in Seurat 6 `LoadAtera()` for 10x Atera) keep their counts in an
-assay named after the platform, not `RNA`, and Seurat names the per-cell
-totals after it (`nCount_Xenium`, `nCount_Atera`). Pass the assay and
-these two columns; the Builder picks them on its own. The readers add no
-dimensional reduction, so run
+and in Seurat 6
+[`LoadAtera()`](https://satijalab.org/seurat/reference/ReadAtera.html)
+for 10x Atera) keep their counts in an assay named after the platform,
+not `RNA`, and Seurat names the per-cell totals after it
+(`nCount_Xenium`, `nCount_Atera`). Pass the assay and these two columns;
+the Builder picks them on its own. The readers add no dimensional
+reduction, so run
 e.g. [`RunPCA()`](https://satijalab.org/seurat/reference/RunPCA.html)
 and [`RunUMAP()`](https://satijalab.org/seurat/reference/RunUMAP.html)
 first.
 
-`LoadAtera()` needs the `blosc`, `jsonlite` and `data.table` packages,
-and by default reads the cell centroids only. Whatever the FOV holds is
-exported, so ask for the rest when reading:
+[`LoadAtera()`](https://satijalab.org/seurat/reference/ReadAtera.html)
+needs the `blosc`, `jsonlite` and `data.table` packages, and by default
+reads the cell centroids only. Whatever the FOV holds is exported, so
+ask for the rest when reading:
 
 - `segmentations = "cell"` (or `"nucleus"`) for the cell outlines;
 - `molecule.coordinates = TRUE` together with `genes` for transcript
