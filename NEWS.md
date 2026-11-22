@@ -8,7 +8,13 @@
   again. On the Allen atlas (3.9 million cells in 59 sections; Windows,
   Chrome) choosing every section sends 19.7 MB instead of 51.2 MB over the
   connection; the second time, the first screen of panels is drawn after
-  2.1 s instead of 2.8 s and all 59 after 2.8 s instead of 4.0 s.
+  2.1 s instead of 2.8 s and all 59 after 2.8 s instead of 4.0 s. The files
+  are fetched a few at a time, in the order of the panels, so that they do
+  not hold back the batches that bring the colours: on a 50 Mbit/s link the
+  first screen is drawn after 3.9 to 5.2 s the first time instead of 5.8 to
+  6.3 s with every file at once (0.2 to 0.5 s later on the same computer),
+  and all 59 after 4.1 to 4.3 s the second time instead of 9.9 to 11.8 s
+  without the files.
 - **Recolouring a grid keeps its panels.** Colouring the Spatial grid by
   another column or gene updates the colours of the panels in place instead
   of building them anew, and a gene that few cells express sends those cells

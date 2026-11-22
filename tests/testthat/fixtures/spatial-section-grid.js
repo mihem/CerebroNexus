@@ -315,7 +315,14 @@ calls = [];
 var partC = { id: 'spatial_projection', render_token: 5, section: 'C', start: 5, count: 4,
   x: [60, 70, 80, 90], y: [6, 7, 8, 9], group_code: Int8Array.from([1, 9, -1, 0]), done: true };
 gridStreamWrite(streamed, partC);
+// A file read still to be drawn (it waits for an animation frame) keeps the
+// stream open even though every batch and file is in.
+gridFileParts = [{ id: 'spatial_projection', fromFile: true, section: ['B'] }];
 gridStreamPaint(partC);
+gridStreamSettle();
+assert.notStrictEqual(gridLive, null, 'a file read waits to be drawn');
+gridFileParts = [];
+gridStreamSettle();
 assert.deepStrictEqual(Array.from(sharedX.slice(5)), [60, 70, 80, 90]);
 assert.strictEqual(spaceById.sC._gridPending, false);
 assert.strictEqual(spaceById.sC._unit, null, 'its extent is measured anew');
@@ -457,3 +464,45 @@ gridStreamWrite(filed, { section: ['C'], start: [4], count: [1], x: [9], y: [9],
 assert.strictEqual(filed.x[4], 9);
 assert.strictEqual(gridStreamComplete(filed.grid_stream), true);
 console.log('PASS sections read from files wait for their file and their batch');
+
+// ---- the files are fetched a few at a time, in panel order -----------------------
+// All at once they would hold back the batches that bring the colours.
+(function () {
+  var requested = [], waiting = [], inFlight = 0, most = 0;
+  var sections = ['A', 'B', 'C', 'D', 'E'];
+  var many = {
+    x: [], y: [],
+    panels: sections.map(function (s, i) {
+      return { section: s, start: i, count: 1, geometry_resource: { url: s + '.bin' } };
+    }),
+    grid_stream: { rows: 5, section: [], start: [], count: [], batches: 2 }
+  };
+  gridStreamExpand(many);
+  var view = { data: many, dataset_context: 'ctx' };
+  singleView = function () { return view; };
+  requestAnimationFrame = function () { return 1; };
+  fetchValidatedSingleGeometryResource = function (resource) {
+    requested.push(resource.url);
+    inFlight++; most = Math.max(most, inFlight);
+    return new Promise(function (resolve) {
+      waiting.push(function () {
+        inFlight--;
+        resolve({ coordinates: { x: Float32Array.of(1), y: Float32Array.of(2) } });
+      });
+    });
+  };
+  gridStreamFetchFiles('spatial_projection', view, {});
+  assert.deepStrictEqual(requested, ['A.bin', 'B.bin', 'C.bin'], 'three at first, in panel order');
+  function settle() {
+    if (!waiting.length) {
+      assert.deepStrictEqual(requested, ['A.bin', 'B.bin', 'C.bin', 'D.bin', 'E.bin']);
+      assert.strictEqual(most, 3, 'never more than three at once');
+      sections.forEach(function (s) { assert.ok(many.grid_stream.filesLoaded[s], s + ' is in'); });
+      console.log('PASS the grid fetches its files a few at a time, in panel order');
+      return;
+    }
+    waiting.shift()();
+    setTimeout(settle, 0);
+  }
+  settle();
+})();

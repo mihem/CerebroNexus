@@ -10618,11 +10618,26 @@
   // again once an animation frame. A file that cannot be read tells the
   // server, which sends this session's grids with their positions again.
   var gridFileParts = [], gridFileFrame = 0;
+  // A few files at a time, in panel order (the order the batches come in):
+  // all at once they fill the connection and hold back the batches that bring
+  // the panels' colours. On a 50 Mbit/s link the first screen of the Allen
+  // atlas waited until 6.6 s for its second batch, which came at 2.0 s once
+  // the files were cached.
+  var GRID_FILES_AT_ONCE = 3;
   function gridStreamFetchFiles(id, view, message) {
     var data = view && view.data, stream = data && data.grid_stream;
     if (!stream || !stream.files || stream.fetching) return;
     stream.fetching = true;
-    Object.keys(stream.files).forEach(function (section) {
+    var queue = (data.panels || []).filter(function (panel) {
+      return panel && panel.section != null && stream.files[String(panel.section)];
+    }).map(function (panel) { return String(panel.section); });
+    function current() {
+      var latest = singleView(id, view.dataset_context);
+      return latest && latest.data && latest.data.grid_stream === stream ? latest : null;
+    }
+    function next() {
+      if (stream.failed || !queue.length || !current()) return;
+      var section = queue.shift();
       var panel = stream.files[section], count = Number(panel.count);
       fetchValidatedSingleGeometryResource(panel.geometry_resource, message, count)
         .then(function (result) {
@@ -10630,12 +10645,12 @@
           if (!coordinates || coordinates.x.length !== count) {
             throw new Error('Spatial geometry length mismatch');
           }
-          var current = singleView(id, view.dataset_context);
-          if (!current || !current.data || current.data.grid_stream !== stream) return;
+          var latest = current();
+          if (!latest) return;
           var part = { id: id, fromFile: true, section: [section],
             start: [Number(panel.start)], count: [count],
             x: coordinates.x, y: coordinates.y };
-          gridStreamWrite(current.data, part);
+          gridStreamWrite(latest.data, part);
           gridFileParts.push(part);
           if (!gridFileFrame) {
             gridFileFrame = requestAnimationFrame(function () {
@@ -10643,6 +10658,7 @@
               var parts = gridFileParts;
               gridFileParts = [];
               parts.forEach(gridStreamPaint);
+              gridStreamSettle();
             });
           }
         })
@@ -10653,8 +10669,10 @@
             Shiny.setInputValue(id + '_projection_resource_failed',
               String(panel.geometry_resource.url || ''), { priority: 'event' });
           }
-        });
-    });
+        })
+        .then(next);
+    }
+    for (var k = 0; k < GRID_FILES_AT_ONCE; k++) next();
   }
   // The first frame of a stream, at full length: its own rows in place.
   function gridStreamExpand(data) {
@@ -10828,7 +10846,13 @@
     });
     updateMoranBadges(touched);
     if (part.done) renderLegend();
-    if (gridStreamComplete(stream)) gridLive = null;
+  }
+  // The stream is over once every batch and file is in and drawn: a file read
+  // waits for an animation frame to be drawn, and the last batch can come
+  // before it (its section stayed pending).
+  function gridStreamSettle() {
+    if (gridLive && !gridFileParts.length && !gridFileFrame &&
+        gridStreamComplete(gridLive.data.grid_stream)) gridLive = null;
   }
   function onGridRows(buffer) {
     var part = window.CBViewWire.unpack(buffer);
@@ -10843,6 +10867,7 @@
     if (Number(view.render_token) !== token) return;
     gridStreamWrite(view.data, part);
     gridStreamPaint(part);
+    gridStreamSettle();
   }
   // Columns asked for, or null for the automatic packing.
   function gridColumnsChoice(count) {

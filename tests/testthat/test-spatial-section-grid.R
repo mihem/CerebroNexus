@@ -727,6 +727,14 @@ test_that("the browser draws a section read from a file once its batch and file 
   )
 })
 
+test_that("the browser fetches a grid's files a few at a time, in panel order", {
+  expect_node_fixture(
+    "spatial-section-grid.js",
+    viewer_test_path("www", "cell_views.js"),
+    pass = "PASS the grid fetches its files a few at a time, in panel order"
+  )
+})
+
 test_that("the author's Spatial layout is a display setting, grid only with sections", {
   ## Older projects and Apps carry no layout: they open one section.
   expect_identical(builderViewerDisplayDefaults()$spatial_layout, "single")
