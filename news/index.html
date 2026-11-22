@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.9</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.10</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -77,6 +77,12 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="8.4.10" id="cerebronexus-8410">CerebroNexus 8.4.10<a class="anchor" aria-label="anchor" href="#cerebronexus-8410"></a></h2>
+<ul><li>The source-checkout demo launcher accepts <code>--data=xenium-prime</code>: the optional 10x Xenium Prime 5K fresh-frozen mouse brain, with all panel genes, published clusters and UMAP, and a four-stain composite microscopy PNG. Expression uses an H5 sidecar; the composite is embedded in the CRB with source-derived bounds, so it is aligned without manual offsets. Data stay in the user cache (<code>CEREBRO_LARGE_CACHE</code>), outside the package/CRAN tarball. The microscopy is read with Bio-Formats (<code>RBioFormats</code>), which only building the demo needs. This uses the existing image renderer; interactive channels and tiled microscopy are not added.</li>
+<li>
+<strong>Split by on the Spatial page draws its cells again for a data set with a Viewer Pack.</strong> Once the Pack’s cell-name file was ready, a split frame sent neither cell names nor the rows that stand for them, so every panel was empty (0 of 63,173 cells for the Xenium Prime 5K demo; the smaller Xenium demo has no Pack and was not affected). The frame now carries the canonical rows and the file, and the browser resolves a range of rows.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="8.4.9" id="cerebronexus-849">CerebroNexus 8.4.9<a class="anchor" aria-label="anchor" href="#cerebronexus-849"></a></h2>
 <ul><li>
