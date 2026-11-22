@@ -1,0 +1,76 @@
+# Creates the GitHub release of a version once it reaches master.
+#
+# A PR bumps the version (DESCRIPTION, inst/app.R) and opens its NEWS
+# section. When master has a version without a tag v<version>, this workflow
+# tags the pushed commit and creates the release: the NEWS section of that
+# version, followed by GitHub's generated "What's Changed" list and the
+# "Full Changelog" link since the previous tag. A push without a new version
+# (docs, CI, ...) does nothing.
+
+name: release
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions: read-all
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Read the version and check it is consistent
+        id: version
+        run: |
+          version=$(sed -n 's/^Version: *//p' DESCRIPTION)
+          tag="v$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            echo "Tag $tag exists, nothing to release."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          app=$(sed -n 's/.*"cerebro_version" = "\([^"]*\)".*/\1/p' inst/app.R)
+          news=$(sed -n 's/^# CerebroNexus *//p' NEWS.md | head -n 1)
+          if [ "$app" != "$version" ] || [ "$news" != "$version" ]; then
+            echo "::error::Version mismatch: DESCRIPTION $version, inst/app.R $app, first NEWS section $news"
+            exit 1
+          fi
+          echo "release=true" >> "$GITHUB_OUTPUT"
+
+      - name: Take the NEWS section of this version
+        if: steps.version.outputs.release == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          awk -v h="# CerebroNexus $VERSION" '
+            $0 == h { on = 1; print; next }
+            on && /^# / { exit }
+            on { print }
+          ' NEWS.md > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md"
+
+      - name: Tag and create the release
+        if: steps.version.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          gh release create "$TAG" \
+            --target "$GITHUB_SHA" \
+            --title "$TAG" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            --generate-notes
