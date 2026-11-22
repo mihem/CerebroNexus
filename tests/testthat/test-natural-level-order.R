@@ -11,7 +11,11 @@ test_that("natural order compares runs of digits as numbers", {
   contract <- natural_contract()
   expect_identical(
     contract$.runtimeNaturalSort(c(
-      "Cluster 10", "Cluster 2", "Unassigned", "Cluster 1", "Cluster 21"
+      "Cluster 10",
+      "Cluster 2",
+      "Unassigned",
+      "Cluster 1",
+      "Cluster 21"
     )),
     c("Cluster 1", "Cluster 2", "Cluster 10", "Cluster 21", "Unassigned")
   )
@@ -24,6 +28,25 @@ test_that("natural order compares runs of digits as numbers", {
     c("a", "b", NA)
   )
   expect_identical(contract$.runtimeNaturalSort(character()), character())
+})
+
+test_that("natural order compares a decimal number as one number", {
+  contract <- natural_contract()
+  expect_identical(
+    contract$.runtimeNaturalSort(c("0.5", "1", "0.25")),
+    c("0.25", "0.5", "1")
+  )
+  expect_identical(
+    contract$.runtimeNaturalSort(c("res_0.5", "res_1.2", "res_0.25", "res_1")),
+    c("res_0.25", "res_0.5", "res_1", "res_1.2")
+  )
+  expect_identical(
+    contract$.runtimeNaturalSort(c("Cluster 10", "Cluster 1.5", "Cluster 2")),
+    c("Cluster 1.5", "Cluster 2", "Cluster 10")
+  )
+  ## Plainly sorted decimal levels are already in numeric order and stay so.
+  plain <- sort(c("0.5", "1", "0.25", "2.75"))
+  expect_identical(contract$.runtimeNaturalLevels(plain), plain)
 })
 
 test_that("only plainly sorted levels are put in natural order", {

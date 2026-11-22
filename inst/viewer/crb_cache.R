@@ -55,7 +55,7 @@ crb_prefetch_abandon <- function(key) {
   cached
 }
 
-## CRBs written before 8.4.11 stored the levels of character groups in plain
+## CRBs written before 8.4.9 stored the levels of character groups in plain
 ## sorted order ("Cluster 1", "Cluster 10", "Cluster 2"). Put such levels of
 ## the registered groups, and of their factor columns in the metadata, in
 ## natural order (.runtimeNaturalLevels() in core/crb_contract.R) once, before
