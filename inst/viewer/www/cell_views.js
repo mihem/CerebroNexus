@@ -3277,6 +3277,12 @@
         btn.setAttribute('aria-label', tip);
         var label = btn.querySelector('.cv-focus-label');
         if (label) label.textContent = primary ? 'Restore' : 'Enlarge';
+        // Restore shrinks the panel back: its icon points inwards.
+        var glyph = btn.querySelector('.fa-expand, .fa-compress');
+        if (glyph) {
+          glyph.classList.toggle('fa-compress', primary);
+          glyph.classList.toggle('fa-expand', !primary);
+        }
       }
       // The enlarged panel says so by its size, its frame and its Restore
       // button, and a thumbnail by its place in the strip: no role badge.

@@ -458,8 +458,10 @@
   justify-content: center;
 }
 .coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-focus-context .cv-ptitle { cursor: pointer; }
-/* The thumbnail itself says what a click does: its icon needs no tooltip. */
-.coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-focus-context .cv-focus-btn::after {
+/* The thumbnail itself says what a click does, and Restore says it in its
+   label: neither needs a tooltip. */
+.coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-focus-context .cv-focus-btn::after,
+.coordviews-page .cv-pane.cv-focus-primary .cv-focus-btn::after {
   content: none;
 }
 .coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-focus-context .cv-ptitle {
