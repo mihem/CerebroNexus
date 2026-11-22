@@ -1,5 +1,10 @@
 # CerebroNexus 8.5.0
 
+- **One smallest panel size on every page.** Panels of Linked views, the
+  Spatial grid, Gene expression's separate panels and an enlarged view's
+  context keep plots of at least 250 pixels a side, and the page scrolls
+  below that. Before, Linked views kept 300 pixels (240 at a pinch), the
+  Spatial grid 160 (120 drawn) and an enlarged view's context 260.
 - **Multi-select fields show one item and a count.** On every page, a field
   with more than one item chosen (Sections, Background images, genes) shows
   its first item and a badge with the count, such as "12+", and is only as

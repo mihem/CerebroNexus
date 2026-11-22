@@ -8150,13 +8150,11 @@
     // unchanged. Force the next resize pass to project the new coordinates.
     _layoutKey = null;
   }
-  // Size visible panels from the available width. Each canvas remains at least
-  // 300px wide when possible and extra spaces flow onto later rows.
-  var MIN_SIDE = 300;
-  var MIN_SIDE_HARD = 240;
-  // Sections of the Spatial grid are compared side by side, so they may be
-  // smaller than a linked lens before the page scrolls.
-  var GRID_MIN_SIDE = 160;
+  // The smallest plot side of a panel on every page (Linked views, the Spatial
+  // grid, Gene expression's panels, an enlarged view's context): below it the
+  // page scrolls rather than shrinking the panels further. Thumbnails of an
+  // enlarged view are not panels (FOCUS_THUMB_MIN).
+  var PANEL_MIN_SIDE = 250;
   // Width a classic scrollbar will take from `host` once it shows. Overlay
   // scrollbars (and one already showing, which clientWidth excludes) reserve 0.
   // The probe forces a layout, and the width only changes with the zoom level
@@ -8193,10 +8191,6 @@
   // largest available panel size. This prevents sparse final rows without
   // forcing plots into a materially smaller layout.
   var BALANCED_SIZE_TOLERANCE = 0.85;
-  // Context is a persistent orientation aid, not the place for close reading.
-  // Let it become slightly smaller while a primary lens is present so a common
-  // 1280px workspace can keep both roles in the same visual field.
-  var FOCUS_CONTEXT_SIDE = 260;
   // The fitted size is computed from the pane header's height, and the header
   // grows when the pane is narrow enough for its toolbar to wrap. That is a
   // positive feedback loop: a smaller plot makes a taller header makes a
@@ -8258,7 +8252,7 @@
   // adding a linked space changes only the packing, never visual geometry.
   function bestOverviewGrid(panelCount, availW, availH, chromeX, chromeY, gap,
                             minSide, fixedCols) {
-    minSide = minSide || MIN_SIDE;
+    minSide = minSide || PANEL_MIN_SIDE;
     var candidates = [];
     for (var cols = fixedCols || 1; cols <= (fixedCols || panelCount); cols++) {
       var rows = Math.ceil(panelCount / cols);
@@ -8342,10 +8336,9 @@
   // window's height, so the panels end at its bottom edge. `square` (Panel
   // shape: Square) makes every panel a square; `aspect` is then still the
   // shape of what is drawn in it, so the columns that draw the most win.
-  var GRID_MIN_DRAWN = 120;
   function sectionGridPacking(k, availW, availH, chromeX, chromeY, gap, aspect, fixedCols, fill, minSide, square) {
-    // The smallest panel side that still reads; Linked views keeps its own floor.
-    var floor = minSide || GRID_MIN_DRAWN;
+    // The smallest drawn side that still reads.
+    var floor = minSide || PANEL_MIN_SIDE;
     var aspectAt = function (i) {
       return typeof aspect === 'number' ? aspect : (aspect && aspect[i]) || 1;
     };
@@ -8718,22 +8711,15 @@
 
     // Overview is a genuine two-dimensional fit: try every possible column
     // count and choose the one that maximises a balanced cell. If there are so
-    // many panels that the result would be unreadable, retain the 300px floor
+    // many panels that the result would be unreadable, retain the 250px floor
     // and let the workspace scroll instead of reducing plots to thumbnails.
-    var minSide = sectionGridActive() ? GRID_MIN_SIDE : MIN_SIDE;
-    var minSideHard = Math.min(minSide, MIN_SIDE_HARD);
+    var minSide = PANEL_MIN_SIDE;
     var overview = !focusPanel
       ? bestOverviewGrid(k, usableW, Math.max(1, availH), chromeX, overhead, gap,
         minSide, gridColumnsChoice(k))
       : null;
-    // When even the best grid is below the usual floor, take its columns down
-    // to a hard floor instead of splitting the panels over rows the page has
-    // no height for: a third plot below the fold is worse than a narrow one.
-    var columnFloor = focusPanel ? FOCUS_CONTEXT_SIDE
-      : (overview && overview.side < minSide
-        ? Math.max(minSideHard, overview.side) : minSide);
     var availableCols = Math.max(1,
-      Math.floor((usableW + gap) / (columnFloor + chromeX + gap)));
+      Math.floor((usableW + gap) / (minSide + chromeX + gap)));
     var cols = focusPanel
       ? Math.max(1, Math.min(k + 1, availableCols))
       : Math.max(1, Math.min(overview ? overview.cols : 1, availableCols));
@@ -8743,8 +8729,7 @@
     var gridPack = !focusPanel && k > 1
       ? sectionGridPacking(k, usableW, Math.max(1, availH), chromeX, overhead, gap,
         sectionGridActive() ? sectionGridAspect() : panelsAspect(vis),
-        gridColumnsChoice(k), !sectionGridActive(),
-        sectionGridActive() ? null : MIN_SIDE_HARD, keepPlotsSquare)
+        gridColumnsChoice(k), !sectionGridActive(), minSide, keepPlotsSquare)
       : null;
     if (gridPack) cols = gridPack.cols;
     var single = cols === 1;
@@ -8756,14 +8741,14 @@
     var colW = Math.floor(rowW / cols);
     var colExtra = rowW - colW * cols;
     var side = focusPanel
-      ? Math.max(FOCUS_CONTEXT_SIDE, Math.floor(colW - chromeX))
+      ? Math.max(PANEL_MIN_SIDE, Math.floor(colW - chromeX))
       : Math.max(minSide, overview ? overview.side : 0);
     if (single && side + chromeX > usableW) {
       side = Math.max(150, usableW - chromeX);
     }
     // A lone/focused card should use the available HEIGHT as well as width.
     // Without this cap a wide monitor produced a 1200px square that continued
-    // far below the viewport. Multi-card grids deliberately keep the 300px
+    // far below the viewport. Multi-card grids deliberately keep the 250px
     // width floor and may scroll vertically; a focused lens is still capped
     // unless that would make it smaller than its persistent context lenses.
     var focusSide = side;
@@ -8785,7 +8770,7 @@
       );
       if (availH > 0) {
         if (focusPanel) {
-          focusSide = Math.min(focusSide, Math.max(MIN_SIDE, availH - overhead));
+          focusSide = Math.min(focusSide, Math.max(PANEL_MIN_SIDE, availH - overhead));
           // Focus hierarchy wins over one-viewport packing. When the controls
           // and cohort bar leave little height, squeezing the primary below its
           // context reverses the meaning of the layout; let the page scroll.
