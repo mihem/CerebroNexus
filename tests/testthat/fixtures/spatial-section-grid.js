@@ -12,7 +12,7 @@ function between(from, to) {
 var D = { n: 9, rows: 'all', cells: ['1', '2', '3', '4', '5', '6', '7', '8', '9'] };
 var singleActive = 'spatial_projection';
 var singleGridSpaces = [], singleGridExtras = [], singleSpaceIds = [], spaceById = {}, panels = [];
-var gridSyncing = false, _layoutKey = 'stale';
+var gridSyncing = false, _layoutKey = 'stale', focusPanel = null;
 var calls = [];
 function alignedRows(keys) {
   return keys.map(function (key) {
@@ -96,6 +96,11 @@ elements.spatial_projection_sections.selectize.items = ['X', 'A2'];
 assert.deepStrictEqual(gridShownSpaces(), [singleGridSpaces[1]]);
 elements.spatial_projection_sections.selectize.items = [];
 assert.deepStrictEqual(gridShownSpaces(), singleGridSpaces);
+// A frame of some sections only (the server's cell budget): a section beyond
+// them waits for a frame, one among them is arranged at once.
+assert.strictEqual(gridFrameHolds(['B1', 'A1']), true);
+assert.strictEqual(gridFrameHolds('A2'), true);
+assert.strictEqual(gridFrameHolds(['A1', 'C7']), false);
 // The embedding is always shown, first.
 singleGridExtras = ['single::spatial_projection::projection'];
 assert.deepStrictEqual(gridShownSpaces(),

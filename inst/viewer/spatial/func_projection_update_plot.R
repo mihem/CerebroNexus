@@ -17,6 +17,10 @@ spatial_projection_output_hulls <- function(
   )
 }
 spatial_projection_drawn_hulls <- list()
+## The hash of the cells, positions and panels of the grid frame drawn last
+## (NULL for any other frame): a new colouring of the same grid sends only its
+## colours.
+spatial_grid_drawn_geometry <- NULL
 
 ##----------------------------------------------------------------------------##
 ## Function that updates projections.
@@ -589,6 +593,38 @@ spatial_projection_update_plot <- function(input) {
   ) {
     payload$data$selection_rows <- cerebroRowRange(aux_cells - 1L)
   }
+  ## A grid coloured anew over the same cells, positions and panels: only the
+  ## colours travel, and the browser keeps what it has (recolorSingle() in
+  ## cell_views.js). Sending the 3.9 million positions of the Allen atlas again
+  ## took 40 s. A new render request (a remounted canvas, a data set switch)
+  ## always gets the whole frame.
+  grid_geometry <- if (is.list(grid)) {
+    rlang::hash(list(
+      context = input[["dataset_context"]],
+      x = payload$data$x,
+      y = payload$data$y,
+      keys = payload$data$selection_key,
+      panels = payload$data$panels,
+      x_range = payload$data$x_range,
+      y_range = payload$data$y_range
+    ))
+  }
+  if (
+    !is.null(grid_geometry) &&
+      identical(grid_geometry, spatial_grid_drawn_geometry) &&
+      !isTRUE(input[["fresh_render"]]) &&
+      !isTRUE(reset_axes)
+  ) {
+    cerebroCellViewRecolor(
+      "spatial_projection",
+      payload[["meta"]],
+      payload[["data"]],
+      dataset_context = input[["dataset_context"]],
+      feedback = input[["feedback"]]
+    )
+    return(invisible(NULL))
+  }
+  spatial_grid_drawn_geometry <<- grid_geometry
   cerebroCellViewRender(
     "spatial_projection",
     payload[["meta"]],

@@ -84,6 +84,9 @@ observe({
   }
   drawn <- data
   data$feedback <- feedback
+  ## A data set switch or a render request draws the whole frame, never only
+  ## new colours over what the browser may no longer have.
+  data$fresh_render <- dataset_changed || render_requested
   ## The switch's current value: plot parameters hold the value from their
   ## last rebuild, and a filter or ROI change rebuilds only the frame.
   data$plot_parameters[["show_region_outlines"]] <- isTRUE(

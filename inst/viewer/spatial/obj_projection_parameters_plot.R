@@ -118,19 +118,26 @@ observe(
       }
     }
     ## Several chosen sections draw the grid. Its frame holds every section
-    ## of the data set, whatever their samples; which of them show and in
-    ## what order is the browser's (cell_views.js), so a change among several
-    ## sections asks for no frame, and the frame's own section stays put.
+    ## of the data set, whatever their samples, or as many as its cell budget
+    ## takes (spatial_grid_frame_sections()); which of them show and in what
+    ## order is the browser's (cell_views.js), so a change among sections the
+    ## frame holds asks for no frame, and the frame's own section stays put.
     layout <- if (length(chosen) > 1L) "grid" else "single"
     grid_sections <- if (
       spatial_grid_active(layout, spatial_names, plot_type[[1L]])
     ) {
-      as.character(spatial_names)
+      spatial_grid_frame_sections(
+        spatial_names,
+        chosen,
+        spatial_section_cell_count,
+        previous = isolate(spatial_projection_controls())$grid_sections %||%
+          character()
+      )
     } else {
       character()
     }
     if (length(grid_sections)) {
-      projection <- spatial_names[[1L]]
+      projection <- grid_sections[[1L]]
     }
     ## An embedding beside the sections, drawn from the same frame.
     grid_projection <- input[["spatial_projection_grid_projection"]] %||% ""
@@ -541,7 +548,7 @@ spatial_projection_parameters_plot_current <- reactive({
           options,
           dataset,
           section,
-          tryCatch(getSpatialData(section), error = function(error) NULL)
+          spatial_grid_section_record(section)
         )
       }),
       grid_sections

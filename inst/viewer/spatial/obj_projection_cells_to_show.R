@@ -44,6 +44,21 @@ spatial_grid_section_index <- function(spatial_name) {
   spatial_section_rows(spatial_name, coordinates)
 }
 
+## A section's spatial record for its grid panel's picture: only a section that
+## embeds pictures needs it. Reading the record of every section (validating its
+## coordinates and naming its cells) took seconds for the 59 sections of the
+## Allen atlas; the others draw without one.
+spatial_grid_section_record <- function(spatial_name) {
+  images <- tryCatch(
+    data_set()$spatial[[spatial_name]][["histology_images"]],
+    error = function(error) NULL
+  )
+  if (!length(images)) {
+    return(NULL)
+  }
+  tryCatch(getSpatialData(spatial_name), error = function(error) NULL)
+}
+
 ## While one section is shown and the session is quiet, read what a switch to
 ## the grid needs of every other section (its coordinates, its rows, its
 ## image's descriptor), one section per event-loop turn, so the switch builds
@@ -61,13 +76,13 @@ observe({
       shiny::withReactiveDomain(
         session,
         shiny::isolate({
-          viewerSpatialCoordinates(section)
+          spatial_grid_section_xy(section)
           spatial_grid_section_index(section)
           spatial_grid_section_background(
             options,
             dataset,
             section,
-            tryCatch(getSpatialData(section), error = function(error) NULL)
+            spatial_grid_section_record(section)
           )
         })
       )

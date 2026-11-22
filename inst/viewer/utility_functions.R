@@ -1837,7 +1837,10 @@ cerebroCellViewRecolor <- function(
     "color_cache_key",
     "packed_rgb",
     "packed_rgb_cache_keys",
-    "zero_color"
+    "zero_color",
+    ## A Spatial grid coloured by a group
+    "group_code",
+    "canonical_group"
   )
   message$data <- message$data[intersect(fields, names(message$data))]
   session$sendBinaryMessage(

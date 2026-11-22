@@ -137,6 +137,21 @@
 - **A group with a thousand levels or more no longer stops the Viewer.** A data
   set with such a group (the Allen atlas's 1,201 supertypes) ended the
   session when it opened.
+- **A grid of many sections opens in seconds.** On the Allen atlas (3.9
+  million cells in 59 sections; Windows, Chrome) a second section draws the
+  grid in 2.1 s instead of 31.5 s, and every section in about 4 s instead of
+  31 s. A data set of more than a million cells sends the chosen sections and
+  those nearest to them, up to a million cells, so most further choices are
+  drawn at once; a section beyond them shows the coming panels while it loads.
+  Colouring the grid by another column sends only the new colours (2 MB
+  instead of 51 MB), and adding a section no longer stalls the page for 300 ms:
+  the panels glide to their new places. The grid places cells without naming
+  them, and the Viewer reads the cell names of such a data set while it is
+  idle, so Linked views opens in 7 to 11 s instead of 15 to 24 s.
+- **Long legends and many sections stay compact.** A colouring by more than
+  24 groups shows three rows of its legend and a *Show all* button. The
+  Sections field keeps its chosen sections in two scrolling rows, counts them
+  (*12 of 59*) and has two shortcuts: *All* and *One*.
 
 # CerebroNexus 8.4.8
 

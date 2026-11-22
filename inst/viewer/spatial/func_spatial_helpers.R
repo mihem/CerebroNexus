@@ -1469,6 +1469,83 @@ spatial_grid_active <- function(layout, sections, plot_type) {
     isTRUE(plot_type %in% spatial_grid_plot_types)
 }
 
+## The sections a grid frame holds. Up to `budget` cells in all it holds every
+## section, so that a change among the chosen ones asks for no frame. Past it
+## (the Allen atlas: 3.9 million cells in 59 sections) a first grid would wait
+## for every section: the frame holds the chosen sections and as many others as
+## fit, the nearest to a chosen one first, so the sections a user picks next
+## are usually drawn already. The sections of the frame on screen (`previous`)
+## stay while they hold every chosen one. In the order of `all`.
+spatial_grid_frame_budget <- 1e6
+spatial_grid_frame_sections <- function(
+  all,
+  chosen,
+  cells_of,
+  previous = character(),
+  budget = spatial_grid_frame_budget
+) {
+  all <- as.character(all)
+  counts <- vapply(all, function(section) as.numeric(cells_of(section)), 0)
+  if (sum(counts) <= budget) {
+    return(all)
+  }
+  if (
+    length(previous) &&
+      all(chosen %in% previous) &&
+      all(previous %in% all)
+  ) {
+    return(all[all %in% previous])
+  }
+  keep <- all %in% chosen
+  total <- sum(counts[keep])
+  picked <- which(keep)
+  others <- which(!keep)
+  if (length(picked)) {
+    distance <- vapply(others, function(i) min(abs(i - picked)), 0)
+    others <- others[order(distance, others)]
+  }
+  for (i in others) {
+    if (total + counts[[i]] <= budget) {
+      keep[[i]] <- TRUE
+      total <- total + counts[[i]]
+    }
+  }
+  all[keep]
+}
+
+## The number of cells of a section, from its stored coordinates (a thin CRB
+## keeps them as metadata rows: no cell name is read).
+spatial_section_cell_count <- function(spatial_name) {
+  coordinates <- tryCatch(
+    data_set()$spatial[[spatial_name]][["coordinates"]],
+    error = function(error) NULL
+  )
+  if (is.data.frame(coordinates)) nrow(coordinates) else 0L
+}
+
+## A section's positions for the grid. The grid places a section's rows by the
+## Pack's index of the section (spatial_section_index()), in stored order, so it
+## needs no cell names: naming every section's cells took 6 to 11 s of a first
+## grid of the 3.9 million cells of the Allen atlas. Without that index, or with
+## coordinates that are not plain x and y, as viewerSpatialCoordinates().
+spatial_grid_section_xy <- function(spatial_name) {
+  if (!is.null(spatial_section_index(spatial_name))) {
+    coordinates <- tryCatch(
+      data_set()$spatial[[spatial_name]][["coordinates"]],
+      error = function(error) NULL
+    )
+    if (
+      is.data.frame(coordinates) &&
+        nrow(coordinates) > 0L &&
+        is.numeric(coordinates[["x"]]) &&
+        is.numeric(coordinates[["y"]])
+    ) {
+      return(coordinates)
+    }
+  }
+  viewerSpatialCoordinates(spatial_name)
+}
+
 ## The cells of a grid frame: the canonical rows of each section in turn,
 ## narrowed by `keep` (sample scope and group filters), each section sampled
 ## on its own to `percentage`. The sections and their cell counts travel as

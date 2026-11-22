@@ -27,6 +27,14 @@ section_grid_renderer <- function(options = list(), private_url = NULL) {
       data = data
     )
   }
+  renderer$cerebroCellViewRecolor <- function(id, meta, data, ...) {
+    renderer$rendered[[length(renderer$rendered) + 1L]] <- list(
+      id = id,
+      meta = meta,
+      data = data,
+      recolor = TRUE
+    )
+  }
   renderer
 }
 
@@ -257,8 +265,12 @@ test_that("a grid's embedding panel draws every row of the frame", {
 })
 
 ## The frame a grid of the three sections renders, coloured by `color`.
-render_section_grid <- function(color, plot_type = "ImageDimPlot") {
-  renderer <- section_grid_renderer()
+render_section_grid <- function(
+  color,
+  plot_type = "ImageDimPlot",
+  renderer = section_grid_renderer(),
+  fresh_render = FALSE
+) {
   data <- section_grid_data()
   cells <- spatial_grid_cells(
     names(data$index),
@@ -272,6 +284,7 @@ render_section_grid <- function(color, plot_type = "ImageDimPlot") {
   metadata <- data.frame(value = color[c(cells)], cell_index = c(cells))
   renderer$spatial_projection_update_plot(list(
     dataset_context = list(dataset_key = "demo"),
+    fresh_render = fresh_render,
     cells_df = metadata,
     coordinates = layout$coordinates,
     reset_axes = FALSE,
@@ -303,8 +316,86 @@ render_section_grid <- function(color, plot_type = "ImageDimPlot") {
       background_descriptor = NULL
     )
   ))
-  renderer$rendered[[1]]
+  renderer$rendered[[length(renderer$rendered)]]
 }
+
+test_that("a grid coloured anew over the same cells sends only its colours", {
+  renderer <- section_grid_renderer()
+  groups <- c("T", "B", "NK", "T", "B", "NK", "T", "B", "NK")
+  first <- render_section_grid(groups, renderer = renderer)
+  expect_null(first$recolor)
+  expect_length(first$data$x, 9L)
+  ## Another colouring: no positions, no panels, the codes of the new groups.
+  again <- render_section_grid(rev(groups), renderer = renderer)
+  expect_true(again$recolor)
+  ## The frame holds the cells section by section.
+  frame_rows <- c(1L, 4L, 7L, 2L, 5L, 3L, 6L, 8L, 9L)
+  expect_identical(
+    unlist(again$meta$traces)[again$data$group_code + 1L],
+    rev(groups)[frame_rows]
+  )
+  expression <- c(1, -2, 3, 4, 9, 6, 2.5, 3.5, 4.5)
+  numeric <- render_section_grid(
+    expression,
+    "ImageFeaturePlot",
+    renderer = renderer
+  )
+  expect_true(numeric$recolor)
+  expect_equal(numeric$data$color_range, c(-2, 9))
+  ## A render request (a remounted canvas, another data set) gets the whole
+  ## frame, and so does the grid of a new renderer.
+  fresh <- render_section_grid(groups, renderer = renderer, fresh_render = TRUE)
+  expect_null(fresh$recolor)
+  expect_length(fresh$data$panels, 3L)
+})
+
+test_that("a grid frame holds every section, or as many as its budget takes", {
+  all <- c("s1", "s2", "s3", "s4", "s5", "s6")
+  cells <- c(s1 = 40, s2 = 30, s3 = 30, s4 = 20, s5 = 50, s6 = 10)
+  count <- function(section) cells[[section]]
+  ## Within the budget: every section, whatever is chosen.
+  expect_identical(
+    spatial_grid_frame_sections(all, c("s1", "s4"), count, budget = 180),
+    all
+  )
+  ## Past it: the chosen ones, then the others nearest to them, while they fit.
+  expect_identical(
+    spatial_grid_frame_sections(all, c("s2", "s5"), count, budget = 120),
+    c("s1", "s2", "s5")
+  )
+  expect_identical(
+    spatial_grid_frame_sections(all, c("s1", "s6"), count, budget = 90),
+    c("s1", "s2", "s6")
+  )
+  ## The frame on screen stays while it holds every chosen section ...
+  previous <- c("s1", "s2", "s5")
+  expect_identical(
+    spatial_grid_frame_sections(
+      all,
+      c("s5", "s1"),
+      count,
+      previous = previous,
+      budget = 120
+    ),
+    previous
+  )
+  ## ... and gives way to one around a section it lacks.
+  expect_identical(
+    spatial_grid_frame_sections(
+      all,
+      c("s3", "s6"),
+      count,
+      previous = previous,
+      budget = 120
+    ),
+    c("s2", "s3", "s4", "s6")
+  )
+  ## Chosen sections are kept even past the budget.
+  expect_identical(
+    spatial_grid_frame_sections(all, c("s1", "s5"), count, budget = 60),
+    c("s1", "s5")
+  )
+})
 
 test_that("a grid frame colours every section on one continuous scale", {
   ## Section A2 holds the extremes: one scale means the other sections are

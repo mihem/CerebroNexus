@@ -5078,6 +5078,7 @@
     var L = $('cv-legend'); if (!L) return;
     var singlePayload = singleActive && singleView(singleActive);
     L.innerHTML = '';
+    L.classList.remove('cv-legend-long');
     if (singlePayload && singlePayload.meta && singlePayload.meta.show_color_scale === false) {
       renderColorbar(false);
       renderPanelScales(false);
@@ -5210,7 +5211,27 @@
       };
     });
     appendEvidenceLegend();
+    // Hundreds of groups (the Allen atlas's 338 subclasses) would push the
+    // plots off the page: a long legend keeps three rows, scrolls, and opens
+    // in full on request.
+    if (g.levels.length > LEGEND_LONG) {
+      L.classList.add('cv-legend-long');
+      L.classList.toggle('cv-legend-open', legendOpen);
+      var more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'cv-legend-more';
+      more.textContent = legendOpen ? 'Show less' : 'Show all ' + g.levels.length;
+      more.setAttribute('aria-expanded', legendOpen ? 'true' : 'false');
+      more.onclick = function (event) {
+        event.stopPropagation();
+        legendOpen = !legendOpen;
+        renderLegend();
+        _layoutKey = null; resizeAll();
+      };
+      L.appendChild(more);
+    }
   }
+  var LEGEND_LONG = 24, legendOpen = false;
 
   // ---- hover tooltip -------------------------------------------------------
   // Three depths, and each is reached deliberately from the one before:
@@ -8660,11 +8681,20 @@
     return isFinite(threshold) && threshold >= 0
       ? { threshold: threshold } : null;
   }
+  // The number of points of a payload or view, without naming them:
+  // singlePayloadCells() makes a string of every key (a second for the 3.9
+  // million cells of the Allen atlas).
+  function singlePayloadCount(payload) {
+    var count = Number(payload && payload.data && payload.data.n);
+    if (isFinite(count)) return count;
+    var keys = payload && payload.data && payload.data.selection_key;
+    if (!Array.isArray(keys) || !keys.length) return 0;
+    if (!Array.isArray(keys[0])) return keys.length;
+    return keys.reduce(function (total, group) { return total + (group ? group.length : 0); }, 0);
+  }
   function singleInteractionRecommendedStatic(view) {
     var config = singleInteractionConfig(view);
-    var count = Number(view && view.data && view.data.n);
-    if (!isFinite(count)) count = singlePayloadCells(view).length;
-    return !!config && count > config.threshold;
+    return !!config && singlePayloadCount(view) > config.threshold;
   }
   function singleInteractionIsStatic() {
     var view = singleActive && singleView(singleActive);
@@ -8677,8 +8707,7 @@
     if (!view || !host) return;
     var recommended = singleInteractionRecommendedStatic(view);
     var isStatic = recommended && view.interactionEnabled !== true;
-    var count = Number(view.data && view.data.n);
-    if (!isFinite(count)) count = singlePayloadCells(view).length;
+    var count = recommended ? singlePayloadCount(view) : 0;
     host.classList.toggle('cv-static-performance', isStatic);
     var notice = host.querySelector('.cv-performance-mode');
     if (notice) {
@@ -10150,6 +10179,19 @@
     });
     return singleGridExtras.concat(out.length ? out : singleGridSpaces);
   }
+  // Whether the grid's frame holds every section of `names`. A data set of
+  // many cells sends a frame of only some sections (the server's cell budget,
+  // spatial_grid_frame_sections()): a section beyond them waits for a frame.
+  function gridFrameHolds(names) {
+    var held = {};
+    singleGridSpaces.forEach(function (spaceId) {
+      var space = spaceById[spaceId];
+      if (space && space._gridSection != null) held[space._gridSection] = true;
+    });
+    return (Array.isArray(names) ? names : [names]).every(function (name) {
+      return held[String(name)];
+    });
+  }
   // Columns asked for, or null for the automatic packing.
   function gridColumnsChoice(count) {
     if (!sectionGridActive()) return null;
@@ -10161,10 +10203,65 @@
     var el = document.getElementById('spatial_projection_grid_sync_zoom');
     return sectionGridActive() && !!(el && el.checked);
   }
+  // Where each shown section's panel is, by section: the panels are slots
+  // that change sections when the grid changes.
+  function gridPaneRects() {
+    var out = {};
+    panels.forEach(function (p) {
+      if (!p.spaceId || !p.pane || p.pane.classList.contains('cv-hidden')) return;
+      var r = p.pane.getBoundingClientRect();
+      if (r.width && r.height) out[p.spaceId] = r;
+    });
+    return out;
+  }
+  // A section added, removed or moved: each panel glides from where its section
+  // was, and a section new to the grid fades in (FLIP: the panels are laid out
+  // in place first, then moved back and released). Transforms only, on the
+  // compositor; past 36 panels, or with reduced motion, they just appear.
+  var GRID_MOVE_MAX = 36;
+  function animateGridChange(before) {
+    if (!before || typeof window === 'undefined' || (window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+    var shown = panels.filter(function (p) {
+      return p.spaceId && p.pane && !p.pane.classList.contains('cv-hidden');
+    });
+    if (!shown.length || shown.length > GRID_MOVE_MAX) return;
+    var viewH = window.innerHeight || 1000;
+    shown.forEach(function (p) {
+      var pane = p.pane, to = pane.getBoundingClientRect();
+      if (!to.width || to.bottom < -viewH || to.top > 2 * viewH) return;
+      var from = before[p.spaceId];
+      pane.style.transition = 'none';
+      if (from) {
+        var dx = from.left - to.left, dy = from.top - to.top;
+        var scale = Math.min(from.width / to.width, from.height / to.height);
+        if (Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(scale - 1) < 0.01) {
+          pane.style.transition = '';
+          return;
+        }
+        pane.style.transformOrigin = 'top left';
+        pane.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(' + scale + ')';
+      } else {
+        pane.style.transformOrigin = 'center';
+        pane.style.opacity = '0';
+        pane.style.transform = 'scale(.96)';
+      }
+      void pane.offsetWidth;
+      pane.style.transition = 'transform .3s cubic-bezier(.2, .8, .2, 1), opacity .24s ease';
+      pane.style.transform = '';
+      pane.style.opacity = '';
+      clearTimeout(pane._gridMoveTimer);
+      pane._gridMoveTimer = setTimeout(function () {
+        pane.style.transition = '';
+        pane.style.transformOrigin = '';
+      }, 340);
+    });
+  }
   function applySectionGrid() {
     if (!sectionGridActive() || !D) return;
     var next = gridShownSpaces();
     if (next.join('|') !== singleSpaceIds.join('|')) {
+      var before = focusPanel ? null : gridPaneRects();
       singleSpaceIds = next;
       // A section shown for the first time loads its own image now.
       next.forEach(function (spaceId) {
@@ -10178,6 +10275,7 @@
     _layoutKey = null;
     resizeAll();
     drawAll();
+    if (before) animateGridChange(before);
     if (gridSyncZoom()) {
       var first = panels.filter(function (p) {
         return singleGridSpaces.indexOf(p.spaceId) >= 0;
@@ -10295,6 +10393,51 @@
     // the page covered.
     gridSkeletonTimer = setTimeout(hideGridSkeleton, 30000);
   }
+  // The Sections field of a data set of many sections: how many are chosen of
+  // how many, and two shortcuts, every section or only the first chosen one
+  // (the single view). Its tags keep two rows and scroll (custom.css).
+  function decorateSectionsField() {
+    var el = document.getElementById('spatial_projection_sections');
+    var select = el && el.selectize;
+    if (!select) return;
+    var total = Object.keys(select.options).length;
+    var group = el.closest('.form-group');
+    var label = group && group.querySelector('label');
+    if (!label || total < 3) return;
+    var tools = label.querySelector('.cv-sections-tools');
+    if (!tools) {
+      tools = document.createElement('span');
+      tools.className = 'cv-sections-tools';
+      tools.innerHTML = '<span class="cv-sections-count"></span>' +
+        '<button type="button" data-sections="all" title="Show every section">All</button>' +
+        '<button type="button" data-sections="one" title="Show only the first chosen section">One</button>';
+      // In the label, whose click would open the field.
+      tools.addEventListener('click', function (event) {
+        var button = event.target.closest && event.target.closest('button[data-sections]');
+        event.preventDefault();
+        event.stopPropagation();
+        if (!button) return;
+        var current = document.getElementById('spatial_projection_sections');
+        var control = current && current.selectize;
+        if (!control) return;
+        if (button.getAttribute('data-sections') === 'all') {
+          // In the order of the list, after those already chosen.
+          var chosen = control.items.slice();
+          Object.keys(control.options).forEach(function (name) {
+            if (chosen.indexOf(name) < 0) chosen.push(name);
+          });
+          control.setValue(chosen);
+        } else if (control.items.length) {
+          control.setValue([control.items[0]]);
+        }
+      });
+      label.appendChild(tools);
+    }
+    var chosen = select.items.length;
+    tools.querySelector('.cv-sections-count').textContent = chosen + ' of ' + total;
+    tools.querySelector('[data-sections="all"]').disabled = chosen >= total;
+    tools.querySelector('[data-sections="one"]').disabled = chosen <= 1;
+  }
   function wireSectionGrid() {
     if (!window.jQuery) return;
     // A grid panel's title shows only its section (the single view). With a
@@ -10333,11 +10476,15 @@
       // between the two waits for a frame (the input also fires when its
       // control binds with what is on screen); a change among several only
       // rearranges the drawn panels.
+      if (event.name === 'spatial_projection_sections') {
+        setTimeout(decorateSectionsField, 0);
+      }
       if (event.name === 'spatial_projection_sections' && singleActive === 'spatial_projection') {
         var count = Array.isArray(event.value) ? event.value.length : (event.value ? 1 : 0);
         if (!count) return;
         var wanted = count > 1 ? 'grid' : 'single';
-        if ((wanted === 'grid') !== sectionGridActive()) {
+        if ((wanted === 'grid') !== sectionGridActive() ||
+            (wanted === 'grid' && !gridFrameHolds(event.value))) {
           setTimeout(function () { showGridSkeleton(wanted); }, 0);
         } else if (wanted === 'grid') {
           setTimeout(applySectionGrid, 0);
@@ -11189,10 +11336,12 @@
     return true;
   }
   // The data fields a cell_view_recolor_binary message may replace.
+  // A Spatial grid coloured by a group carries its colours as group codes.
   var SINGLE_COLOR_FIELDS = [
     'color', 'rgb', 'rgb_genes', 'colorscale', 'panel_colorscales',
     'color_range', 'reversescale', 'paint_order', 'render_key', 'sparse_color',
-    'color_cache_key', 'packed_rgb', 'packed_rgb_cache_keys', 'zero_color'
+    'color_cache_key', 'packed_rgb', 'packed_rgb_cache_keys', 'zero_color',
+    'group_code', 'canonical_group'
   ];
   function updateSingleExpression(id, previousMeta, previousData, message) {
     var view = singleView(id), data = view.data, meta = view.meta;
@@ -11338,11 +11487,28 @@
     };
   }
 
+  // A frame's arrays do not change: their extent is kept per array, since
+  // the summary is asked for often (tests poll it) and walking 3.9 million
+  // positions took a third of a second each time.
+  var numericExtentCache = typeof WeakMap === 'function' ? new WeakMap() : null;
   function numericExtent(value) {
+    var cacheable = numericExtentCache && value && typeof value === 'object';
+    if (cacheable && numericExtentCache.has(value)) return numericExtentCache.get(value);
     var min = Infinity, max = -Infinity, count = 0;
     function visit(entry) {
-      if (Array.isArray(entry) || ArrayBuffer.isView(entry)) {
-        Array.prototype.forEach.call(entry, visit);
+      if (ArrayBuffer.isView(entry) && !(entry instanceof DataView)) {
+        for (var i = 0, n = entry.length; i < n; i++) {
+          var v = entry[i];
+          if (v === v && v !== Infinity && v !== -Infinity) {
+            if (v < min) min = v;
+            if (v > max) max = v;
+            count++;
+          }
+        }
+        return;
+      }
+      if (Array.isArray(entry)) {
+        for (var j = 0; j < entry.length; j++) visit(entry[j]);
         return;
       }
       var number = Number(entry);
@@ -11350,7 +11516,9 @@
       min = Math.min(min, number); max = Math.max(max, number); count++;
     }
     visit(value);
-    return count ? Object.freeze({ min: min, max: max, count: count }) : null;
+    var result = count ? Object.freeze({ min: min, max: max, count: count }) : null;
+    if (cacheable) numericExtentCache.set(value, result);
+    return result;
   }
 
   function singleSummary(id) {

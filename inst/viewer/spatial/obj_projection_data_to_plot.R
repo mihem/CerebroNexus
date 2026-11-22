@@ -174,7 +174,7 @@ spatial_projection_grid_data <- function(
   options <- if (exists("Cerebro.options")) Cerebro.options else NULL
   layout <- spatial_grid_coordinates(
     cells_to_extract,
-    viewerSpatialCoordinates,
+    spatial_grid_section_xy,
     spatial_grid_section_index,
     function(section) spatialPlotRotation(options, dataset, section)
   )

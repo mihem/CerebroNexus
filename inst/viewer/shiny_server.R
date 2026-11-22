@@ -253,6 +253,50 @@ viewerCellNamesFile <- function(pack) {
 ## it. NULL while the file is not there; a caller then reads the Pack's cell
 ## order (viewerPackCellBarcodesAt() in core/viewer_pack.R).
 viewerCellNamesRead <- function(pack, index) {
+  entry <- viewerCellNamesEntry(pack)
+  if (
+    is.null(entry) ||
+      !is.integer(index) ||
+      anyNA(index) ||
+      any(index < 1L | index > entry$result$cells)
+  ) {
+    return(NULL)
+  }
+  ## Every name, once read (viewerCellNamesWarm(), or below).
+  all <- get0("cell names", envir = pack$cache, inherits = FALSE)
+  if (!is.null(all)) {
+    return(all[index])
+  }
+  layout <- viewerCellNamesLayout(pack, entry)
+  if (is.null(layout)) {
+    return(NULL)
+  }
+  ## Names asked for after a quarter of the cells were: every name, read at
+  ## once. The sections of a grid or of Linked views ask for every cell a
+  ## section at a time, and cutting them out one by one cost twice as much.
+  layout$asked <- layout$asked + length(index)
+  assign("cell names file", layout, envir = pack$cache)
+  if (layout$asked * 4 >= entry$result$cells) {
+    all <- viewerCellNamesSpan(layout, 1L, entry$result$cells)
+    if (length(all) == entry$result$cells) {
+      assign("cell names", all, envir = pack$cache)
+      return(all[index])
+    }
+  }
+  starts <- layout$starts[index]
+  ## Each name with its terminating NUL, one after the other.
+  positions <- sequence(layout$ends[index] - starts + 1L, from = starts)
+  cells <- readBin(layout$bytes[positions], "character", n = length(index))
+  if (length(cells) != length(index)) {
+    return(NULL)
+  }
+  if (!isTRUE(layout$ascii)) {
+    Encoding(cells) <- "UTF-8"
+  }
+  cells
+}
+## The written cell names file of `pack` (its entry), or NULL.
+viewerCellNamesEntry <- function(pack) {
   fingerprint <- as.character(pack$manifest$cell_order_fingerprint %||% "")
   if (
     !viewerPackCanonical(pack) ||
@@ -263,41 +307,114 @@ viewerCellNamesRead <- function(pack, index) {
     return(NULL)
   }
   entry <- .viewer_cell_names_files[[fingerprint]]
+  if (is.null(entry) || !is.list(entry$result) || !file.exists(entry$file)) {
+    return(NULL)
+  }
+  entry
+}
+## The bytes of the cell names file, where each name starts and ends, and how
+## many names were asked for: read once per process (the Pack's cache).
+viewerCellNamesLayout <- function(pack, entry) {
+  layout <- get0("cell names file", envir = pack$cache, inherits = FALSE)
+  if (!is.null(layout)) {
+    return(layout)
+  }
+  connection <- gzfile(entry$file, "rb")
+  on.exit(close(connection), add = TRUE)
+  bytes <- readBin(connection, "raw", n = entry$result$bytes)
+  ## grepRaw() finds the NULs in 0.1 s where which(bytes == 0) took 2.5 s for
+  ## the 81 MB of names of 3.9 million cells.
+  ends <- grepRaw(as.raw(0L), bytes, all = TRUE, fixed = TRUE)
   if (
-    is.null(entry) ||
-      !is.list(entry$result) ||
-      !file.exists(entry$file) ||
-      !is.integer(index) ||
-      anyNA(index) ||
-      any(index < 1L | index > entry$result$cells)
+    length(bytes) != entry$result$bytes ||
+      length(ends) != entry$result$cells
   ) {
     return(NULL)
   }
-  ## The bytes of the file and where each name ends, for the session.
-  layout <- get0("cell names file", envir = pack$cache, inherits = FALSE)
-  if (is.null(layout)) {
-    connection <- gzfile(entry$file, "rb")
-    on.exit(close(connection), add = TRUE)
-    bytes <- readBin(connection, "raw", n = entry$result$bytes)
-    ends <- which(bytes == as.raw(0L))
-    if (
-      length(bytes) != entry$result$bytes ||
-        length(ends) != entry$result$cells
-    ) {
-      return(NULL)
+  layout <- list(
+    bytes = bytes,
+    ends = ends,
+    starts = c(1L, ends[-length(ends)] + 1L),
+    asked = 0,
+    ## Marking ASCII names as UTF-8 changes nothing and took seconds.
+    ascii = !any(bytes > as.raw(127L))
+  )
+  assign("cell names file", layout, envir = pack$cache)
+  layout
+}
+## The names `first` to `last`, which lie one after the other in the file.
+viewerCellNamesSpan <- function(layout, first, last) {
+  bytes <- layout$bytes[layout$starts[[first]]:layout$ends[[last]]]
+  names <- readBin(bytes, "character", n = last - first + 1L)
+  if (!isTRUE(layout$ascii)) {
+    Encoding(names) <- "UTF-8"
+  }
+  names
+}
+## Reads every cell name of `pack` while the session is idle, `step` names at
+## a time, so that Linked views and the Spatial grid find them read. Making
+## the 3.9 million names of the Allen atlas takes R about 10 s however they
+## are read; in steps, no request waits for more than one step. Waits for the
+## names file while it is being written.
+viewerCellNamesWarm <- function(
+  pack,
+  step = 100000L,
+  delay = 0.05,
+  tries = 60L
+) {
+  if (!is.list(pack) || !is.environment(pack$cache)) {
+    return(invisible(FALSE))
+  }
+  if (
+    exists("cell names", envir = pack$cache, inherits = FALSE) ||
+      isTRUE(get0("cell names warming", envir = pack$cache, inherits = FALSE))
+  ) {
+    return(invisible(FALSE))
+  }
+  entry <- viewerCellNamesEntry(pack)
+  if (is.null(entry)) {
+    if (tries > 0L && isTRUE(viewerCellNamesPending(pack))) {
+      later::later(
+        function() viewerCellNamesWarm(pack, step, delay, tries - 1L),
+        2
+      )
     }
-    layout <- list(bytes = bytes, ends = ends)
-    assign("cell names file", layout, envir = pack$cache)
+    return(invisible(FALSE))
   }
-  starts <- c(1L, layout$ends[-length(layout$ends)] + 1L)[index]
-  ## Each name with its terminating NUL, one after the other.
-  positions <- sequence(layout$ends[index] - starts + 1L, from = starts)
-  cells <- readBin(layout$bytes[positions], "character", n = length(index))
-  if (length(cells) != length(index)) {
-    return(NULL)
+  assign("cell names warming", TRUE, envir = pack$cache)
+  cells <- entry$result$cells
+  parts <- vector("list", ceiling(cells / step))
+  part <- 0L
+  finish <- function(all = NULL) {
+    if (!is.null(all) && length(all) == cells) {
+      assign("cell names", all, envir = pack$cache)
+    }
+    assign("cell names warming", FALSE, envir = pack$cache)
   }
-  Encoding(cells) <- "UTF-8"
-  cells
+  next_part <- function() {
+    ## Read meanwhile by a request.
+    if (exists("cell names", envir = pack$cache, inherits = FALSE)) {
+      return(finish())
+    }
+    layout <- tryCatch(
+      viewerCellNamesLayout(pack, entry),
+      error = function(error) NULL
+    )
+    if (is.null(layout)) {
+      return(finish())
+    }
+    part <<- part + 1L
+    first <- (part - 1L) * step + 1L
+    last <- min(part * step, cells)
+    parts[[part]] <<- viewerCellNamesSpan(layout, first, last)
+    if (last < cells) {
+      later::later(next_part, delay)
+    } else {
+      finish(unlist(parts, use.names = FALSE))
+    }
+  }
+  later::later(next_part, delay)
+  invisible(TRUE)
 }
 ## TRUE while the background process still writes the cell names of `pack`.
 ## Only looks: viewerCellNamesFile() starts the process.
@@ -2396,6 +2513,15 @@ server <- function(input, output, session) {
     ## A dataset opened in this session (an upload, another CRB) starts its
     ## cell-name file here; launch datasets started theirs at start-up.
     viewerCellNamesFile(viewerPackCurrent())
+    ## Sections of hundreds of thousands of cells: Linked views and the
+    ## Spatial grid name every cell of every section; read the names while
+    ## the session is idle.
+    if (
+      isTRUE(identity$cell_count >= 2e5) &&
+        length(isolate(availableSpatial())) > 1L
+    ) {
+      viewerCellNamesWarm(viewerPackCurrent())
+    }
     loaded_context <- viewer_loaded_dataset_context()
     dataset_identity <- list(
       dataset_context = loaded_context,
