@@ -11099,51 +11099,6 @@
     // the page covered.
     gridSkeletonTimer = setTimeout(hideGridSkeleton, 30000);
   }
-  // The Sections field of a data set of many sections: how many are chosen of
-  // how many, and two shortcuts, every section or only the first chosen one
-  // (the single view). Its tags keep two rows and scroll (custom.css).
-  function decorateSectionsField() {
-    var el = document.getElementById('spatial_projection_sections');
-    var select = el && el.selectize;
-    if (!select) return;
-    var total = Object.keys(select.options).length;
-    var group = el.closest('.form-group');
-    var label = group && group.querySelector('label');
-    if (!label || total < 3) return;
-    var tools = label.querySelector('.cv-sections-tools');
-    if (!tools) {
-      tools = document.createElement('span');
-      tools.className = 'cv-sections-tools';
-      tools.innerHTML = '<span class="cv-sections-count"></span>' +
-        '<button type="button" data-sections="all" title="Show every section">All</button>' +
-        '<button type="button" data-sections="one" title="Show only the first chosen section">One</button>';
-      // In the label, whose click would open the field.
-      tools.addEventListener('click', function (event) {
-        var button = event.target.closest && event.target.closest('button[data-sections]');
-        event.preventDefault();
-        event.stopPropagation();
-        if (!button) return;
-        var current = document.getElementById('spatial_projection_sections');
-        var control = current && current.selectize;
-        if (!control) return;
-        if (button.getAttribute('data-sections') === 'all') {
-          // In the order of the list, after those already chosen.
-          var chosen = control.items.slice();
-          Object.keys(control.options).forEach(function (name) {
-            if (chosen.indexOf(name) < 0) chosen.push(name);
-          });
-          control.setValue(chosen);
-        } else if (control.items.length) {
-          control.setValue([control.items[0]]);
-        }
-      });
-      label.appendChild(tools);
-    }
-    var chosen = select.items.length;
-    tools.querySelector('.cv-sections-count').textContent = chosen + ' of ' + total;
-    tools.querySelector('[data-sections="all"]').disabled = chosen >= total;
-    tools.querySelector('[data-sections="one"]').disabled = chosen <= 1;
-  }
   function wireSectionGrid() {
     if (!window.jQuery) return;
     // A grid panel's title shows only its section (the single view). With a
@@ -11182,9 +11137,6 @@
       // between the two waits for a frame (the input also fires when its
       // control binds with what is on screen); a change among several only
       // rearranges the drawn panels.
-      if (event.name === 'spatial_projection_sections') {
-        setTimeout(decorateSectionsField, 0);
-      }
       if (event.name === 'spatial_projection_sections' && singleActive === 'spatial_projection') {
         var count = Array.isArray(event.value) ? event.value.length : (event.value ? 1 : 0);
         if (!count) return;

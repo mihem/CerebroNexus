@@ -1613,8 +1613,9 @@ body .selectize-control {
   min-inline-size: min(var(--c-select-min-width), 100%);
   max-inline-size: 100%;
 }
-.cerebro-viz-toolbar .selectize-control.multi .selectize-input,
-.coordviews-page .cv-topbar .selectize-control.multi .selectize-input {
+/* (A field collapsed to one row by multiselect.js keeps its own rules.) */
+.cerebro-viz-toolbar .selectize-control.multi:not(.cerebro-ms-collapse) .selectize-input,
+.coordviews-page .cv-topbar .selectize-control.multi:not(.cerebro-ms-collapse) .selectize-input {
   height: auto !important;
   min-height: var(--c-toolbar-control-height) !important;
   padding-block: 5px !important;
@@ -1623,8 +1624,8 @@ body .selectize-control {
   white-space: normal !important;
 }
 /* Selected labels remain in flow, including names wider than the control. */
-.cerebro-viz-toolbar .selectize-control.multi .selectize-input > .item,
-.coordviews-page .cv-topbar .selectize-control.multi .selectize-input > .item {
+.cerebro-viz-toolbar .selectize-control.multi:not(.cerebro-ms-collapse) .selectize-input > .item,
+.coordviews-page .cv-topbar .selectize-control.multi:not(.cerebro-ms-collapse) .selectize-input > .item {
   flex: 0 1 auto !important;
   max-width: 100%;
   white-space: normal;
@@ -3958,20 +3959,61 @@ body .cerebro-viz-toolbar.cerebro-box-toolbar {
   background: transparent;
 }
 
-/* Spatial's Sections field with many sections chosen: the tags keep two rows
-   and scroll, and open to more while the field has the focus. Its label counts
-   the chosen sections and has two shortcuts (cell_views.js). */
-#spatial_projection_sections + .selectize-control.multi .selectize-input {
-  max-height: 62px;
-  /* The toolbar lets every multi-select grow (overflow: visible !important). */
-  overflow-x: hidden !important;
-  overflow-y: auto !important;
-  scrollbar-width: thin;
-  transition: max-height .18s ease;
+/* Every multi-select keeps one row (multiselect.js): its chips stop at the
+   field's edge, a badge at the right ("12+") says some are out of sight, and
+   the open list starts with every chosen item. Fields that hold sections
+   count them in their label, with All and One (multiselect.js). */
+.cerebro-ms-collapse { position: relative; }
+.cerebro-ms-collapse { min-width: 0; }
+body .cerebro-ms-collapse.selectize-control.multi .selectize-input {
+  height: auto !important;
+  min-height: var(--c-toolbar-control-height, 34px) !important;
+  padding-block: 5px !important;
+  flex-wrap: nowrap !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  /* The chips must not widen the field (and with it the toolbar's rows). */
+  contain: inline-size;
+  min-width: 0 !important;
 }
-#spatial_projection_sections + .selectize-control.multi .selectize-input.focus {
-  max-height: 168px;
+body .cerebro-ms-collapse.selectize-control.multi .selectize-input > .item {
+  flex: none !important;
+  max-width: none;
 }
+body .cerebro-ms-collapse.is-overflowing.selectize-control .selectize-input {
+  padding-right: 46px !important;
+}
+.cerebro-ms-collapse.is-overflowing.is-open .selectize-input > .item { display: none !important; }
+.cerebro-ms-more {
+  position: absolute; top: 50%; right: 8px; transform: translateY(-50%);
+  z-index: 2; pointer-events: none;
+  padding: 0 7px; border-radius: 999px;
+  background: var(--c-amber-100, #fde7c7); color: var(--c-amber-700, #b45309);
+  font-size: 11.5px; font-weight: 600; line-height: 18px;
+  font-variant-numeric: tabular-nums;
+  /* Covers the field's right edge, where the cut chip would show through. */
+  box-shadow: 0 0 0 5px var(--c-white, #fff), -16px 0 0 5px var(--c-white, #fff),
+    2px 0 0 5px var(--c-white, #fff);
+}
+.cerebro-ms-more:empty { display: none; }
+.cerebro-ms-chosen {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  max-height: 132px; overflow-y: auto;
+  padding: 6px 8px 8px; border-bottom: 1px solid var(--c-border, #e5e7eb);
+  background: var(--c-white, #fff);
+}
+.cerebro-ms-chosen-head {
+  flex: 1 0 100%; color: var(--c-text-3, #8a8f98); font-size: 11px;
+}
+.cerebro-ms-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 0 4px 0 8px; border: 1px solid var(--c-amber-100, #fde7c7);
+  border-radius: var(--r-xs, 4px);
+  background: var(--c-amber-50, #fff7ed); color: var(--c-amber-700, #b45309);
+  font-size: 13px; line-height: 20px; white-space: nowrap;
+}
+.cerebro-ms-remove { padding: 0 3px; cursor: pointer; }
+.cerebro-ms-remove:hover { background: var(--c-amber-100, #fde7c7); border-radius: 3px; }
 .cv-sections-tools {
   display: inline-flex;
   align-items: center;
