@@ -2079,10 +2079,12 @@ server <- function(input, output, session) {
     codes_path <- paste0(prefix_path, ".codes.bin")
     dictionary_path <- paste0(prefix_path, ".dictionary.json")
     requested_levels <- if (is.null(levels)) NULL else as.character(levels)
+    ## The levels by their hash: a group of a thousand levels or more (the
+    ## Allen atlas's supertypes) would pass the 10,000 bytes an R name may have.
     key <- paste(
       pack$path,
       codes_path,
-      paste(requested_levels, collapse = "\r"),
+      rlang::hash(requested_levels),
       sep = "::"
     )
     if (exists(key, envir = viewer_metadata_resources, inherits = FALSE)) {
