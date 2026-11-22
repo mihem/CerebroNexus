@@ -52,3 +52,24 @@ cerebroRgbGeneFields <- function(
     )
   )
 }
+
+## The Columns field of a page of panels (Spatial's grid, Linked views): Auto,
+## or 1 to `most` columns, at most 8. cell_views.js (gridColumnsChoice())
+## reads it; NULL `label` leaves the label to the caller's markup.
+cerebroColumnsInput <- function(
+  id,
+  most = 8L,
+  selected = NULL,
+  label = "Columns"
+) {
+  most <- max(1L, min(8L, as.integer(most)))
+  selectInput(
+    id,
+    label = label,
+    choices = c(
+      "Auto" = "auto",
+      stats::setNames(seq_len(most), seq_len(most))
+    ),
+    selected = selected %||% "auto"
+  )
+}

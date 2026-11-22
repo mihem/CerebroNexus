@@ -1,5 +1,9 @@
 # CerebroNexus 8.5.0
 
+- **Linked views has a Columns field.** As on Spatial's grid, *Columns* sets
+  how many panels a row holds (Auto, or 1 to 8); both pages build the field
+  with one function, `cerebroColumnsInput()`, and lay the panels out with
+  one reading of it.
 - **One smallest panel size on every page.** Panels of Linked views, the
   Spatial grid, Gene expression's separate panels and an enlarged view's
   context keep plots of at least 250 pixels a side, and the page scrolls

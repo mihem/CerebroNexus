@@ -10884,11 +10884,18 @@
     gridStreamSettle();
   }
   // Columns asked for, or null for the automatic packing.
-  function gridColumnsChoice(count) {
-    if (!sectionGridActive()) return null;
-    var el = document.getElementById('spatial_projection_grid_columns');
+  // The columns a Columns field (cerebroColumnsInput()) asks for, at most
+  // `count`; null for Auto or without the field.
+  function columnsFrom(el, count) {
     var cols = el ? parseInt(el.value, 10) : NaN;
     return cols > 0 ? Math.max(1, Math.min(cols, count || cols)) : null;
+  }
+  // The Columns field of the panels being laid out: Spatial's grid, or Linked
+  // views (no single view active); other pages have none.
+  function gridColumnsChoice(count) {
+    var id = sectionGridActive() ? 'spatial_projection_grid_columns'
+      : (singleActive ? null : 'coordviews_columns');
+    return columnsFrom(id && document.getElementById(id), count);
   }
   function gridSyncZoom() {
     var el = document.getElementById('spatial_projection_grid_sync_zoom');
@@ -11052,11 +11059,7 @@
     var availH = Math.max(240, visibleHeight(scrollHost) - Math.max(0, rect.top) - 2 * VIEWPORT_GUTTER);
     var pack = layout === 'grid'
       ? sectionGridPacking(labels.length, rect.width, availH, 18, 58, gap, lastGridAspect,
-        (function () {
-          var el = document.getElementById('spatial_projection_grid_columns');
-          var n = el ? parseInt(el.value, 10) : NaN;
-          return n > 0 ? Math.min(n, labels.length) : null;
-        })())
+        columnsFrom(document.getElementById('spatial_projection_grid_columns'), labels.length))
       : { cols: 1, height: Math.max(240, availH - 58) };
     var skeleton = document.createElement('div');
     skeleton.className = 'cv-grid-skeleton';
@@ -11138,6 +11141,14 @@
           event.name === 'spatial_projection_grid_sync_zoom') {
         // The input's new value is in the DOM once the event has run.
         setTimeout(applySectionGrid, 0);
+      }
+      if (event.name === 'coordviews_columns') {
+        setTimeout(function () {
+          if (!D || singleActive) return;
+          _layoutKey = null;
+          resizeAll();
+          drawAll();
+        }, 0);
       }
     });
   }

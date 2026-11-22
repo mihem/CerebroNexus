@@ -205,6 +205,13 @@ tab_coordinated_views <- tabItem(
           tags$label("Sections"),
           tags$select(id = "cv-pick-spatial", multiple = "multiple")
         ),
+        ## How many panels a row holds, as on Spatial's grid.
+        div(
+          class = "cv-ctl",
+          id = "cv-columns-ctl",
+          tags$label("Columns", `for` = "coordviews_columns"),
+          cerebroColumnsInput("coordviews_columns", label = NULL)
+        ),
         ## Data, then what colours it: the order of every page's toolbar.
         div(
           class = "cv-ctl",

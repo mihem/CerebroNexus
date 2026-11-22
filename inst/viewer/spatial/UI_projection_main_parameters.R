@@ -251,18 +251,10 @@ output[["spatial_projection_scene_UI"]] <- renderUI({
       condition = grid_js,
       div(
         class = "spatial-grid-controls",
-        selectInput(
+        cerebroColumnsInput(
           "spatial_projection_grid_columns",
-          label = "Columns",
-          choices = c(
-            "Auto" = "auto",
-            stats::setNames(
-              seq_len(min(8L, length(scene$grid_choices))),
-              seq_len(min(8L, length(scene$grid_choices)))
-            )
-          ),
-          selected = isolate(input[["spatial_projection_grid_columns"]]) %||%
-            "auto"
+          most = length(scene$grid_choices),
+          selected = isolate(input[["spatial_projection_grid_columns"]])
         ),
         selectInput(
           "spatial_projection_grid_projection",

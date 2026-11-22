@@ -1052,7 +1052,10 @@
    custom.css). */
 /* keep the mode-specific gene pickers compact in the top bar */
 .coordviews-page #cv-gene-ctl .form-group,
+.coordviews-page #cv-columns-ctl .form-group,
 .coordviews-page #cv-rgb-ctl .form-group { margin-bottom: 0; }
+/* The field's own (empty) label would still take its margin. */
+.coordviews-page #cv-columns-ctl .shiny-label-null { display: none; }
 /* Match searchable gene controls to the shared native/selectize metrics while
    retaining their compact widths in this horizontal toolbar. */
 .coordviews-page .cv-topbar .selectize-control .selectize-input {
