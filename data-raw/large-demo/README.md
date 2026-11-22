@@ -115,12 +115,15 @@ The first run downloads the **13.3 GB** 10x outs ZIP into
 analysis archive and four focus TIFFs (about 2.1 GB combined) are unpacked in a
 temporary build directory. Allow roughly **17 GB free disk** for preparation.
 The transcript clouds, boundaries and 3D morphology stack are not extracted.
+10x also offers the matrix, cell table and analysis archive as separate
+downloads (54, 4 and 22 MB), but the focus TIFFs come only inside the outs
+ZIP, so the microscopy needs the full 13.3 GB download.
 
 The prepared directory contains:
 
 - `cerebro_xenium_prime.crb`: metadata, spatial coordinates, published UMAP
   and the microscopy composite, **embedded** as the section's background image
-  (about 20 MB; the Viewer serves it through a private per-session URL, not
+  (19 MB, of which the PNG is 17 MB; the Viewer serves it through a private per-session URL, not
   inline). The Viewer only serves *external* image files from inside its own
   app folders, so a PNG left in the cache would be refused.
 - `cerebro_xenium_prime.h5`: log-normalised expression, read on demand.
