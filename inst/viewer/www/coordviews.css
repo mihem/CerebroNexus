@@ -353,8 +353,70 @@
 .coordviews-page .cv-panes:not(.cv-has-focus) > .cv-pane { align-self: stretch; }
 .coordviews-page .cv-panes.cv-focus-transitioning .cv-pane {
   will-change: transform, opacity;
-  transition: transform .32s cubic-bezier(.2, .8, .2, 1),
-    opacity .24s ease, border-color .2s ease, box-shadow .2s ease;
+  /* The motion itself is keyframes (setFocusPanel()). */
+  transition: opacity .24s ease, border-color .2s ease, box-shadow .2s ease;
+}
+/* A pane moving into place (setFocusPanel()) keeps its plot whole at one
+   scale; its frame is drawn behind it instead of by the pane, from where the
+   pane was to where it goes, so the outline changes shape smoothly. */
+@property --cv-flip-x { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --cv-flip-y { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --cv-flip-r { syntax: '<length>'; inherits: false; initial-value: 10px; }
+.coordviews-page .cv-panes.cv-focus-transitioning .cv-pane.cv-flip-frame {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.coordviews-page .cv-panes.cv-focus-transitioning .cv-pane.cv-flip-frame::before {
+  content: '';
+  /* The pane's keyframes set them (they are not inherited, so nothing else
+     in the pane is styled again on each frame of the motion). */
+  --cv-flip-x: inherit;
+  --cv-flip-y: inherit;
+  --cv-flip-r: inherit;
+  position: absolute;
+  z-index: -1;
+  /* The pane's border box, pushed out to where the pane was. */
+  top: calc(var(--cv-flip-y) - 1px);
+  bottom: calc(var(--cv-flip-y) - 1px);
+  left: calc(var(--cv-flip-x) - 1px);
+  right: calc(var(--cv-flip-x) - 1px);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--cv-flip-r);
+  box-shadow: var(--shadow-1);
+  pointer-events: none;
+}
+.coordviews-page .cv-panes.cv-focus-transitioning .cv-pane.cv-focus-primary.cv-flip-frame::before {
+  border-color: var(--c-amber);
+}
+/* The pane taking or giving up the focus is above the others while they
+   move, and the panes fading out (thumbnails off the strip) below them. */
+.coordviews-page .cv-panes.cv-focus-transitioning > .cv-pane { z-index: 1; }
+.coordviews-page .cv-panes.cv-focus-transitioning > .cv-pane.cv-flip-lead { z-index: 2; }
+.coordviews-page .cv-panes.cv-focus-transitioning > .cv-pane.cv-flip-ghost {
+  z-index: 0;
+  pointer-events: none;
+}
+.coordviews-page .cv-panes.cv-focus-transitioning > .cv-pane.cv-flip-ghost .cv-pane-head,
+.coordviews-page .cv-panes.cv-focus-transitioning > .cv-pane.cv-flip-ghost .cv-panebar {
+  opacity: 0;
+}
+/* Title and buttons drawn much larger or smaller than their size on the way
+   show only near the end of the motion. */
+.coordviews-page .cv-panes.cv-focus-transitioning .cv-pane .cv-pane-head,
+.coordviews-page .cv-panes.cv-focus-transitioning .cv-pane .cv-panebar {
+  transition: opacity .12s ease .2s;
+}
+.coordviews-page .cv-panes.cv-focus-transitioning .cv-pane.cv-flip-head-later .cv-pane-head,
+.coordviews-page .cv-panes.cv-focus-transitioning .cv-pane.cv-flip-head-later .cv-panebar {
+  opacity: 0;
+  transition: none;
+}
+/* The strip's arrows come in with the thumbnails rather than before them. */
+@keyframes cv-strip-arrow-in { from { opacity: 0; } to { opacity: 1; } }
+.coordviews-page .cv-panes.cv-focus-transitioning > .cv-strip-arrow:not([hidden]) {
+  animation: cv-strip-arrow-in .16s ease .18s both;
 }
 .coordviews-page .cv-panes.cv-focus-transitioning canvas { transition: none; }
 /* An enlarged view in its grid (focusGridPacking()): tracks set by JS. */

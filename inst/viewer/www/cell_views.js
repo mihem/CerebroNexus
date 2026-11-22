@@ -3221,9 +3221,13 @@
   // grows; every other pane remains visible as context and keeps its viewport.
   function setFocusPanel(key) {
     var host = panels[0] && panels[0].pane && panels[0].pane.parentElement;
-    // A second click during the motion starts from the visible layout rather
-    // than inheriting a half-finished transform from the first transition.
+    // A second click during the motion starts from where the panes are seen
+    // (their rectangles are read with the motion's transform), then stops it.
     clearTimeout(focusResizeTimer);
+    var before = {};
+    panels.forEach(function (p) {
+      if (p.pane && p.spaceId) before[p.key] = p.pane.getBoundingClientRect();
+    });
     if (host) host.classList.remove('cv-focus-transitioning');
     panels.forEach(function (p) {
       if (!p.pane) return;
@@ -3231,13 +3235,11 @@
       p.pane.style.transform = '';
       p.pane.style.transformOrigin = '';
       p.pane.style.opacity = '';
-    });
-    var before = {};
-    panels.forEach(function (p) {
-      if (p.pane && p.spaceId) before[p.key] = p.pane.getBoundingClientRect();
+      clearFocusFlip(p);
     });
     focusAnimating = true;
     if (host) host.classList.add('cv-focus-transitioning');
+    var previousFocus = focusPanel;
     focusPanel = (focusPanel === key) ? null : key;
     paintEnlarged();
     updateFocusButtons();
@@ -3248,28 +3250,75 @@
     // then every pane animates from its old rectangle into that geometry. This is
     // symmetric for enter/exit and avoids ResizeObserver repeatedly redrawing a
     // canvas while its CSS box is still moving.
+    // Every new rectangle is read before any style is written: a written frame
+    // changes layout, and reading after it would lay the page out once a pane.
+    var after = {};
     panels.forEach(function (p) {
-      if (!p.pane || !p.spaceId || !before[p.key]) return;
-      var from = before[p.key], to = p.pane.getBoundingClientRect();
-      if (!(to.width > 0 && to.height > 0)) return;
-      // One scale for both axes: a pane changing shape is not stretched while
-      // it moves (its text and plot keep their proportions), it grows from the
-      // centre of where it was.
-      var scale = Math.min(from.width / to.width, from.height / to.height);
-      var dx = from.left + from.width / 2 - (to.left + to.width * scale / 2);
-      var dy = from.top + from.height / 2 - (to.top + to.height * scale / 2);
-      p.pane.style.transition = 'none';
-      p.pane.style.transformOrigin = 'top left';
-      p.pane.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(' + scale + ')';
-      p.pane.style.opacity = focusPanel && p.key !== focusPanel ? '.88' : '.96';
+      if (p.pane && p.spaceId && before[p.key]) after[p.key] = p.pane.getBoundingClientRect();
     });
-    if (host) void host.offsetWidth; // commit the inverse transforms before release
+    var hostBox = host && host.getBoundingClientRect();
+    // The pane taking the focus, or giving it up, moves above the others: the
+    // thumbnails pass behind it rather than across it.
+    var lead = focusPanel || previousFocus;
+    // Panes the enlarged view hides (thumbnails off the strip) that were in
+    // sight fade out where they were instead of vanishing: shown again for the
+    // motion, out of the grid's flow, at their old place.
+    var ghosts = !hostBox ? [] : panels.filter(function (p) {
+      var from = before[p.key], to = after[p.key];
+      return from && to && from.width > 0 && from.height > 0 && !(to.width > 0) &&
+        p.pane.classList.contains('cv-strip-off') &&
+        from.bottom > 0 && from.top < (window.innerHeight || 0);
+    }).slice(0, FOCUS_FLIP_GHOSTS);
+    ghosts.forEach(function (p) {
+      var from = before[p.key];
+      p.pane.classList.remove('cv-strip-off');
+      p.pane.classList.add('cv-flip-ghost');
+      p.pane.style.position = 'absolute';
+      p.pane.style.left = (from.left - hostBox.left - host.clientLeft) + 'px';
+      p.pane.style.top = (from.top - hostBox.top - host.clientTop) + 'px';
+      p.pane.style.translate = p.pane.style.clipPath = '';
+    });
+    // Read where they now stand (one layout for all of them) before writing on.
+    var ghostBox = {};
+    ghosts.forEach(function (p) { ghostBox[p.key] = p.pane.getBoundingClientRect(); });
+    ghosts.forEach(function (p) {
+      var from = before[p.key], box = ghostBox[p.key];
+      // Shrinking a little towards its centre as it fades.
+      var end = { left: from.left + from.width * 0.04, top: from.top + from.height * 0.04,
+        width: from.width * 0.92, height: from.height * 0.92 };
+      var keys = focusFlipKeyframes(from, end, 1, box, 0);
+      if (!keys) return;
+      p.pane.style.transformOrigin = 'top left';
+      if (keys.framed) p.pane.classList.add('cv-flip-frame');
+      p._focusFlip = p.pane.animate(keys.frames,
+        { duration: FOCUS_FLIP_FADE_MS, easing: 'ease-out', fill: 'forwards' });
+    });
+    panels.forEach(function (p) {
+      if (!after[p.key]) return;
+      var from = before[p.key], to = after[p.key];
+      if (!(to.width > 0 && to.height > 0)) return;
+      if (p.key === lead) p.pane.classList.add('cv-flip-lead');
+      // A pane that was hidden (a thumbnail off its strip's page) has no place
+      // to come from: it fades in where it is.
+      if (!(from.width > 0 && from.height > 0)) {
+        p._focusFlip = p.pane.animate([{ opacity: 0 }, { opacity: 1 }],
+          { duration: FOCUS_FLIP_MS, easing: 'ease' });
+        return;
+      }
+      var keys = focusFlipKeyframes(from, to,
+        focusPanel && p.key !== focusPanel ? 0.88 : 0.96);
+      if (!keys) return;
+      p.pane.style.transformOrigin = 'top left';
+      if (keys.framed) p.pane.classList.add('cv-flip-frame');
+      // Title and buttons drawn at another size on the way (much larger when
+      // the pane shrinks into place) wait until it is nearly there.
+      if (keys.scale > 1.25 || keys.scale < 0.8) p.pane.classList.add('cv-flip-head-later');
+      p._focusFlip = p.pane.animate(keys.frames,
+        { duration: FOCUS_FLIP_MS, easing: 'cubic-bezier(.2, 0, 0, 1)' });
+    });
     requestAnimationFrame(function () {
       panels.forEach(function (p) {
-        if (!p.pane || !p.spaceId) return;
-        p.pane.style.transition = '';
-        p.pane.style.transform = '';
-        p.pane.style.opacity = '';
+        if (p.pane) p.pane.classList.remove('cv-flip-head-later');
       });
     });
     focusResizeTimer = setTimeout(function () {
@@ -3279,11 +3328,75 @@
       panels.forEach(function (p) {
         if (!p.pane) return;
         p.pane.style.transformOrigin = '';
+        clearFocusFlip(p);
       });
       // The panes reached their size before the motion: resize only a pane
       // whose header wrapped meanwhile, rather than drawing every plot again.
       resizeAll(true);
-    }, 380);
+    }, 400);
+  }
+  // A pane moving into place (setFocusPanel()), as keyframes: at each step
+  // its frame is the straight blend of the rectangle it leaves and the one it
+  // takes, and the pane inside the largest copy of itself that fits that
+  // frame whole, centred (one scale for both axes, so the plot keeps its
+  // proportions). The frame is drawn behind the pane (the ::before of
+  // .cv-flip-frame): its sides reach --cv-flip-x/y past the scaled pane, in
+  // the pane's own pixels, its corners as round as the pane's 10px. A pane of
+  // about the old shape needs no frame: its own outline matches. Blending the
+  // pane's scale and the frame's reach separately would bend the frame's path
+  // past both rectangles.
+  // `box` is where the pane is laid out (by default where it goes), and the
+  // opacity runs from `opacity` to `opacityEnd` (by default 1). A pane fading
+  // out (FOCUS_FLIP_GHOSTS of them at most) takes FOCUS_FLIP_FADE_MS.
+  var FOCUS_FLIP_MS = 340, FOCUS_FLIP_STEPS = 12;
+  var FOCUS_FLIP_FADE_MS = 220, FOCUS_FLIP_GHOSTS = 24;
+  function focusFlipKeyframes(from, to, opacity, box, opacityEnd) {
+    box = box || to;
+    var fade = opacityEnd == null ? 1 : opacityEnd;
+    var at = function (q) {
+      var mix = function (a, b) { return a + (b - a) * q; };
+      var left = mix(from.left, to.left), top = mix(from.top, to.top);
+      var width = mix(from.width, to.width), height = mix(from.height, to.height);
+      var scale = Math.min(width / box.width, height / box.height);
+      return {
+        scale: scale,
+        dx: left + width / 2 - (box.left + box.width * scale / 2),
+        dy: top + height / 2 - (box.top + box.height * scale / 2),
+        fx: Math.max(0, (width / scale - box.width) / 2),
+        fy: Math.max(0, (height / scale - box.height) / 2)
+      };
+    };
+    var start = at(0);
+    if (!(start.scale > 0 && isFinite(start.scale))) return null;
+    var framed = (start.fx * start.scale > 2 || start.fy * start.scale > 2);
+    var frames = [];
+    for (var i = 0; i <= FOCUS_FLIP_STEPS; i++) {
+      var q = i / FOCUS_FLIP_STEPS, step = at(q);
+      var frame = {
+        offset: q,
+        transform: 'translate(' + step.dx.toFixed(2) + 'px,' + step.dy.toFixed(2) + 'px) scale(' +
+          step.scale.toFixed(5) + ')',
+        opacity: opacity + (fade - opacity) * q
+      };
+      if (framed) {
+        frame['--cv-flip-x'] = (-step.fx).toFixed(2) + 'px';
+        frame['--cv-flip-y'] = (-step.fy).toFixed(2) + 'px';
+        frame['--cv-flip-r'] = (10 / step.scale).toFixed(2) + 'px';
+      }
+      frames.push(frame);
+    }
+    return { frames: frames, framed: framed, scale: start.scale };
+  }
+  function clearFocusFlip(p) {
+    if (p._focusFlip) p._focusFlip.cancel();
+    p._focusFlip = null;
+    p.pane.classList.remove('cv-flip-frame', 'cv-flip-head-later', 'cv-flip-lead');
+    // A faded pane goes back off the strip (placeFocusStrip() keeps it so).
+    if (p.pane.classList.contains('cv-flip-ghost')) {
+      p.pane.classList.remove('cv-flip-ghost');
+      p.pane.classList.add('cv-strip-off');
+      p.pane.style.position = p.pane.style.left = p.pane.style.top = '';
+    }
   }
   // The per-panel "zoom to selection" is only an action while there IS one, and
   // only on a panel that lays cells out in a plane -- a rotated cloud has no
