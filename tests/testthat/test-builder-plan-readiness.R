@@ -200,6 +200,17 @@ test_that("spatial image storage and nested image counts freeze exactly", {
         )
     )
 
+    ## Images kept inside the CRB need no Viewer App; a Trekker image still does.
+    entry$settings$spatial_image_storage <- "embedded"
+    expect_false(builder_plan_requires_app(list(entry)))
+    crb_only <- builder_freeze_plan(list(entry), tempdir(), make_app = FALSE)
+    expect_null(crb_only$error)
+    expect_identical(crb_only$items[[1L]]$spatial_image_storage, "embedded")
+    entry$settings$images$trekker <- trekker_record
+    expect_true(builder_plan_requires_app(list(entry)))
+    entry$settings$images$trekker <- NULL
+    entry$settings$spatial_image_storage <- "external"
+
     expect_error(
       builder_plan_requires_app("not a list"),
       "Builder plan entries must be a list.",

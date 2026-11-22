@@ -1279,11 +1279,25 @@ builder_verify_crb <- function(
     },
     logical(1)
   )]
-  if (length(embedded_sections)) {
+  ## Stored inside the CRB, exactly the sections given an image carry one.
+  expected_embedded <- if (identical(item$spatial_image_storage, "embedded")) {
+    intersect(
+      spatial_sections,
+      names(builder_image_collection_normalize(item$images %||% list()))
+    )
+  } else {
+    character()
+  }
+  if (!setequal(embedded_sections, expected_embedded)) {
     stop(
-      "The staged CRB contains embedded Spatial images; Builder supports ",
-      "external Spatial images only: ",
-      paste(embedded_sections, collapse = ", "),
+      "The staged CRB embedded Spatial images differ from BuildPlan: ",
+      paste(
+        union(
+          setdiff(embedded_sections, expected_embedded),
+          setdiff(expected_embedded, embedded_sections)
+        ),
+        collapse = ", "
+      ),
       ".",
       call. = FALSE
     )
@@ -1887,6 +1901,9 @@ builder_verify_crb <- function(
         if (!is.null(external$error)) {
           stop(external$error, call. = FALSE)
         }
+        if (identical(item$spatial_image_storage, "embedded")) {
+          .builder_embed_spatial_images(export, item$images)
+        }
       }
     },
     verbose = FALSE
@@ -1932,7 +1949,13 @@ builder_verify_crb <- function(
   images <- list()
   settings <- list()
   materialized_paths <- character()
-  collection_input <- item$images %||% list()
+  ## Embedded section images are already in the CRB (.builder_build_export());
+  ## only a Trekker image is still a file beside the App.
+  collection_input <- if (identical(item$spatial_image_storage, "embedded")) {
+    list()
+  } else {
+    item$images %||% list()
+  }
   if (!is.null(item$trekker_alignment)) {
     collection_input[["trekker"]] <- item$trekker_alignment
   }

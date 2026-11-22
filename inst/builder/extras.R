@@ -2252,6 +2252,81 @@ builder_pair_sections <- function(picture, per_section) {
   list(object = crb, applied = applied, changed = changed)
 }
 
+#' Write each Spatial section's images into the Cerebro object.
+#'
+#' The "embedded" choice: the CRB carries the pictures as base64 data URIs, so
+#' it opens with its images without a Viewer App beside it. Each image keeps
+#' the Builder alignment as live Viewer settings (`geometry = "live"`), so the
+#' Viewer draws it exactly as it draws the same image kept as a file.
+.builder_embed_spatial_images <- function(crb, images) {
+  collection <- builder_image_collection_normalize(images)
+  sections <- intersect(
+    names(collection) %||% character(),
+    crb$availableSpatial()
+  )
+  for (section_id in sections) {
+    embedded <- list()
+    for (label in names(collection[[section_id]])) {
+      record <- collection[[section_id]][[label]]
+      path <- tryCatch(
+        normalizePath(record$source_path, winslash = "/", mustWork = TRUE),
+        error = function(error) NULL
+      )
+      if (is.null(path) || !isTRUE(file_test("-f", path))) {
+        stop("A Builder Spatial image asset is missing.", call. = FALSE)
+      }
+      source <- record[["source", exact = TRUE]]
+      inspected <- builder_read_image(
+        path,
+        filename = if (is.list(source)) source$name %||% path else path
+      )
+      if (!is.null(inspected$error)) {
+        stop(inspected$error, call. = FALSE)
+      }
+      if (
+        !is.null(record$source_content_md5) &&
+          !identical(record$source_content_md5, inspected$source_content_md5)
+      ) {
+        stop(
+          "A Builder Spatial image failed its integrity check.",
+          call. = FALSE
+        )
+      }
+      bytes <- readBin(path, "raw", file.info(path)$size)
+      alignment <- list(
+        builder_managed = TRUE,
+        geometry = "live",
+        viewer_setting = builder_alignment_viewer_setting(record)
+      )
+      if (.builder_alignment_valid_bounds(record$viewport_bounds)) {
+        alignment$viewport_bounds <- as.list(unlist(
+          record$viewport_bounds[c("xmin", "xmax", "ymin", "ymax")]
+        ))
+      }
+      payload <- list(
+        histology_image = paste0(
+          "data:",
+          inspected$mime,
+          ";base64,",
+          gsub("\n", "", jsonlite::base64_enc(bytes), fixed = TRUE)
+        ),
+        histology_image_bounds = unlist(
+          record$base_bounds[c("xmin", "xmax", "ymin", "ymax")]
+        ),
+        histology_alignment = alignment,
+        image_label = record$image_label %||% label
+      )
+      scope <- intersect(c("roi_field", "roi_value"), names(record))
+      payload[scope] <- record[scope]
+      embedded[[label]] <- payload
+    }
+    spatial <- crb$getSpatialData(section_id, hydrate_expression = FALSE)
+    spatial$histology_images <- embedded
+    crb$addSpatialData(section_id, spatial)
+  }
+  invisible(crb)
+}
+
 #' The coordinates of the first spatial slice, for bounds decisions.
 #'
 #' `@images` entries differ per platform; the coordinate slot is what they

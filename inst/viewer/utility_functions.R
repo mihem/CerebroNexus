@@ -439,6 +439,21 @@ spatialImagePreset <- function(options, dataset, spatial_name, image_label) {
   setting <- options[["spatial_image_settings"]][[dataset]][[spatial_name]][[
     image_label
   ]]
+  spatialImageSettingPreset(setting)
+}
+
+## The drawing preset of one per-image setting (offset_x ... image_opacity).
+spatialImageSettingPreset <- function(setting) {
+  defaults <- list(
+    offsetX = 0,
+    offsetY = 0,
+    scaleX = 1,
+    scaleY = 1,
+    flipX = FALSE,
+    flipY = FALSE,
+    rotation = 0,
+    opacity = 1
+  )
   if (!is.list(setting)) {
     return(defaults)
   }
@@ -471,6 +486,11 @@ spatialImagePreset <- function(options, dataset, spatial_name, image_label) {
 spatialEmbeddedImagePreset <- function(preset, alignment) {
   if (!is.list(alignment)) {
     return(preset)
+  }
+  ## The Builder's "embedded" storage keeps the picture as uploaded and the
+  ## alignment as the same live settings an external image gets.
+  if (identical(alignment[["geometry"]], "live")) {
+    return(spatialImageSettingPreset(alignment[["viewer_setting"]]))
   }
   number <- function(key, fallback) {
     value <- suppressWarnings(as.numeric(alignment[[key]]))

@@ -376,7 +376,13 @@ builder_upgrade_viewer_content_entry <- function(entry) {
     return(entry)
   }
   settings <- entry$settings
-  settings$spatial_image_storage <- "external"
+  settings$spatial_image_storage <- if (
+    identical(settings$spatial_image_storage, "embedded")
+  ) {
+    "embedded"
+  } else {
+    "external"
+  }
   entry$settings <- settings
   if (is.null(settings$spatial_coordinate_transforms)) {
     settings$spatial_coordinate_transforms <- list()
@@ -1059,10 +1065,13 @@ builder_upgrade_viewer_content_entry <- function(entry) {
     )
   }
   storage <- .subset2(settings, "spatial_image_storage")
-  if (!is.null(storage) && !identical(storage, "external")) {
+  if (
+    !is.null(storage) &&
+      !(identical(storage, "external") || identical(storage, "embedded"))
+  ) {
     .builder_state_abort(
       "invalid_spatial_image_storage",
-      "Builder Spatial images must use external storage."
+      "Builder Spatial images are stored either external or embedded."
     )
   }
   .builder_state_spatial_coordinate_transforms(

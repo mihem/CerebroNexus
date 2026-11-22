@@ -141,6 +141,15 @@ builder_resolve_colors <- function(settings, levels) {
   )
 }
 
+## Where a dataset's Spatial images go: "external" keeps them as files beside
+## the Viewer App (small CRB, pictures served and cached as files); "embedded"
+## writes them into the CRB, so the CRB alone carries them. Anything else is
+## the default, "external".
+builder_spatial_image_storage <- function(settings) {
+  value <- if (is.list(settings)) .subset2(settings, "spatial_image_storage")
+  if (identical(value, "embedded")) "embedded" else "external"
+}
+
 .builder_plan_flatten_spatial_images <- function(images) {
   if (
     exists(

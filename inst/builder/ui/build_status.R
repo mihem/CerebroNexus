@@ -212,7 +212,11 @@ builder_build_options_ui <- function(
         p(
           id = "build_output_crb_reason",
           class = "hint builder-app-required-reason",
-          "Spatial images or ROI settings require CRB files + Viewer App output."
+          paste(
+            "Spatial images kept as separate files, Trekker images or ROI",
+            "settings require CRB files + Viewer App output. To build CRB",
+            "files only, store the Spatial images inside the CRB."
+          )
         )
       },
       if (!isTRUE(app_available)) {
