@@ -59,7 +59,10 @@ viewer_demo_options <- function() {
     CEREBRO_1M_DEMO_CRB = NA,
     CEREBRO_REN_DEMO_CRB = NA,
     CEREBRO_COSMX_DEMO_CRB = NA,
-    CEREBRO_TCELL_DEMO_CRB = NA
+    CEREBRO_TCELL_DEMO_CRB = NA,
+    CEREBRO_ALLEN_DEMO_CRB = NA,
+    CEREBRO_EAE_DEMO_CRB = NA,
+    CEREBRO_MS_DEMO_CRB = NA
   ))
   sys.source(viewer_test_path("million_cell_demo.R"), scope)
   eval(viewer_r_assignment(path, "custom_welcome_message"), scope)

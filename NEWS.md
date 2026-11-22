@@ -121,6 +121,18 @@
   open in the same Viewer as the other large demos (`--data=1m,dlpfc` works),
   and the file can still be imported in the Builder. Sources and licences are
   in `data-raw/large-demo/visium.ATTRIBUTION.md`.
+- **Spatial demos with many sections.** `Rscript run-demo.R
+  --data=allen,eae,ms` prepares the Allen whole mouse brain MERFISH atlas
+  (3,938,808 cells in 59 coronal sections, 550 genes; Yao et al. 2023) and the
+  spinal cord data of Kukanja et al. 2024: mouse EAE by in situ sequencing
+  (592,421 cells, 52 sections) and human MS by Xenium (660,801 cells, 6
+  sections). Each section is one spatial entry, with the authors' cell types
+  and colours, so the data sets exercise the Spatial grid, its enlarged view
+  and Linked views with many panels. Sources and licences are in
+  `data-raw/large-demo/allen.ATTRIBUTION.md` and `kukanja.ATTRIBUTION.md`.
+- **A group with a thousand levels or more no longer stops the Viewer.** A data
+  set with such a group (the Allen atlas's 1,201 supertypes) ended the
+  session when it opened.
 
 # CerebroNexus 8.4.8
 

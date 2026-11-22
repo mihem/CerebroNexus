@@ -126,6 +126,51 @@ viewerAddTcellDemo <- function(
   )
 }
 
+## 59 coronal sections of one mouse brain, about 67,000 cells each.
+viewerAddAllenDemo <- function(
+  options,
+  path = Sys.getenv("CEREBRO_ALLEN_DEMO_CRB", unset = "")
+) {
+  viewerAddLargeDemo(
+    options,
+    path,
+    "CEREBRO_ALLEN_DEMO_CRB",
+    "Allen whole mouse brain MERFISH (59 sections, 3.9M)",
+    point_size = 1,
+    point_opacity = 0.6
+  )
+}
+
+## Kukanja et al. 2024: mouse EAE spinal cord by in situ sequencing, about
+## 11,000 cells per section, and human MS spinal cord by Xenium.
+viewerAddEaeDemo <- function(
+  options,
+  path = Sys.getenv("CEREBRO_EAE_DEMO_CRB", unset = "")
+) {
+  viewerAddLargeDemo(
+    options,
+    path,
+    "CEREBRO_EAE_DEMO_CRB",
+    "Kukanja et al. mouse EAE ISS (52 sections)",
+    point_size = 1,
+    point_opacity = 0.6
+  )
+}
+
+viewerAddMsDemo <- function(
+  options,
+  path = Sys.getenv("CEREBRO_MS_DEMO_CRB", unset = "")
+) {
+  viewerAddLargeDemo(
+    options,
+    path,
+    "CEREBRO_MS_DEMO_CRB",
+    "Kukanja et al. human MS Xenium (6 sections)",
+    point_size = 1,
+    point_opacity = 0.6
+  )
+}
+
 ## The multi-section Visium demos run-demo.R built with the Builder: each
 ## demo.rds (prepareViewerVisiumDemoData()) names its CRB, the picture of every
 ## section and the display settings the Builder chose, Spatial opening as the

@@ -1,6 +1,6 @@
 # Large demo data sets
 
-These scripts download and prepare the large demo data sets that `run-demo.R` opens in the Viewer: the mouse brain E18 data set (all 1,306,127 cells of the 10x 1M neurons matrix), the Ren et al. COVID-19 atlas (1.46M cells with paired TCR/BCR data), and, on request, the NanoString CosMx NSCLC spatial data set (eight tissue sections) and the Zheng et al. pan-cancer T-cell atlas (397,810 cells with TCR sequences and the CD8 exhaustion pseudotime). They are not shipped in `inst/extdata/examples/`, `data-raw/` is excluded from package builds, and they are not part of the test suite. `tests/testthat/test-run-demo.R`, `test-ren-demo.R`, `test-large-demos.R`, `test-million-cell-viewer.R` and `test-demo-h5-transpose.R` test them with small synthetic data.
+These scripts download and prepare the large demo data sets that `run-demo.R` opens in the Viewer: the mouse brain E18 data set (all 1,306,127 cells of the 10x 1M neurons matrix), the Ren et al. COVID-19 atlas (1.46M cells with paired TCR/BCR data), and, on request, the NanoString CosMx NSCLC spatial data set (eight tissue sections), the Zheng et al. pan-cancer T-cell atlas (397,810 cells with TCR sequences and the CD8 exhaustion pseudotime), and three spatial data sets with many sections: the Allen whole mouse brain MERFISH atlas (3,938,808 cells, 59 sections) and the Kukanja et al. mouse EAE (in situ sequencing, 52 sections) and human MS (Xenium, 6 sections) spinal cord data. They are not shipped in `inst/extdata/examples/`, `data-raw/` is excluded from package builds, and they are not part of the test suite. `tests/testthat/test-run-demo.R`, `test-ren-demo.R`, `test-large-demos.R`, `test-million-cell-viewer.R` and `test-demo-h5-transpose.R` test them with small synthetic data.
 
 ## How to run
 
@@ -9,13 +9,14 @@ You normally do not run these scripts yourself. From the repository root, run th
 ```bash
 Rscript run-demo.R                             # the mouse brain, then the Viewer in the browser
 Rscript run-demo.R --data=ren                  # only the Ren atlas
-Rscript run-demo.R --data=1m,ren,cosmx,tcell   # all four large data sets
+Rscript run-demo.R --data=1m,ren,cosmx,tcell   # the four large single-cell data sets
+Rscript run-demo.R --data=allen,eae,ms         # the three spatial data sets with many sections
 Rscript run-demo.R --data=ren --prepare-only   # download and convert, do not start the Viewer
 Rscript run-demo.R --data=dlpfc,mouse_brain,breast,prostate  # the four multi-section Visium data sets
 Rscript run-demo.R --data=1m,tcell,dlpfc,breast              # any mix, all in one Viewer
 ```
 
-`--data` takes a comma-separated list of `1m` (the mouse brain), `ren`, `cosmx`, `tcell`, `dlpfc`, `mouse_brain`, `breast` and `prostate`; without it the launcher prepares the mouse brain.
+`--data` takes a comma-separated list of `1m` (the mouse brain), `ren`, `cosmx`, `tcell`, `allen`, `eae`, `ms`, `dlpfc`, `mouse_brain`, `breast` and `prostate`; without it the launcher prepares the mouse brain.
 
 The launcher loads this checkout with `pkgload`, sources the scripts below, prepares each data set (a complete cache is reused, so only the first run downloads and converts), builds the Viewer Pack, and starts the app on `http://127.0.0.1:7451`. It needs `pkgload`, `rhdf5`, `HDF5Array`, `DelayedArray`, `readxl` and `qs2`, plus the packages the Viewer itself uses.
 
@@ -50,6 +51,8 @@ crb <- prepareViewerRenDemoData()   # returns the path of the prepared .crb
 - `prepare_viewer_ren_data.R`: downloads the Ren et al. atlas (about 61 GB as `.h5ad`), the cell annotation, the clinical sample table and the TCR/BCR tables, and builds the Ren `.crb` with its immune repertoire. Entry function: `prepareViewerRenDemoData()`.
 - `prepare_viewer_cosmx_data.R`: downloads the eight section archives of the CosMx NSCLC data set (11.3 GB), reads the expression and cell tables, and builds the CosMx `.crb` with one spatial entry per section. Entry function: `prepareViewerCosMxDemoData()`. Source, licence status and changes: [`cosmx.ATTRIBUTION.md`](cosmx.ATTRIBUTION.md).
 - `prepare_viewer_tcell_data.R`: downloads the Zenodo files of the pan-cancer T-cell atlas (14.1 GB), joins the 70 per-data-set expression objects, computes the joint embedding and builds the `.crb` with the TCR repertoire and the CD8 trajectory. Entry function: `prepareViewerTcellDemoData()`. Source, licence and changes: [`tcell.ATTRIBUTION.md`](tcell.ATTRIBUTION.md).
+- `prepare_viewer_allen_data.R`: downloads the cell table, the gene table and the log2 expression `.h5ad` of the Allen whole mouse brain MERFISH data set (8.6 GB), computes the joint embedding and builds the `.crb` with one spatial entry per section and the atlas's taxonomy colours. Entry function: `prepareViewerAllenDemoData()`. Source, licence and changes: [`allen.ATTRIBUTION.md`](allen.ATTRIBUTION.md).
+- `prepare_viewer_kukanja_data.R`: downloads the AnnData archive of the Kukanja et al. EAE (`eae`, 0.57 GB) or MS (`ms`, 0.51 GB) data set and builds the `.crb` with one spatial entry per section, the authors' cell types, colours and UMAP. Entry function: `prepareViewerKukanjaDemoData("eae")` or `("ms")`. Source, licence and changes: [`kukanja.ATTRIBUTION.md`](kukanja.ATTRIBUTION.md).
 - `prepare_builder_visium_data.R`: downloads four real multi-section 10x Visium data sets with the H&E photograph of every section (`dlpfc`: 12 sections of human prefrontal cortex with layer labels; `mouse_brain`: 4 sagittal sections; `breast`: 2 breast cancer sections; `prostate`: prostate cancer and normal), and writes one SingleCellExperiment file per data set as Builder input, with a computed PCA, UMAP and clusters. `Rscript run-demo.R --data=dlpfc` prepares that file and then builds it with the Builder's own steps: import, the Builder's settings, every section's picture, Spatial opening as the grid. The resulting CRB opens in the same Viewer as the other data sets. The launcher prints the file's path, so it can also be imported in the Builder (`launchCerebroBuilder()`). This build loads the Builder code the way its end-to-end tests do, so it also needs `testthat` and `withr`. The Viewer shows pictures only from its own `spatial-assets` folder, so each picture is linked or copied into `inst/spatial-assets/demo-visium/`, a folder Git ignores. Entry functions: `prepareBuilderVisiumDemoData(id)` (the Builder input) and `prepareViewerVisiumDemoData(id, repo_root)` (the built data set). Sources, licences and changes: [`visium.ATTRIBUTION.md`](visium.ATTRIBUTION.md).
 - `download_helpers.R`: the cache folder, the checked download (size, then MD5 or SHA256, resumable) and the publish-by-rename shared by the two scripts above. `run-demo.R` sources it before them.
 - `prepare_viewer_pack.R`: builds or reuses the Viewer Pack of a prepared `.crb`. Entry function: `prepareDemoViewerPack()`.
@@ -80,5 +83,23 @@ Notes on the T-cell data set:
 - The TCR table covers 168,901 cells of 86 patients; a repertoire sample is a patient and a tissue site (`patient (T)`, `patient (N)`, `patient (P)`), so Compare and Clone Sharing follow a patient's clones between sites.
 - The trajectory (`published_pseudotime`, "Published pseudotime" in the Viewer) is the CD8 continuum with the authors' diffusion pseudotime, which belongs to mini-clusters; see the attribution file for exactly what is inherited and rescaled.
 - The H5 file and the intermediate matrix are held in memory while the data set is built: the peak was about 52 GB of resident memory.
+
+## The spatial data sets with many sections
+
+They are built like the CosMx data set, one spatial entry per section, so that Spatial opens as the grid of sections. They are meant to exercise the Spatial grid, its enlarged view and the Linked views with many panels.
+
+| | `--data=allen` | `--data=eae` | `--data=ms` |
+|---|---|---|---|
+| Environment variable read by the Viewer | `CEREBRO_ALLEN_DEMO_CRB` | `CEREBRO_EAE_DEMO_CRB` | `CEREBRO_MS_DEMO_CRB` |
+| Cache folder | `large-examples/allen/` | `large-examples/eae/` | `large-examples/ms/` |
+| Data set menu entry | Allen whole mouse brain MERFISH (59 sections, 3.9M) | Kukanja et al. mouse EAE ISS (52 sections) | Kukanja et al. human MS Xenium (6 sections) |
+| Cells, genes, sections | 3,938,808, 550, 59 | 592,421, 239, 52 | 660,801, 266, 6 |
+| Download | 3 files, 8.6 GB | 1 file, 0.57 GB | 1 file, 0.51 GB |
+| Licence | CC BY-NC 4.0 | CC BY 4.0 | CC BY 4.0 |
+
+Notes:
+
+- Allen: the expression is the atlas's log2-normalised matrix of the cells that passed its quality control. The atlas publishes no embedding of these cells; the `umap` projection is computed by the script (30 principal components, UMAP).
+- Kukanja: the AnnData archive is unpacked into the build folder (4.3 GB for `eae`, 3.5 GB for `ms`) and removed afterwards. The embedding is the authors' UMAP.
 
 Benchmarks and smoke checks live in [CerebroNexus_paper_code](https://github.com/duocang/CerebroNexus_paper_code) (`topics/viewer_performance/` and `topics/expression_backends/`).

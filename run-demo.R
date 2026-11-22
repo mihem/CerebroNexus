@@ -3,14 +3,19 @@
 ## Prepares the large demo data sets and opens them together in this
 ## checkout's Viewer.
 ##
-##   Rscript run-demo.R [--data=1m,ren,cosmx,tcell,dlpfc,mouse_brain,...]
+##   Rscript run-demo.R [--data=1m,ren,cosmx,tcell,allen,eae,ms,dlpfc,...]
 ##                      [--prepare-only]
 ##
 ## --data names the data sets to prepare (default: 1m, the mouse brain), any
 ## mix of the two kinds below. --prepare-only downloads and converts without
 ## starting the Viewer.
 ##
-## 1m, ren, cosmx and tcell are written as CRBs directly.
+## 1m, ren, cosmx, tcell, allen, eae and ms are written as CRBs directly. The
+## spatial ones have many sections each:
+##   allen  Allen whole mouse brain MERFISH atlas, 59 sections of one brain
+##   eae    mouse spinal cord in EAE by in situ sequencing, 52 sections
+##   ms     human multiple sclerosis spinal cord by Xenium, 6 sections
+## (eae and ms: Kukanja et al. 2024).
 ##
 ## The Visium data sets are real tissue with their H&E photographs, several
 ## sections each (data-raw/large-demo/prepare_builder_visium_data.R):
@@ -55,12 +60,24 @@ demos <- list(
   tcell = list(
     prepare = function() prepareViewerTcellDemoData(),
     variable = "CEREBRO_TCELL_DEMO_CRB"
+  ),
+  allen = list(
+    prepare = function() prepareViewerAllenDemoData(),
+    variable = "CEREBRO_ALLEN_DEMO_CRB"
+  ),
+  eae = list(
+    prepare = function() prepareViewerKukanjaDemoData("eae"),
+    variable = "CEREBRO_EAE_DEMO_CRB"
+  ),
+  ms = list(
+    prepare = function() prepareViewerKukanjaDemoData("ms"),
+    variable = "CEREBRO_MS_DEMO_CRB"
   )
 )
 ## Built by the Builder from the file prepareBuilderVisiumDemoData() writes.
 visium_demos <- c("dlpfc", "mouse_brain", "breast", "prostate")
 usage <- paste0(
-  "Usage: Rscript run-demo.R [--data=1m,ren,cosmx,tcell,",
+  "Usage: Rscript run-demo.R [--data=1m,ren,cosmx,tcell,allen,eae,ms,",
   "dlpfc,mouse_brain,breast,prostate] [--prepare-only]"
 )
 
@@ -92,6 +109,8 @@ for (script in c(
   "prepare_viewer_ren_data.R",
   "prepare_viewer_cosmx_data.R",
   "prepare_viewer_tcell_data.R",
+  "prepare_viewer_allen_data.R",
+  "prepare_viewer_kukanja_data.R",
   "prepare_viewer_pack.R",
   "prepare_builder_visium_data.R"
 )) {

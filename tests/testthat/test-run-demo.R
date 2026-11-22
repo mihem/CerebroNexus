@@ -8,10 +8,10 @@ run_demo <- function(options, scope = new.env(parent = globalenv())) {
 }
 
 test_that("run-demo prepares the data sets --data names and opens the Viewer", {
-  keys <- c("1m", "ren", "cosmx", "tcell")
+  keys <- c("1m", "ren", "cosmx", "tcell", "allen", "eae", "ms")
   variables <- paste0("CEREBRO_", toupper(keys), "_DEMO_CRB")
   withr::local_envvar(stats::setNames(
-    rep(NA, 5),
+    rep(NA, length(keys) + 1L),
     c(variables, "CEREBRO_VISIUM_DEMOS")
   ))
   datasets <- stats::setNames(tempfile(paste0(keys, "-")), keys)
@@ -39,7 +39,8 @@ test_that("run-demo prepares the data sets --data names and opens the Viewer", {
   runs <- list(
     list(options = character(), expected = "1m"),
     list(options = "--data=cosmx", expected = "cosmx"),
-    list(options = "--data=tcell,ren,1m", expected = c("1m", "ren", "tcell"))
+    list(options = "--data=tcell,ren,1m", expected = c("1m", "ren", "tcell")),
+    list(options = "--data=ms,allen,eae", expected = c("allen", "eae", "ms"))
   )
   fake <- function(key) {
     function() {
@@ -56,6 +57,8 @@ test_that("run-demo prepares the data sets --data names and opens the Viewer", {
       scope$prepareViewerRenDemoData <- fake("ren")
       scope$prepareViewerCosMxDemoData <- fake("cosmx")
       scope$prepareViewerTcellDemoData <- fake("tcell")
+      scope$prepareViewerAllenDemoData <- fake("allen")
+      scope$prepareViewerKukanjaDemoData <- function(set) fake(set)()
       ## A Viewer Pack for each prepared data set.
       scope$prepareDemoViewerPack <- function(crb) {
         packs <<- c(packs, basename(crb))
@@ -85,7 +88,7 @@ test_that("run-demo rejects unknown options and data sets", {
     expect_error(
       run_demo(options),
       paste0(
-        "Usage: Rscript run-demo.R [--data=1m,ren,cosmx,tcell,",
+        "Usage: Rscript run-demo.R [--data=1m,ren,cosmx,tcell,allen,eae,ms,",
         "dlpfc,mouse_brain,breast,prostate] [--prepare-only]"
       ),
       fixed = TRUE
@@ -99,6 +102,9 @@ test_that("run-demo builds the Visium sets with the Builder beside the others", 
     CEREBRO_REN_DEMO_CRB = NA,
     CEREBRO_COSMX_DEMO_CRB = NA,
     CEREBRO_TCELL_DEMO_CRB = NA,
+    CEREBRO_ALLEN_DEMO_CRB = NA,
+    CEREBRO_EAE_DEMO_CRB = NA,
+    CEREBRO_MS_DEMO_CRB = NA,
     CEREBRO_VISIUM_DEMOS = NA
   ))
   testthat::local_mocked_bindings(

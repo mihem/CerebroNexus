@@ -122,7 +122,7 @@ cosmx_flat_files <- function(
   files
 }
 
-test_that("the CosMx and T-cell demos join the menu", {
+test_that("the large spatial and T-cell demos join the menu", {
   env <- new.env(parent = baseenv())
   sys.source(viewer_test_path("million_cell_demo.R"), envir = env)
   original <- list(
@@ -142,6 +142,21 @@ test_that("the CosMx and T-cell demos join the menu", {
       add = env$viewerAddTcellDemo,
       label = "Zheng et al. pan-cancer T cells (398K + TCR)",
       variable = "CEREBRO_TCELL_DEMO_CRB"
+    ),
+    allen = list(
+      add = env$viewerAddAllenDemo,
+      label = "Allen whole mouse brain MERFISH (59 sections, 3.9M)",
+      variable = "CEREBRO_ALLEN_DEMO_CRB"
+    ),
+    eae = list(
+      add = env$viewerAddEaeDemo,
+      label = "Kukanja et al. mouse EAE ISS (52 sections)",
+      variable = "CEREBRO_EAE_DEMO_CRB"
+    ),
+    ms = list(
+      add = env$viewerAddMsDemo,
+      label = "Kukanja et al. human MS Xenium (6 sections)",
+      variable = "CEREBRO_MS_DEMO_CRB"
     )
   )
   for (stem in names(demos)) {
@@ -240,19 +255,26 @@ test_that("the Builder-built Visium demos join the menu with their pictures", {
 })
 
 test_that("a preparation keeps the previous data set until a new one is complete", {
-  for (demo in c("CosMx", "Tcell")) {
+  for (demo in c("CosMx", "Tcell", "Allen", "Kukanja")) {
     env <- large_demo_env(sprintf("prepare_viewer_%s_data.R", tolower(demo)))
     prepare <- env[[sprintf("prepareViewer%sDemoData", demo)]]
+    paths_of <- env[[sprintf(".viewer%sPaths", demo)]]
+    if (demo == "Kukanja") {
+      ## One script, two data sets: the first stands for both.
+      prepare <- function(root) env$prepareViewerKukanjaDemoData("eae", root)
+      paths_of <- function(root) env$.viewerKukanjaPaths("eae", root)
+      env$.demoDownload <- function(...) NULL
+    }
     recipe <- env[[sprintf(".viewer%sRecipe", demo)]]
     build <- sprintf(".viewer%sBuildObject", demo)
     root <- withr::local_tempdir()
-    paths <- env[[sprintf(".viewer%sPaths", demo)]](root)
+    paths <- paths_of(root)
     env$.demoRequire <- function(...) NULL
     env[[sprintf(".viewer%sFiles", demo)]] <- function(...) list()
     dir.create(dirname(paths$crb), recursive = TRUE)
     writeLines("previous", paths$crb)
 
-    env[[build]] <- function(paths, work) {
+    env[[build]] <- function(paths, work, ...) {
       writeLines("partial", paths$crb)
       stop("simulated preparation failure")
     }
@@ -260,7 +282,7 @@ test_that("a preparation keeps the previous data set until a new one is complete
     expect_identical(readLines(paths$crb), "previous", info = demo)
     expect_length(list.files(paths$root, pattern = "stage-"), 0L)
 
-    env[[build]] <- function(paths, work) {
+    env[[build]] <- function(paths, work, ...) {
       writeLines("new", paths$crb)
       file.create(paths$sidecar, if (!is.null(paths$immune)) paths$immune)
       env$.demoStampWrite(paths$stamp, recipe)
@@ -700,4 +722,233 @@ test_that("the T-cell embedding covers every cell from batch-wise variable genes
   expect_identical(rownames(embedding), colnames(expression))
   expect_named(embedding, c("Dim_1", "Dim_2"))
   expect_false(anyNA(embedding))
+})
+
+## The Allen files in their published columns: the cell table, the gene table
+## and an h5ad whose X is stored by cell (CSR) or dense.
+allen_files <- function(dir, dense = FALSE) {
+  cells <- data.frame(
+    cell_label = c("c1", "c3", "c4"),
+    brain_section_label = c(
+      "C57BL6J-638850.40",
+      "C57BL6J-638850.05",
+      "C57BL6J-638850.40"
+    ),
+    cluster_alias = 1:3,
+    average_correlation_score = c(0.5, 0.6, 0.7),
+    x = c(1, 2, 3),
+    y = c(4, 5, 6),
+    z = c(2, 7, 2),
+    neurotransmitter = c("Glut", NA, "Glut"),
+    class = c("01 IT-ET Glut", "30 Astro-Epen", "01 IT-ET Glut"),
+    subclass = c(
+      "007 L2/3 IT CTX Glut",
+      "319 Astro-TE NN",
+      "007 L2/3 IT CTX Glut"
+    ),
+    supertype = c(
+      "0028 L2/3 IT CTX Glut_1",
+      "1163 Astro-TE NN_3",
+      "0029 L2/3 IT CTX Glut_2"
+    ),
+    cluster = c("0100 a", "5200 b", "0101 c"),
+    neurotransmitter_color = c("#2b93df", NA, "#2b93df"),
+    class_color = c("#fa0087", "#594a26", "#fa0087"),
+    subclass_color = c("#0f6632", "#c8f2a6", "#0f6632"),
+    supertype_color = c("#266dff", "#99e6cc", "#3366ff"),
+    cluster_color = "#000000"
+  )
+  genes <- data.frame(
+    gene_identifier = c("ENSMUSG1", "ENSMUSG2", "ENSMUSG3"),
+    gene_symbol = c("Slc17a7", "Gfap", "Slc17a7")
+  )
+  files <- c(
+    cells = file.path(dir, "cells.csv"),
+    genes = file.path(dir, "gene.csv"),
+    expression = file.path(dir, "log2.h5ad")
+  )
+  utils::write.csv(cells, files[["cells"]], row.names = FALSE, na = "")
+  utils::write.csv(genes, files[["genes"]], row.names = FALSE)
+  h5ad <- files[["expression"]]
+  rhdf5::h5createFile(h5ad)
+  rhdf5::h5createGroup(h5ad, "obs")
+  rhdf5::h5createGroup(h5ad, "var")
+  rhdf5::h5write(c("c1", "c2", "c3", "c4"), h5ad, "obs/_index")
+  rhdf5::h5write(genes$gene_identifier, h5ad, "var/_index")
+  ## cells x genes: c1 (1, 0, 2), c2 (0, 3, 0), c3 (0, 0, 4), c4 (5, 6, 0)
+  if (dense) {
+    values <- matrix(c(1, 0, 2, 0, 3, 0, 0, 0, 4, 5, 6, 0), nrow = 3)
+    ## rhdf5 stores an R matrix transposed: genes x cells is the h5ad's X.
+    rhdf5::h5write(values, h5ad, "X")
+  } else {
+    rhdf5::h5createGroup(h5ad, "X")
+    rhdf5::h5write(c(1, 2, 3, 4, 5, 6), h5ad, "X/data")
+    rhdf5::h5write(c(0L, 2L, 1L, 2L, 0L, 1L), h5ad, "X/indices")
+    rhdf5::h5write(c(0L, 2L, 3L, 4L, 6L), h5ad, "X/indptr")
+    file <- rhdf5::H5Fopen(h5ad)
+    group <- rhdf5::H5Gopen(file, "X")
+    rhdf5::h5writeAttribute("csr_matrix", group, "encoding-type")
+    rhdf5::H5Gclose(group)
+    rhdf5::H5Fclose(file)
+  }
+  files
+}
+
+test_that("the Allen cells keep the atlas's sections, taxonomy and colours", {
+  skip_if_not_installed("data.table")
+  env <- large_demo_env("prepare_viewer_allen_data.R")
+  files <- allen_files(withr::local_tempdir())
+  table <- env$.viewerAllenReadCells(files[["cells"]])
+  cells <- table$cells
+  expect_identical(rownames(cells), c("c1", "c3", "c4"))
+  ## Sections are ordered along the brain, front to back.
+  expect_identical(levels(cells$section), c("Section 40", "Section 05"))
+  expect_identical(
+    as.character(cells$section),
+    c("Section 40", "Section 05", "Section 40")
+  )
+  expect_identical(
+    as.character(cells$neurotransmitter),
+    c("Glut", "N/A", "Glut")
+  )
+  expect_identical(
+    levels(cells$class),
+    c("01 IT-ET Glut", "30 Astro-Epen")
+  )
+  expect_false("cluster" %in% names(cells))
+  expect_equal(cells$mapping_score, c(0.5, 0.6, 0.7))
+  ## The atlas's colours, one per term; a term without a colour has none.
+  expect_identical(
+    table$colors$class,
+    c("01 IT-ET Glut" = "#FA0087", "30 Astro-Epen" = "#594A26")
+  )
+  expect_identical(table$colors$neurotransmitter, c(Glut = "#2B93DF"))
+  expect_setequal(names(table$colors$supertype), levels(cells$supertype))
+  ## The atlas's y axis grows downwards, the Viewer's upwards.
+  expect_equal(table$coordinates$y, c(-4, -5, -6))
+  expect_identical(rownames(table$coordinates), rownames(cells))
+})
+
+test_that("the Allen expression is read for the table's cells, by cell or dense", {
+  skip_if_not_installed("data.table")
+  skip_if_not_installed("rhdf5")
+  env <- large_demo_env("prepare_viewer_allen_data.R")
+  expected <- matrix(
+    c(0, 0, 4, 1, 0, 2, 5, 6, 0),
+    nrow = 3,
+    dimnames = list(
+      c("Slc17a7_ENSMUSG1", "Gfap", "Slc17a7_ENSMUSG3"),
+      c("c3", "c1", "c4")
+    )
+  )
+  for (dense in c(FALSE, TRUE)) {
+    files <- allen_files(withr::local_tempdir(), dense = dense)
+    expression <- env$.viewerAllenReadExpression(
+      files[["expression"]],
+      c("c3", "c1", "c4"),
+      files[["genes"]]
+    )
+    expect_s4_class(expression, "dgCMatrix")
+    expect_equal(as.matrix(expression), expected, info = dense)
+    expect_error(
+      env$.viewerAllenReadExpression(
+        files[["expression"]],
+        c("c1", "c9"),
+        files[["genes"]]
+      ),
+      "1 cells of the Allen cell table have no expression"
+    )
+  }
+})
+
+## An h5ad in the shape of the Kukanja files: counts stored by gene (CSC),
+## categorical obs columns with scanpy's colours, aligned coordinates and UMAP.
+kukanja_h5ad <- function(path) {
+  write_attribute <- function(object, name, value) {
+    file <- rhdf5::H5Fopen(path)
+    handle <- rhdf5::H5Oopen(file, object)
+    rhdf5::h5writeAttribute(value, handle, name)
+    rhdf5::H5Oclose(handle)
+    rhdf5::H5Fclose(file)
+  }
+  categorical <- function(column, categories, codes) {
+    rhdf5::h5createGroup(path, paste0("obs/", column))
+    rhdf5::h5write(categories, path, paste0("obs/", column, "/categories"))
+    rhdf5::h5write(as.integer(codes), path, paste0("obs/", column, "/codes"))
+  }
+  rhdf5::h5createFile(path)
+  for (group in c("obs", "var", "obsm", "uns", "X")) {
+    rhdf5::h5createGroup(path, group)
+  }
+  rhdf5::h5write(c("a1", "a2", "b1", "b2"), path, "obs/cell_id")
+  categorical("sample_id", c("S2", "S1"), c(0, 0, 1, 1))
+  ## A category no cell has is dropped; code -1 is a missing label.
+  categorical("Level2", c("Astro", "MiGl", "Neurons"), c(0, 2, -1, 2))
+  rhdf5::h5write(
+    c("#ff0000ff", "#00ff00ff", "#0000ffff"),
+    path,
+    "uns/Level2_colors"
+  )
+  categorical("sex", c("female", "male"), c(0, 0, 1, 1))
+  rhdf5::h5write(c(NaN, NaN), path, "uns/sex_colors")
+  rhdf5::h5write(c(10, 20, 30, 40), path, "obs/cell_area")
+  rhdf5::h5write(c("GeneA", "GeneB", "GeneC"), path, "var/feature_name")
+  write_attribute("var", "_index", "feature_name")
+  ## cells x genes: a1 (1, 0, 2), a2 (0, 3, 0), b1 (4, 0, 0), b2 (0, 0, 5)
+  rhdf5::h5write(c(1, 4, 3, 2, 5), path, "X/data")
+  rhdf5::h5write(c(0L, 2L, 1L, 0L, 3L), path, "X/indices")
+  rhdf5::h5write(c(0L, 2L, 3L, 5L), path, "X/indptr")
+  write_attribute("X", "encoding-type", "csc_matrix")
+  write_attribute("X", "shape", c(4L, 3L))
+  ## rhdf5 stores an R matrix transposed: 2 x cells is the h5ad's cells x 2.
+  rhdf5::h5write(rbind(c(1, 2, 3, 4), c(5, 6, 7, 8)), path, "obsm/xy_loc")
+  rhdf5::h5write(rbind(c(-1, -2, -3, -4), c(9, 8, 7, 6)), path, "obsm/X_umap")
+  path
+}
+
+test_that("a Kukanja h5ad gives counts, groups with colours and both layouts", {
+  skip_if_not_installed("rhdf5")
+  env <- large_demo_env("prepare_viewer_kukanja_data.R")
+  h5ad <- kukanja_h5ad(file.path(withr::local_tempdir(), "ms.h5ad"))
+  spec <- list(
+    cells = "cell_id",
+    groups = c(section = "sample_id", cell_type = "Level2", sex = "sex"),
+    numbers = c(cell_area = "cell_area")
+  )
+  data <- env$.viewerKukanjaRead(h5ad, spec)
+  cells <- c("a1", "a2", "b1", "b2")
+  expect_equal(
+    as.matrix(data$counts),
+    matrix(
+      c(1, 0, 2, 0, 3, 0, 4, 0, 0, 0, 0, 5),
+      nrow = 3,
+      dimnames = list(c("GeneA", "GeneB", "GeneC"), cells)
+    )
+  )
+  metadata <- data$metadata
+  expect_identical(rownames(metadata), cells)
+  ## The authors' order of the sections is kept.
+  expect_identical(levels(metadata$section), c("S2", "S1"))
+  expect_identical(
+    as.character(metadata$cell_type),
+    c("Astro", "Neurons", "N/A", "Neurons")
+  )
+  expect_identical(levels(metadata$cell_type), c("Astro", "Neurons", "N/A"))
+  expect_identical(metadata$nUMI, c(3L, 3L, 4L, 5L))
+  expect_identical(metadata$nGene, c(2L, 1L, 1L, 1L))
+  expect_equal(metadata$cell_area, c(10, 20, 30, 40))
+  ## scanpy's colours lose their alpha; colours that are not colours are dropped.
+  expect_identical(
+    data$colors,
+    list(cell_type = c(Astro = "#FF0000", Neurons = "#0000FF"))
+  )
+  expect_equal(data$coordinates$x, c(1, 2, 3, 4))
+  expect_equal(data$coordinates$y, c(-5, -6, -7, -8))
+  expect_equal(data$projection$Dim_2, c(9, 8, 7, 6))
+  expect_identical(rownames(data$projection), cells)
+
+  spec$groups <- c(section = "cell_area")
+  expect_error(env$.viewerKukanjaRead(h5ad, spec), "is not categorical")
+  spec$groups <- c(section = "missing")
+  expect_error(env$.viewerKukanjaRead(h5ad, spec), "no obs column missing")
 })
