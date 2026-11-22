@@ -327,3 +327,41 @@ assert.strictEqual(gridLive, null, 'the stream is over');
 assert.strictEqual(streamed.grid_stream.done, true);
 assert.strictEqual(gridStreamPending(streamed, 'C'), false);
 console.log('PASS a streaming grid draws each batch of sections as it comes');
+
+// ---- a streaming grid names its cells batch by batch ----------------------------
+eval(between('  function expandRowRange(', '  function frameSubsetRows('));
+eval(between('  function unitArraysOf(', '  function deferredUnitOf('));
+assert.deepStrictEqual(Array.from(expandRowRange({ kind: 'ranges', start: [10, 40], length: [2, 3] })),
+  [10, 11, 40, 41, 42], 'runs of rows');
+assert.deepStrictEqual(Array.from(expandRowRange({ kind: 'range', start: 5, length: 2 })), [5, 6]);
+assert.deepStrictEqual(expandRowRange([3, 1]), [3, 1], 'rows one by one as they are');
+// The first frame names section B's cells (canonical rows 7 and 2); the
+// names of A come with its batch, by canonical rows in runs.
+var named = {
+  x: [1, 2], y: [1, 2],
+  selection_key: ['h', 'c'], selection_rows: Int32Array.from([7, 2]),
+  panels: [{ section: 'A', start: 0, count: 3 }, { section: 'B', start: 3, count: 2 }],
+  grid_stream: { rows: 5, section: ['B'], start: [3], count: [2], batches: 2,
+    names: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] }
+};
+gridStreamExpand(named);
+assert.deepStrictEqual(named.selection_key, ['', '', '', 'h', 'c'], 'a cell still to come has no name');
+assert.deepStrictEqual(Array.from(named.selection_rows), [-1, -1, -1, 7, 2]);
+gridStreamWrite(named, { section: 'A', start: 0, count: 3, x: [0, 0, 0], y: [0, 0, 0],
+  selection_index: { kind: 'ranges', start: [4], length: [3] }, done: true });
+assert.deepStrictEqual(named.selection_key, ['e', 'f', 'g', 'h', 'c']);
+assert.deepStrictEqual(Array.from(named.selection_rows), [4, 5, 6, 7, 2]);
+// Without a cell-name resource the batch carries the names themselves.
+var byName = { x: [1], y: [1], selection_key: ['q'],
+  panels: [{ section: 'A', start: 0, count: 1 }, { section: 'B', start: 1, count: 2 }],
+  grid_stream: { rows: 3, section: ['A'], start: [0], count: [1], batches: 2 } };
+gridStreamExpand(byName);
+gridStreamWrite(byName, { section: 'B', start: 1, count: 2, x: [2, 3], y: [2, 3],
+  selection_key: ['r', 's'], done: true });
+assert.deepStrictEqual(byName.selection_key, ['q', 'r', 's']);
+// The sections of a grid share one pair of unit position arrays.
+var pair = { nx: new Float32Array(5), ny: new Float32Array(5) };
+assert.strictEqual(unitArraysOf({ _unitArrays: pair }, 5), pair);
+assert.strictEqual(unitArraysOf({ _unitArrays: pair }, 6), null, 'only at the frame length');
+assert.strictEqual(unitArraysOf({}, 5), null);
+console.log('PASS a streaming grid names its cells batch by batch');

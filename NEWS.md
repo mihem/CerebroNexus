@@ -150,10 +150,13 @@
   idle, so Linked views opens in 7 to 11 s instead of 15 to 24 s.
 - **The sections of a large grid draw as they arrive.** A grid of more than
   400,000 cells sends the sections shown first with its first message and the
-  others in batches; each panel draws when its cells come and shimmers until
-  then. On the Allen atlas, choosing every section fills the first screen of
-  panels after 2.9 s instead of 5.5 s and draws all 59 after 4.1 s, and the
-  page's longest stall falls from 1.1 s to 0.75 s.
+  others in batches, each with the positions, colours and names of its own
+  cells; a panel draws when its cells come and shimmers until then. The
+  sections of a grid also share their drawing arrays (2 GB for the Allen
+  atlas before). On the Allen atlas, choosing every section fills the first
+  screen of panels after 2.1 s instead of 5.5 s and draws all 59 after 3.3 s;
+  the first message is 2 MB instead of 51 MB, and the page's longest stall
+  falls from 1.3 s to 0.4 s.
 - **Long legends and many sections stay compact.** A colouring by more than
   24 groups shows three rows of its legend and a *Show all* button. The
   Sections field keeps its chosen sections in two scrolling rows, counts them

@@ -562,6 +562,15 @@
   // Every 2-D layout fills its fluid canvas by normalising x/y independently.
   // Spatial views recover one physical screen scale when project() letterboxes
   // their unit box; only rotatable 3-D embeddings keep one shared axis scale here.
+  // The sections of a grid (cell_views.js, sharedSliceGeometry()) name
+  // different cells of one frame: their unit positions share one pair of
+  // arrays, each section writing only its own cells. `ok` stays the space's
+  // own, and every reader of a position asks it first. A pair per section was
+  // 35 MB each: 2 GB for the 59 sections of the Allen atlas.
+  function unitArraysOf(space, n) {
+    var shared = space._unitArrays;
+    return shared && shared.nx.length === n ? shared : null;
+  }
   function deferredUnitOf(space) {
     var xr = space.xRange, yr = space.yRange;
     if (space._fitToData || space.z || !Array.isArray(xr) || xr.length !== 2 ||
@@ -572,8 +581,10 @@
     var y1 = Math.max(Number(yr[0]), Number(yr[1]));
     if (![x0, x1, y0, y1].every(isFinite) || x0 === x1 || y0 === y1) return null;
     var n = space.x.length, dw = x1 - x0, dh = y1 - y0;
+    var shared = unitArraysOf(space, n);
     return {
-      nx: new Float32Array(n), ny: new Float32Array(n), nz: null,
+      nx: shared ? shared.nx : new Float32Array(n),
+      ny: shared ? shared.ny : new Float32Array(n), nz: null,
       ok: new Uint8Array(n), x0: x0, y0: y0, k: 1 / dw, ky: 1 / dh,
       ox: 0, oy: 0, aspect: dw / dh,
       bx: { x0: 0, x1: 1, y0: 0, y1: 1 },
@@ -618,7 +629,9 @@
       var k = 1 / Math.max(dw, dh);
       kx = k; ky = k; ox = (1 - dw * k) / 2; oy = (1 - dh * k) / 2;
     }
-    var nx = new Float32Array(n), ny = new Float32Array(n), ok = new Uint8Array(n);
+    var shared = zs ? null : unitArraysOf(space, n);
+    var nx = shared ? shared.nx : new Float32Array(n);
+    var ny = shared ? shared.ny : new Float32Array(n), ok = new Uint8Array(n);
     // ---- third dimension, when the embedding has one ----------------------
     // Normalised on the SAME scale as x/y (an embedding's axes are comparable,
     // so stretching one would misrepresent the shape), then the whole cloud is
@@ -9095,8 +9108,20 @@
     }
     return keys;
   }
-  // Contiguous canonical rows travel as {kind: 'range', start, length}.
+  // Contiguous canonical rows travel as {kind: 'range', start, length}, a few
+  // runs of them as {kind: 'ranges', start: [...], length: [...]}.
   function expandRowRange(rows) {
+    if (rows && String(rows.kind) === 'ranges') {
+      var starts = [].concat(rows.start), lengths = [].concat(rows.length), total = 0;
+      for (var r = 0; r < lengths.length; r++) total += Number(lengths[r]);
+      var runs = new Int32Array(total);
+      for (var run = 0, at = 0; run < starts.length; run++) {
+        for (var k = 0, first = Number(starts[run]); k < Number(lengths[run]); k++) {
+          runs[at++] = first + k;
+        }
+      }
+      return runs;
+    }
     if (!rows || String(rows.kind) !== 'range') return rows;
     var start = Number(rows.start), out = new Int32Array(Number(rows.length));
     for (var i = 0; i < out.length; i++) out[i] = start + i;
@@ -9176,6 +9201,8 @@
       var resolved = Object.assign({}, data, {
         selection_key: namesAt(entry.names, rows), selection_rows: rows
       });
+      // A streaming grid names the cells of its later batches from them.
+      if (data.grid_stream) data.grid_stream.names = entry.names;
       delete resolved.selection_index;
       delete resolved.cell_names_resource;
       return Object.assign({}, message, {data: resolved});
@@ -10263,6 +10290,22 @@
       write(projection.x, part.projection.x);
       write(projection.y, part.projection.y);
     }
+    // A batch names its cells by canonical row (the names come from the
+    // cell-name resource the first frame was read with) or by name.
+    var rows = part.selection_index != null ? expandRowRange(part.selection_index)
+      : part.selection_rows;
+    if (rows != null) {
+      write(data.selection_rows, rows);
+      var names = stream.names, keys = data.selection_key;
+      if (names && Array.isArray(keys)) {
+        for (var s = 0, offset = 0; s < starts.length; s++) {
+          var start = Number(starts[s]), count = Number(counts[s]);
+          for (var k = 0; k < count; k++) keys[start + k] = names[rows[offset + k]];
+          offset += count;
+        }
+      }
+    }
+    if (part.selection_key != null) write(data.selection_key, part.selection_key);
     sections.forEach(function (section) { stream.loaded[String(section)] = true; });
     if (part.done) stream.done = true;
   }
@@ -10282,6 +10325,16 @@
       part.projection = { x: projection.x, y: projection.y };
       projection.x = gridStreamArray(projection.x, n, NaN);
       projection.y = gridStreamArray(projection.y, n, NaN);
+    }
+    // The cells' keys of the first batch: names, and canonical rows when
+    // they come from the cell-name resource. A cell still to come is ''.
+    if (Array.isArray(data.selection_key) && data.selection_key.length < n) {
+      part.selection_key = data.selection_key;
+      data.selection_key = new Array(n).fill('');
+    }
+    if (data.selection_rows != null && data.selection_rows.length < n) {
+      part.selection_rows = data.selection_rows;
+      data.selection_rows = new Int32Array(n).fill(-1);
     }
     stream.loaded = {};
     stream.done = Number(stream.batches) <= 1;
@@ -10314,6 +10367,9 @@
     var levels = group ? group.levels.length : 0;
     var starts = [].concat(part.start), counts = [].concat(part.count);
     var map = live.rows, touched = {};
+    // The view's cells (D.cells, D.rows) are the frame's key arrays, which
+    // gridStreamWrite() has filled: the name index is built anew when asked.
+    singleIndexMap = null;
     // Each value of the batch at its cell of the view.
     var copy = function (target, values) {
       if (!target || !values) return;
@@ -10834,6 +10890,9 @@
       return alignFlatValues(panelKeys, values, fallback);
     };
     var shared = sharedSliceGeometry(data, keys);
+    var unitArrays = shared ? {
+      nx: new Float32Array(shared.x.length), ny: new Float32Array(shared.x.length)
+    } : null;
     data.panels.forEach(function (panel, panelIndex) {
       // A slice panel draws rows [start, start + count) of the frame's x, y
       // and keys instead of carrying its own copies.
@@ -10893,6 +10952,7 @@
         _hoverMask: null
       };
       if (slice) space._cells = sharedSlice || sliceCells();
+      if (sharedSlice) space._unitArrays = unitArrays;
       // A section of the Spatial grid: the browser orders and hides these.
       if (panel.section != null) {
         space._gridSection = String(panel.section);

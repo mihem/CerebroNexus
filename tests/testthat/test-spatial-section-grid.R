@@ -430,6 +430,27 @@ test_that("a grid of many cells streams its sections in batches, shown first", {
   renderer$spatial_grid_stream_send <- function(stream, render_token, ...) {
     streams[[length(streams) + 1L]] <<- stream
   }
+  ## The cells are named by canonical row from a cell-name resource.
+  renderer$viewerProjectionFirstFrameMetadata <- function() data.frame(x = 1:9)
+  renderer$viewerProjectionMetadataColumns <- function(...) character()
+  renderer$getGroups <- function() character()
+  renderer$viewerCellNamesResourceFor <- function(rows) list(cells = 9L)
+  head_aux <- NULL
+  renderer$cerebroCellViewRender <- function(
+    id,
+    meta,
+    data,
+    hover,
+    ...,
+    deferred_aux = NULL
+  ) {
+    head_aux <<- deferred_aux()
+    renderer$rendered[[length(renderer$rendered) + 1L]] <- list(
+      id = id,
+      meta = meta,
+      data = data
+    )
+  }
   groups <- c("T", "B", "NK", "T", "B", "NK", "T", "B", "NK")
   head <- render_section_grid(groups, renderer = renderer)
   expect_length(streams, 1L)
@@ -447,7 +468,12 @@ test_that("a grid of many cells streams its sections in batches, shown first", {
   traces <- unlist(head$meta$traces)
   frame_rows <- c(1L, 4L, 7L, 2L, 5L, 3L, 6L, 8L, 9L)
   expect_identical(traces[head$data$group_code + 1L], groups[frame_rows][6:9])
+  ## The first message names the cells of section B1 only (canonical rows 3,
+  ## 6, 8 and 9, 0-based); the batch names its own.
+  expect_identical(head_aux$selection_index, c(2L, 5L, 7L, 8L))
+  expect_identical(head_aux$cell_names_resource, list(cells = 9L))
   rest <- streams[[1L]]$part(2L)
+  expect_identical(rest$selection_index, c(1L, 4L, 0L, 3L, 6L))
   expect_identical(rest$section, c("sectionA2", "sectionA1"))
   expect_identical(rest$start, c(3L, 0L))
   expect_identical(rest$count, c(2L, 3L))
@@ -467,6 +493,66 @@ test_that("a grid of many cells streams its sections in batches, shown first", {
   expect_null(whole$data$grid_stream)
   expect_length(whole$data$x, 9L)
   expect_length(streams, 2L)
+})
+
+test_that("a streaming grid's cells travel as runs of rows when they are", {
+  ## One block of the data set: its start and length.
+  expect_identical(
+    spatial_grid_row_runs(100:199),
+    list(kind = "ranges", start = I(100L), length = I(100L))
+  )
+  expect_identical(
+    spatial_grid_row_runs(c(0:49, 500:549)),
+    list(kind = "ranges", start = I(c(0L, 500L)), length = I(c(50L, 50L)))
+  )
+  ## Cells scattered through the data set travel one by one.
+  scattered <- as.integer(seq(1, 199, by = 2))
+  expect_identical(spatial_grid_row_runs(scattered), scattered)
+  expect_identical(spatial_grid_row_runs(5L), 5L)
+
+  ## The keys of each batch: canonical rows, or names without a resource.
+  stream <- list(
+    rows_of = function(k) list(1:2, 3:5)[[k]],
+    part = function(k) list(batch = k)
+  )
+  by_rows <- spatial_grid_stream_keys(
+    stream,
+    list(
+      selection_index = list(kind = "range", start = 10L, length = 5L),
+      cell_names_resource = "names",
+      hover = list(hoverinfo = "skip")
+    )
+  )
+  expect_identical(by_rows$head_aux$selection_index, c(10L, 11L))
+  expect_identical(by_rows$head_aux$cell_names_resource, "names")
+  expect_identical(by_rows$head_aux$hover, list(hoverinfo = "skip"))
+  expect_identical(
+    by_rows$part(2L),
+    list(batch = 2L, selection_index = c(12L, 13L, 14L))
+  )
+  by_name <- spatial_grid_stream_keys(
+    stream,
+    list(selection_key = I(c("a", "b", "c", "d", "e")))
+  )
+  expect_identical(by_name$head_aux$selection_key, c("a", "b"))
+  expect_identical(by_name$part(2L)$selection_key, c("c", "d", "e"))
+})
+
+test_that("a grid's metadata is its columns at its cells, without row names", {
+  full <- data.frame(
+    group = factor(c("a", "b", "a", "c")),
+    other = 1:4,
+    row.names = c("w", "x", "y", "z")
+  )
+  metadata <- spatial_grid_metadata(full, c(4L, 1L), "group")
+  expect_identical(names(metadata), c("group", "cell_index"))
+  expect_identical(
+    metadata$group,
+    factor(c("c", "a"), levels = c("a", "b", "c"))
+  )
+  expect_identical(metadata$cell_index, c(4L, 1L))
+  expect_identical(nrow(metadata), 2L)
+  expect_identical(.row_names_info(metadata), -2L)
 })
 
 test_that("a grid frame colours every section on one continuous scale", {
@@ -536,6 +622,11 @@ test_that("the browser draws a streaming grid batch by batch", {
     "spatial-section-grid.js",
     viewer_test_path("www", "cell_views.js"),
     pass = "PASS a streaming grid draws each batch of sections as it comes"
+  )
+  expect_node_fixture(
+    "spatial-section-grid.js",
+    viewer_test_path("www", "cell_views.js"),
+    pass = "PASS a streaming grid names its cells batch by batch"
   )
 })
 

@@ -162,11 +162,11 @@ spatial_projection_update_plot <- function(input) {
       hover_info = hover,
       groups = getGroups()
     )
-    hover_metadata <- viewerProjectionSubsetRows(
-      first_frame,
-      cell_index,
-      columns
-    )
+    ## Read only for hover text: the rows of a frame of 3.9 million cells
+    ## took 0.3 s even without a column.
+    hover_metadata <- if (hover) {
+      viewerProjectionSubsetRows(first_frame, cell_index, columns)
+    }
     ## The browser takes the names from the cell-name resource when there is
     ## one, so only the canonical rows of the points are sent.
     names_resource <- viewerCellNamesResourceFor(cell_index)
@@ -423,12 +423,17 @@ spatial_projection_update_plot <- function(input) {
     if (is.numeric(color_input)) {
       payload$data$color_range <- spatial_grid_color_range(color_input)
     } else {
-      grid_groups <- as.character(color_input)
-      grid_groups[is.na(grid_groups)] <- "(missing)"
       trace_names <- unlist(payload$meta$traces, use.names = FALSE)
-      payload$data$group_code <- as.integer(
-        match(grid_groups, trace_names) - 1L
-      )
+      ## The payload's codes of the traces, when it has them: matching 3.9
+      ## million names again took 0.2 s.
+      canonical <- payload$data$canonical_group
+      payload$data$group_code <- if (length(canonical) == length(color_input)) {
+        as.integer(unclass(canonical))
+      } else {
+        grid_groups <- as.character(color_input)
+        grid_groups[is.na(grid_groups)] <- "(missing)"
+        as.integer(match(grid_groups, trace_names) - 1L)
+      }
       payload$data$canonical_group <- NULL
       payload$data$color <- NULL
       ## The payload adds "(missing)" with this colour when a cell has none.
@@ -636,9 +641,12 @@ spatial_projection_update_plot <- function(input) {
   stream <- if (is.list(grid)) {
     spatial_grid_stream_split(payload$data, spatial_grid_shown_sections())
   }
+  deferred_aux <- function() build_deferred_aux(aux_rows)
   if (!is.null(stream)) {
     payload$data <- stream$head
     spatial_grid_drawn_geometry <<- NULL
+    stream <- spatial_grid_stream_keys(stream, deferred_aux())
+    deferred_aux <- function() stream$head_aux
   }
   render_token <- cerebroCellViewRender(
     "spatial_projection",
@@ -646,9 +654,7 @@ spatial_projection_update_plot <- function(input) {
     payload[["data"]],
     payload[["hover"]],
     extra = list(group_hulls = output_hulls),
-    deferred_aux = function() {
-      build_deferred_aux(aux_rows)
-    },
+    deferred_aux = deferred_aux,
     dataset_context = input[["dataset_context"]],
     feedback = input[["feedback"]],
     aux_key = aux_key(aux_rows)
@@ -715,13 +721,24 @@ spatial_grid_stream_send <- function(
       count = I(part$count)
     )
     for (field in intersect(
-      c("x", "y", "group_code", "color", "projection"),
+      c(
+        "x",
+        "y",
+        "group_code",
+        "color",
+        "projection",
+        "selection_index",
+        "selection_key"
+      ),
       names(part)
     )) {
-      message[[field]] <- if (is.list(part[[field]])) {
-        lapply(part[[field]], function(values) I(unname(values)))
+      value <- part[[field]]
+      message[[field]] <- if (identical(field, "projection")) {
+        lapply(value, function(values) I(unname(values)))
+      } else if (is.list(value)) {
+        value
       } else {
-        I(unname(part[[field]]))
+        I(unname(value))
       }
     }
     session$sendBinaryMessage(

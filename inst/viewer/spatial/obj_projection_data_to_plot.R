@@ -179,7 +179,10 @@ spatial_projection_grid_data <- function(
     function(section) spatialPlotRotation(options, dataset, section)
   )
   cells <- c(cells_to_extract)
-  metadata <- spatial_projection_metadata()
+  columns <- spatial_projection_metadata_columns(plot_parameters)
+  full_metadata <- viewerProjectionFirstFrameMetadata()
+  req(all(columns %in% colnames(full_metadata)))
+  metadata <- spatial_grid_metadata(full_metadata, cells, columns)
   if (
     identical(plot_parameters$plot_type, "ImageFeaturePlot") &&
       !is.null(plot_parameters$feature_to_display)

@@ -1613,11 +1613,10 @@ spatial_grid_xy <- function(coordinates) {
 ## The extent of a section with a 2% margin, as the single-section frame pins
 ## its axes (spatial_projection_full_ranges()).
 spatial_grid_range <- function(values) {
-  values <- values[is.finite(values)]
-  if (!length(values)) {
+  if (!any(is.finite(values))) {
     return(NULL)
   }
-  extent <- range(values)
+  extent <- range(values, finite = TRUE)
   margin <- if (diff(extent) > 0) diff(extent) * 0.02 else 1
   c(extent[[1L]] - margin, extent[[2L]] + margin)
 }
@@ -1813,6 +1812,31 @@ spatial_grid_color_range <- function(values) {
   range(values)
 }
 
+## The metadata columns a frame reads: the colour column of a group plot and
+## the split column.
+spatial_projection_metadata_columns <- function(parameters) {
+  color_variable <- if (identical(parameters[["plot_type"]], "ImageDimPlot")) {
+    parameters[["color_variable"]]
+  } else {
+    character()
+  }
+  unique(Filter(nzchar, c(color_variable, parameters$split_by)))
+}
+
+## The metadata of a grid's cells: those columns and the cells' canonical
+## rows, without row names. Subsetting the data frame named every one of the
+## 3.9 million cells of the Allen atlas (0.4 s).
+spatial_grid_metadata <- function(full_metadata, cells, columns) {
+  values <- lapply(columns, function(column) full_metadata[[column]][cells])
+  names(values) <- columns
+  values$cell_index <- cells
+  structure(
+    values,
+    class = "data.frame",
+    row.names = c(NA_integer_, -length(cells))
+  )
+}
+
 ## A grid frame of many cells streams (cell_views.js, onGridRows()): the first
 ## message holds every panel and the cells' names, but the positions and
 ## colours of the first sections shown only; the others follow a batch of
@@ -1823,7 +1847,7 @@ spatial_grid_stream_min <- 4e5
 ## The cells of the first batch (a few sections, drawn about 1.5 s sooner than
 ## the whole grid) and of every other.
 spatial_grid_stream_first <- 1.5e5
-spatial_grid_stream_step <- 4e5
+spatial_grid_stream_step <- 1e6
 
 ## The batches of a streaming grid: lists of indices into `counts` (the cells
 ## of each section panel, in frame order). `order` names the panels in the
@@ -1927,9 +1951,10 @@ spatial_grid_stream_split <- function(
     function(panel) isTRUE(panel$projection) && length(panel$x) == n,
     logical(1)
   ))
+  rows_of <- function(k) spatial_grid_stream_rows(batches[[k]], starts, counts)
   part <- function(k) {
     batch <- batches[[k]]
-    rows <- spatial_grid_stream_rows(batch, starts, counts)
+    rows <- rows_of(k)
     out <- list(
       section = sections[batch],
       start = starts[batch],
@@ -1960,5 +1985,58 @@ spatial_grid_stream_split <- function(
     count = I(first$count),
     batches = length(batches)
   )
-  list(head = head, batches = length(batches), part = part)
+  list(head = head, batches = length(batches), part = part, rows_of = rows_of)
+}
+
+## Canonical rows (0-based) as the runs of consecutive rows they are, when
+## there are few: a section whose cells are one block of the data set travels
+## as its start and length instead of a number per cell.
+spatial_grid_row_runs <- function(rows) {
+  rows <- as.integer(rows)
+  n <- length(rows)
+  if (n < 2L || anyNA(rows)) {
+    return(rows)
+  }
+  breaks <- which(diff(rows) != 1L)
+  if (length(breaks) + 1L > n %/% 8L) {
+    return(rows)
+  }
+  starts <- c(1L, breaks + 1L)
+  ends <- c(breaks, n)
+  list(
+    kind = "ranges",
+    start = I(rows[starts]),
+    length = I(ends - starts + 1L)
+  )
+}
+
+## The cells' keys of a streaming grid travel with their batches as well: the
+## first message names the cells of the first batch only. `aux` is the frame's
+## auxiliary data (cerebroCellViewDeferredAux()): canonical rows with a
+## cell-name resource, else the names themselves. Every 4 bytes a cell of the
+## Allen atlas were 16 MB in its first message.
+spatial_grid_stream_keys <- function(stream, aux) {
+  index <- aux$selection_index
+  if (is.list(index) && identical(index$kind, "range")) {
+    index <- index$start + seq_len(index$length) - 1L
+  }
+  index <- if (!is.null(index)) as.integer(unclass(index))
+  keys <- if (!is.null(aux$selection_key)) unclass(aux$selection_key)
+  slice <- function(rows) {
+    out <- list()
+    if (!is.null(index)) {
+      out$selection_index <- spatial_grid_row_runs(index[rows])
+    }
+    if (!is.null(keys)) {
+      out$selection_key <- keys[rows]
+    }
+    out
+  }
+  head_aux <- aux
+  head_aux$selection_index <- NULL
+  head_aux$selection_key <- NULL
+  stream$head_aux <- c(head_aux, slice(stream$rows_of(1L)))
+  part <- stream$part
+  stream$part <- function(k) c(part(k), slice(stream$rows_of(k)))
+  stream
 }
