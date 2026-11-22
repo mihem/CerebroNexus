@@ -27,6 +27,11 @@ test_that("projection defaults are canonical and spatial defaults independent", 
 
 test_that("a data set of more than 100,000 cells starts every page with size 1", {
   env <- viewer_runtime_env()
+  ## Installed, the package's internals are not on the search path.
+  sys.source(
+    viewer_test_path("core", "viewer_content_contract.R"),
+    envir = env
+  )
   options <- list(point_size = c(a = 3), spatial_point_size = c(a = 7))
   for (page in list(NULL, "spatial")) {
     expect_identical(
