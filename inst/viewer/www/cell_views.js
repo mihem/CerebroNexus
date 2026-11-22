@@ -10338,11 +10338,16 @@
   // Direct assets replace only the values, never geometry or selection state.
   // Token checks apply again after asynchronous IO: an older fetch cannot win.
   var expressionFrameToken = 0, expressionFrames = new Map();
+  // Controls that can change how the projection is coloured. The summary
+  // plot's group selector fills in after the first gene is drawn; counting it
+  // made the second gene of every session miss its preview.
+  var EXPRESSION_CONTROLS_IGNORED = /^(expression_by_group_|geneIdConversion_)/;
   function expressionControlsKey() {
     return JSON.stringify(Array.from(document.querySelectorAll(
       'input[id],select[id]'
     )).filter(function (el) {
       return el.id !== 'expression_genes_input' &&
+        !EXPRESSION_CONTROLS_IGNORED.test(el.id) &&
         !el.id.endsWith('-selectized') && !el.id.startsWith('selectize-');
     }).map(function (el) {
       return [el.id, el.value, el.checked];
@@ -10353,9 +10358,32 @@
     Shiny.setInputValue('expression_projection_expression_resource_failed',
       message.data.expression_resource.url, {priority: 'event'});
   }
+  // The index named by a frame without a direct gene (e.g. none selected yet).
+  function loadExpressionIndex(message, base) {
+    if (!base || !window.CerebroExpressionAssets ||
+        typeof window.CerebroExpressionAssets.loadIndex !== 'function') return;
+    var view = singleView(message.id, message.dataset_context);
+    if (!canonicalResourceIdentityMatches(
+      base, message.dataset_identity || (view && view.datasetIdentity)
+    )) return;
+    window.CerebroExpressionAssets.loadIndex(base).catch(function () {});
+  }
+  // Start an unseen gene's fetch on selection even when it cannot be drawn
+  // yet; R's reply then finds it in flight or cached.
+  function prefetchExpression(value) {
+    var genes = previewGenes(value), view = singleView('expression_projection');
+    if (genes.length !== 1 || !view || !view.data || !window.CerebroExpressionAssets ||
+        typeof window.CerebroExpressionAssets.resourceFor !== 'function') return;
+    var base = view.data.expression_resource || view.data.expression_index;
+    var resource = base && window.CerebroExpressionAssets.resourceFor(base, genes[0]);
+    if (resource) window.CerebroExpressionAssets.load(resource).catch(function () {});
+  }
   function hydrateExpressionResource(message) {
     var resource = message && message.data && message.data.expression_resource;
-    if (!resource) return Promise.resolve(message);
+    if (!resource) {
+      loadExpressionIndex(message, message && message.data && message.data.expression_index);
+      return Promise.resolve(message);
+    }
     var view = singleView(message.id, message.dataset_context);
     var controls = expressionControlsKey();
     if (!window.CerebroExpressionAssets || !canonicalResourceIdentityMatches(
@@ -12399,8 +12427,9 @@
     window.jQuery(document).on('shiny:inputchanged.cerebroExpression', function (event) {
       if (event.name === 'expression_genes_input') {
         var token = ++expressionFrameToken;
-        if (!previewCachedExpression(event.value)) {
-          previewUnseenExpression(event.value, token);
+        if (!previewCachedExpression(event.value) &&
+            !previewUnseenExpression(event.value, token)) {
+          prefetchExpression(event.value);
         }
       }
     });

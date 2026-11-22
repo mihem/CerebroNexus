@@ -65,6 +65,43 @@ window.viewerScenarios = {
     } finally {window.CerebroExpressionAssets=original;}
     return true;
   },
+  async directExpressionPrefetch() {
+    const t = viewerTest; t.dataset();
+    const identity = {cell_count:3, cell_fingerprint:'md5-cell-set-v1:'+'a'.repeat(32),
+      cell_order_fingerprint:'md5-cell-order-v1:'+'b'.repeat(32),
+      pack_dataset_fingerprint:'md5-crb-v1:'+'c'.repeat(32)};
+    const index = {cells:3,dataset_fingerprint:identity.cell_fingerprint,
+      cell_order_fingerprint:identity.cell_order_fingerprint,
+      pack_dataset_fingerprint:identity.pack_dataset_fingerprint,
+      index:{url:'cerebro-expression-test/index.json?v='+'e'.repeat(32),bytes:10}};
+    const indexed = [], loads = [];
+    const original = window.CerebroExpressionAssets;
+    window.CerebroExpressionAssets = {
+      load:r=>{loads.push(r.gene);return new Promise(()=>{});},
+      peek:()=>null,
+      loadIndex:base=>{indexed.push(base.index.url);return Promise.resolve(null);},
+      resourceFor:(base,gene)=>base===null||gene!=='G'?null:{...index,gene:'G',
+        protocol:'expression-f64-gzip-v1',url:'cerebro-expression-test/000001.bin.gz?v='+'d'.repeat(32)}
+    };
+    try {
+      // The first frame of a session shows no gene but names the index.
+      await t.render({expression_index:index},{color_variable:'umap'},'expression_projection',
+        {dataset_identity:identity});
+      t.equal(indexed.length,1,'A frame without a gene loads the expression index');
+      let previews=0;const onPreview=()=>previews++;
+      document.addEventListener('cerebro:expression-preview',onPreview);
+      jQuery(document).trigger({type:'shiny:inputchanged',name:'expression_genes_input',value:['G']});
+      await t.settle();
+      t.equal(loads.join(),'G','The first gene is fetched on selection, in parallel with R');
+      t.equal(previews,0,'Without a gene frame to derive from, nothing is previewed');
+      document.removeEventListener('cerebro:expression-preview',onPreview);
+      // An index from another Pack is not loaded.
+      await t.render({expression_index:{...index,pack_dataset_fingerprint:'md5-crb-v1:'+'f'.repeat(32)}},
+        {color_variable:'umap'},'expression_projection',{dataset_identity:identity});
+      t.equal(indexed.length,1,'An index of another Pack is ignored');
+    } finally {window.CerebroExpressionAssets=original;}
+    return true;
+  },
   async directExpressionUnseen() {
     const t = viewerTest; t.dataset();
     const identity = {cell_count:3, cell_fingerprint:'md5-cell-set-v1:'+'a'.repeat(32),
@@ -100,6 +137,13 @@ window.viewerScenarios = {
     try {
       await t.render(descriptor('A'),{color_variable:'A'},'expression_projection',
         {dataset_identity:identity});
+      // As on the page: the summary's group selector fills in after the first
+      // gene is drawn. It does not colour the projection, so it must not
+      // block the next preview.
+      const group=document.createElement('select');
+      group.id='expression_by_group_selected_group';
+      group.innerHTML='<option value="seurat_clusters">seurat_clusters</option>';
+      document.body.appendChild(group);
       const state=cerebroCellViews.captureState('expression_projection');
       const acknowledgements=t.requests.length;
       const previews=[];
@@ -136,6 +180,7 @@ window.viewerScenarios = {
       t.check(document.getElementById('cv-cbar').textContent.includes('A'),'Late C cannot overwrite A');
       document.removeEventListener('cerebro:expression-preview',onPreview);
       document.removeEventListener('cerebro:expression-preview-corrected',onCorrected);
+      group.remove();
     } finally {window.CerebroExpressionAssets=original;}
     return true;
   },

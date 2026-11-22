@@ -1676,15 +1676,43 @@ server <- function(input, output, session) {
   viewer_projection_resources <- new.env(parent = emptyenv())
   ## Experimental direct rows are opt-in, public configured datasets only.
   ## Never register a new expression URL for authenticated or uploaded data.
-  viewerExpressionAsset <- function(gene, cells) {
+  viewerExpressionPack <- function(cells) {
     if (!isTRUE(getOption("CerebroNexus.direct_expression", FALSE)) ||
         !is.null(Cerebro.options[[".viewer_auth"]]) ||
         is.null(viewer_first_view_source())) return(NULL)
     pack <- viewerPackCurrent()
     if (!viewerPackCanonical(pack) ||
-        !identical(as.integer(cells), seq_len(pack$cell_count))) return(NULL)
+        !identical(as.integer(cells), seq_len(pack$cell_count)) ||
+        !is.data.frame(pack$manifest$expression_rows)) return(NULL)
+    pack
+  }
+  ## The gene index of the Pack, verified once per Pack. It only names files
+  ## in its own served directory, each checked by size and gzip CRC on arrival.
+  ## Also sent with a frame that shows no gene, so even the first gene of a
+  ## session is fetched in parallel with Shiny.
+  viewerExpressionIndex <- function(cells, pack = viewerExpressionPack(cells)) {
+    if (is.null(pack) || !is.environment(pack$cache)) return(NULL)
+    if (!exists("expression_index", envir = pack$cache, inherits = FALSE)) {
+      assign("expression_index", viewerPackVerifiedAsset(
+        pack, "expression/index.json", accept = function(asset) {
+          identical(asset$dtype, "expression-index-v1")
+        }
+      ), envir = pack$cache)
+    }
+    index <- get("expression_index", envir = pack$cache, inherits = FALSE)
+    if (!is.list(index)) return(NULL)
+    prefix <- viewerStaticResourcePrefix("expression", dirname(index$file))
+    c(list(
+      cells = pack$cell_count,
+      index = list(url = paste0(prefix, "/index.json?v=", index$checksum),
+                   bytes = index$bytes),
+      directory = dirname(index$file)
+    ), viewerCanonicalResourceIdentity(pack))
+  }
+  viewerExpressionAsset <- function(gene, cells) {
+    pack <- viewerExpressionPack(cells)
+    if (is.null(pack)) return(NULL)
     rows <- pack$manifest$expression_rows
-    if (!is.data.frame(rows)) return(NULL)
     i <- which(rows$gene == gene)
     if (length(i) != 1L) return(NULL)
     path <- as.character(rows$path[[i]])
@@ -1701,24 +1729,9 @@ server <- function(input, output, session) {
       cells = pack$cell_count, bytes = asset$bytes, checksum = asset$checksum,
       range = c(rows$low[[i]], rows$high[[i]])
     ), viewerCanonicalResourceIdentity(pack))
-    ## The index is verified once per Pack; it only names files in this
-    ## already-served directory, each checked by size and gzip CRC on arrival.
-    index <- NULL
-    if (is.environment(pack$cache)) {
-      if (!exists("expression_index", envir = pack$cache, inherits = FALSE)) {
-        assign("expression_index", viewerPackVerifiedAsset(
-          pack, "expression/index.json", accept = function(asset) {
-            identical(asset$dtype, "expression-index-v1")
-          }
-        ), envir = pack$cache)
-      }
-      index <- get("expression_index", envir = pack$cache, inherits = FALSE)
-    }
-    if (is.list(index) && identical(dirname(index$file), dirname(asset$file))) {
-      resource$index <- list(
-        url = paste0(prefix, "/index.json?v=", index$checksum),
-        bytes = index$bytes
-      )
+    index <- viewerExpressionIndex(cells, pack)
+    if (is.list(index) && identical(index$directory, dirname(asset$file))) {
+      resource$index <- index$index
     }
     resource
   }

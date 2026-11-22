@@ -220,6 +220,14 @@ expression_projection_update_plot <- function(input) {
   if (is.list(resource)) {
     output_data$color <- NULL
     output_data$expression_resource <- resource
+  } else if (exists("viewerExpressionIndex", mode = "function", inherits = TRUE)) {
+    ## No direct gene on screen (e.g. none selected yet): still name the index,
+    ## so the browser can fetch the next gene in parallel with Shiny.
+    index <- viewerExpressionIndex(cell_indices)
+    if (is.list(index)) {
+      index$directory <- NULL  # server path; never sent
+      output_data$expression_index <- index
+    }
   }
   shared_projection <- if (
     exists("viewerSharedProjectionName", mode = "function", inherits = TRUE)

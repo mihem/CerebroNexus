@@ -101,6 +101,11 @@ test_that("unseen genes fetch on selection and preview before R replies", {
   viewer_browser_test("directExpressionUnseen")
 })
 
+test_that("the first gene of a session is fetched in parallel with R", {
+  skip_on_cran()
+  viewer_browser_test("directExpressionPrefetch")
+})
+
 test_that("a direct marker bypasses source reads and a failed asset falls back", {
   scope <- new.env(parent = globalenv())
   scope$input <- list(sidebar = "other")
