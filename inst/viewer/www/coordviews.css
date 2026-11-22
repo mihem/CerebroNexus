@@ -362,9 +362,19 @@
   justify-content: center;
   align-items: start;
 }
-.coordviews-page .cv-panes.cv-focus-grid > .cv-pane { align-self: start; }
-/* The strip of an enlarged view: thumbnails off the shown page are hidden,
-   and the arrows at its ends turn its pages. */
+.coordviews-page .cv-panes.cv-focus-grid > .cv-pane {
+  align-self: start;
+  justify-self: start;
+}
+/* The strip of an enlarged view: its thumbnails share one cell and scroll
+   along it (placeFocusStrip()); those well outside it are not shown. The
+   panes are clipped so that a thumbnail moved past either end of the strip
+   neither shows nor makes the page scroll; not while Enlarge moves the
+   panels in from where they were. */
+.coordviews-page .cv-panes.cv-focus-grid:not(.cv-focus-transitioning) {
+  overflow: clip;
+  overflow-clip-margin: 8px;
+}
 .coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-strip-off { display: none; }
 /* A thumbnail keeps its title, which enlarges it; it needs no Enlarge button. */
 .coordviews-page .cv-panes.cv-focus-grid > .cv-pane.cv-focus-context .cv-focus-btn { display: none; }
@@ -377,6 +387,7 @@
 }
 .coordviews-page .cv-strip-arrow {
   align-self: center;
+  justify-self: center;
   width: 36px;
   height: 56px;
   padding: 0;
@@ -389,33 +400,20 @@
   line-height: 1;
   cursor: pointer;
 }
-.coordviews-page .cv-strip-prev { justify-self: end; }
-.coordviews-page .cv-strip-next { justify-self: start; }
 .coordviews-page .cv-strip-arrow:hover:not(:disabled) {
   border-color: var(--c-amber-200);
   color: var(--c-amber-700);
 }
 .coordviews-page .cv-strip-arrow:disabled { opacity: .35; cursor: default; }
 .coordviews-page .cv-strip-arrow[hidden] { display: none; }
-/* A turned page of thumbnails slides in from the side it comes from. */
-@keyframes cv-strip-in-next {
-  from { opacity: 0; transform: translateX(64px); }
-  to { opacity: 1; transform: none; }
+.coordviews-page .cv-strip-glyph { display: inline-block; }
+/* A strip to the left of the enlarged panel runs top to bottom: its arrows
+   sit above and below it and point up and down. */
+.coordviews-page .cv-focus-left > .cv-strip-arrow {
+  width: 56px;
+  height: 36px;
 }
-@keyframes cv-strip-in-prev {
-  from { opacity: 0; transform: translateX(-64px); }
-  to { opacity: 1; transform: none; }
-}
-.coordviews-page .cv-pane.cv-strip-in-next {
-  animation: cv-strip-in-next .3s cubic-bezier(.2, .8, .2, 1) both;
-}
-.coordviews-page .cv-pane.cv-strip-in-prev {
-  animation: cv-strip-in-prev .3s cubic-bezier(.2, .8, .2, 1) both;
-}
-@media (prefers-reduced-motion: reduce) {
-  .coordviews-page .cv-pane.cv-strip-in-next,
-  .coordviews-page .cv-pane.cv-strip-in-prev { animation: none; }
-}
+.coordviews-page .cv-focus-left .cv-strip-glyph { transform: rotate(90deg); }
 /* A narrow linked panel keeps its title; its "Context" badge gives way. */
 .coordviews-page .cv-pane.cv-narrow.cv-focus-context .cv-role-badge { display: none; }
 .coordviews-page .cv-pane.cv-focus-primary {

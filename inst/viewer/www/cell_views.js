@@ -8079,43 +8079,67 @@
     for (var c = 1; c <= k; c++) if (widthOf(c) >= Math.max(260, floor)) scrollCols = c;
     return scrolling(scrollCols);
   }
-  // An enlarged panel reads like a photo viewer: it spans the width on top, and
-  // the n others are a strip of thumbnails below it, one row of equal squares
-  // taking at most a fifth of the height (FOCUS_THUMB_MIN to FOCUS_THUMB_MAX).
-  // When they do not fit the width, the strip shows a page of them between
-  // arrows that turn the pages, so many sections never shrink the enlarged
-  // panel. Null without room for both.
+  // An enlarged panel reads like a photo viewer: the n others are a strip of
+  // equal square thumbnails (FOCUS_THUMB_MIN to FOCUS_THUMB_MAX, about a
+  // quarter of the height), either one row below the enlarged panel or one
+  // column to its left, whichever draws the enlarged panel's content larger
+  // (`aspect`, its width / height): a wide window and a square plot put them
+  // to the left, a very wide section below. The strip is as long as the
+  // enlarged panel (its width below it, its height beside it). Thumbnails that
+  // do not fit scroll along it, between two arrows at its ends, so many
+  // sections never shrink the enlarged panel. Null without room for both.
   var FOCUS_THUMB_MIN = 96, FOCUS_THUMB_MAX = 200, FOCUS_STRIP_SHARE = 0.24;
   var FOCUS_ARROW = 36;
-  function focusGridPacking(n, availW, availH, chromeX, chromeY, gap) {
+  function focusStripPacking(place, n, availW, availH, chromeX, chromeY, gap) {
     var side = Math.floor(Math.max(FOCUS_THUMB_MIN,
       Math.min(FOCUS_THUMB_MAX, availH * FOCUS_STRIP_SHARE - chromeY)));
-    var fits = function (width) {
-      return Math.max(0, Math.floor((width + gap) / (side + chromeX + gap)));
-    };
-    var perPage = fits(availW);
-    var paged = n > perPage;
-    if (paged) perPage = fits(availW - 2 * (FOCUS_ARROW + gap));
-    var pack = { place: 'photo', side: side, ctxW: side, n: n,
-      perPage: Math.max(1, Math.min(n, perPage)), paged: paged,
-      pages: paged ? Math.ceil(n / Math.max(1, perPage)) : 1,
-      mainW: Math.floor(availW - chromeX),
-      mainH: Math.floor(availH - (side + chromeY) - gap - chromeY) };
-    if (perPage < 1 || pack.mainH < side * 1.5) return null;
-    return pack;
+    var left = place === 'left';
+    var mainW = Math.floor(left ? availW - (side + chromeX) - gap - chromeX : availW - chromeX);
+    var mainH = Math.floor(left ? availH - chromeY : availH - (side + chromeY) - gap - chromeY);
+    if (mainH < side * 1.5 || mainW < side * 1.5) return null;
+    // A thumbnail's length along the strip, and the strip's: the enlarged
+    // panel's height beside it, the whole width below it.
+    var thumb = left ? side + chromeY : side + chromeX;
+    var length = left ? mainH + chromeY : availW;
+    var content = n * (thumb + gap) - gap;
+    var scroll = content > length;
+    // The part of the strip that shows thumbnails: all of it, or what the
+    // arrows at its ends leave.
+    var view = scroll ? length - 2 * (FOCUS_ARROW + gap) : length;
+    if (view < thumb) return null;
+    return { place: place, side: side, ctxW: side, n: n, mainW: mainW, mainH: mainH,
+      thumb: thumb, step: thumb + gap, length: length, view: view, content: content,
+      scroll: scroll };
   }
-  // The page of the strip shown, and its arrows.
-  var focusStripPage = 0, focusStripKey = null, focusStripArrows = null;
+  // The area the enlarged panel's content is drawn at in a pack.
+  function focusContentArea(pack, aspect) {
+    if (!pack) return -1;
+    var a = aspect > 0 && isFinite(aspect) ? aspect : 1;
+    var w = Math.min(pack.mainW, pack.mainH * a);
+    return w * (w / a);
+  }
+  function focusGridPacking(n, availW, availH, chromeX, chromeY, gap, aspect) {
+    var below = focusStripPacking('below', n, availW, availH, chromeX, chromeY, gap);
+    var left = focusStripPacking('left', n, availW, availH, chromeX, chromeY, gap);
+    // Below wins a tie: it was the layout before.
+    return focusContentArea(left, aspect) > focusContentArea(below, aspect) ? left : below;
+  }
+  // The strip's arrows, and how far it is scrolled: `focusStripOffset` is
+  // drawn, `focusStripTarget` is where it is heading.
+  var focusStripKey = null, focusStripArrows = null;
+  var focusStripOffset = 0, focusStripTarget = 0, focusStripFrame = 0;
   function focusStripArrowsOf(panes) {
     if (focusStripArrows && focusStripArrows.prev.parentElement === panes) return focusStripArrows;
     var make = function (direction) {
       var button = document.createElement('button');
       button.type = 'button';
       button.className = 'cv-strip-arrow cv-strip-' + direction;
-      button.setAttribute('aria-label', direction === 'prev' ? 'Previous views' : 'Next views');
-      button.innerHTML = direction === 'prev' ? '&#8249;' : '&#8250;';
+      button.setAttribute('aria-label', direction === 'prev' ? 'Scroll to earlier views' : 'Scroll to later views');
+      button.innerHTML = '<span class="cv-strip-glyph" aria-hidden="true">' +
+        (direction === 'prev' ? '&#8249;' : '&#8250;') + '</span>';
       button.addEventListener('click', function () {
-        turnFocusStrip(direction === 'prev' ? -1 : 1);
+        var pack = lastFocusGrid && lastFocusGrid.pack;
+        if (pack) scrollFocusStrip((direction === 'prev' ? -1 : 1) * pack.step);
       });
       panes.appendChild(button);
       return button;
@@ -8123,105 +8147,153 @@
     focusStripArrows = { prev: make('prev'), next: make('next') };
     return focusStripArrows;
   }
-  // Turns the strip a page: the panels keep their size, so only the shown
-  // thumbnails change; they slide in from the side they come from.
   var lastFocusGrid = null;
-  function turnFocusStrip(step) {
-    var last = lastFocusGrid;
-    if (!last || !last.pack || !last.pack.paged) return;
-    var page = Math.max(0, Math.min(last.pack.pages - 1, focusStripPage + step));
-    if (page === focusStripPage) return;
-    var before = last.vis.filter(function (p) {
-      return p.pane && !p.pane.classList.contains('cv-strip-off');
-    });
-    focusStripPage = page;
-    applyFocusGrid(last.panes, last.vis, last.primaryKey, last.pack,
-      last.chromeX, last.chromeY, last.gap);
-    var slot = 0;
-    last.vis.forEach(function (p) {
-      if (!p.pane || p.key === last.primaryKey || p.pane.classList.contains('cv-strip-off') ||
-          before.indexOf(p) >= 0) return;
-      var pane = p.pane;
-      pane.classList.remove('cv-strip-in-next', 'cv-strip-in-prev');
-      void pane.offsetWidth;
-      pane.style.animationDelay = (slot++ * 30) + 'ms';
-      pane.classList.add(step > 0 ? 'cv-strip-in-next' : 'cv-strip-in-prev');
-      pane.addEventListener('animationend', function done() {
-        pane.removeEventListener('animationend', done);
-        pane.classList.remove('cv-strip-in-next', 'cv-strip-in-prev');
-        pane.style.animationDelay = '';
-      });
-      // A thumbnail hidden while its plot was last drawn shows it now.
-      if (p._resizedUndrawn) drawPanel(p);
-    });
-    anchorComposition(singleActive);
+  function focusStripMax(pack) {
+    return pack && pack.scroll ? Math.max(0, pack.content - pack.view) : 0;
   }
-  // Left and right keys turn the strip of an enlarged view.
+  // Scrolls the strip by `delta` pixels, smoothly: each frame covers part of
+  // the way left, so clicks in a row add up and the motion eases out.
+  function scrollFocusStrip(delta) {
+    var pack = lastFocusGrid && lastFocusGrid.pack;
+    if (!pack || !pack.scroll) return;
+    focusStripTarget = Math.max(0, Math.min(focusStripMax(pack), focusStripTarget + delta));
+    var reduced = window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced || typeof requestAnimationFrame !== 'function') {
+      focusStripOffset = focusStripTarget;
+      placeFocusStrip();
+      return;
+    }
+    if (!focusStripFrame) focusStripFrame = requestAnimationFrame(stepFocusStrip);
+  }
+  function stepFocusStrip() {
+    focusStripFrame = 0;
+    var left = focusStripTarget - focusStripOffset;
+    focusStripOffset = Math.abs(left) < 0.5 ? focusStripTarget : focusStripOffset + left * 0.22;
+    placeFocusStrip();
+    if (focusStripOffset !== focusStripTarget) {
+      focusStripFrame = requestAnimationFrame(stepFocusStrip);
+    } else {
+      anchorComposition(singleActive);
+    }
+  }
+  // Puts the thumbnails where the scroll has them. They share the strip's
+  // grid cell; each is moved along it (the `translate` property, which leaves
+  // `transform` to Enlarge's motion) and cut where it leaves the cell, so a
+  // thumbnail at either end shows in part. Thumbnails a step or more outside
+  // are not shown at all.
+  function placeFocusStrip() {
+    var last = lastFocusGrid, pack = last && last.pack;
+    if (!pack) return;
+    var left = pack.place === 'left';
+    var lead = pack.scroll ? 0 : Math.floor((pack.view - pack.content) / 2);
+    var index = 0;
+    last.vis.forEach(function (p) {
+      if (!p.pane || p.key === last.primaryKey) return;
+      var at = lead + index++ * pack.step - focusStripOffset;
+      var near = at + pack.thumb > -pack.step && at < pack.view + pack.step;
+      var wasOff = p.pane.classList.contains('cv-strip-off');
+      p.pane.classList.toggle('cv-strip-off', !near);
+      if (!near) return;
+      var pos = Math.round(at);
+      p.pane.style.translate = left ? '0 ' + pos + 'px' : pos + 'px 0';
+      var head = Math.max(0, -pos), tail = Math.max(0, pos + pack.thumb - pack.view);
+      p.pane.style.clipPath = !head && !tail ? ''
+        : left ? 'inset(' + head + 'px 0 ' + tail + 'px 0)'
+          : 'inset(0 ' + tail + 'px 0 ' + head + 'px)';
+      // A thumbnail hidden while its plot was last drawn shows it now.
+      if (wasOff && p._resizedUndrawn) drawPanel(p);
+    });
+    var arrows = focusStripArrows;
+    if (arrows && arrows.prev.parentElement === last.panes && pack.scroll) {
+      arrows.prev.disabled = focusStripTarget <= 0;
+      arrows.next.disabled = focusStripTarget >= focusStripMax(pack);
+    }
+  }
+  // The arrow keys scroll the strip of an enlarged view: left and right either
+  // strip, up and down the one on the left.
   if (typeof document !== 'undefined' && document.addEventListener) {
     document.addEventListener('keydown', function (event) {
-      if (!focusPanel || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
+      if (!focusPanel || !lastFocusGrid || !lastFocusGrid.pack) return;
+      var keys = lastFocusGrid.pack.place === 'left'
+        ? { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }
+        : { ArrowLeft: -1, ArrowRight: 1 };
+      var step = keys[event.key];
+      if (!step) return;
       var target = event.target;
       if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
-      if (!lastFocusGrid || !lastFocusGrid.pack || !lastFocusGrid.pack.paged ||
-          !lastFocusGrid.panes.getClientRects().length) return;
+      if (!lastFocusGrid.pack.scroll || !lastFocusGrid.panes.getClientRects().length) return;
       event.preventDefault();
-      turnFocusStrip(event.key === 'ArrowLeft' ? -1 : 1);
+      scrollFocusStrip(step * lastFocusGrid.pack.step);
     });
   }
   // The panes' grid for an enlarged panel, or the ordinary flow without one.
   function applyFocusGrid(panes, vis, primaryKey, pack, chromeX, chromeY, gap) {
     lastFocusGrid = { panes: panes, vis: vis, primaryKey: primaryKey, pack: pack,
       chromeX: chromeX, chromeY: chromeY, gap: gap };
-    var arrows = pack && pack.paged ? focusStripArrowsOf(panes)
+    var arrows = pack && pack.scroll ? focusStripArrowsOf(panes)
       : (focusStripArrows && focusStripArrows.prev.parentElement === panes ? focusStripArrows : null);
     if (arrows) {
-      arrows.prev.hidden = arrows.next.hidden = !(pack && pack.paged);
+      arrows.prev.hidden = arrows.next.hidden = !(pack && pack.scroll);
     }
     if (!pack) {
       vis.forEach(function (p) {
         if (!p.pane) return;
         p.pane.style.gridColumn = p.pane.style.gridRow = '';
+        p.pane.style.translate = p.pane.style.clipPath = '';
         p.pane.classList.remove('cv-strip-off');
       });
       panes.style.display = panes.style.gridTemplateColumns = panes.style.gridTemplateRows = '';
-      panes.classList.remove('cv-focus-grid');
+      panes.classList.remove('cv-focus-grid', 'cv-focus-left');
+      if (focusStripFrame) cancelAnimationFrame(focusStripFrame);
+      focusStripFrame = 0;
       focusStripKey = null;
+      focusStripOffset = focusStripTarget = 0;
       return;
     }
-    if (focusStripKey !== primaryKey) { focusStripKey = primaryKey; focusStripPage = 0; }
-    focusStripPage = Math.max(0, Math.min(pack.pages - 1, focusStripPage));
-    var first = focusStripPage * pack.perPage;
-    var shown = Math.min(pack.perPage, pack.n - first);
-    // Flexible gutters at both ends hold the arrows and centre the strip.
+    // A new enlarged view starts at the beginning of its strip; enlarging a
+    // thumbnail of it keeps the strip where it is.
+    if (focusStripKey === null) {
+      focusStripOffset = focusStripTarget = 0;
+    }
+    focusStripKey = primaryKey;
+    var max = focusStripMax(pack);
+    focusStripTarget = Math.min(focusStripTarget, max);
+    focusStripOffset = Math.min(focusStripOffset, max);
+    var left = pack.place === 'left';
+    // The strip: the thumbnails' cell, between the arrows when it scrolls.
+    var strip = pack.scroll
+      ? FOCUS_ARROW + 'px ' + pack.view + 'px ' + FOCUS_ARROW + 'px'
+      : pack.view + 'px';
+    var cell = pack.scroll ? '2' : '1';
     panes.classList.add('cv-focus-grid');
+    panes.classList.toggle('cv-focus-left', left);
     panes.style.display = 'grid';
-    panes.style.gridTemplateColumns = 'minmax(0, 1fr) repeat(' + shown + ', ' +
-      (pack.ctxW + chromeX) + 'px) minmax(0, 1fr)';
-    panes.style.gridTemplateRows = (pack.mainH + chromeY) + 'px ' + (pack.side + chromeY) + 'px';
-    var index = 0;
+    panes.style.gridTemplateColumns = left
+      ? (pack.ctxW + chromeX) + 'px ' + (pack.mainW + chromeX) + 'px'
+      : strip;
+    panes.style.gridTemplateRows = left
+      ? strip
+      : (pack.mainH + chromeY) + 'px ' + (pack.side + chromeY) + 'px';
     vis.forEach(function (p) {
       if (!p.pane) return;
       if (p.key === primaryKey) {
-        p.pane.style.gridColumn = '1 / -1';
-        p.pane.style.gridRow = '1';
+        p.pane.style.gridColumn = left ? '2' : '1 / -1';
+        p.pane.style.gridRow = left ? '1 / -1' : '1';
+        p.pane.style.translate = p.pane.style.clipPath = '';
         p.pane.classList.remove('cv-strip-off');
         return;
       }
-      var slot = index++ - first;
-      var onPage = slot >= 0 && slot < shown;
-      p.pane.classList.toggle('cv-strip-off', !onPage);
-      p.pane.style.gridColumn = onPage ? String(slot + 2) : '';
-      p.pane.style.gridRow = onPage ? '2' : '';
+      p.pane.style.gridColumn = left ? '1' : cell;
+      p.pane.style.gridRow = left ? cell : '2';
     });
-    if (arrows && pack.paged) {
-      arrows.prev.style.gridColumn = '1';
-      arrows.next.style.gridColumn = String(shown + 2);
-      arrows.prev.style.gridRow = arrows.next.style.gridRow = '2';
-      arrows.prev.disabled = focusStripPage === 0;
-      arrows.next.disabled = focusStripPage >= pack.pages - 1;
-      arrows.prev.title = arrows.next.title = 'Views ' + (first + 1) + '–' + (first + shown) +
-        ' of ' + pack.n;
+    if (arrows && pack.scroll) {
+      var along = left ? 'gridRow' : 'gridColumn', across = left ? 'gridColumn' : 'gridRow';
+      arrows.prev.style[along] = '1';
+      arrows.next.style[along] = '3';
+      arrows.prev.style[across] = arrows.next.style[across] = left ? '1' : '2';
     }
+    placeFocusStrip();
   }
   function sectionGridRowOf(pack, index) {
     var rows = pack && pack.rowSizes;
@@ -8373,9 +8445,15 @@
         }
       }
     }
-    var focusPack = focusPanel && k > 1 && availH > 0
-      ? focusGridPacking(k - 1, usableW, availH, chromeX, overhead, gap)
-      : null;
+    var focusPack = null;
+    if (focusPanel && k > 1 && availH > 0) {
+      var focusAspect = 1;
+      if (!keepPlotsSquare) {
+        focusAspect = sectionGridActive() ? sectionGridAspect()
+          : (panelsAspect(vis.filter(function (p) { return p.key === focusPanel; }))[0] || 1);
+      }
+      focusPack = focusGridPacking(k - 1, usableW, availH, chromeX, overhead, gap, focusAspect);
+    }
     applyFocusGrid(panes, vis, focusPanel, focusPack, chromeX, overhead, gap);
     // Explicit tracks consume all available width. In the default fluid mode,
     // canvases also consume their row's share of available height. Square mode

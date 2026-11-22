@@ -221,23 +221,41 @@ syncGridView(panels[0]);
 assert.strictEqual(panels[1].view, null);
 assert.strictEqual(gridSyncing, false);
 console.log('PASS synced zoom gives every shown section the same relative view');
-// An enlarged panel reads like a photo viewer: it spans the width on top and
-// the others are one strip of thumbnails below, paged when they do not fit,
-// so many sections never shrink it.
-var few = focusGridPacking(3, 1310, 726, 18, 58, 8);
-assert.strictEqual(few.place, 'photo');
-assert.strictEqual(few.paged, false);
-assert.strictEqual(few.perPage, 3);
+// An enlarged panel reads like a photo viewer: the others are one strip of
+// thumbnails as long as the enlarged panel, scrolled between two arrows when
+// they do not fit, so many sections never shrink it. The strip goes below or
+// to the left, wherever the enlarged content is drawn larger. A very wide
+// section in a wide window: below.
+var few = focusGridPacking(3, 1310, 726, 18, 58, 8, 4);
+assert.strictEqual(few.place, 'below');
+assert.strictEqual(few.scroll, false);
+assert.strictEqual(few.view, 1310, 'three thumbnails need no arrows');
 assert.strictEqual(few.mainW, 1310 - 18, 'the enlarged panel takes the full width');
 assert.ok(few.side >= FOCUS_THUMB_MIN && few.side <= FOCUS_THUMB_MAX, JSON.stringify(few));
 assert.ok(few.mainH + 58 + few.side + 58 + 8 <= 726, 'both rows fit the window');
-var many = focusGridPacking(40, 1310, 726, 18, 58, 8);
-assert.strictEqual(many.paged, true);
+var many = focusGridPacking(40, 1310, 726, 18, 58, 8, 4);
+assert.strictEqual(many.scroll, true);
 assert.strictEqual(many.mainW, few.mainW, 'forty sections leave the enlarged panel as wide');
 assert.strictEqual(many.mainH, few.mainH, 'and as tall');
-assert.ok(many.perPage * (many.ctxW + 18) + (many.perPage - 1) * 8 + 2 * (FOCUS_ARROW + 8) <= 1310,
-  'a page of thumbnails and its arrows fit the width');
-assert.strictEqual(many.pages, Math.ceil(40 / many.perPage));
-assert.strictEqual(focusGridPacking(4, 500, 200, 18, 58, 8), null,
+assert.strictEqual(many.view + 2 * (FOCUS_ARROW + 8), 1310, 'the strip and its arrows span the width');
+assert.strictEqual(many.content, 40 * many.step - 8);
+assert.strictEqual(focusGridPacking(4, 500, 200, 18, 58, 8, 1), null,
   'no room: the page scrolls as before');
-console.log('PASS an enlarged panel is a photo above a paged strip of the others');
+// A square plot in the same window: the strip moves to the left, where the
+// plot is drawn larger; with its arrows it is exactly as tall as the
+// enlarged panel.
+var square = focusGridPacking(40, 1310, 726, 18, 58, 8, 1);
+assert.strictEqual(square.place, 'left');
+assert.strictEqual(square.mainH, 726 - 58, 'the enlarged panel takes the full height');
+assert.strictEqual(square.mainW + 18 + 8 + square.ctxW + 18, 1310, 'the strip fits beside it');
+assert.ok(Math.min(square.mainW, square.mainH) > Math.min(many.mainW, many.mainH),
+  'the square plot is larger than with the strip below');
+assert.strictEqual(square.scroll, true);
+assert.strictEqual(square.view + 2 * (FOCUS_ARROW + 8), square.mainH + 58,
+  'strip and arrows are as tall as the enlarged panel');
+assert.strictEqual(square.thumb, square.side + 58);
+// In a narrow, tall window a tall section still goes to the left, a wide
+// one below.
+assert.strictEqual(focusGridPacking(6, 900, 1300, 18, 58, 8, 0.5).place, 'left');
+assert.strictEqual(focusGridPacking(6, 900, 1300, 18, 58, 8, 2).place, 'below');
+console.log('PASS an enlarged panel is a photo with a scrolling strip below or to the left');

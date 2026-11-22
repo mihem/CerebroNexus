@@ -21,6 +21,32 @@ shinyjs.showScrollDownIndicator = function (message) {
     message || 'Charts generated below';
   document.body.appendChild(indicator);
 
+  // The strip of an enlarged section ends in an arrow at the bottom right of
+  // the window, where the hint sits: the hint moves to the left of the arrow
+  // it would cover, so the arrow stays usable.
+  const avoidStripArrows = function () {
+    indicator.style.right = '';
+    const box = indicator.getBoundingClientRect();
+    page.querySelectorAll('.cv-strip-arrow:not([hidden])').forEach(function (arrow) {
+      const a = arrow.getBoundingClientRect();
+      if (a.width && a.left < box.right && a.right > box.left &&
+          a.top < box.bottom && a.bottom > box.top) {
+        indicator.style.right = Math.ceil(window.innerWidth - a.left + 12) + 'px';
+      }
+    });
+  };
+  avoidStripArrows();
+  // The panels are laid out again a moment after the window changes size, so
+  // the hint looks again once they have settled.
+  let settle = 0;
+  const onResize = function () {
+    avoidStripArrows();
+    clearTimeout(settle);
+    settle = setTimeout(avoidStripArrows, 500);
+  };
+  window.addEventListener('resize', onResize);
+  indicator._onResize = onResize;
+
   indicator.onclick = function () {
     const reducedMotion = window.matchMedia &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -55,6 +81,9 @@ shinyjs.hideScrollDownIndicator = function () {
   }
   if (indicator._onClickOutside) {
     document.removeEventListener('click', indicator._onClickOutside);
+  }
+  if (indicator._onResize) {
+    window.removeEventListener('resize', indicator._onResize);
   }
   indicator.remove();
 };

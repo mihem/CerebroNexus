@@ -70,11 +70,15 @@
   "% of cells" is applied when the slider rests or is let go.
 - **Enlarge reads like a photo viewer.** Enlarge in Linked views, the
   Spatial grid or Gene expression's separate panels shows the enlarged panel
-  across the width on top and the others as one strip of thumbnails below it,
-  instead of wrapping them into rows with empty space around. When the
-  thumbnails do not fit the width, arrows at the ends of the strip page
-  through them (or the left and right keys), sliding the next page in, so
-  many sections never shrink the enlarged panel; a thumbnail's title enlarges
+  large and the others as one strip of thumbnails, below it or to its left,
+  wherever the enlarged plot is drawn larger (an embedding or most sections in
+  a wide window: to the left; a very wide section: below), instead of
+  wrapping them into rows with empty space around. The strip, its arrows
+  included, is as long as the enlarged panel is wide or tall. When the
+  thumbnails do not fit, the arrows at its ends (or the arrow keys) scroll it
+  smoothly, a thumbnail at a time, with the thumbnails at either end shown in
+  part, so many sections never shrink the enlarged panel; a thumbnail's title
+  enlarges
   it. Enlarge and Restore move each panel at its own proportions instead of
   stretching it, and draw the plots once instead of twice: with a million
   cells in 13 panels, 70 to 74 frames a second instead of 42 to 60, with no
