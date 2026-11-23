@@ -54,8 +54,8 @@
   and makes cell names only for the cells that need them, and draws its
   sections first: opened right after loading, it is ready after 3.5 s instead
   of 12 s on the Allen atlas, with 1.4 GB instead of 5.5 GB. With WebGPU the
-  GPU draws a gene's points through the paint order (0.7 s instead of 1.4 to
-  1.7 s on the first gene), the order is found by a radix sort, Moran's I
+  GPU draws a gene's points through the paint order (1.2 s instead of 2.4 s on
+  the first gene of Gene expression, 0.65 s instead of 1.05 s on the next), the order is found by a radix sort, Moran's I
   finds neighbours through buckets (1.6 ms a section instead of 26 ms), and
   Colour management writes its pickers at once (1.0 to 1.8 s instead of 3.5 to
   4.1 s with 1,640 groups).
