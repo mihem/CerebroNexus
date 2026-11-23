@@ -3000,19 +3000,32 @@ test_that("a compact scene of a thin CRB's section is made without a cell name",
   expect_equal(fast$label, reference$label)
   expect_equal(fast$builder_point_size, reference$builder_point_size)
 
-  # A data set with ROIs keeps the cell names: they are looked up by name.
-  with_roi <- cbind(metadata, sample_roi = c("A", "A", "B", "B", "A", "B"))
-  roi_crb <- make_crb(stored)
+  # ROIs are read from the metadata at the rows: the same scenes as with the
+  # cells named, none named.
+  with_roi <- cbind(
+    metadata,
+    sample_roi = c("A", "B", NA, "B", "A", "")
+  )
   scenes <- cv_env$cv_build_spatial(
-    roi_crb,
+    make_crb(stored),
+    cells = stop("the cell names were read"),
+    metadata = with_roi,
+    compact = TRUE,
+    n_cells = 6L
+  )
+  expect_identical(getter_named, 0L)
+  expect_identical(
+    vapply(scenes$samples, `[[`, character(1), "name"),
+    c("fov", "fov::roi::A", "fov::roi::B")
+  )
+  by_name <- cv_env$cv_build_spatial(
+    make_crb(named),
     cells = cells,
     metadata = with_roi,
     compact = TRUE,
     n_cells = 6L
   )
-  expect_gt(getter_named, 0L)
-  expect_identical(
-    vapply(scenes$samples, `[[`, character(1), "name"),
-    c("fov", "fov::roi::A", "fov::roi::B")
-  )
+  expect_equal(scenes, by_name)
+  expect_identical(as.integer(scenes$samples[[2]]$rows), c(4L, 0L))
+  expect_identical(as.integer(scenes$samples[[3]]$rows), 1L)
 })

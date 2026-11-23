@@ -957,9 +957,11 @@ cv_build_projections <- function(
 ## Returns list(name, x, y, image) or NULL.
 ## The section as Linked views' compact scenes use it, without reading a cell
 ## name: the coordinates keep the metadata rows a thin CRB stores as their
-## row names (so `rownames()` of them are row numbers, not cell names). Only for a section whose rows the Viewer Pack's index states the
-## same way, in a data set without ROIs (which are looked up by cell name);
-## NULL otherwise, and `cv_spatial_data()` names the cells.
+## row names (so `rownames()` of them are row numbers, not cell names). Only
+## for a section whose rows the Viewer Pack's index states the same way; NULL
+## otherwise, and `cv_spatial_data()` names the cells. A ROI of a cell is read
+## from the metadata at its row.
+
 cv_spatial_data_by_rows <- function(crb, nm, metadata) {
   coordinates <- tryCatch(
     crb$spatial[[nm]][["coordinates"]],
@@ -969,8 +971,7 @@ cv_spatial_data_by_rows <- function(crb, nm, metadata) {
   if (
     !is.data.frame(coordinates) ||
       !isTRUE(attr(coordinates, "cerebro_cell_index_rownames", exact = TRUE)) ||
-      !viewerPackCanonical(pack) ||
-      !is.null(spatial_metadata_field(metadata, spatial_roi_fields))
+      !viewerPackCanonical(pack)
   ) {
     return(NULL)
   }
@@ -999,6 +1000,31 @@ cv_spatial_data_by_rows <- function(crb, nm, metadata) {
   crb$spatial <- swapped
   on.exit(crb$spatial <- original, add = TRUE)
   tryCatch(viewerGetSpatialData(crb, nm), error = function(error) NULL)
+}
+
+## The ROI of each cell of a section named by metadata rows (NA where the
+## metadata has none), as spatial_metadata_facet() finds it by cell name, and
+## the pivots the ROIs rotate about; with no ROI field, none.
+cv_roi_by_rows <- function(coordinates, metadata) {
+  field <- spatial_metadata_field(metadata, spatial_roi_fields)
+  if (is.null(field)) {
+    return(NULL)
+  }
+  rows <- attr(coordinates, "row.names")
+  values <- as.character(metadata[[field]][rows])
+  values[is.na(values) | !nzchar(values)] <- NA_character_
+  values
+}
+cv_roi_context_by_rows <- function(coordinates, metadata, degrees) {
+  roi <- cv_roi_by_rows(coordinates, metadata)
+  list(
+    roi_by_cell = roi,
+    pivots = if (is.null(roi)) list() else spatialRoiPivots(coordinates, roi, degrees)
+  )
+}
+cv_roi_values_by_rows <- function(metadata, coordinates) {
+  roi <- cv_roi_by_rows(coordinates, metadata)
+  if (is.null(roi)) character() else unique(roi[!is.na(roi)])
 }
 
 cv_spatial_data <- function(crb, nm) {
@@ -1038,7 +1064,8 @@ cv_spatial_one <- function(
   by_rows = FALSE
 ) {
   ## `by_rows`: the section comes from cv_spatial_data_by_rows(), its cells
-  ## numbered by metadata rows and no ROIs; no cell name is made for it.
+  ## numbered by metadata rows; no cell name is made for it, and the ROI of a
+  ## cell is the metadata's at its row.
   by_rows <- isTRUE(by_rows) && isTRUE(compact)
   ## The number of cells, for point sizes: given by a caller that has not
   ## read the data set's cell names, which `length(cells)` would do.
@@ -1058,7 +1085,7 @@ cv_spatial_one <- function(
     metadata <- tryCatch(crb$getMetaData(), error = function(error) NULL)
   }
   context <- if (by_rows) {
-    list(roi_by_cell = NULL, pivots = list())
+    cv_roi_context_by_rows(co, metadata, rotation)
   } else {
     spatial_roi_transform_context(co, metadata, degrees = rotation)
   }
@@ -1073,18 +1100,22 @@ cv_spatial_one <- function(
   roi_value <- spatial_roi_value(roi_value)
   if (nzchar(roi_value)) {
     keep <- !is.na(context$roi_by_cell) & context$roi_by_cell == roi_value
+    kept <- if (by_rows) keep
     co <- co[keep, , drop = FALSE]
     if (!nrow(co)) {
       return(NULL)
     }
     co <- rotateSpatialCoordinatesByRoi(
       co,
-      as.character(context$roi_by_cell[rownames(co)]),
+      as.character(
+        if (by_rows) context$roi_by_cell[keep] else context$roi_by_cell[rownames(co)]
+      ),
       spatialRoiSettings(opts, dataset_name, nm),
       rotation,
       pivots = context$pivots
     )
   } else {
+    kept <- NULL
     co <- rotateSpatialCoordinates(co, rotation)
   }
   spatial_cells <- if (!by_rows) {
@@ -1099,8 +1130,12 @@ cv_spatial_one <- function(
     } else {
       cv_spatial_section_rows(nm, sd$coordinates, cells)
     }
-    whole <- by_rows || identical(spatial_cells, section_cells)
-    rows <- if (whole) {
+    whole <- if (by_rows) is.null(kept) || all(kept) else {
+      identical(spatial_cells, section_cells)
+    }
+    rows <- if (by_rows) {
+      if (is.null(kept)) section_rows else section_rows[kept]
+    } else if (whole) {
       section_rows
     } else {
       section_rows[match(spatial_cells, section_cells)]
@@ -1360,7 +1395,7 @@ cv_build_spatial <- function(
     }
     built[[length(built) + 1L]] <- scene
     rois <- if (by_rows) {
-      character()
+      cv_roi_values_by_rows(metadata, sd$coordinates)
     } else {
       spatial_metadata_facet(
         metadata,
@@ -1379,7 +1414,8 @@ cv_build_spatial <- function(
           metadata,
           sd,
           compact = compact,
-          n_cells = n_cells
+          n_cells = n_cells,
+          by_rows = by_rows
         )
         if (is.null(scene)) {
           next
