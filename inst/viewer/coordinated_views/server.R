@@ -289,6 +289,54 @@ coordviews_primary_bundle <- reactive({
   cv_build_bundle_safe(primary_only = TRUE)
 })
 
+## The Spatial space of the supplement, kept for the session: it depends on the
+## data set only. Emptied when another data set is loaded; filled while the
+## session is idle after a large one loads (below), so that opening Linked views
+## does not wait for the sections to be built.
+cv_spatial_cache <- new.env(parent = emptyenv())
+cv_prewarm_spatial <- function(context, tries = 6L) {
+  later::later(
+    function() {
+      shiny::withReactiveDomain(session, {
+        shiny::isolate(
+          tryCatch(
+            {
+              if (!identical(context, viewer_loaded_dataset_context())) {
+                return(invisible(NULL))
+              }
+              crb <- data_set()
+              first_frame <- viewerProjectionFirstFrameCache()
+              pack <- attr(crb, "cerebro_viewer_pack", exact = TRUE)
+              if (!is.data.frame(first_frame$meta_data) || !is.list(pack)) {
+                if (tries > 0L) {
+                  cv_prewarm_spatial(context, tries - 1L)
+                }
+                return(invisible(NULL))
+              }
+              if (
+                nrow(first_frame$meta_data) >= 2e5 &&
+                  length(crb$availableSpatial()) > 0L
+              ) {
+                cv_compact_spatial(crb, first_frame, cv_spatial_cache)
+              }
+            },
+            error = function(error) NULL
+          )
+        )
+      })
+    },
+    delay = 1.5
+  )
+}
+observeEvent(
+  viewer_loaded_dataset_context(),
+  {
+    rm(list = ls(cv_spatial_cache, all.names = TRUE), envir = cv_spatial_cache)
+    cv_prewarm_spatial(viewer_loaded_dataset_context())
+  },
+  ignoreNULL = TRUE
+)
+
 cv_prepare_progressive_supplement <- function(primary, primary_n, modalities) {
   started <- proc.time()[["elapsed"]]
   wants_clone <- "all" %in% modalities || "clone" %in% modalities
@@ -314,7 +362,8 @@ cv_prepare_progressive_supplement <- function(primary, primary_n, modalities) {
         primary,
         viewerProjectionFirstFrameCache(),
         include_clone = wants_clone && is.null(clone_spec),
-        projection_resources = projection_resources
+        projection_resources = projection_resources,
+        spatial_cache = cv_spatial_cache
       )
       if (is.null(value)) {
         value <- cv_build_progressive_supplement(

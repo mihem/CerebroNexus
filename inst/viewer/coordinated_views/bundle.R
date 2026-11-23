@@ -2350,12 +2350,40 @@ cv_supplement <- function(
   )
 }
 
+## A value kept in the environment `cache` under `key`: built once. Without a
+## cache it is built every time.
+cv_memo <- function(cache, key, build) {
+  if (!is.environment(cache)) {
+    return(build())
+  }
+  if (!exists(key, envir = cache, inherits = FALSE)) {
+    assign(key, list(value = build()), envir = cache)
+  }
+  get(key, envir = cache, inherits = FALSE)$value
+}
+
+## The compact Spatial space of the supplement, from the Pack's section index
+## and the first-frame metadata (no cell name is read). Kept in `cache` when
+## given, so a session that built it while idle (cv_prewarm_spatial() in
+## server.R) hands it over at once when Linked views opens.
+cv_compact_spatial <- function(crb, first_frame, cache = NULL) {
+  cv_memo(cache, "spatial", function() {
+    cv_build_spatial(
+      crb,
+      cells = cv_canonical_metadata(crb$getMetaData())$cell_barcode,
+      metadata = first_frame$meta_data,
+      compact = TRUE
+    )
+  })
+}
+
 cv_build_compact_supplement <- function(
   crb,
   primary,
   first_frame,
   include_clone = TRUE,
-  projection_resources = list()
+  projection_resources = list(),
+  spatial_cache = NULL
 ) {
   pack <- attr(crb, "cerebro_viewer_pack", exact = TRUE)
   valid <- is.list(pack) &&
@@ -2388,12 +2416,7 @@ cv_build_compact_supplement <- function(
   )
   ## Spatial scenes take their rows from the Pack's section index too, and
   ## sample and ROI facets from the first-frame metadata.
-  spatial <- cv_build_spatial(
-    crb,
-    cells = cells(),
-    metadata = first_frame$meta_data,
-    compact = TRUE
-  )
+  spatial <- cv_compact_spatial(crb, first_frame, spatial_cache)
   if (!is.null(spatial)) {
     spaces[[length(spaces) + 1L]] <- spatial
   }

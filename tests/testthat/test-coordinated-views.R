@@ -3025,3 +3025,46 @@ test_that("a compact scene of a thin CRB's section is made without a cell name",
   expect_identical(as.integer(scenes$samples[[2]]$rows), c(4L, 0L))
   expect_identical(as.integer(scenes$samples[[3]]$rows), 1L)
 })
+
+test_that("the supplement's Spatial space is built once per session cache", {
+  calls <- 0L
+  old <- get("cv_build_spatial", envir = cv_env)
+  on.exit(assign("cv_build_spatial", old, envir = cv_env), add = TRUE)
+  assign(
+    "cv_build_spatial",
+    function(crb, cells, metadata = NULL, compact = FALSE) {
+      calls <<- calls + 1L
+      list(id = "spatial", compact = compact, rows = nrow(metadata))
+    },
+    envir = cv_env
+  )
+  crb <- list(getMetaData = function() stop("cell names were read"))
+  frame <- list(meta_data = data.frame(a = 1:3))
+
+  # Without a cache every call builds.
+  cv_env$cv_compact_spatial(crb, frame)
+  cv_env$cv_compact_spatial(crb, frame)
+  expect_identical(calls, 2L)
+
+  # With one, the first call builds and the next hand the same space over.
+  cache <- new.env(parent = emptyenv())
+  first <- cv_env$cv_compact_spatial(crb, frame, cache)
+  again <- cv_env$cv_compact_spatial(crb, frame, cache)
+  expect_identical(calls, 3L)
+  expect_identical(again, first)
+  expect_true(first$compact)
+
+  # A data set without Spatial (NULL) is kept too, not built again.
+  assign(
+    "cv_build_spatial",
+    function(...) {
+      calls <<- calls + 1L
+      NULL
+    },
+    envir = cv_env
+  )
+  empty <- new.env(parent = emptyenv())
+  expect_null(cv_env$cv_compact_spatial(crb, frame, empty))
+  expect_null(cv_env$cv_compact_spatial(crb, frame, empty))
+  expect_identical(calls, 4L)
+})
