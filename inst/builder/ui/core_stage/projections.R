@@ -76,7 +76,7 @@
 builder_scatter_thumbnail_ui <- function(
   points,
   colors = NULL,
-  point_size = 4,
+  point_size = 5,
   label = "Coordinate preview",
   class = "viewer-scatter-preview",
   edges = NULL

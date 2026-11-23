@@ -370,6 +370,7 @@ viewerColourGroupChoices <- function(
 ## The size, opacity and share of cells a page starts with: the author's
 ## options, else points of size 4.
 viewerScatterDefaults <- function(options, dataset = NULL, page = NULL) {
+  default_size <- 4
   resolve <- function(key, fallback, minimum, maximum) {
     value <- options[[key]]
     if (!is.null(dataset) && !is.null(names(value))) {
@@ -389,7 +390,7 @@ viewerScatterDefaults <- function(options, dataset = NULL, page = NULL) {
     }
   }
   defaults <- list(
-    point_size = resolve("point_size", 4, 1, 20),
+    point_size = resolve("point_size", default_size, 1, 20),
     point_opacity = resolve("point_opacity", 1, 0.1, 1),
     percentage_cells_to_show = resolve(
       "percentage_cells_to_show",
@@ -403,7 +404,7 @@ viewerScatterDefaults <- function(options, dataset = NULL, page = NULL) {
     return(defaults)
   }
   list(
-    point_size = resolve("spatial_point_size", 4, 1, 20),
+    point_size = resolve("spatial_point_size", default_size, 1, 20),
     point_opacity = resolve("spatial_point_opacity", 1, 0.1, 1),
     percentage_cells_to_show = resolve(
       "spatial_percentage_cells_to_show",

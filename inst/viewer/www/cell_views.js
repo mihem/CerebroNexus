@@ -131,7 +131,8 @@
   var nicheRadius = 250;        // µm radius for the picked-nucleus niche readout
   var nicheSet = null;          // cell indices inside the picked nucleus's niche
   var colorBy = null;           // group name
-  var ps = 4;                   // point diameter in CSS pixels
+  var DEFAULT_POINT_SIZE = 4;   // the size a view starts with when nothing configures one
+  var ps = DEFAULT_POINT_SIZE;  // point diameter in CSS pixels
   var pointOpacity = 1;         // base draw opacity (no-selection view)
   var bordersOn = false;        // outline cell points in the active view
   var pictureOutlineOn = true;  // light outline on points over a dark picture
@@ -1445,6 +1446,15 @@
       drawNearPanels();
     });
   }
+  // A panel that was off stage, now near: sized as the layout meanwhile
+  // asked, then drawn.
+  function drawOnStage(p) {
+    if (p._pendingSize) {
+      var size = p._pendingSize;
+      resizePanel(p, size[0], size[1]);
+    }
+    drawPanel(p);
+  }
   function drawNearPanels() {
     var waiting = panels.filter(function (p) {
       return p.spaceId && (p._pendingSize || p._resizedUndrawn);
@@ -1452,12 +1462,7 @@
     if (!waiting.length) return;
     var off = waiting.map(offStage);
     waiting.forEach(function (p, i) {
-      if (off[i]) return;
-      if (p._pendingSize) {
-        var size = p._pendingSize;
-        resizePanel(p, size[0], size[1]);
-      }
-      drawPanel(p);
+      if (!off[i]) drawOnStage(p);
     });
   }
   function resizePanel(p, width, height) {
@@ -3163,8 +3168,7 @@
     var configured = D.default_point_size == null
       ? NaN : Number(D.default_point_size);
     var v;
-    // The configured size, else the Viewer's default (4).
-    v = isFinite(configured) ? Math.max(0, Math.min(20, configured)) : 4;
+    v = isFinite(configured) ? Math.max(0, Math.min(20, configured)) : DEFAULT_POINT_SIZE;
     ps = Math.round(v * 5) / 5;                    // slider step is 0.2
     setLinkedSliderValue('cv-ps', ps);
   }
@@ -8713,13 +8717,8 @@
       p.pane.style.clipPath = !head && !tail ? ''
         : left ? 'inset(' + head + 'px 0 ' + tail + 'px 0)'
           : 'inset(0 ' + tail + 'px 0 ' + head + 'px)';
-      // A thumbnail hidden while its plot was last drawn shows it now, at the
-      // size the layout gave it meanwhile.
-      if (wasOff && p._pendingSize) {
-        var pending = p._pendingSize;
-        resizePanel(p, pending[0], pending[1]);
-      }
-      if (wasOff && p._resizedUndrawn) drawPanel(p);
+      // A thumbnail hidden while its plot was last drawn shows it now.
+      if (wasOff && (p._pendingSize || p._resizedUndrawn)) drawOnStage(p);
     });
     var arrows = focusStripArrows;
     if (arrows && arrows.prev.parentElement === last.panes && pack.scroll) {
@@ -13511,7 +13510,7 @@
         ? Math.max(0, Math.min(1, configuredOpacity)) : 0.8;
       var configuredPointSize = Number(D.default_point_size);
       ps = D.default_point_size != null && isFinite(configuredPointSize)
-        ? Math.max(1, Math.min(20, configuredPointSize)) : 4;
+        ? Math.max(1, Math.min(20, configuredPointSize)) : DEFAULT_POINT_SIZE;
       pointSizeEdited = false;
       pointOpacityEdited = false;
       psSeeded = true;
