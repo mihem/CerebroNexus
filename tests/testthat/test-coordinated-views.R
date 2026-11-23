@@ -2932,3 +2932,87 @@ test_that("supplement projections served by the Viewer Pack are sent as descript
   expect_null(projections$tsne$x)
   expect_identical(projections$pca$x, I(c(1, 2)))
 })
+
+test_that("a compact scene of a thin CRB's section is made without a cell name", {
+  cells <- paste0("c", 1:6)
+  rows <- c(5L, 2L, 6L, 1L)
+  x <- c(1, 2, 3, 4)
+  y <- c(8, 7, 6, 5)
+  stored <- data.frame(x = x, y = y)
+  attr(stored, "row.names") <- rows
+  attr(stored, "cerebro_cell_index_rownames") <- TRUE
+  named <- data.frame(x = x, y = y, row.names = cells[rows])
+  metadata <- data.frame(cell_barcode = cells, sample = "S")
+  getter_named <- 0L
+  make_crb <- function(coordinates) {
+    crb <- new.env()
+    crb$spatial <- list(fov = list(coordinates = coordinates))
+    crb$availableSpatial <- function() "fov"
+    crb$getSpatialData <- function(name, hydrate_molecules = TRUE) {
+      co <- crb$spatial[[name]]$coordinates
+      if (isTRUE(attr(co, "cerebro_cell_index_rownames"))) {
+        getter_named <<- getter_named + 1L
+        attr(co, "cerebro_cell_index_rownames") <- NULL
+        attr(co, "row.names") <- cells[attr(co, "row.names")]
+      }
+      list(coordinates = co)
+    }
+    attr(crb, "cerebro_viewer_pack") <- list(
+      canonical_order = TRUE,
+      manifest = list(n_cells = 6L)
+    )
+    crb
+  }
+  old_index <- get0("viewerPackSpatialIndex", envir = cv_env, inherits = FALSE)
+  on.exit(
+    if (is.null(old_index)) {
+      rm("viewerPackSpatialIndex", envir = cv_env)
+    } else {
+      assign("viewerPackSpatialIndex", old_index, envir = cv_env)
+    },
+    add = TRUE
+  )
+  assign("viewerPackSpatialIndex", function(pack, name) rows, envir = cv_env)
+
+  thin <- make_crb(stored)
+  fast <- cv_env$cv_build_spatial(
+    thin,
+    cells = stop("the cell names were read"),
+    metadata = metadata,
+    compact = TRUE,
+    n_cells = 6L
+  )
+  # The getter named no cell, and the stored section is back as it was.
+  expect_identical(getter_named, 0L)
+  expect_identical(thin$spatial$fov$coordinates, stored)
+
+  reference <- cv_env$cv_build_spatial(
+    make_crb(named),
+    cells = cells,
+    metadata = metadata,
+    compact = TRUE,
+    n_cells = 6L
+  )
+  expect_identical(as.integer(fast$rows), as.integer(reference$rows))
+  expect_identical(as.integer(fast$rows), rows - 1L)
+  expect_equal(fast$x, reference$x)
+  expect_equal(fast$y, reference$y)
+  expect_equal(fast$label, reference$label)
+  expect_equal(fast$builder_point_size, reference$builder_point_size)
+
+  # A data set with ROIs keeps the cell names: they are looked up by name.
+  with_roi <- cbind(metadata, sample_roi = c("A", "A", "B", "B", "A", "B"))
+  roi_crb <- make_crb(stored)
+  scenes <- cv_env$cv_build_spatial(
+    roi_crb,
+    cells = cells,
+    metadata = with_roi,
+    compact = TRUE,
+    n_cells = 6L
+  )
+  expect_gt(getter_named, 0L)
+  expect_identical(
+    vapply(scenes$samples, `[[`, character(1), "name"),
+    c("fov", "fov::roi::A", "fov::roi::B")
+  )
+})

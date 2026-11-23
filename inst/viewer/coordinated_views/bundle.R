@@ -955,6 +955,52 @@ cv_build_projections <- function(
 ##   - EXTERNAL (Visium H&E): separate files configured for this exact dataset
 ##     and FOV, with an optional per-image alignment preset and explicit bounds.
 ## Returns list(name, x, y, image) or NULL.
+## The section as Linked views' compact scenes use it, without reading a cell
+## name: the coordinates keep the metadata rows a thin CRB stores as their
+## row names (so `rownames()` of them are row numbers, not cell names). Only for a section whose rows the Viewer Pack's index states the
+## same way, in a data set without ROIs (which are looked up by cell name);
+## NULL otherwise, and `cv_spatial_data()` names the cells.
+cv_spatial_data_by_rows <- function(crb, nm, metadata) {
+  coordinates <- tryCatch(
+    crb$spatial[[nm]][["coordinates"]],
+    error = function(error) NULL
+  )
+  pack <- attr(crb, "cerebro_viewer_pack", exact = TRUE)
+  if (
+    !is.data.frame(coordinates) ||
+      !isTRUE(attr(coordinates, "cerebro_cell_index_rownames", exact = TRUE)) ||
+      !viewerPackCanonical(pack) ||
+      !is.null(spatial_metadata_field(metadata, spatial_roi_fields))
+  ) {
+    return(NULL)
+  }
+  stored <- attr(coordinates, "row.names")
+  index <- tryCatch(viewerPackSpatialIndex(pack, nm), error = function(e) NULL)
+  if (
+    !is.integer(stored) ||
+      !identical(index, stored) ||
+      anyNA(stored) ||
+      any(stored < 1L) ||
+      anyDuplicated(stored)
+  ) {
+    return(NULL)
+  }
+  ## The object's getter names the cells of a thin CRB's section from its
+  ## metadata (and an object saved by an older release has no argument to
+  ## stop that): hand it the section without the flag, and put the stored
+  ## section back afterwards.
+  original <- crb$spatial
+  plain <- coordinates
+  attr(plain, "cerebro_cell_index_rownames") <- NULL
+  entry <- original[[nm]]
+  entry[["coordinates"]] <- plain
+  swapped <- original
+  swapped[[nm]] <- entry
+  crb$spatial <- swapped
+  on.exit(crb$spatial <- original, add = TRUE)
+  tryCatch(viewerGetSpatialData(crb, nm), error = function(error) NULL)
+}
+
 cv_spatial_data <- function(crb, nm) {
   ## Rows a thin CRB stores as metadata rows get the Pack's cell names first.
   viewerPackRestoreSpatialNames(
@@ -987,8 +1033,16 @@ cv_spatial_one <- function(
   roi_value = NULL,
   metadata = NULL,
   spatial_data = NULL,
-  compact = FALSE
+  compact = FALSE,
+  n_cells = NULL,
+  by_rows = FALSE
 ) {
+  ## `by_rows`: the section comes from cv_spatial_data_by_rows(), its cells
+  ## numbered by metadata rows and no ROIs; no cell name is made for it.
+  by_rows <- isTRUE(by_rows) && isTRUE(compact)
+  ## The number of cells, for point sizes: given by a caller that has not
+  ## read the data set's cell names, which `length(cells)` would do.
+  n_cells <- n_cells %||% length(cells)
   sd <- tryCatch(
     spatial_data %||% cv_spatial_data(crb, nm),
     error = function(e) NULL
@@ -1003,7 +1057,11 @@ cv_spatial_one <- function(
   if (is.null(metadata)) {
     metadata <- tryCatch(crb$getMetaData(), error = function(error) NULL)
   }
-  context <- spatial_roi_transform_context(co, metadata, degrees = rotation)
+  context <- if (by_rows) {
+    list(roi_by_cell = NULL, pivots = list())
+  } else {
+    spatial_roi_transform_context(co, metadata, degrees = rotation)
+  }
   rois <- unique(as.character(context$roi_by_cell))
   rois <- rois[!is.na(rois) & nzchar(rois)]
   ## A single-ROI FOV has the same default scene as Spatial's single-ROI view.
@@ -1029,16 +1087,19 @@ cv_spatial_one <- function(
   } else {
     co <- rotateSpatialCoordinates(co, rotation)
   }
-  spatial_cells <- cv_cell_ids(
-    rownames(co),
-    paste0("Spatial section `", nm, "`")
-  )
+  spatial_cells <- if (!by_rows) {
+    cv_cell_ids(rownames(co), paste0("Spatial section `", nm, "`"))
+  }
   rows <- NULL
   geometry <- NULL
   if (isTRUE(compact)) {
-    section_cells <- rownames(sd$coordinates)
-    section_rows <- cv_spatial_section_rows(nm, sd$coordinates, cells)
-    whole <- identical(spatial_cells, section_cells)
+    section_cells <- if (!by_rows) rownames(sd$coordinates)
+    section_rows <- if (by_rows) {
+      attr(sd$coordinates, "row.names")
+    } else {
+      cv_spatial_section_rows(nm, sd$coordinates, cells)
+    }
+    whole <- by_rows || identical(spatial_cells, section_cells)
     rows <- if (whole) {
       section_rows
     } else {
@@ -1083,7 +1144,7 @@ cv_spatial_one <- function(
     opts,
     dataset_name,
     nm,
-    n_cells = length(cells)
+    n_cells = n_cells
   )
   roi_appearance <- spatialRoiSetting(opts, dataset_name, nm, roi_value)
   if (!is.null(roi_appearance)) {
@@ -1101,7 +1162,7 @@ cv_spatial_one <- function(
     opts,
     dataset_name,
     "spatial",
-    n_cells = length(cells)
+    n_cells = n_cells
   )
   for (embedded_index in seq_along(embedded)) {
     entry <- embedded[[embedded_index]]
@@ -1259,7 +1320,13 @@ cv_spatial_one <- function(
 ## travels in `$samples` so Linked views can switch between them client-side (the
 ## "Spatial data" picker), each donor's tissue section being its own coordinate
 ## system + image. Returns the space or NULL when there is no spatial.
-cv_build_spatial <- function(crb, cells, metadata = NULL, compact = FALSE) {
+cv_build_spatial <- function(
+  crb,
+  cells,
+  metadata = NULL,
+  compact = FALSE,
+  n_cells = NULL
+) {
   sp_names <- tryCatch(crb$availableSpatial(), error = function(e) NULL)
   if (!length(sp_names)) {
     return(NULL)
@@ -1268,7 +1335,12 @@ cv_build_spatial <- function(crb, cells, metadata = NULL, compact = FALSE) {
     tryCatch(crb$getMetaData(), error = function(error) NULL)
   built <- list()
   for (nm in sp_names) {
-    sd <- tryCatch(cv_spatial_data(crb, nm), error = function(error) NULL)
+    sd <- if (isTRUE(compact)) {
+      cv_spatial_data_by_rows(crb, nm, metadata)
+    }
+    by_rows <- !is.null(sd)
+    sd <- sd %||%
+      tryCatch(cv_spatial_data(crb, nm), error = function(error) NULL)
     if (is.null(sd)) {
       next
     }
@@ -1279,17 +1351,23 @@ cv_build_spatial <- function(crb, cells, metadata = NULL, compact = FALSE) {
       TRUE,
       metadata = metadata,
       spatial_data = sd,
-      compact = compact
+      compact = compact,
+      n_cells = n_cells,
+      by_rows = by_rows
     )
     if (is.null(scene)) {
       next
     }
     built[[length(built) + 1L]] <- scene
-    rois <- spatial_metadata_facet(
-      metadata,
-      rownames(sd$coordinates),
-      spatial_roi_fields
-    )$values
+    rois <- if (by_rows) {
+      character()
+    } else {
+      spatial_metadata_facet(
+        metadata,
+        rownames(sd$coordinates),
+        spatial_roi_fields
+      )$values
+    }
     if (length(rois) > 1L) {
       for (roi in rois) {
         scene <- cv_spatial_one(
@@ -1300,7 +1378,8 @@ cv_build_spatial <- function(crb, cells, metadata = NULL, compact = FALSE) {
           roi,
           metadata,
           sd,
-          compact = compact
+          compact = compact,
+          n_cells = n_cells
         )
         if (is.null(scene)) {
           next
@@ -2289,7 +2368,8 @@ cv_build_compact_supplement <- function(
     crb,
     cells = cells(),
     metadata = first_frame$meta_data,
-    compact = TRUE
+    compact = TRUE,
+    n_cells = primary$n
   )
   if (!is.null(spatial)) {
     spaces[[length(spaces) + 1L]] <- spatial

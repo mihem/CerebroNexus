@@ -78,7 +78,10 @@
   are read after the sections are drawn, and a section's ROI context reads
   its rows as they are when it holds all of them. On the Allen atlas Linked
   views has its sections after 2.4 s instead of 4.1 s and is ready after
-  6.7 s instead of 8.1 s.
+  6.7 s instead of 8.1 s. The sections of a data set without ROIs are built
+  from the rows the Viewer Pack stores, without reading the 3.9 million cell
+  names: opened right after loading, Linked views is ready after 7 s instead
+  of 15 s.
 - **Colour management opens faster with many groups.** The colour pickers
   of a column's groups are written at once instead of one by one: with the
   1,640 groups of the Allen atlas the page opens in 1.0 to 1.8 s instead of
