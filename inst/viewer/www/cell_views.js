@@ -1421,6 +1421,45 @@
   function offStrip(p) {
     return !!(p.pane && p.pane.classList.contains('cv-strip-off'));
   }
+  // A panel that is not on stage is neither sized nor drawn: one off the
+  // enlarged view's strip, or, in a grid of OFFSTAGE_MIN_PANELS panels or
+  // more, one more than a window above or below the window. It is sized and
+  // drawn when it comes near (the strip placing it, or drawNearPanels() as the
+  // page scrolls). Opening the 59 sections of the Allen atlas then draws the
+  // dozen the window shows. Without a layout (hidden tab, no geometry) every
+  // panel counts as on stage.
+  var OFFSTAGE_MIN_PANELS = 8, stagePanels = 0;
+  function offStage(p) {
+    if (offStrip(p)) return true;
+    if (focusPanel || stagePanels < OFFSTAGE_MIN_PANELS || !p.pane ||
+        typeof p.pane.getBoundingClientRect !== 'function') return false;
+    var r = p.pane.getBoundingClientRect(), h = window.innerHeight || 0;
+    if (!(r.width > 0) || !(h > 0)) return false;
+    return r.bottom < -h || r.top > 2 * h;
+  }
+  var stageFrame = 0;
+  function onStageScroll() {
+    if (stageFrame || typeof window.requestAnimationFrame !== 'function') return;
+    stageFrame = window.requestAnimationFrame(function () {
+      stageFrame = 0;
+      drawNearPanels();
+    });
+  }
+  function drawNearPanels() {
+    var waiting = panels.filter(function (p) {
+      return p.spaceId && (p._pendingSize || p._resizedUndrawn);
+    });
+    if (!waiting.length) return;
+    var off = waiting.map(offStage);
+    waiting.forEach(function (p, i) {
+      if (off[i]) return;
+      if (p._pendingSize) {
+        var size = p._pendingSize;
+        resizePanel(p, size[0], size[1]);
+      }
+      drawPanel(p);
+    });
+  }
   function resizePanel(p, width, height) {
     var dpr = window.devicePixelRatio || 1;
     p.W = width; p.H = height; p._dpr = dpr; p._resizedUndrawn = true;
@@ -3071,11 +3110,12 @@
   function drawAll() {
     if (drawAllDeferred || (awaitingSupplement && awaitingSupplement === D)) return;
     var first = null;
-    panels.forEach(function (p) {
+    // Read every panel's place before any is drawn (drawing can dirty layout).
+    var off = panels.map(function (p) { return p.spaceId ? offStage(p) : false; });
+    panels.forEach(function (p, index) {
       if (!p.spaceId) { p.cloneBase = null; return; }
-      // A thumbnail off the strip of an enlarged view is not on screen:
-      // placeFocusStrip() draws it when the strip brings it back.
-      if (offStrip(p)) { p._resizedUndrawn = true; return; }
+      // A panel not on stage is drawn when it comes near (offStage()).
+      if (off[index]) { p._resizedUndrawn = true; return; }
       var state = shownState(p);
       if (!first) first = state;
       draw(p, state.mask, state.count);
@@ -8931,6 +8971,12 @@
       ? Math.max(panelWidth, Math.floor(colW * 2 + gap - chromeX))
       : panelWidth;
     var resized = false;
+    stagePanels = k;
+    var stageOff = vis.map(function (p) { return offStage(p); });
+    if (scrollHost && !scrollHost._cvStageWired && scrollHost.addEventListener) {
+      scrollHost._cvStageWired = true;
+      scrollHost.addEventListener('scroll', onStageScroll, { passive: true });
+    }
     vis.forEach(function (p, index) {
       var primary = !!focusPanel && p.key === focusPanel;
       var extra = !focusPanel && cols > 1 && index % cols < colExtra ? 1 : 0;
@@ -8960,8 +9006,8 @@
       if (ifChanged && p.W === width && Math.abs(p.H - height) <= 2 &&
           p._dpr === (window.devicePixelRatio || 1)) return;
       resized = true;
-      // Off the strip: sized and drawn when the strip shows it.
-      if (focusPanel && offStrip(p)) {
+      // Not on stage: sized and drawn when it comes near.
+      if (stageOff[index]) {
         p._pendingSize = [width, height];
         p._resizedUndrawn = true;
         return;
@@ -8969,7 +9015,9 @@
       resizePanel(p, width, height);
     });
     // A panel resized while drawing was deferred is blank: draw it now.
-    if (ifChanged && !resized && !vis.some(function (p) { return p._resizedUndrawn; })) {
+    if (ifChanged && !resized && !vis.some(function (p, index) {
+      return p._resizedUndrawn && !stageOff[index];
+    })) {
       // Nothing was redrawn, so this check does not use up a layout pass.
       _layoutKey = passKey; _layoutPass = pass; _layoutHeader = passHeader;
       return false;
@@ -8978,6 +9026,9 @@
     // Visibility of focus affordances depends on how many linked lenses remain.
     updateFocusButtons();
     drawAll();
+    // The panels were told apart before the layout settled: draw, next frame,
+    // those that turn out to be near.
+    onStageScroll();
     if ((sel && sel.size) || (pick != null && nicheSet)) renderSelbar();
     anchorComposition(singleActive);
     // Layout advice uses canvas CSS dimensions, never the spread of the cells.
