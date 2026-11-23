@@ -1971,36 +1971,27 @@
     if (!pointSizeEdited && sp && sp.builder_point_size != null) {
       size = Math.max(1, Math.min(20, Number(sp.builder_point_size)));
     }
-    // The default size (nothing configured it, no slider moved it) in the
-    // panels of a grid of sections follows how densely the section's cells
-    // sit in its panel.
-    if (size === DEFAULT_POINT_SIZE && sp &&
-        (sp._gridSection != null || (!singleActive && isSpatialSpace(sp))) &&
+    // The size the Pack's builder recommended for the section, in a panel of
+    // HINT_PANEL pixels, when nothing set one (no hint) and no slider moved it:
+    // scaled with the plot area of the panel it is drawn in, so an enlarged
+    // panel grows it back and a small one shrinks it.
+    if (size === DEFAULT_POINT_SIZE && sp && sp._pointSizeHint != null &&
         !(pointSizeUserContext &&
           sameDatasetContext(pointSizeUserContext, currentDatasetContext()))) {
-      return densityPointSize(p, sp);
+      return hintedPointSize(p, sp);
     }
     return size;
   }
-  // About the spacing of the points on screen: the area of the tissue in the
-  // panel (the panel's plot area times the share of the unit box its cells
-  // occupy) over the number of cells, as a side. Never above the default
-  // size, so sparse data keeps it and dense data (66,000 cells in a small
-  // panel) shrinks to a point or two; enlarging the panel grows it back.
-  var DENSITY_POINT_FACTOR = 1.3;
-  function densityPointSize(p, sp) {
-    var u = sp._unit;
-    var n = sp._cells ? sp._cells.length : (D ? D.n : 0);
-    if (!u || !u.occ || !(p._SX > 0) || !(p._SY > 0) || !(n > 0)) return DEFAULT_POINT_SIZE;
-    if (u._occShare == null) {
-      var filled = 0;
-      for (var i = 0; i < u.occ.length; i++) if (u.occ[i]) filled++;
-      // A unit not normalised yet has an empty lattice: half the box.
-      u._occShare = filled ? filled / u.occ.length : 0.5;
-    }
-    var side = Math.sqrt(p._SX * p._SY * u._occShare / n);
-    var size = Math.round(DENSITY_POINT_FACTOR * side * 10) / 10;
-    return Math.max(1, Math.min(DEFAULT_POINT_SIZE, size));
+  // The reference panel of the hint (.viewerPackSpatialPointSize() in R): 300 x
+  // 250 pixels less 20 of padding, the section fitted into it by its aspect.
+  var HINT_PANEL_W = 280, HINT_PANEL_H = 230;
+  function hintedPointSize(p, sp) {
+    var u = sp._unit, aspect = u && Number(u.aspect);
+    if (!(aspect > 0) || !(p._SX > 0) || !(p._SY > 0)) return Number(sp._pointSizeHint);
+    var refW = HINT_PANEL_W / HINT_PANEL_H > aspect ? HINT_PANEL_H * aspect : HINT_PANEL_W;
+    var refH = HINT_PANEL_W / HINT_PANEL_H > aspect ? HINT_PANEL_H : HINT_PANEL_W / aspect;
+    var size = Number(sp._pointSizeHint) * Math.sqrt((p._SX * p._SY) / (refW * refH));
+    return Math.max(1, Math.min(DEFAULT_POINT_SIZE, Math.round(size * 10) / 10));
   }
   function pointOpacityOf(p) {
     var sp = spaceById[p.spaceId];
@@ -7966,6 +7957,7 @@
       y_range: spatialTemplate.y_range,
       builder_point_opacity: spatialTemplate.builder_point_opacity,
       builder_point_size: spatialTemplate.builder_point_size,
+      point_size_hint: spatialTemplate.point_size_hint,
       builder_percentage_cells: spatialTemplate.builder_percentage_cells,
       images: spatialTemplate.images || []
     }];
@@ -7994,6 +7986,7 @@
         yRange: sample.y_range || null,
         builder_point_opacity: sample.builder_point_opacity,
         builder_point_size: sample.builder_point_size,
+        _pointSizeHint: sample.point_size_hint,
         builder_percentage_cells: sample.builder_percentage_cells,
         images: images,
         _sampleName: sample.name,
@@ -11581,6 +11574,7 @@
         space._preserveAspect = !!panel.preserve_aspect;
       }
       space.builder_point_size = panel.builder_point_size;
+      space._pointSizeHint = panel.point_size_hint;
       space.builder_point_opacity = panel.builder_point_opacity;
       space.xRange = panel.x_range;
       space.yRange = panel.y_range;

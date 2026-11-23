@@ -625,6 +625,19 @@ viewerPackSpatialFrame <- function(pack, name) {
   if (!isTRUE(valid)) NULL else frame
 }
 
+## The point size the Pack's builder recommended for a section in a panel of
+## 300 x 250 pixels (.viewerPackSpatialPointSize() in R/viewer_pack.R), or NULL:
+## an older Pack has none.
+viewerPackSpatialPointSize <- function(pack, name) {
+  frame <- viewerPackSpatialFrame(pack, name)
+  size <- suppressWarnings(as.numeric(frame$point_size))
+  if (length(size) == 1L && is.finite(size) && size >= 1 && size <= 20) {
+    size
+  } else {
+    NULL
+  }
+}
+
 viewerPackGroupMetric <- function(pack, group, metric) {
   if (is.null(pack) || !is.list(pack)) {
     return(NULL)

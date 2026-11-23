@@ -1340,6 +1340,16 @@ cv_spatial_one <- function(
       spatial_defaults$point_opacity,
     builder_point_size = section_appearance$point_size %||%
       spatial_defaults$point_size,
+    ## The size the Pack's builder recommends for the whole section, when
+    ## nobody set one: the browser scales it to the panel.
+    point_size_hint = if (
+      is.null(section_appearance$point_size) && !nzchar(roi_value)
+    ) {
+      viewerPackSpatialPointSize(
+        attr(crb, "cerebro_viewer_pack", exact = TRUE),
+        nm
+      )
+    },
     builder_percentage_cells = spatial_defaults$percentage_cells_to_show,
     ## The picker list; the first entry is the default background.
     images = images
@@ -1435,6 +1445,7 @@ cv_build_spatial <- function(crb, cells, metadata = NULL, compact = FALSE) {
   }
   space$builder_point_opacity <- first$builder_point_opacity
   space$builder_point_size <- first$builder_point_size
+  space$point_size_hint <- first$point_size_hint
   space$builder_percentage_cells <- first$builder_percentage_cells
   ## Only when there is no `samples` list to hold them: with one, the space's
   ## default section IS samples[[1]] and repeating its images here would send
@@ -1456,6 +1467,7 @@ cv_build_spatial <- function(crb, cells, metadata = NULL, compact = FALSE) {
         y_range = if (is.null(s$y_range)) NULL else I(s$y_range),
         builder_point_opacity = s$builder_point_opacity,
         builder_point_size = s$builder_point_size,
+        point_size_hint = s$point_size_hint,
         builder_percentage_cells = s$builder_percentage_cells,
         images = I(s$images)
       )

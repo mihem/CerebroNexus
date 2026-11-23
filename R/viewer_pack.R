@@ -594,6 +594,46 @@
   list(indexes = indexes, frames = frame_table, assets = assets)
 }
 
+## The point size (in CSS pixels) that suits a section's cells in a panel of
+## `panel` pixels, written to the Pack when it is built: about the spacing of
+## the points on screen (the tissue's area in the panel, its plot area times
+## the share of the section's bounding box its cells occupy, over the number of
+## cells, as a side), times 1.3, from 1 to 4. The Viewer scales it to the
+## panels it draws and lets any size an author or a reader sets win. NA for a
+## section without usable coordinates.
+.viewerPackSpatialPointSize <- function(
+  coordinates,
+  panel = c(300, 250),
+  padding = 20,
+  lattice = 64L
+) {
+  x <- suppressWarnings(as.numeric(coordinates[, 1L]))
+  y <- suppressWarnings(as.numeric(coordinates[, 2L]))
+  keep <- is.finite(x) & is.finite(y)
+  x <- x[keep]
+  y <- y[keep]
+  if (!length(x)) {
+    return(NA_real_)
+  }
+  width <- diff(range(x))
+  height <- diff(range(y))
+  if (!(width > 0) || !(height > 0)) {
+    return(NA_real_)
+  }
+  available <- panel - padding
+  scale <- min(available[[1L]] / width, available[[2L]] / height)
+  area <- (width * scale) * (height * scale)
+  cell <- function(v, low, span) {
+    pmin(lattice - 1L, floor((v - low) / span * lattice))
+  }
+  share <- length(unique(
+    cell(x, min(x), width) * lattice + cell(y, min(y), height)
+  )) /
+    lattice^2
+  size <- 1.3 * sqrt(area * share / length(x))
+  max(1, min(4, round(size, 1L)))
+}
+
 .viewerPackSpatialAssets <- function(object, cells, stage) {
   spatial_names <- object$availableSpatial()
   getter <- object$getSpatialData
@@ -647,6 +687,7 @@
       cells = nrow(coordinate_matrix),
       dimensions = ncol(coordinate_matrix),
       geometry_path = geometry_path,
+      point_size = .viewerPackSpatialPointSize(coordinate_matrix),
       stringsAsFactors = FALSE
     )
   }
@@ -658,6 +699,7 @@
       cells = integer(),
       dimensions = integer(),
       geometry_path = character(),
+      point_size = numeric(),
       stringsAsFactors = FALSE
     )
   }

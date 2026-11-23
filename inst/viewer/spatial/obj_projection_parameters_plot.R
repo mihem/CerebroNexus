@@ -555,6 +555,7 @@ spatial_projection_parameters_plot_current <- reactive({
   ## picker: its first until the picker has bound, then what the picker holds.
   ## The frame itself carries no image.
   grid_backgrounds <- list()
+  grid_point_size_hints <- list()
   if (grid) {
     options <- if (exists("Cerebro.options")) Cerebro.options else NULL
     picks <- spatial_grid_background_picks(
@@ -581,6 +582,20 @@ spatial_projection_parameters_plot_current <- reactive({
     grid_backgrounds <- grid_backgrounds[
       !vapply(grid_backgrounds, is.null, logical(1))
     ]
+    ## The size the Pack's builder recommends, for the sections nothing sets a
+    ## size for (a Builder setting for the section wins).
+    grid_point_size_hints <- stats::setNames(
+      lapply(grid_sections, function(section) {
+        if (!is.null(spatialPointAppearance(options, dataset, section))) {
+          return(NULL)
+        }
+        tryCatch(
+          viewerPackSpatialPointSize(viewerPackCurrent(), section),
+          error = function(error) NULL
+        )
+      }),
+      grid_sections
+    )
     background_image <- "none"
     background_descriptor <- NULL
     configured_background_images <- list()
@@ -607,6 +622,7 @@ spatial_projection_parameters_plot_current <- reactive({
     grid_sections = grid_sections,
     grid_projection = controls$grid_projection %||% "",
     grid_backgrounds = grid_backgrounds,
+    grid_point_size_hints = grid_point_size_hints,
     n_dimensions = n_dimensions,
     color_variable = color_variable,
     plot_type = plot_type,

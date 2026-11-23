@@ -1829,10 +1829,14 @@ spatial_panel_background <- function(configured, coordinates, cerebro_root) {
 
 ## One panel per section, drawing its slice of the frame. `backgrounds` is
 ## named by section; a section without one has no image fields.
+## `point_size_hints`: section -> the size the Pack's builder recommends for it
+## (viewerPackSpatialPointSize()), for the sections nothing set a size for; the
+## browser scales it to the panel.
 spatial_grid_panels <- function(
   layout,
   backgrounds = list(),
-  cerebro_root = NULL
+  cerebro_root = NULL,
+  point_size_hints = list()
 ) {
   lapply(seq_along(layout$sections), function(i) {
     section <- layout$sections[[i]]
@@ -1852,7 +1856,8 @@ spatial_grid_panels <- function(
         spatial = TRUE,
         preserve_aspect = TRUE,
         x_range = layout$x_ranges[[i]],
-        y_range = layout$y_ranges[[i]]
+        y_range = layout$y_ranges[[i]],
+        point_size_hint = point_size_hints[[section]]
       ),
       if (!is.null(layout$geometry[[i]])) {
         list(geometry_resource = layout$geometry[[i]])

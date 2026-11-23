@@ -314,7 +314,8 @@ spatial_projection_update_plot <- function(input) {
             Cerebro.options[["cerebro_root"]]
           } else {
             NULL
-          }
+          },
+          plot_parameters[["grid_point_size_hints"]] %||% list()
         )
       )
     }
@@ -413,7 +414,8 @@ spatial_projection_update_plot <- function(input) {
           Cerebro.options[["cerebro_root"]]
         } else {
           NULL
-        }
+        },
+        plot_parameters[["grid_point_size_hints"]] %||% list()
       )
     )
     ## Slices index the frame's rows, so x, y and keys are flat in frame order

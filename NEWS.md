@@ -21,14 +21,18 @@
   *Outline points on dark pictures* in the settings of Spatial and Linked
   views, and in the Builder's Spatial display settings, turns it off.
 - **Points start at size 4, smaller where cells crowd.** The Viewer,
-  `launchCerebro()`, `createShinyApp()` and the Builder default to 4. In the
-  panels of the Spatial grid and of Linked views' sections the default is the
-  spacing of the points on screen (the tissue's area in the panel over its
-  number of cells), never above 4: 66,000 cells in a small panel get 1 to 1.5,
-  a sparse section keeps 3 to 4, and an enlarged panel grows back. The
-  fixed rules are gone: size 1 above 100,000 cells (and its option
+  `launchCerebro()`, `createShinyApp()` and the Builder default to 4. The
+  Viewer Pack, written with the CRB (so by the Builder and `saveCerebro()`),
+  records for every section the size that suits its cells in a small panel:
+  the spacing of the points on screen, from the tissue's area over its number
+  of cells, from 1 to 4. The grid and Linked views scale that size with the
+  panel they draw it in, so 66,000 cells in a small panel get 1 to 1.5, a
+  sparse section keeps 3 to 4, and an enlarged panel grows back. The Viewer
+  itself decides nothing about the data: a Pack written before has no size
+  (4), and a size an author or a reader sets is used as it is. The fixed rules
+  are gone: size 1 above 100,000 cells (and its option
   `large_data_point_size_cells`), and smaller, lighter points in small grid
-  panels. The sliders and the author's settings still set any size.
+  panels.
 - **Enlarge reads like a photo viewer.** In Linked views, the Spatial grid and
   Gene expression's separate panels, Enlarge shows one panel large and the
   others as a strip of thumbnails beside or below it, scrolled by its arrows
