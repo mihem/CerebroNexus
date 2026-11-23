@@ -2530,15 +2530,11 @@ server <- function(input, output, session) {
     ## A dataset opened in this session (an upload, another CRB) starts its
     ## cell-name file here; launch datasets started theirs at start-up.
     viewerCellNamesFile(viewerPackCurrent())
-    ## Sections of hundreds of thousands of cells: Linked views and the
-    ## Spatial grid name every cell of every section; read the names while
-    ## the session is idle.
-    if (
-      isTRUE(identity$cell_count >= 2e5) &&
-        length(isolate(availableSpatial())) > 1L
-    ) {
-      viewerCellNamesWarm(viewerPackCurrent())
-    }
+    ## The names are no longer read ahead while the session is idle: Linked
+    ## views and the Spatial grid work with canonical rows, and a table, a
+    ## hover or a click names its own cells from the names file. Reading all
+    ## 3.9 million of them took the R process about 4 s that every page
+    ## opened in the first seconds had to wait for.
     loaded_context <- viewer_loaded_dataset_context()
     dataset_identity <- list(
       dataset_context = loaded_context,
