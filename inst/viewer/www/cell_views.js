@@ -7565,13 +7565,15 @@
     }
   }
 
-  // A picture that is ready paints the panels showing its space, in the next
-  // frame, together with the pictures that arrive meanwhile. Drawing every
-  // panel for every picture was 52 x 52 draws for the 52 sections of a
-  // Kukanja data set in Linked views.
+  // In a grid of many panels a picture that is ready paints the panels showing
+  // its space, in the next frame, together with the pictures that arrive
+  // meanwhile. Drawing every panel for every picture was 52 x 52 draws for the
+  // 52 sections of a Kukanja data set in Linked views.
   var imageRedraw = null;
   function redrawForImage(space) {
-    if (typeof window.requestAnimationFrame !== 'function') { drawAll(); return; }
+    // Few panels: draw them all at once, as before.
+    if (stagePanels < OFFSTAGE_MIN_PANELS ||
+        typeof window.requestAnimationFrame !== 'function') { drawAll(); return; }
     if (!imageRedraw) {
       imageRedraw = [];
       window.requestAnimationFrame(function () {
