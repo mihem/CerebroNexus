@@ -1416,9 +1416,14 @@
   }
   // Size one panel to the rectangle assigned by resizeAll. Below 420px it is
   // narrow, which shrinks the minimap.
+  // A pane the enlarged view's strip does not show (display: none).
+  function offStrip(p) {
+    return !!(p.pane && p.pane.classList.contains('cv-strip-off'));
+  }
   function resizePanel(p, width, height) {
     var dpr = window.devicePixelRatio || 1;
     p.W = width; p.H = height; p._dpr = dpr; p._resizedUndrawn = true;
+    p._pendingSize = null;
     resizePanelLayers(p, width, height, dpr);
     if (p.pane) {
       p.pane.classList.toggle('cv-narrow', width < 420);
@@ -3041,6 +3046,9 @@
     var first = null;
     panels.forEach(function (p) {
       if (!p.spaceId) { p.cloneBase = null; return; }
+      // A thumbnail off the strip of an enlarged view is not on screen:
+      // placeFocusStrip() draws it when the strip brings it back.
+      if (offStrip(p)) { p._resizedUndrawn = true; return; }
       var state = shownState(p);
       if (!first) first = state;
       draw(p, state.mask, state.count);
@@ -7495,6 +7503,25 @@
     }
   }
 
+  // A picture that is ready paints the panels showing its space, in the next
+  // frame, together with the pictures that arrive meanwhile. Drawing every
+  // panel for every picture was 52 x 52 draws for the 52 sections of a
+  // Kukanja data set in Linked views.
+  var imageRedraw = null;
+  function redrawForImage(space) {
+    if (typeof window.requestAnimationFrame !== 'function') { drawAll(); return; }
+    if (!imageRedraw) {
+      imageRedraw = [];
+      window.requestAnimationFrame(function () {
+        var spaces = imageRedraw;
+        imageRedraw = null;
+        panels.forEach(function (p) {
+          if (p.spaceId && spaces.indexOf(spaceById[p.spaceId]) >= 0) drawPanel(p);
+        });
+      });
+    }
+    if (imageRedraw.indexOf(space) < 0) imageRedraw.push(space);
+  }
   function loadSpaceImage(space) {
     if (!space) return;
     space._imgEl = null; space._imgReady = false;
@@ -7545,7 +7572,7 @@
       decodedImages.delete(cacheKey);
       decodedImages.set(cacheKey, cached);
       space._imgEl = cached;
-      space._imgReady = true; drawAll();
+      space._imgReady = true; redrawForImage(space);
       viewOperation(feedbackId, feedbackId === 'linked' && !linkedBackgroundsOn
         ? 'Background images hidden' : 'Background loaded: ' + (space.label || space.id));
       return;
@@ -7554,7 +7581,7 @@
     im.onload = function () {
       if (cacheKey) rememberDecodedImage(cacheKey, im);
       if (!stillCurrent()) return;
-      space._imgReady = true; drawAll();
+      space._imgReady = true; redrawForImage(space);
       viewOperation(feedbackId, feedbackId === 'linked' && !linkedBackgroundsOn
         ? 'Background images hidden' : 'Background loaded: ' + (space.label || space.id));
     };
@@ -8618,7 +8645,12 @@
       p.pane.style.clipPath = !head && !tail ? ''
         : left ? 'inset(' + head + 'px 0 ' + tail + 'px 0)'
           : 'inset(0 ' + tail + 'px 0 ' + head + 'px)';
-      // A thumbnail hidden while its plot was last drawn shows it now.
+      // A thumbnail hidden while its plot was last drawn shows it now, at the
+      // size the layout gave it meanwhile.
+      if (wasOff && p._pendingSize) {
+        var pending = p._pendingSize;
+        resizePanel(p, pending[0], pending[1]);
+      }
       if (wasOff && p._resizedUndrawn) drawPanel(p);
     });
     var arrows = focusStripArrows;
@@ -8906,6 +8938,12 @@
       if (ifChanged && p.W === width && Math.abs(p.H - height) <= 2 &&
           p._dpr === (window.devicePixelRatio || 1)) return;
       resized = true;
+      // Off the strip: sized and drawn when the strip shows it.
+      if (focusPanel && offStrip(p)) {
+        p._pendingSize = [width, height];
+        p._resizedUndrawn = true;
+        return;
+      }
       resizePanel(p, width, height);
     });
     // A panel resized while drawing was deferred is blank: draw it now.

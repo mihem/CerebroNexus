@@ -1176,7 +1176,17 @@ observeEvent(
       ),
       !is.null(assets[[key]])
     )
-    uri <- cv_asset_data_uri(assets[[key]])
+    ## A picture kept in a file goes to the browser as the Viewer's image URL
+    ## (fetched over HTTP, cached by its MD5), not as a base64 string through
+    ## the websocket: 1.3 MB of JSON per Kukanja DAPI picture, 52 of them for
+    ## Linked views.
+    uri <- if (is.list(assets[[key]])) {
+      tryCatch(
+        viewerPrivateImageUrl(assets[[key]]$path, session),
+        error = function(error) NULL
+      )
+    }
+    uri <- uri %||% cv_asset_data_uri(assets[[key]])
     req(!is.null(uri))
     if (!is.character(assets[[key]])) {
       assets[[key]] <- uri

@@ -86,6 +86,13 @@
   of a column's groups are written at once instead of one by one: with the
   1,640 groups of the Allen atlas the page opens in 1.0 to 1.8 s instead of
   3.5 to 4.1 s.
+- **Enlarge and background pictures stall less.** Thumbnails off the strip
+  of an enlarged view are sized and drawn when the strip brings them in, so
+  Enlarge on the 59 Allen sections stalls the page for about 60 ms instead
+  of 130 to 180 ms. A background picture that arrives redraws only its own
+  panels, and Linked views fetches the pictures kept in files over HTTP, not
+  as base64 through the websocket: the 52 Kukanja EAE pictures cost 0.13 s of
+  script instead of 1.7 s of long frames.
 - **The GPU draws the highest expression on top.** With WebGPU, a view
   coloured by a gene keeps its points in cell order and hands the renderer
   the paint order as a list of indices, so a new gene rebuilds colours and
