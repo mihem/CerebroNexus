@@ -848,9 +848,15 @@ test_that("the author's Spatial layout is a display setting, grid only with sect
   expect_identical(
     spatial_default_layout(
       viewerPageDisplayDefaults(
-        list(viewer_content = list(x = list(display = list(
-          spatial_layout = "single"
-        )))),
+        list(
+          viewer_content = list(
+            x = list(
+              display = list(
+                spatial_layout = "single"
+              )
+            )
+          )
+        ),
         "x",
         "spatial"
       ),

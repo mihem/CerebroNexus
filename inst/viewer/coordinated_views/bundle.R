@@ -1019,7 +1019,11 @@ cv_roi_context_by_rows <- function(coordinates, metadata, degrees) {
   roi <- cv_roi_by_rows(coordinates, metadata)
   list(
     roi_by_cell = roi,
-    pivots = if (is.null(roi)) list() else spatialRoiPivots(coordinates, roi, degrees)
+    pivots = if (is.null(roi)) {
+      list()
+    } else {
+      spatialRoiPivots(coordinates, roi, degrees)
+    }
   )
 }
 cv_roi_values_by_rows <- function(metadata, coordinates) {
@@ -1108,7 +1112,11 @@ cv_spatial_one <- function(
     co <- rotateSpatialCoordinatesByRoi(
       co,
       as.character(
-        if (by_rows) context$roi_by_cell[keep] else context$roi_by_cell[rownames(co)]
+        if (by_rows) {
+          context$roi_by_cell[keep]
+        } else {
+          context$roi_by_cell[rownames(co)]
+        }
       ),
       spatialRoiSettings(opts, dataset_name, nm),
       rotation,
@@ -1130,7 +1138,9 @@ cv_spatial_one <- function(
     } else {
       cv_spatial_section_rows(nm, sd$coordinates, cells)
     }
-    whole <- if (by_rows) is.null(kept) || all(kept) else {
+    whole <- if (by_rows) {
+      is.null(kept) || all(kept)
+    } else {
       identical(spatial_cells, section_cells)
     }
     rows <- if (by_rows) {

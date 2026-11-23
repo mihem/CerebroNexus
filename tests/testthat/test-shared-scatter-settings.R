@@ -37,13 +37,21 @@ test_that("the number of cells does not change the size a page starts with", {
     expected <- if (is.null(page)) 3 else 7
     for (n_cells in list(NULL, 5e4, 1e5, 4e6)) {
       expect_identical(
-        env$viewerScatterDefaults(options, "a", page, n_cells = n_cells)$point_size,
+        env$viewerScatterDefaults(
+          options,
+          "a",
+          page,
+          n_cells = n_cells
+        )$point_size,
         expected
       )
     }
   }
   ## Without an author's size: 4, whatever the data set.
-  expect_identical(env$viewerScatterDefaults(list(), "a", n_cells = 4e6)$point_size, 4)
+  expect_identical(
+    env$viewerScatterDefaults(list(), "a", n_cells = 4e6)$point_size,
+    4
+  )
   ## A section's own Builder appearance is used as saved.
   section <- list(
     viewer_content = list(

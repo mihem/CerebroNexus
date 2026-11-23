@@ -562,7 +562,9 @@ spatial_projection_parameters_plot_current <- reactive({
       input[["spatial_projection_grid_background_images"]],
       availableSpatial()
     )
-    unpicked <- if (spatial_input_bound("spatial_projection_grid_background_images")) {
+    unpicked <- if (
+      spatial_input_bound("spatial_projection_grid_background_images")
+    ) {
       0L
     }
     grid_backgrounds <- stats::setNames(
