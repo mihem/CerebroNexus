@@ -2052,7 +2052,8 @@
       selection: sel,
       niche: nicheSet,
       opacity: pointOpacityOf(p),
-      clip: colorClip
+      clip: colorClip,
+      renderer: p.gpu
     };
   }
 
@@ -2301,6 +2302,28 @@
     return seq;
   }
 
+  // A paint order the GPU can follow: the panel's points then stay in cell
+  // order (built in one pass over its cells, colour-only changes keep them)
+  // and the renderer draws them through gpuDrawOrder(). Without it, the
+  // points themselves are laid out in paint order.
+  function gpuPaintOrder(p, order, count) {
+    return order && count > 0 && p.gpu && p.gpu.drawsInOrder &&
+      p.gpu.drawsInOrder(count) ? order : null;
+  }
+  // The points of a panel in paint order: drawOrder[k] is the vertex drawn
+  // k-th. vertexIndex maps a slot (a position in `cells`, else a cell) to
+  // its vertex + 1, 0 for a cell not drawn.
+  function gpuDrawOrder(order, cells, vertexIndex, count) {
+    if (!cells && count === order.length) return order;
+    var seq = cells ? panelPaintSequence(cells, order) : order;
+    var drawOrder = new Uint32Array(count), k = 0, vertex;
+    for (var r = 0; r < seq.length; r++) {
+      vertex = vertexIndex[seq[r]];
+      if (vertex > 0) drawOrder[k++] = vertex - 1;
+    }
+    return drawOrder;
+  }
+
   function updateGpuSelection(p, state, hiSet) {
     var previous = p.gpuData, oldState = p.gpuDataState;
     if (!previous || !oldState || !previous.opaque || !previous.vertexIndex ||
@@ -2325,7 +2348,7 @@
     p.gpuData = {positions: previous.positions, colors: colors, layers: layers,
       count: previous.count, foreground: foreground, opaque: true,
       vertexIndex: previous.vertexIndex, vertexCells: previous.vertexCells,
-      ordered: previous.ordered};
+      ordered: previous.ordered, drawOrder: previous.drawOrder};
     return p.gpuData;
   }
 
@@ -2337,8 +2360,10 @@
     'fieldConstantColor', 'groupValues', 'groupColors', 'clip', 'opacity', 'selection', 'niche'];
   function updateGpuColors(p, state, hiSet, shownMask) {
     var previous = p.gpuData, oldState = p.gpuDataState, unit = state.unit;
+    var order = previous && paintOrder(p);
     if (!previous || !oldState || !previous.vertexIndex || previous.ordered ||
-        !unit || unit._pending || panelColorMode(p) === RGB_MODE || paintOrder(p) ||
+        !unit || unit._pending || panelColorMode(p) === RGB_MODE ||
+        (order && !gpuPaintOrder(p, order, previous.count)) ||
         Object.keys(state).some(function (key) {
           return GPU_COLOUR_KEYS.indexOf(key) < 0 && state[key] !== oldState[key];
         })) return null;
@@ -2399,7 +2424,10 @@
     p.gpuDataState = state;
     p.gpuData = {positions: previous.positions, colors: colors, layers: layers,
       count: previous.count, foreground: foreground, opaque: opaque,
-      vertexIndex: vertexIndex, vertexCells: cells, ordered: false};
+      vertexIndex: vertexIndex, vertexCells: cells, ordered: false,
+      drawOrder: order ? (previous.drawOrder && previous.drawOrderOf === order
+        ? previous.drawOrder : gpuDrawOrder(order, cells, vertexIndex, previous.count)) : null,
+      drawOrderOf: order || null};
     return p.gpuData;
   }
 
@@ -2413,6 +2441,8 @@
     var colourData = updateGpuColors(p, state, hiSet, shownMask);
     if (colourData) return colourData;
     var unit = state.unit, order = paintOrder(p), n = D.n;
+    var gpuOrder = rgb ? null : gpuPaintOrder(p, order, shownCount);
+    if (gpuOrder) order = null;
     var shared = window.CerebroSharedDatasetState;
     var sharedName = null;
     var currentSpace = spaceById[p.spaceId];
@@ -2647,7 +2677,9 @@
       vertexIndex: vertexIndex,
       vertexCells: cells,
       foreground: foreground,
-      ordered: !!order
+      ordered: !!order,
+      drawOrder: gpuOrder && out ? gpuDrawOrder(gpuOrder, cells, vertexIndex, out) : null,
+      drawOrderOf: gpuOrder && out ? gpuOrder : null
     };
     return p.gpuData;
   }

@@ -806,6 +806,18 @@ window.viewerScenarios = {
     const ordered=t.uploads.at(-1),indices=[];
     for(let i=0;i<ordered.count;i++){const index=Math.round(ordered.positions[i*2]*(n-1));if(index<7)indices.push(index);}
     t.equal(indices,[1,4,5,2,6,0,3],'Missing values first, followed by stable ascending values');
+    t.check(ordered.drawOrder===null,'A renderer without a draw order gets its points in paint order');
+    // A renderer that draws through an order keeps the points in cell order
+    // and is handed the same paint order as indices.
+    t.gpuOrder=true;t.resetPaint();await t.render({n,selection_key:Array.from({length:n},(_,i)=>'c'+i),x,y,color,paint_order:'highest'});
+    const viaGpu=t.uploads.at(-1),drawn=[];
+    t.check(viaGpu.drawOrder&&viaGpu.drawOrder.length===viaGpu.count,'The paint order reaches the renderer');
+    for(let j=0;j<viaGpu.count;j++)t.check(Math.round(viaGpu.positions[j*2]*(n-1))===j,'Points stay in cell order');
+    for(const vertex of viaGpu.drawOrder){const index=Math.round(viaGpu.positions[vertex*2]*(n-1));if(index<7)drawn.push(index);}
+    t.equal(drawn,[1,4,5,2,6,0,3],'The renderer draws the same order');
+    const colourOf=(upload,cell)=>{for(let j=0;j<upload.count;j++)if(Math.round(upload.positions[j*2]*(n-1))===cell)return upload.colors.slice(j*4,j*4+4);};
+    for(let cell=0;cell<7;cell++)t.equal(colourOf(viaGpu,cell),colourOf(ordered,cell),'Cell '+cell+' keeps its colour');
+    t.gpuOrder=false;
     t.failGpu=true;t.resetPaint();await t.render({n,selection_key:null,x:Float32Array.from(x,(v,i)=>i===13?NaN:v),y,color});
     t.equal(t.arcs().length,n-1,'GPU failure falls back to valid CPU points');
     return true;

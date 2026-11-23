@@ -20,8 +20,10 @@ window.viewerTest = (() => {
     let submission;
     return {ready:Promise.resolve(), failed:new Promise(()=>{}),
       isReady:()=>true, resize(){}, clear(){}, destroy(){}, idle:()=>Promise.resolve(),
+      drawsInOrder:()=>!!window.viewerTest.gpuOrder,
       setData(data) {
         const copy = {canvas, count:data.count, foreground:data.foreground, positionSource:data.positions,
+          drawOrder:data.drawOrder?Array.from(data.drawOrder.subarray(0,data.count)):null,
           positions:Array.from(data.positions.subarray(0,data.count*2)),
           colors:Array.from(data.colors.subarray(0,data.count*4)),
           layers:Array.from(data.layers.subarray(0,data.count))};
