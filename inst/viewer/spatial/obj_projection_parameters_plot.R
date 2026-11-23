@@ -539,7 +539,8 @@ spatial_projection_parameters_plot_current <- reactive({
     )
   }
   ## Each grid panel shows the picture chosen for its section in the grid's
-  ## picker, and none until one is chosen. The frame itself carries no image.
+  ## picker: its first until the picker has bound, then what the picker holds.
+  ## The frame itself carries no image.
   grid_backgrounds <- list()
   if (grid) {
     options <- if (exists("Cerebro.options")) Cerebro.options else NULL
@@ -547,6 +548,9 @@ spatial_projection_parameters_plot_current <- reactive({
       input[["spatial_projection_grid_background_images"]],
       availableSpatial()
     )
+    unpicked <- if (spatial_input_bound("spatial_projection_grid_background_images")) {
+      0L
+    }
     grid_backgrounds <- stats::setNames(
       lapply(grid_sections, function(section) {
         spatial_grid_section_background(
@@ -554,7 +558,7 @@ spatial_projection_parameters_plot_current <- reactive({
           dataset,
           section,
           spatial_grid_section_record(section),
-          pick = picks[[section]] %||% 0L
+          pick = picks[[section]] %||% unpicked
         )
       }),
       grid_sections

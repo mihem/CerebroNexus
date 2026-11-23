@@ -21,11 +21,11 @@
   each section its first picture.
 - **The grid chooses each section's picture.** With several sections shown,
   Spatial's *Background images* field lists the pictures grouped by section,
-  as the Sections field and Linked views' Colour by do. No picture is shown
-  until one is chosen; a chosen picture is a removable chip such as
-  "Br5292_151508: hires", a section shows at most one (choosing another in
-  its group replaces it), and it keeps its choice while other sections are
-  added or removed.
+  as the Sections field and Linked views' Colour by do. Every section starts
+  with its first picture, as in the single view; a chosen picture is a
+  removable chip such as "Br5292_151508: hires", a section shows at most one
+  (choosing another in its group replaces it), and it keeps its choice while
+  other sections are added or removed.
 - **An enlarged view's thumbnails only lead to their panel.** With a panel
   enlarged, a click anywhere on a thumbnail, or on the Enlarge icon at its top
   right, enlarges it; its cells no longer take hover, selection or zoom, and

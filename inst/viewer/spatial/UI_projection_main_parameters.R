@@ -672,11 +672,13 @@ outputOptions(
 )
 
 ## The grid's picture picker: the pictures grouped by section, as the Sections
-## field and Linked views' Colour by look. No picture is shown until one is
-## chosen; a section shows at most one (choosing another in its group replaces
-## it) and keeps it while other sections come and go; another data set starts
-## over. Each chosen picture is a removable chip named "section: picture".
+## field and Linked views' Colour by look. A section starts with its first
+## picture, as the single view does, and keeps what was chosen for it (or
+## removed) while other sections come and go; a section shows at most one
+## (choosing another in its group replaces it); another data set starts over.
+## Each chosen picture is a removable chip named "section: picture".
 spatial_grid_background_dataset <- reactiveVal(NULL)
+spatial_grid_background_seen <- reactiveVal(character())
 spatial_grid_background_js <- list(
   on_item_add = paste0(
     "function(value) {",
@@ -717,8 +719,16 @@ output[["spatial_projection_grid_background_UI"]] <- renderUI({
   if (!identical(isolate(spatial_grid_background_dataset()), dataset)) {
     previous <- NULL
     spatial_grid_background_dataset(dataset)
+    spatial_grid_background_seen(character())
   }
   tokens <- unlist(lapply(groups, function(group) unname(group$tokens)))
+  ## The sections new to the picker start with their first picture.
+  seen <- isolate(spatial_grid_background_seen())
+  fresh <- setdiff(names(groups), seen)
+  spatial_grid_background_seen(union(seen, names(groups)))
+  starts <- unlist(lapply(groups[fresh], function(group) {
+    unname(group$tokens)[[1L]]
+  }))
   div(
     class = "spatial-grid-background-picker",
     selectizeInput(
@@ -727,7 +737,7 @@ output[["spatial_projection_grid_background_UI"]] <- renderUI({
       choices = lapply(groups, function(group) {
         stats::setNames(unname(group$tokens), names(group$tokens))
       }),
-      selected = intersect(previous %||% character(), tokens),
+      selected = union(intersect(previous %||% character(), tokens), starts),
       multiple = TRUE,
       options = list(
         plugins = list("remove_button"),
