@@ -840,7 +840,45 @@
   // in ascending index order and the scatter is stable, so ties never need a
   // comparison; a range of one value is already in its final order.
   var RAW_ORDER_BUCKETS = 1024, RAW_ORDER_SMALL = 32, RAW_ORDER_DEPTH = 4;
+  // A Float32Array of some thousand cells or more goes through a radix sort
+  // on the float's bits instead: three stable passes of 11 bits each, ties
+  // keeping index order by construction (a pass that every key agrees on is
+  // skipped, so a mostly-zero gene costs fewer).
+  var RAW_RADIX_MIN = 4096;
+  function radixPaintOrder(raw) {
+    var n = raw.length, order = new Uint32Array(n), missing = 0, i, v;
+    for (i = 0; i < n; i++) if (raw[i] !== raw[i]) missing++;
+    var m = n - missing, rest = 0, idx = new Uint32Array(m), keys = new Uint32Array(m);
+    var bits = new Uint32Array(raw.buffer, raw.byteOffset, n), u;
+    var h0 = new Uint32Array(2048), h1 = new Uint32Array(2048), h2 = new Uint32Array(2048);
+    missing = 0;
+    for (i = 0; i < n; i++) {
+      v = raw[i];
+      if (v !== v) { order[missing++] = i; continue; }
+      // +0 and -0 are one value; a negative float sorts by its bits reversed.
+      u = v === 0 ? 0x80000000 : (bits[i] >>> 31 ? ~bits[i] : bits[i] | 0x80000000) >>> 0;
+      idx[rest] = i; keys[rest++] = u;
+      h0[u & 2047]++; h1[(u >>> 11) & 2047]++; h2[u >>> 22]++;
+    }
+    var hists = [h0, h1, h2], src = idx, srcKeys = keys;
+    var dst = new Uint32Array(m), dstKeys = new Uint32Array(m), pass, h, shift, total, j, c, k;
+    for (pass = 0; pass < 3; pass++) {
+      h = hists[pass]; shift = pass * 11;
+      if (m === 0 || h[(srcKeys[0] >>> shift) & 2047] === m) continue;  // nothing moves
+      for (j = 0, total = 0; j < 2048; j++) { c = h[j]; h[j] = total; total += c; }
+      for (j = 0; j < m; j++) {
+        k = (srcKeys[j] >>> shift) & 2047;
+        dst[h[k]] = src[j]; dstKeys[h[k]++] = srcKeys[j];
+      }
+      v = src; src = dst; dst = v; v = srcKeys; srcKeys = dstKeys; dstKeys = v;
+    }
+    order.set(src, missing);
+    return order;
+  }
   function rawPaintOrder(raw) {
+    if (raw instanceof Float32Array && raw.length >= RAW_RADIX_MIN) {
+      return radixPaintOrder(raw);
+    }
     var n = raw.length, order = new Uint32Array(n), missing = 0, rest, i, v;
     for (i = 0; i < n; i++) {
       v = raw[i];

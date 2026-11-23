@@ -90,7 +90,9 @@
   pixel. On the Allen atlas (3.9 million cells) the page stalls for 0.7 s
   instead of 1.4 to 1.7 s on the first gene of Gene expression and 0.4 s
   instead of 0.7 to 0.9 s on the next; Linked views with all 59 sections
-  for 0.8 s instead of 1.2 to 1.4 s. WebGL keeps the order on the CPU.
+  for 0.8 s instead of 1.2 to 1.4 s. WebGL keeps the order on the CPU. The
+  order of an expression field is found by a radix sort on the float
+  values, 0.08 s instead of 0.3 s for 3.9 million cells in a script test.
 - **Spatial shows all sections side by side.** A data set with more than one
   spatial entry (tissue sections, FOVs, capture areas) can show several of
   them at once: the Spatial page's **Sections** field takes one section (the
