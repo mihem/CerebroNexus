@@ -52,8 +52,8 @@
 - **Linked views and gene colouring are faster on large data.** Linked views
   builds the sections of a data set without ROIs from the Viewer Pack's rows
   and makes cell names only for the cells that need them, and draws its
-  sections first: opened right after loading, it is ready after 3.5 s instead
-  of 12 s on the Allen atlas, with 1.4 GB instead of 5.5 GB. With WebGPU the
+  sections first: opened by its tab after loading, it is ready after about 2 s
+  instead of 5 to 10 s on the Allen atlas, with 1.4 GB instead of 5.5 GB. With WebGPU the
   GPU draws a gene's points through the paint order (1.2 s instead of 2.4 s on
   the first gene of Gene expression, 0.65 s instead of 1.05 s on the next), the order is found by a radix sort, Moran's I
   finds neighbours through buckets (1.6 ms a section instead of 26 ms), and
