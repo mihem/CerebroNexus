@@ -171,8 +171,7 @@ spatial_projection_update_plot <- function(input) {
     ## one, so only the canonical rows of the points are sent.
     names_resource <- viewerCellNamesResourceFor(cell_index)
     cell_barcodes <- if (is.null(names_resource)) {
-      viewerPackCellBarcodes(viewerPackCurrent(), cell_index) %||%
-        getMetaData()[["cell_barcode"]][cell_index]
+      viewerCellBarcodesAt(cell_index)
     }
     aux <- cerebroCellViewDeferredAux(
       selection_rows = selection_rows,
@@ -458,12 +457,7 @@ spatial_projection_update_plot <- function(input) {
     panel_selection_keys <- if ("cell_barcode" %in% colnames(metadata)) {
       metadata[["cell_barcode"]]
     } else {
-      barcodes <- viewerPackCellBarcodes(viewerPackCurrent(), cell_index)
-      if (is.null(barcodes)) {
-        getMetaData()[["cell_barcode"]][cell_index]
-      } else {
-        barcodes
-      }
+      viewerCellBarcodesAt(cell_index)
     }
     req(
       length(panel_selection_keys) == length(selection_keys),

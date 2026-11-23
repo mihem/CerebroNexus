@@ -1640,7 +1640,7 @@ ir_clonal_umap_barcodes <- function(data) {
     return(NULL)
   }
   cells <- tryCatch(
-    viewerPackCellBarcodes(viewerPackCurrent(), data$cell_index),
+    viewerPackCellBarcodesAt(viewerPackCurrent(), as.integer(data$cell_index)),
     error = function(e) NULL
   )
   if (!is.null(cells)) {

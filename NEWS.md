@@ -80,8 +80,15 @@
   views has its sections after 2.4 s instead of 4.1 s and is ready after
   6.7 s instead of 8.1 s. The sections of a data set without ROIs are built
   from the rows the Viewer Pack stores, without reading the 3.9 million cell
-  names: opened right after loading, Linked views is ready after 7 s instead
-  of 15 s.
+  names: opened right after loading, Linked views is ready after 3.5 s
+  instead of 12 s on an idle machine.
+- **Cell names are made only for the cells that need them.** A table of
+  selected cells, a hover or a click on one cell takes the names of those
+  cells from the Viewer Pack's names file instead of reading all of them
+  first; Trajectory's table and distribution plot name their own cells;
+  Colour management and Trekker read the first-frame metadata instead of the
+  whole CRB; and the Viewer no longer reads every name ahead while idle
+  (4 s of the R process and 400 MB on the Allen atlas).
 - **Colour management opens faster with many groups.** The colour pickers
   of a column's groups are written at once instead of one by one: with the
   1,640 groups of the Allen atlas the page opens in 1.0 to 1.8 s instead of

@@ -145,7 +145,9 @@ output[["color_assignments_UI"]] <- renderUI({
                 collapsible = TRUE,
                 color_group_pickers(
                   column,
-                  unique(as.character(getMetaData()[[column]])),
+                  unique(as.character(
+                    viewerProjectionFirstFrameMetadata()[[column]]
+                  )),
                   initial_colors[[column]]
                 )
               )

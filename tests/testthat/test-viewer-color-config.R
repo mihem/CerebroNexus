@@ -92,6 +92,7 @@ test_that("colour pickers stay mounted while shared colours update", {
     getMetaData <- function() {
       data.frame(group = c("a", "b"), cycle = c("G1", "S"))
     }
+    viewerProjectionFirstFrameMetadata <- getMetaData
     getGroups <- function() "group"
     getGroupLevels <- function(group) c("a", "b")
     getCellCycle <- function() "cycle"
