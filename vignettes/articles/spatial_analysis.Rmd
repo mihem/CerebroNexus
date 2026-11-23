@@ -113,10 +113,10 @@ shows the single view, several a grid with one panel per section. Clicking a
 panel's title shows only that section. The grid needs no change to the data
 or the export.
 
-![The Spatial grid of the mouse spinal cord data of Kukanja et al. (EAE, 52
-sections): every section on its DAPI picture, cells coloured by type, with
-the Sections, Background images and Columns fields above the
-panels.](img/spatial-grid-kukanja-eae.png)
+![The Spatial grid of the Allen whole mouse brain MERFISH atlas (59 coronal
+sections, 3.9 million cells), cells coloured by class, with the Sections,
+Display mode, Colour by, Columns and Embedding fields above the
+panels.](img/spatial-grid-allen.png)
 
 - **Same colours, same scale**: every section is coloured by the same metadata
   column or gene. A group has one colour in every section, and a gene has one

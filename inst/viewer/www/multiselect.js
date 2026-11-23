@@ -169,7 +169,8 @@
   }
 
   // Fields that hold sections count them in their label and offer every
-  // section (All) or only the first chosen (One). In a field grouped by
+  // section (All) or only the first chosen (One; None in the grid's picture
+  // field, which can be left empty). In a field grouped by
   // section (one item per group), All adds each missing group's first option.
   var COUNTED = [
     "spatial_projection_sections",
@@ -184,9 +185,13 @@
     if (!tools) {
       tools = document.createElement("span");
       tools.className = "cv-sections-tools";
+      // The pictures of the grid can all be taken away: None; the sections
+      // keep One.
+      var second = select.id === "spatial_projection_grid_background_images"
+        ? ["none", "None"] : ["one", "One"];
       tools.innerHTML = '<span class="cv-sections-count"></span>' +
         '<button type="button" data-sections="all">All</button>' +
-        '<button type="button" data-sections="one">One</button>';
+        '<button type="button" data-sections="' + second[0] + '">' + second[1] + '</button>';
       label.appendChild(tools);
     }
     var groupOf = function (value) {
@@ -204,7 +209,10 @@
       tools.style.display = total < 3 ? "none" : "";
       tools.querySelector(".cv-sections-count").textContent = chosen + " of " + total;
       tools.querySelector('[data-sections="all"]').disabled = chosen >= total;
-      tools.querySelector('[data-sections="one"]').disabled = chosen <= 1;
+      var one = tools.querySelector('[data-sections="one"]');
+      if (one) one.disabled = chosen <= 1;
+      var none = tools.querySelector('[data-sections="none"]');
+      if (none) none.disabled = chosen < 1;
     };
     // The label's click would open the field: the tools keep their clicks.
     tools.onclick = function (event) {
@@ -226,6 +234,8 @@
             chosen.push(value);
           });
         instance.setValue(chosen);
+      } else if (button.getAttribute("data-sections") === "none") {
+        instance.setValue([]);
       } else if (instance.items.length) {
         instance.setValue([instance.items[0]]);
       }

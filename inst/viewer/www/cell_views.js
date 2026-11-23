@@ -132,6 +132,7 @@
   var nicheSet = null;          // cell indices inside the picked nucleus's niche
   var colorBy = null;           // group name
   var DEFAULT_POINT_SIZE = 4;   // the size a view starts with when nothing configures one
+  var GRID_POINT_SIZE = 2;      // the default size in the panels of a grid of sections
   var ps = DEFAULT_POINT_SIZE;  // point diameter in CSS pixels
   var pointOpacity = 1;         // base draw opacity (no-selection view)
   var bordersOn = false;        // outline cell points in the active view
@@ -1966,6 +1967,14 @@
     var size = ps;
     if (!pointSizeEdited && sp && sp.builder_point_size != null) {
       size = Math.max(1, Math.min(20, Number(sp.builder_point_size)));
+    }
+    // The default size (nothing configured it, no slider moved it) is smaller
+    // in the panels of a grid of sections, where many cells share a small
+    // panel, and the default again in the panel enlarged.
+    if (!pointSizeEdited && size === DEFAULT_POINT_SIZE && sp &&
+        (sp._gridSection != null || (!singleActive && isSpatialSpace(sp))) &&
+        !(focusPanel && p.key === focusPanel)) {
+      return GRID_POINT_SIZE;
     }
     return size;
   }

@@ -12,18 +12,21 @@
   outlines stay single-section views.
 - **The grid chooses each section's picture.** *Background images* lists the
   pictures grouped by section; every section starts with its first picture, a
-  chosen picture is a removable chip, and a section keeps its choice while
+  chosen picture is a removable chip, *All* gives every section its first
+  picture and *None* takes them all away, and a section keeps its choice while
   other sections come and go.
 - **Points over a dark picture get a light outline.** Over a picture darker
   than a mean brightness of 0.35 (a fluorescence image such as the Kukanja
   DAPI sections) points are drawn with a light outline. It is on by default;
   *Outline points on dark pictures* in the settings of Spatial and Linked
   views, and in the Builder's Spatial display settings, turns it off.
-- **Points start at size 4.** The Viewer, `launchCerebro()`,
-  `createShinyApp()` and the Builder default to 4. The rules that changed the
-  size by themselves are gone: size 1 above 100,000 cells (and its option
-  `large_data_point_size_cells`), and smaller, lighter points in small grid
-  panels. The sliders and the author's settings still set any size.
+- **Points start at size 4, and 2 in a grid.** The Viewer, `launchCerebro()`,
+  `createShinyApp()` and the Builder default to 4; the panels of the Spatial
+  grid and of Linked views' sections use 2, and an enlarged panel 4 again.
+  The rules that changed the size by themselves are gone: size 1 above
+  100,000 cells (and its option `large_data_point_size_cells`), and smaller,
+  lighter points in small grid panels. The sliders and the author's settings
+  still set any size.
 - **Enlarge reads like a photo viewer.** In Linked views, the Spatial grid and
   Gene expression's separate panels, Enlarge shows one panel large and the
   others as a strip of thumbnails beside or below it, scrolled by its arrows
