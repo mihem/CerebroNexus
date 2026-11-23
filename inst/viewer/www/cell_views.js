@@ -1532,6 +1532,7 @@
     try {
       var c = document.createElement('canvas');
       c.width = 16; c.height = 16;
+      c.setAttribute('data-cv-probe', 'brightness');   // not a panel's canvas
       var x = c.getContext('2d', { willReadFrequently: true });
       x.drawImage(im, 0, 0, 16, 16);
       var d = x.getImageData(0, 0, 16, 16).data, sum = 0;

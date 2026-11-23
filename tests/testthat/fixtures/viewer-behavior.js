@@ -308,8 +308,8 @@ window.viewerScenarios = {
     t.equal(t.choices('cv-bg-image-select').map(o=>o.text),['First','Second','None']);
     t.equal(picker.value,'one','Background choice retained after download');
     t.resetPaint();t.change('cv-bg-image-select',none);await t.settle();
-    t.check(!t.paints.some(p=>p.method==='drawImage'&&p.args[0] instanceof HTMLImageElement),'None removes background');
-    const drawn=canvas=>t.paints.findLast(p=>p.method==='drawImage'&&p.args[0] instanceof HTMLImageElement&&(!canvas||p.canvas===canvas));
+    t.check(!t.paints.some(p=>p.method==='drawImage'&&p.args[0] instanceof HTMLImageElement&&!p.canvas.hasAttribute('data-cv-probe')),'None removes background');
+    const drawn=canvas=>t.paints.findLast(p=>p.method==='drawImage'&&p.args[0] instanceof HTMLImageElement&&!p.canvas.hasAttribute('data-cv-probe')&&(!canvas||p.canvas===canvas));
     t.change('cv-bg-image-select','two');await t.settle();
     const plain=drawn();
     t.change('cv-bg-image-select','one');await t.settle();
