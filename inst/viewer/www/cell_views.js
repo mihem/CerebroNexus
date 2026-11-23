@@ -1204,6 +1204,7 @@
       p.sx = null; p.sy = null; p.gpuTransformOnly = false;
       return;
     }
+    if (!forceCpu) wakeGpu(p);
     if (!sp._unit) sp._unit = deferredUnitOf(sp) || unitOf(sp);
     var u = sp._unit, n = D.n;
     // Axis'd spaces (the clone panel) reserve room on the left for the y-label
@@ -1440,7 +1441,9 @@
         typeof p.pane.getBoundingClientRect !== 'function') return false;
     var r = p.pane.getBoundingClientRect(), h = window.innerHeight || 0;
     if (!(r.width > 0) || !(h > 0)) return false;
-    return r.bottom < -h || r.top > 2 * h;
+    // A grid on WebGL2 has about 14 contexts to share: a smaller margin.
+    var margin = webglPool ? 0.15 * h : h;
+    return r.bottom < -margin || r.top > h + margin;
   }
   var stageFrame = 0;
   function onStageScroll() {
@@ -2254,16 +2257,104 @@
   // Swaps the panel's failed renderer for WebGL2, or drops it to Canvas.
   // Returns whether a GPU renderer is still attached.
   function failOver(p) {
+    var stats = p.gpu && p.gpu.stats ? p.gpu.stats() : {};
+    // A panel of a grid has WebGL2 when it is drawn and the page has a context
+    // to spare (acquireWebGl()); a lost context is made again, a few times.
+    if (stats.backend === 'webgpu' || p.gpuPool) {
+      if (stats.backend === 'webgl2' && ++p._webglLosses > 3) {
+        disableGpu(p);
+        return false;
+      }
+      releaseGpu(p);
+      p.gpuPool = true;
+      webglPool = true;
+      return false;
+    }
     if (replaceGpuWithWebGl(p, p.gpu)) { watchGpu(p, p.gpu); return true; }
     disableGpu(p);
     return false;
+  }
+
+  // ---- WebGL2 contexts of the panels of a grid ------------------------------
+  // A page keeps about 16 WebGL contexts and drops the oldest of any more. With
+  // WebGPU every panel has its own canvas on it; without, one context per panel
+  // made a grid of more than 16 sections lose most of them, and a lost context
+  // sent its panel to Canvas2D for good. A panel takes a context when it is
+  // on stage and gives it up when it is not (or has it taken for a panel that
+  // is), a lost one is made again.
+  var WEBGL_CONTEXT_LIMIT = 15, webglPool = false;
+  // How far a panel is from the window, in pixels (0 in it; far when it has no
+  // place, as one off an enlarged view's strip).
+  function windowDistance(p) {
+    if (offStrip(p) || !p.pane || typeof p.pane.getBoundingClientRect !== 'function') {
+      return Infinity;
+    }
+    var r = p.pane.getBoundingClientRect(), h = window.innerHeight || 0;
+    if (!(r.width > 0)) return Infinity;
+    return Math.max(0, r.top - h, -r.bottom);
+  }
+  function releaseGpu(p) {
+    var renderer = p.gpu;
+    if (!renderer) return;
+    p.gpu = null; p.gpuData = null; p.gpuDataState = null;
+    p.gpuTransformOnly = false;
+    try { if (renderer.release) renderer.release(); } catch (error) { /* gone */ }
+    var old = p.gpuCanvas;
+    if (old && old.parentNode) {
+      // A canvas whose context was lost cannot take another.
+      var canvas = createLayerCanvas(null, 'cv-gpu-layer');
+      old.parentNode.replaceChild(canvas, old);
+      p.gpuCanvas = canvas;
+    }
+    p._resizedUndrawn = true;
+  }
+  // A WebGL2 context for the panel, if the page has one to spare or a panel off
+  // stage holds one it can give up.
+  function acquireWebGl(p) {
+    if (p.gpu || !p.gpuCanvas || !window.CerebroPointRenderer ||
+        !window.CerebroPointRenderer.createWebGl) return !!p.gpu;
+    var holders = panels.filter(function (q) { return q !== p && q.gpuPool && q.gpu; });
+    if (holders.length >= WEBGL_CONTEXT_LIMIT) {
+      // The panel holding one that is farthest from the window gives it up, if
+      // it is farther than this one.
+      var mine = windowDistance(p), victim = null, far = mine;
+      holders.forEach(function (q) {
+        var d = windowDistance(q);
+        if (d > far) { far = d; victim = q; }
+      });
+      if (!victim) return false;
+      releaseGpu(victim);
+    }
+    var old = p.gpuCanvas, canvas = old;
+    if (old.parentNode && old._cerebroPointRenderer) {
+      canvas = createLayerCanvas(null, 'cv-gpu-layer');
+      old.parentNode.replaceChild(canvas, old);
+    }
+    try {
+      p.gpuCanvas = canvas;
+      p.gpu = window.CerebroPointRenderer.createWebGl(canvas);
+      canvas._cerebroPointRenderer = p.gpu;
+      p.gpu.resize(p.W || canvas.clientWidth || 1, p.H || canvas.clientHeight || 1,
+        window.devicePixelRatio || 1);
+      p.gpuData = null; p.gpuDataState = null;
+      watchGpu(p, p.gpu);
+      return true;
+    } catch (error) {
+      p.gpu = null;
+      return false;
+    }
+  }
+  // Before a panel on stage is laid out or drawn: it has a context if it can.
+  function wakeGpu(p) {
+    if (p.gpu || !p.gpuPool || !gpuAcceleration || !D || D.n < GPU_MIN_CELLS) return;
+    acquireWebGl(p);
   }
 
   function watchGpu(p, renderer) {
     function failed() {
       if (p.gpu !== renderer) return;
       failOver(p);
-      if (D && p.spaceId) draw(p);
+      if (D && p.spaceId) drawPanel(p);
     }
     renderer.failed.then(failed);
     renderer.ready.then(function () {
@@ -2276,6 +2367,14 @@
     if (!window.CerebroPointRenderer || !window.CerebroPointRenderer.create) return;
     if (p.gpuCanvas) p.gpuCanvas.remove();
     var canvas = createLayerCanvas(p, 'cv-gpu-layer');
+    // No WebGPU: WebGL2 only, a context when the panel is drawn (see above).
+    if (!navigator.gpu && window.CerebroPointRenderer.createWebGl) {
+      p.gpuCanvas = canvas;
+      p.gpuPool = true;
+      p._webglLosses = 0;
+      webglPool = true;
+      return;
+    }
     try {
       p.gpuCanvas = canvas;
       p.gpu = window.CerebroPointRenderer.create(canvas);
@@ -2930,6 +3029,12 @@
   }
   function draw(p, shownMask, shownCount) {
     p._resizedUndrawn = false;
+    // A panel that gave its WebGL2 context up takes one again and lays itself
+    // out for it.
+    if (p.gpuPool && !p.gpu) {
+      wakeGpu(p);
+      if (p.gpu && p.spaceId) project(p);
+    }
     markGridPending(p);
     var c = p.ctx; clearPanelLayers(p);
     if (needsUnderlay(p)) attachUnderlay(p);

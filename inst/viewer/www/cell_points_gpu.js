@@ -595,6 +595,7 @@ void main() {
     var pixelRatio = 1;
     var ready = true;
     var contextLost = false;
+    var released = false;
     var gpuError = '';
     var metrics = {
       backend: 'webgl2', ready: true, pointCount: 0, positionUploads: 0,
@@ -616,8 +617,22 @@ void main() {
     canvas.addEventListener('webglcontextlost', function (event) {
       event.preventDefault();
       contextLost = true;
-      fail('WebGL2 context lost.');
+      // Given up on purpose (release()): not a failure.
+      if (!released) fail('WebGL2 context lost.');
     });
+
+    // Gives the context back at once: a page holds about 16 and drops the
+    // oldest of any more. The renderer is not used afterwards.
+    function release() {
+      if (released) return;
+      released = true;
+      ready = false;
+      lastFrame = null;
+      try {
+        var extension = gl.getExtension('WEBGL_lose_context');
+        if (extension) extension.loseContext();
+      } catch (error) { /* already gone */ }
+    }
 
     function resize(cssWidth, cssHeight, dpr) {
       lastFrame = null;
@@ -758,6 +773,7 @@ void main() {
       failed: failed,
       isReady: function () { return ready; },
       drawsInOrder: function () { return false; },
+      release: release,
       resize: resize,
       setData: setData,
       draw: draw,

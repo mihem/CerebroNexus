@@ -41,7 +41,7 @@ assert.equal(section.style.display, 'none');
 active = {id:'roi-a',images:[{id:'image-a',preset:{opacity:.6}}]};
 let stashed = 0;
 Object.assign(context, {stashImgState() {stashed++;}, loadSpaceImage() {},
-  imgChoice: {}, backgroundStateKey: sp => sp.id, updateSpaceScopedControls() {}, drawAll() {}});
+  imgChoice: {}, backgroundStateKey: sp => sp.id, updateSpaceScopedControls() {}, fillBackgroundPicker() {}, drawAll() {}});
 vm.runInContext(extract('setSpatialImage', 'activateSpatial'), context);
 context.setSpatialImage('other-roi', active);
 assert.equal(stashed, 0);

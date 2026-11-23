@@ -59,6 +59,12 @@
   panels in place (a gene few cells express sends those cells only), and a
   panel keeps its maps over its own cells, so the browser holds 1.0 GB instead
   of 1.7 to 2.5 GB. A grid of many sections shows a turning ring while it loads.
+  Without WebGPU (no adapter, Firefox, Safari) the panels take turns at the
+  page's WebGL2 contexts, which Chrome limits to about 16: the panels near the
+  window hold them, a lost one is made again, and a grid of 59 sections no
+  longer falls back to Canvas2D (0 of the 12 panels in sight on the GPU and
+  43 contexts lost before, 12 of 12 and none lost now; longest stall 0.7 s
+  instead of 1.7 to 1.9 s).
 - **Linked views and gene colouring are faster on large data.** Linked views
   builds the sections of a data set without ROIs from the Viewer Pack's rows
   and makes cell names only for the cells that need them, and draws its
