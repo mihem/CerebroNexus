@@ -18,7 +18,7 @@ test_that("rail Review and BuildPlan share manifest readiness", {
     expect_identical(
       defaults$app_options$point_size,
       list(
-        overview_projection_point_size = 5,
+        overview_projection_point_size = 4,
         projection_point_opacity = 1
       )
     )
