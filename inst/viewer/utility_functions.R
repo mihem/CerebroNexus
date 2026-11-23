@@ -5730,14 +5730,13 @@ viewerPackCellNames <- function() {
   }
   cache$cells
 }
+## The names of some canonical rows, and only those: they are cut out of the
+## Pack's names file, so a table of ten selected cells does not make the
+## 3.9 million strings of every name first.
 viewerCellBarcodesAt <- function(rows) {
-  cells <- viewerPackCellNames()
-  barcodes <- if (
-    !is.null(cells) &&
-      !anyNA(rows) &&
-      all(rows >= 1L & rows <= length(cells))
-  ) {
-    cells[rows]
+  pack <- viewerPackCurrent()
+  barcodes <- if (is.list(pack) && !anyNA(rows)) {
+    viewerPackCellBarcodesAt(pack, as.integer(rows))
   }
   barcodes %||% as.character(getMetaData()[["cell_barcode"]][rows])
 }
