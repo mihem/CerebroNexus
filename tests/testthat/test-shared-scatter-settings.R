@@ -25,7 +25,7 @@ test_that("projection defaults are canonical and spatial defaults independent", 
   )
 })
 
-test_that("the number of cells does not change the size a page starts with", {
+test_that("a page starts with the author's size, else 4, however large the data set", {
   env <- viewer_runtime_env()
   ## Installed, the package's internals are not on the search path.
   sys.source(
@@ -34,24 +34,13 @@ test_that("the number of cells does not change the size a page starts with", {
   )
   options <- list(point_size = c(a = 3), spatial_point_size = c(a = 7))
   for (page in list(NULL, "spatial")) {
-    expected <- if (is.null(page)) 3 else 7
-    for (n_cells in list(NULL, 5e4, 1e5, 4e6)) {
-      expect_identical(
-        env$viewerScatterDefaults(
-          options,
-          "a",
-          page,
-          n_cells = n_cells
-        )$point_size,
-        expected
-      )
-    }
+    expect_identical(
+      env$viewerScatterDefaults(options, "a", page)$point_size,
+      if (is.null(page)) 3 else 7
+    )
   }
-  ## Without an author's size: 4, whatever the data set.
-  expect_identical(
-    env$viewerScatterDefaults(list(), "a", n_cells = 4e6)$point_size,
-    4
-  )
+  ## Without an author's size: 4.
+  expect_identical(env$viewerScatterDefaults(list(), "a")$point_size, 4)
   ## A section's own Builder appearance is used as saved.
   section <- list(
     viewer_content = list(
@@ -63,7 +52,7 @@ test_that("the number of cells does not change the size a page starts with", {
     )
   )
   expect_identical(
-    env$spatialPointAppearance(section, "a", "s1", n_cells = 3e5),
+    env$spatialPointAppearance(section, "a", "s1"),
     list(point_opacity = 0.8, point_size = 6)
   )
 })

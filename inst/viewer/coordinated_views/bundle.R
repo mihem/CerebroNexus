@@ -1064,16 +1064,12 @@ cv_spatial_one <- function(
   metadata = NULL,
   spatial_data = NULL,
   compact = FALSE,
-  n_cells = NULL,
   by_rows = FALSE
 ) {
   ## `by_rows`: the section comes from cv_spatial_data_by_rows(), its cells
   ## numbered by metadata rows; no cell name is made for it, and the ROI of a
   ## cell is the metadata's at its row.
   by_rows <- isTRUE(by_rows) && isTRUE(compact)
-  ## The number of cells, for point sizes: given by a caller that has not
-  ## read the data set's cell names, which `length(cells)` would do.
-  n_cells <- n_cells %||% length(cells)
   sd <- tryCatch(
     spatial_data %||% cv_spatial_data(crb, nm),
     error = function(e) NULL
@@ -1185,12 +1181,7 @@ cv_spatial_one <- function(
   embedded <- embedded_spatial_images(sd, roi_value)
   alignment <- sd[["histology_alignment", exact = TRUE]]
   appearance <- cv_alignment_appearance(alignment)
-  section_appearance <- spatialPointAppearance(
-    opts,
-    dataset_name,
-    nm,
-    n_cells = n_cells
-  )
+  section_appearance <- spatialPointAppearance(opts, dataset_name, nm)
   roi_appearance <- spatialRoiSetting(opts, dataset_name, nm, roi_value)
   if (!is.null(roi_appearance)) {
     section_appearance <- roi_appearance[c("point_opacity", "point_size")]
@@ -1203,12 +1194,7 @@ cv_spatial_one <- function(
       section_appearance <- appearance[c("point_opacity", "point_size")]
     }
   }
-  spatial_defaults <- viewerScatterDefaults(
-    opts,
-    dataset_name,
-    "spatial",
-    n_cells = n_cells
-  )
+  spatial_defaults <- viewerScatterDefaults(opts, dataset_name, "spatial")
   for (embedded_index in seq_along(embedded)) {
     entry <- embedded[[embedded_index]]
     embedded_names <- names(embedded)
@@ -1365,13 +1351,7 @@ cv_spatial_one <- function(
 ## travels in `$samples` so Linked views can switch between them client-side (the
 ## "Spatial data" picker), each donor's tissue section being its own coordinate
 ## system + image. Returns the space or NULL when there is no spatial.
-cv_build_spatial <- function(
-  crb,
-  cells,
-  metadata = NULL,
-  compact = FALSE,
-  n_cells = NULL
-) {
+cv_build_spatial <- function(crb, cells, metadata = NULL, compact = FALSE) {
   sp_names <- tryCatch(crb$availableSpatial(), error = function(e) NULL)
   if (!length(sp_names)) {
     return(NULL)
@@ -1397,7 +1377,6 @@ cv_build_spatial <- function(
       metadata = metadata,
       spatial_data = sd,
       compact = compact,
-      n_cells = n_cells,
       by_rows = by_rows
     )
     if (is.null(scene)) {
@@ -1424,7 +1403,6 @@ cv_build_spatial <- function(
           metadata,
           sd,
           compact = compact,
-          n_cells = n_cells,
           by_rows = by_rows
         )
         if (is.null(scene)) {
@@ -2414,8 +2392,7 @@ cv_build_compact_supplement <- function(
     crb,
     cells = cells(),
     metadata = first_frame$meta_data,
-    compact = TRUE,
-    n_cells = primary$n
+    compact = TRUE
   )
   if (!is.null(spatial)) {
     spaces[[length(spaces) + 1L]] <- spatial

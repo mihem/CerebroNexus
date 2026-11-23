@@ -3157,7 +3157,7 @@
   // Returns true if anything was cleared.
   // Seed the dataset-level point size once, then leave user changes alone.
   var psSeeded = false;
-  function autoPointSize(side) {
+  function autoPointSize() {
     if (!D) return;
     psSeeded = true;
     var configured = D.default_point_size == null
@@ -9028,7 +9028,7 @@
       _layoutKey = passKey; _layoutPass = pass; _layoutHeader = passHeader;
       return false;
     }
-    if (!psSeeded) autoPointSize(side);
+    if (!psSeeded) autoPointSize();
     // Visibility of focus affordances depends on how many linked lenses remain.
     updateFocusButtons();
     drawAll();

@@ -2979,8 +2979,7 @@ test_that("a compact scene of a thin CRB's section is made without a cell name",
     thin,
     cells = stop("the cell names were read"),
     metadata = metadata,
-    compact = TRUE,
-    n_cells = 6L
+    compact = TRUE
   )
   # The getter named no cell, and the stored section is back as it was.
   expect_identical(getter_named, 0L)
@@ -2990,8 +2989,7 @@ test_that("a compact scene of a thin CRB's section is made without a cell name",
     make_crb(named),
     cells = cells,
     metadata = metadata,
-    compact = TRUE,
-    n_cells = 6L
+    compact = TRUE
   )
   expect_identical(as.integer(fast$rows), as.integer(reference$rows))
   expect_identical(as.integer(fast$rows), rows - 1L)
@@ -3010,8 +3008,7 @@ test_that("a compact scene of a thin CRB's section is made without a cell name",
     make_crb(stored),
     cells = stop("the cell names were read"),
     metadata = with_roi,
-    compact = TRUE,
-    n_cells = 6L
+    compact = TRUE
   )
   expect_identical(getter_named, 0L)
   expect_identical(
@@ -3022,8 +3019,7 @@ test_that("a compact scene of a thin CRB's section is made without a cell name",
     make_crb(named),
     cells = cells,
     metadata = with_roi,
-    compact = TRUE,
-    n_cells = 6L
+    compact = TRUE
   )
   expect_equal(scenes, by_name)
   expect_identical(as.integer(scenes$samples[[2]]$rows), c(4L, 0L))

@@ -368,14 +368,8 @@ viewerColourGroupChoices <- function(
 }
 
 ## The size, opacity and share of cells a page starts with: the author's
-## options, else points of size 4. `n_cells` is not used any more (the size no
-## longer depends on the number of cells); callers may still pass it.
-viewerScatterDefaults <- function(
-  options,
-  dataset = NULL,
-  page = NULL,
-  n_cells = NULL
-) {
+## options, else points of size 4.
+viewerScatterDefaults <- function(options, dataset = NULL, page = NULL) {
   resolve <- function(key, fallback, minimum, maximum) {
     value <- options[[key]]
     if (!is.null(dataset) && !is.null(names(value))) {
@@ -556,12 +550,7 @@ spatialPlotRotation <- function(options, dataset, spatial_name) {
   }
 }
 
-spatialPointAppearance <- function(
-  options,
-  dataset,
-  spatial_name,
-  n_cells = NULL
-) {
+spatialPointAppearance <- function(options, dataset, spatial_name) {
   setting <- if (
     is.list(options) &&
       .runtimeIsString(dataset) &&
