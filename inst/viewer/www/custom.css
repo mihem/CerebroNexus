@@ -4044,7 +4044,7 @@ body .selectize-dropdown.cerebro-ms-dropdown .selectize-dropdown-content {
 .cv-sections-count {
   margin-right: 4px;
   color: var(--c-text-3, #8a8f98);
-  font-size: 11px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 .cv-sections-tools button {
@@ -4053,8 +4053,8 @@ body .selectize-dropdown.cerebro-ms-dropdown .selectize-dropdown-content {
   border-radius: 4px;
   background: transparent;
   color: var(--c-amber-700, #b45309);
-  font-size: 11px;
-  line-height: 18px;
+  font-size: 13px;
+  line-height: 20px;
   cursor: pointer;
 }
 .cv-sections-tools button:hover:not(:disabled) {

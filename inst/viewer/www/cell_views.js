@@ -7856,6 +7856,7 @@
       seedImgControls();
     }
     renderImagePicker();
+    fillBackgroundPicker();
     updateSpaceScopedControls();
     drawAll();
   }
@@ -8030,6 +8031,81 @@
     });
     selEl.selectize.setValue(selectedSpatial, true);
   }
+  // The pictures behind the shown sections, one item per section ("Section:
+  // picture"), as on Spatial's grid; shown when a section has pictures. An item
+  // is a section's choice (None when it has no item); All and None are
+  // multiselect.js's.
+  function backgroundItemOf(sp, index) {
+    var images = spatialImages(sp);
+    var id = sp._customImageId;
+    if (id === IMG_NONE || !images.length) return null;
+    var image = id ? images.filter(function (im) { return im.id === id; })[0] : images[0];
+    return image ? index + '|' + image.id : null;
+  }
+  function pictureSections() {
+    return selectedSpatial.map(function (name) { return spaceById[spatialId(name)]; })
+      .filter(function (sp) { return sp && spatialImages(sp).length; });
+  }
+  function fillBackgroundPicker() {
+    var selEl = $('cv-pick-bg'), ctl = $('cv-bg-pick-ctl');
+    if (!selEl || !ctl) return;
+    destroyPicker(selEl);
+    var spaces = pictureSections();
+    if (!spaces.length) { ctl.style.display = 'none'; selEl.innerHTML = ''; return; }
+    ctl.style.display = '';
+    selEl.innerHTML = spaces.map(function (sp, i) {
+      var label = (sp.label || sp._sampleName || sp.id).replace(/ \(spatial\)$/, '');
+      return '<optgroup label="' + esc(label) + '">' + spatialImages(sp).map(function (im) {
+        return '<option value="' + esc(i + '|' + im.id) + '">' + esc(im.label || im.id) + '</option>';
+      }).join('') + '</optgroup>';
+    }).join('');
+    window.jQuery(selEl).selectize({
+      plugins: ['remove_button'],
+      persist: false,
+      closeAfterSelect: false,
+      onItemAdd: function (value) {
+        // One picture a section: choosing another replaces it.
+        var group = value.slice(0, value.indexOf('|'));
+        this.items.slice().forEach(function (item) {
+          if (item !== value && item.slice(0, item.indexOf('|')) === group) this.removeItem(item, true);
+        }, this);
+        this.refreshItems();
+      },
+      render: {
+        item: function (item, escape) {
+          return '<div class="item">' + escape(item.optgroup || '') + ': ' + escape(item.text) + '</div>';
+        }
+      },
+      onChange: function (values) { setSectionBackgrounds(pictureSections(), values == null ? [] : [].concat(values)); }
+    });
+    selEl.selectize.setValue(spaces.map(backgroundItemOf).filter(Boolean), true);
+  }
+  // Each section shows the picture its item names, or none.
+  function setSectionBackgrounds(spaces, values) {
+    var chosen = {};
+    values.forEach(function (value) {
+      var cut = value.indexOf('|');
+      chosen[value.slice(0, cut)] = value.slice(cut + 1);
+    });
+    var changed = false;
+    spaces.forEach(function (sp, i) {
+      var id = chosen[i] != null ? chosen[i] : IMG_NONE;
+      var images = spatialImages(sp);
+      if (id !== IMG_NONE && !images.some(function (im) { return im.id === id; })) return;
+      var current = sp._customImageId || (images[0] && images[0].id);
+      if (current === id) return;
+      stashImgState(sp);
+      sp._customImageId = id;
+      imgChoice[backgroundStateKey(sp)] = id;
+      loadSpaceImage(sp);
+      changed = true;
+    });
+    if (!changed) return;
+    renderImagePicker();
+    seedImgControls();
+    updateSpaceScopedControls();
+    drawAll();
+  }
   function setSelectedSpatial(names) {
     var available = spatialSamples().map(function (s) { return s.name; });
     names = names.filter(function (name, index) {
@@ -8040,6 +8116,7 @@
     });
     selectedSpatial = names;
     rebuildSpatialInstances();
+    fillBackgroundPicker();
     ensurePanelSlots(orderedSpaces().length);
     buildPanels();
     layoutPanels();
@@ -13595,6 +13672,7 @@
     fillColorPicker();
     fillProjPicker();
     fillSpatialPicker();
+    fillBackgroundPicker();
     renderGroupFilters();
     activateSpatial(activeSpatialId);
     // hide the gene/RGB pickers on a fresh dataset (starts in a categorical mode)
@@ -14036,7 +14114,9 @@
     pointOpacityEdited = overrides.opacity;
     labelsOn = display.group_labels === true;
     bordersOn = !!display.cell_borders;
-    linkedBackgroundsOn = display.background_images !== false;
+    // The pictures are the Background images field's: a workspace saved with
+    // them hidden (the old switch) shows them again.
+    linkedBackgroundsOn = true;
     syncLinkedBackgroundsDefault(false);
     keepPlotsSquare = !!display.keep_square;
     selectMode = display.selection_mode;

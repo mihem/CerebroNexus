@@ -218,6 +218,16 @@ tab_coordinated_views <- tabItem(
           tags$label("Colour by", `for` = "cv-pick-color"),
           tags$select(id = "cv-pick-color")
         ),
+        ## The picture behind each shown section, one item per section as on
+        ## Spatial's grid; shown when a section has pictures. None takes them all
+        ## away.
+        div(
+          class = "cv-ctl cv-multiselect-ctl",
+          id = "cv-bg-pick-ctl",
+          style = "display:none",
+          tags$label("Background images"),
+          tags$select(id = "cv-pick-bg", multiple = "multiple")
+        ),
         ## Mean/per-gene expression picker. Per-gene mode expands the linked
         ## spaces into a gene x space grid; the client enforces a 12-panel cap.
         div(
@@ -296,20 +306,6 @@ tab_coordinated_views <- tabItem(
           shinyWidgets::materialSwitch(
             inputId = "cv-hover",
             label = "Cross-view highlight",
-            value = TRUE,
-            status = "primary",
-            inline = TRUE
-          )
-        ),
-        div(
-          class = "cv-linked-hover",
-          title = paste(
-            "Show or hide backgrounds in linked views.",
-            "Each view uses the first image matched to its FOV or ROI."
-          ),
-          shinyWidgets::materialSwitch(
-            inputId = "cv-backgrounds",
-            label = "Background images",
             value = TRUE,
             status = "primary",
             inline = TRUE

@@ -175,6 +175,7 @@
   var COUNTED = [
     "spatial_projection_sections",
     "cv-pick-spatial",
+    "cv-pick-bg",
     "spatial_projection_grid_background_images"
   ];
   function countTools(select, instance) {
@@ -187,8 +188,8 @@
       tools.className = "cv-sections-tools";
       // The pictures of the grid can all be taken away: None; the sections
       // keep One.
-      var second = select.id === "spatial_projection_grid_background_images"
-        ? ["none", "None"] : ["one", "One"];
+      var second = (select.id === "spatial_projection_grid_background_images" ||
+        select.id === "cv-pick-bg") ? ["none", "None"] : ["one", "One"];
       tools.innerHTML = '<span class="cv-sections-count"></span>' +
         '<button type="button" data-sections="all">All</button>' +
         '<button type="button" data-sections="' + second[0] + '">' + second[1] + '</button>';

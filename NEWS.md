@@ -14,7 +14,8 @@
   pictures grouped by section; every section starts with its first picture, a
   chosen picture is a removable chip, *All* gives every section its first
   picture and *None* takes them all away, and a section keeps its choice while
-  other sections come and go.
+  other sections come and go. Linked views has the same field in its toolbar,
+  in place of the *Background images* switch, when its sections have pictures.
 - **Points over a dark picture get a light outline.** Over a picture darker
   than a mean brightness of 0.35 (a fluorescence image such as the Kukanja
   DAPI sections) points are drawn with a light outline. It is on by default;
