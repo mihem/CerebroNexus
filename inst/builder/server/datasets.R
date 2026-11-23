@@ -436,7 +436,7 @@ send_projection_state <- function(entry, message = NULL) {
           entry$settings$default_projection %||%
           character()
       ),
-      point_size = entry$settings$overview_point_size %||% 5,
+      point_size = entry$settings$overview_point_size %||% 4,
       point_opacity = entry$settings$overview_point_opacity %||% 1,
       percentage_cells_to_show = entry$settings[[
         "overview_percentage_cells_to_show"

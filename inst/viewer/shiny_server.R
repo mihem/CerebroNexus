@@ -827,24 +827,10 @@ server <- function(input, output, session) {
   # Author defaults plus session edits, isolated by stable dataset key. Only
   # context-tagged user edits may enter this store (never stale slider binding).
   scatter_session <- reactiveValues()
-  ## The cells of the data set `key` once it is the one loaded; a large data
-  ## set starts with small points (viewerLargePointData()). NULL before then:
-  ## a page that reads its defaults while no data set is loaded (Trajectory,
-  ## when its module is sourced) must not stop on the loaded context's req().
-  viewer_scatter_cell_count <- function(key) {
-    tryCatch(
-      if (identical(viewer_current_dataset_key(), key)) getNumberOfCells(),
-      error = function(error) NULL
-    )
-  }
   current_scatter_defaults <- reactive({
     key <- viewer_requested_dataset_context()$dataset_key
     scatter_session[[key]] %||%
-      viewerScatterDefaults(
-        Cerebro.options,
-        key,
-        n_cells = viewer_scatter_cell_count(key)
-      )
+      viewerScatterDefaults(Cerebro.options, key)
   })
   current_scatter_percentage <- reactiveVal(100)
   observe(
@@ -856,12 +842,7 @@ server <- function(input, output, session) {
   )
   current_spatial_scatter_defaults <- reactive({
     key <- viewer_requested_dataset_context()$dataset_key
-    viewerScatterDefaults(
-      Cerebro.options,
-      key,
-      page = "spatial",
-      n_cells = viewer_scatter_cell_count(key)
-    )
+    viewerScatterDefaults(Cerebro.options, key, page = "spatial")
   })
   observeEvent(
     input$viewer_scatter_edit,

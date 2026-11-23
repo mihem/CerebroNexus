@@ -69,6 +69,7 @@ tab_spatial <- tabItem(
               uiOutput("spatial_projection_show_group_label_UI"),
               uiOutput("spatial_projection_show_region_outline_UI"),
               uiOutput("spatial_projection_point_border_UI"),
+              uiOutput("spatial_projection_picture_outline_UI"),
               uiOutput("spatial_projection_keep_square_UI")
             ),
             cerebroInfoButton(

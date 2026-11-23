@@ -376,6 +376,11 @@ tab_coordinated_views <- tabItem(
                 value = FALSE
               ),
               checkboxInput(
+                "cv-picture-outline",
+                "Outline points on dark pictures",
+                value = TRUE
+              ),
+              checkboxInput(
                 "cv-square-plots",
                 "Keep plots square",
                 value = FALSE

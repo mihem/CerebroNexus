@@ -818,8 +818,8 @@ test_that("the browser fetches a grid's files a few at a time, in panel order", 
 })
 
 test_that("the author's Spatial layout is a display setting, grid only with sections", {
-  ## Older projects and Apps carry no layout: they open one section.
-  expect_identical(builderViewerDisplayDefaults()$spatial_layout, "single")
+  ## Older projects and Apps carry no layout: they open the grid of all sections.
+  expect_identical(builderViewerDisplayDefaults()$spatial_layout, "grid")
   display <- builderViewerDisplayDefaults(list(spatial_layout = "grid"))
   expect_identical(display$spatial_layout, "grid")
   expect_identical(
@@ -835,12 +835,25 @@ test_that("the author's Spatial layout is a display setting, grid only with sect
   options <- list(viewer_content = list(ds = list(display = display)))
   page <- viewerPageDisplayDefaults(options, "ds", "spatial")
   expect_identical(page$layout, "grid")
-  ## The grid needs more than one section; without settings, one section.
+  ## The grid needs more than one section; the author's defaults open it.
   expect_identical(spatial_default_layout(page, c("a", "b")), "grid")
   expect_identical(spatial_default_layout(page, "a"), "single")
   expect_identical(
     spatial_default_layout(
       viewerPageDisplayDefaults(list(), "x", "spatial"),
+      c("a", "b")
+    ),
+    "grid"
+  )
+  expect_identical(
+    spatial_default_layout(
+      viewerPageDisplayDefaults(
+        list(viewer_content = list(x = list(display = list(
+          spatial_layout = "single"
+        )))),
+        "x",
+        "spatial"
+      ),
       c("a", "b")
     ),
     "single"

@@ -801,7 +801,7 @@ builder_spatial_alignment_ui <- function(id, model) {
                       "Size",
                       1,
                       20,
-                      controls$point_size %||% 5,
+                      controls$point_size %||% 4,
                       1
                     ),
                     builder_coordinate_control_ui(

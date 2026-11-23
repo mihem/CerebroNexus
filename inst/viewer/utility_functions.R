@@ -367,27 +367,15 @@ viewerColourGroupChoices <- function(
   )
 }
 
-## Above this many cells (option `large_data_point_size_cells`, 100,000 by
-## default) every page starts with points of size 1: at five pixels the cells
-## of a large data set cover each other and the tissue under them.
-viewerLargePointData <- function(options, n_cells) {
-  threshold <- suppressWarnings(as.numeric(
-    if (is.list(options)) options[["large_data_point_size_cells"]]
-  ))
-  if (length(threshold) != 1L || is.na(threshold) || threshold < 0) {
-    threshold <- 1e5
-  }
-  n_cells <- suppressWarnings(as.numeric(n_cells))
-  length(n_cells) == 1L && !is.na(n_cells) && n_cells > threshold
-}
-
+## The size, opacity and share of cells a page starts with: the author's
+## options, else points of size 4. `n_cells` is not used any more (the size no
+## longer depends on the number of cells); callers may still pass it.
 viewerScatterDefaults <- function(
   options,
   dataset = NULL,
   page = NULL,
   n_cells = NULL
 ) {
-  large <- viewerLargePointData(options, n_cells)
   resolve <- function(key, fallback, minimum, maximum) {
     value <- options[[key]]
     if (!is.null(dataset) && !is.null(names(value))) {
@@ -407,7 +395,7 @@ viewerScatterDefaults <- function(
     }
   }
   defaults <- list(
-    point_size = resolve("point_size", 5, 1, 20),
+    point_size = resolve("point_size", 4, 1, 20),
     point_opacity = resolve("point_opacity", 1, 0.1, 1),
     percentage_cells_to_show = resolve(
       "percentage_cells_to_show",
@@ -418,13 +406,10 @@ viewerScatterDefaults <- function(
   )
   # Ordinary projection views share one author configuration.
   if (!identical(page, "spatial")) {
-    if (large) {
-      defaults$point_size <- 1
-    }
     return(defaults)
   }
   list(
-    point_size = if (large) 1 else resolve("spatial_point_size", 5, 1, 20),
+    point_size = resolve("spatial_point_size", 4, 1, 20),
     point_opacity = resolve("spatial_point_opacity", 1, 0.1, 1),
     percentage_cells_to_show = resolve(
       "spatial_percentage_cells_to_show",
@@ -588,11 +573,7 @@ spatialPointAppearance <- function(
   } else {
     NULL
   }
-  appearance <- viewerSpatialPointSetting(setting)
-  if (!is.null(appearance) && viewerLargePointData(options, n_cells)) {
-    appearance$point_size <- 1
-  }
-  appearance
+  viewerSpatialPointSetting(setting)
 }
 
 spatialRoiSettings <- function(options, dataset, spatial_name) {
@@ -2049,7 +2030,7 @@ cerebroFeedbackControls <- function(id, input, overrides = list()) {
     id,
     overview_projection = "^overview_projection_(to_display|point_color|point_size|point_opacity|point_border|group_labels|keep_square|percentage_cells_to_show|group_filter_.+)$",
     expression_projection = "^expression_projection_(to_display|point_size|point_opacity|point_border|group_labels|keep_square|percentage_cells_to_show|group_filter_.+)$",
-    spatial_projection = "^spatial_projection_(to_display|plot_type|point_color|point_size|point_opacity|group_labels|point_border|keep_square|percentage_cells_to_show|feature_to_display|coexpr_[rgb]|rgb_layout|show_region_outlines|background_image|group_filter_.+)$",
+    spatial_projection = "^spatial_projection_(to_display|plot_type|point_color|point_size|point_opacity|group_labels|point_border|picture_outline|keep_square|percentage_cells_to_show|feature_to_display|coexpr_[rgb]|rgb_layout|show_region_outlines|background_image|group_filter_.+)$",
     trajectory_projection = "^trajectory_(selected_method|selected_name|point_color|point_size|point_opacity|projection_group_labels|projection_point_border|projection_keep_square|percentage_cells_to_show|projection_group_filter_.+)$",
     hla_motif_network = "^hla_(chain|scope|color_by|color_allele|pair_allele_i|pair_allele_ii|min_nodes|by_v|show_isolated|node_scale|legend_mode|group_filter_.+)$",
     "a^"
@@ -2292,7 +2273,8 @@ cerebroCellViewScatterPayload <- function(
   space_label = NULL,
   cell_count = NULL,
   coordinate_resource = NULL,
-  categorical_resource = NULL
+  categorical_resource = NULL,
+  picture_outline = TRUE
 ) {
   dimensions <- if (as.integer(n_dimensions) == 3L) 3L else 2L
   resource_coordinates <- is.list(coordinate_resource) &&
@@ -2355,7 +2337,8 @@ cerebroCellViewScatterPayload <- function(
       draw_border = isTRUE(
         suppressWarnings(as.numeric(point_line[["width"]])) > 0
       ),
-      keep_square = isTRUE(keep_square)
+      keep_square = isTRUE(keep_square),
+      picture_outline = !isFALSE(picture_outline)
     )
   )
   if (!is.null(space_label)) {

@@ -155,9 +155,12 @@ builderViewerDisplayDefaults <- function(value = NULL) {
     spatial_draw_border = FALSE,
     spatial_keep_square = FALSE,
     spatial_region_outlines = FALSE,
-    ## A data set with several spatial entries opens Spatial as one section
-    ## or as the grid of all of them; one entry always opens as one section.
-    spatial_layout = "single",
+    ## Points get a light outline over a dark picture (a fluorescence image),
+    ## where they would be lost; readers can switch it off.
+    spatial_picture_outline = TRUE,
+    ## A data set with several spatial entries opens Spatial as the grid of
+    ## all of them, or as one section; one entry always opens as one section.
+    spatial_layout = "grid",
     trajectory_group_labels = FALSE,
     trajectory_draw_border = TRUE,
     trajectory_keep_square = FALSE,
@@ -193,7 +196,7 @@ builderViewerDisplayDefaults <- function(value = NULL) {
     typeof(x) %in% type && !is.object(x) && length(x) == 1L && !is.na(x)
   }
   flags <- grep(
-    "(^|_)(group_labels|draw_border|keep_square|region_outlines|show_trend_line)$",
+    "(^|_)(group_labels|draw_border|keep_square|region_outlines|picture_outline|show_trend_line)$",
     names(defaults),
     value = TRUE
   )

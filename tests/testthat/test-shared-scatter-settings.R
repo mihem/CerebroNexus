@@ -17,15 +17,15 @@ test_that("projection defaults are canonical and spatial defaults independent", 
   }
   expect_identical(
     env$viewerScatterDefaults(options, "a", "spatial"),
-    list(point_size = 5, point_opacity = 1, percentage_cells_to_show = 50)
+    list(point_size = 4, point_opacity = 1, percentage_cells_to_show = 50)
   )
   expect_equal(
     env$viewerScatterDefaults(list(point_size = c(a = 2)), "b")$point_size,
-    5
+    4
   )
 })
 
-test_that("a data set of more than 100,000 cells starts every page with size 1", {
+test_that("the number of cells does not change the size a page starts with", {
   env <- viewer_runtime_env()
   ## Installed, the package's internals are not on the search path.
   sys.source(
@@ -34,37 +34,17 @@ test_that("a data set of more than 100,000 cells starts every page with size 1",
   )
   options <- list(point_size = c(a = 3), spatial_point_size = c(a = 7))
   for (page in list(NULL, "spatial")) {
-    expect_identical(
-      env$viewerScatterDefaults(
-        options,
-        "a",
-        page,
-        n_cells = 100001
-      )$point_size,
-      1
-    )
-    expect_identical(
-      env$viewerScatterDefaults(options, "a", page, n_cells = 1e5)$point_size,
-      if (is.null(page)) 3 else 7
-    )
-    ## Opacity and sampling are not touched.
-    expect_identical(
-      env$viewerScatterDefaults(options, "a", page, n_cells = 2e6)[-1L],
-      env$viewerScatterDefaults(options, "a", page)[-1L]
-    )
+    expected <- if (is.null(page)) 3 else 7
+    for (n_cells in list(NULL, 5e4, 1e5, 4e6)) {
+      expect_identical(
+        env$viewerScatterDefaults(options, "a", page, n_cells = n_cells)$point_size,
+        expected
+      )
+    }
   }
-  ## The cell count is not known yet: the configured size.
-  expect_identical(env$viewerScatterDefaults(options, "a")$point_size, 3)
-  ## An author can move the threshold.
-  expect_identical(
-    env$viewerScatterDefaults(
-      c(options, list(large_data_point_size_cells = Inf)),
-      "a",
-      n_cells = 4e6
-    )$point_size,
-    3
-  )
-  ## A section's own Builder appearance is capped as well.
+  ## Without an author's size: 4, whatever the data set.
+  expect_identical(env$viewerScatterDefaults(list(), "a", n_cells = 4e6)$point_size, 4)
+  ## A section's own Builder appearance is used as saved.
   section <- list(
     viewer_content = list(
       a = list(
@@ -76,11 +56,7 @@ test_that("a data set of more than 100,000 cells starts every page with size 1",
   )
   expect_identical(
     env$spatialPointAppearance(section, "a", "s1", n_cells = 3e5),
-    list(point_opacity = 0.8, point_size = 1)
-  )
-  expect_identical(
-    env$spatialPointAppearance(section, "a", "s1", n_cells = 5e4)$point_size,
-    6
+    list(point_opacity = 0.8, point_size = 6)
   )
 })
 

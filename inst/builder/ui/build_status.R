@@ -46,7 +46,7 @@ builder_build_options <- function(
   make_app = FALSE,
   welcome_message = "Welcome to CerebroNexus!",
   initial_page = "data_info",
-  point_size = 5,
+  point_size = 4,
   variable_to_compare = FALSE,
   host = "127.0.0.1",
   port = 8080L,

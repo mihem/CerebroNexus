@@ -601,7 +601,7 @@ builder_upgrade_viewer_content_entry <- function(entry) {
   }
   point_size <- settings$overview_point_size
   if (!.builder_state_number_in(point_size, 1, 20)) {
-    point_size <- 5
+    point_size <- 4
   }
   percentage_cells_to_show <- settings$overview_percentage_cells_to_show
   if (!.builder_state_number_in(percentage_cells_to_show, 10, 100)) {

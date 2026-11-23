@@ -131,9 +131,10 @@
   var nicheRadius = 250;        // µm radius for the picked-nucleus niche readout
   var nicheSet = null;          // cell indices inside the picked nucleus's niche
   var colorBy = null;           // group name
-  var ps = 5;                   // point diameter in CSS pixels
+  var ps = 4;                   // point diameter in CSS pixels
   var pointOpacity = 1;         // base draw opacity (no-selection view)
   var bordersOn = false;        // outline cell points in the active view
+  var pictureOutlineOn = true;  // light outline on points over a dark picture
   var keepPlotsSquare = false;  // fluid rectangles use the workspace by default
   // A live user edit overrides Builder's per-spatial-section starting values.
   var pointSizeEdited = false;
@@ -1478,6 +1479,42 @@
   // Draw the histology image behind the points of the spatial panel. The image's
   // data-space corners (alignment applied, see CerebroBackgroundModel.corners)
   // are mapped to screen with the SAME transform as the cells, so it aligns.
+  // Over a dark picture (a fluorescence image) coloured points get lost: they
+  // are drawn with a light outline. Dark is the picture's mean brightness
+  // under DARK_PICTURE_LUMA, read once from a 16 x 16 copy and kept with it;
+  // transparent pixels count as the white page behind them.
+  var DARK_PICTURE_LUMA = 0.35;
+  function pictureIsDark(im) {
+    if (!im) return false;
+    if (im._dark !== undefined) return im._dark;
+    var w = im.naturalWidth || im.width, h = im.naturalHeight || im.height;
+    if (!(w > 0 && h > 0)) return false;
+    var dark = false;
+    try {
+      var c = document.createElement('canvas');
+      c.width = 16; c.height = 16;
+      var x = c.getContext('2d', { willReadFrequently: true });
+      x.drawImage(im, 0, 0, 16, 16);
+      var d = x.getImageData(0, 0, 16, 16).data, sum = 0;
+      for (var k = 0; k < d.length; k += 4) {
+        var a = d[k + 3] / 255;
+        sum += a * (0.2126 * d[k] + 0.7152 * d[k + 1] + 0.0722 * d[k + 2]) / 255 + (1 - a);
+      }
+      dark = sum / (d.length / 4) < DARK_PICTURE_LUMA;
+    } catch (e) { dark = false; }
+    im._dark = dark;
+    return dark;
+  }
+  // The outline of a panel's points: light, when the picture drawn under them
+  // is dark and the outline is on; else none.
+  function pictureOutline(p) {
+    if (!pictureOutlineOn || (!singleActive && !linkedBackgroundsOn)) return null;
+    var sp = spaceById[p.spaceId];
+    var state = sp && sp._imgState;
+    if (!sp || !currentImage(sp) || !sp._imgEl || !sp._imgReady || !state || !state.show) return null;
+    return pictureIsDark(sp._imgEl) ? { color: 'rgba(255,255,255,.85)', width: 0.8 } : null;
+  }
+
   function drawImage(p, context) {
     if (!singleActive && !linkedBackgroundsOn) return;
     var sp = spaceById[p.spaceId];
@@ -1878,24 +1915,13 @@
   // path fills one path per COLOUR — a path can hold arcs of different radii,
   // but not of different alphas, so shading by opacity would cost the batching
   // exactly where it matters most.
-  // A panel of the Spatial grid shows its section smaller than the single
-  // view does, so its points shrink with it: full size from GRID_POINT_FULL_PX
-  // wide, down to GRID_POINT_MIN_SCALE of it, never below one pixel. They also
-  // turn more transparent, so the tissue picture stays readable under them.
-  var GRID_POINT_FULL_PX = 640, GRID_POINT_MIN_SCALE = 0.3;
-  function gridPointScale(p) {
-    var sp = spaceById[p.spaceId];
-    if (!sp || sp._gridSection == null || !(p.W > 0)) return 1;
-    return Math.max(GRID_POINT_MIN_SCALE, Math.min(1, p.W / GRID_POINT_FULL_PX));
-  }
   function pointSizeOf(p) {
     var sp = spaceById[p.spaceId];
     var size = ps;
     if (!pointSizeEdited && sp && sp.builder_point_size != null) {
       size = Math.max(1, Math.min(20, Number(sp.builder_point_size)));
     }
-    var scale = gridPointScale(p);
-    return scale < 1 ? Math.max(1, size * scale) : size;
+    return size;
   }
   function pointOpacityOf(p) {
     var sp = spaceById[p.spaceId];
@@ -1903,8 +1929,7 @@
     if (!pointOpacityEdited && sp && sp.builder_point_opacity != null) {
       opacity = Math.max(0, Math.min(1, Number(sp.builder_point_opacity)));
     }
-    var scale = gridPointScale(p);
-    return scale < 1 ? opacity * (0.55 + 0.45 * scale) : opacity;
+    return opacity;
   }
   // Per-view factor on a frame's own point sizes (HLA node size), so a size
   // slider redraws without a new frame. Set by cerebroCellViews.scalePointSizes
@@ -2782,7 +2807,7 @@
       p.cloneBase = null;
       return null;
     }
-    var state = gpuDataState(p), border = space.pointBorder;
+    var state = gpuDataState(p), border = space.pointBorder || pictureOutline(p);
     if (!border && bordersOn) border = {color:'rgba(90,90,90,.42)',width:0.7};
     state.axes = space._axisSpec;
     state.width = p.canvas.width; state.height = p.canvas.height;
@@ -2860,6 +2885,7 @@
     // niche. Cells in it stay solid; everything else fades.
     var n = D.n, i, rgb = panelColorMode(p) === RGB_MODE;
     var space = spaceById[p.spaceId], border = space && space.pointBorder;
+    if (!border) border = pictureOutline(p);
     if (!border && bordersOn) {
       border = { color: 'rgba(90,90,90,.42)', width: 0.7 };
     }
@@ -3092,13 +3118,8 @@
     var configured = D.default_point_size == null
       ? NaN : Number(D.default_point_size);
     var v;
-    if (isFinite(configured)) {
-      v = Math.max(0, Math.min(20, configured));
-    } else {
-      var base = 6.5 - Math.log10(Math.max(1, D.n));
-      var scale = Math.max(0.75, Math.min(1.35, (side || 520) / 520));
-      v = Math.max(0.8, Math.min(7, base * scale));
-    }
+    // The configured size, else the Viewer's default (4).
+    v = isFinite(configured) ? Math.max(0, Math.min(20, configured)) : 4;
     ps = Math.round(v * 5) / 5;                    // slider step is 0.2
     setLinkedSliderValue('cv-ps', ps);
   }
@@ -11855,11 +11876,14 @@
     if (appearance) {
       labelsOn = appearance.group_labels === true;
       bordersOn = !!appearance.draw_border;
+      pictureOutlineOn = appearance.picture_outline !== false;
       keepPlotsSquare = !!appearance.keep_square;
     } else {
       var labelsControl = $('cv-labels');
       var bordersControl = $('cv-borders');
       var squareControl = $('cv-square-plots');
+      var outlineControl = $('cv-picture-outline');
+      if (outlineControl) pictureOutlineOn = !!outlineControl.checked;
       if (labelsControl) labelsOn = !!labelsControl.checked;
       if (bordersControl) bordersOn = !!bordersControl.checked;
       if (squareControl) keepPlotsSquare = !!squareControl.checked;
@@ -13406,6 +13430,7 @@
       var authorDisplay = D.display_defaults || {};
       labelsOn = authorDisplay.group_labels === true;
       bordersOn = authorDisplay.draw_border === true;
+      pictureOutlineOn = authorDisplay.spatial_picture_outline !== false;
       keepPlotsSquare = authorDisplay.keep_square === true;
       colorClip = [0, 0.01, 0.02, 0.05].indexOf(authorDisplay.color_clip) >= 0
         ? authorDisplay.color_clip : 0.01;
@@ -13416,6 +13441,8 @@
       if (labelsControl) labelsControl.checked = labelsOn;
       var bordersControl = $('cv-borders');
       if (bordersControl) bordersControl.checked = bordersOn;
+      var outlineEl = $('cv-picture-outline');
+      if (outlineEl) outlineEl.checked = pictureOutlineOn;
       var squareControl = $('cv-square-plots');
       if (squareControl) squareControl.checked = keepPlotsSquare;
       var configuredOpacity = Number(D.default_point_opacity);
@@ -13423,7 +13450,7 @@
         ? Math.max(0, Math.min(1, configuredOpacity)) : 0.8;
       var configuredPointSize = Number(D.default_point_size);
       ps = D.default_point_size != null && isFinite(configuredPointSize)
-        ? Math.max(1, Math.min(20, configuredPointSize)) : 5;
+        ? Math.max(1, Math.min(20, configuredPointSize)) : 4;
       pointSizeEdited = false;
       pointOpacityEdited = false;
       psSeeded = true;
@@ -14454,7 +14481,7 @@
       }
       if (singleActive !== message.id) return;
       if (reordered) drawAll();
-      var drawn = [ps, pointOpacity, labelsOn, bordersOn, keepPlotsSquare].join('|');
+      var drawn = [ps, pointOpacity, labelsOn, bordersOn, pictureOutlineOn, keepPlotsSquare].join('|');
       if (Number.isFinite(message.values.point_size)) {
         ps = Math.max(1, Math.min(20, message.values.point_size)); pointSizeEdited = true;
       }
@@ -14467,12 +14494,15 @@
       if (Object.prototype.hasOwnProperty.call(message.values, 'draw_border')) {
         bordersOn = !!message.values.draw_border;
       }
+      if (Object.prototype.hasOwnProperty.call(message.values, 'picture_outline')) {
+        pictureOutlineOn = message.values.picture_outline !== false;
+      }
       if (Object.prototype.hasOwnProperty.call(message.values, 'keep_square')) {
         keepPlotsSquare = !!message.values.keep_square;
       }
       // Controls binding with the values already drawn change nothing: lay
       // out only if the panels' size changed meanwhile.
-      if ([ps, pointOpacity, labelsOn, bordersOn, keepPlotsSquare].join('|') === drawn) {
+      if ([ps, pointOpacity, labelsOn, bordersOn, pictureOutlineOn, keepPlotsSquare].join('|') === drawn) {
         resizeAll(true);
       } else {
         // A layout change draws in resizeAll(); draw here only when it did not.
@@ -14946,6 +14976,13 @@
         var nextBorders = !!target.checked;
         if (bordersOn === nextBorders) return true;
         bordersOn = nextBorders;
+        drawAll();
+        return true;
+      }
+      if (id === 'cv-picture-outline') {
+        var nextOutline = !!target.checked;
+        if (pictureOutlineOn === nextOutline) return true;
+        pictureOutlineOn = nextOutline;
         drawAll();
         return true;
       }

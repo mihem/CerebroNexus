@@ -390,7 +390,7 @@ builder_alignment_defaults <- function() {
     flip_y = FALSE,
     image_opacity = 0.8,
     point_opacity = 0.85,
-    point_size = 5
+    point_size = 4
   )
 }
 

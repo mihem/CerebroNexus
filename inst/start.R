@@ -31,7 +31,7 @@ cerebroStart <- function(
   mode = "closed",
   maxFileSize = 800,
   welcome_message = NULL,
-  point_size = 5,
+  point_size = 4,
   point_opacity = 1,
   percentage_cells_to_show = 100,
   projections_show_hover_info = TRUE,

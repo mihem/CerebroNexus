@@ -8,7 +8,8 @@
 spatial_projection_appearance <- reactiveValues(
   group_labels = FALSE,
   draw_border = FALSE,
-  keep_square = FALSE
+  keep_square = FALSE,
+  picture_outline = TRUE
 )
 spatial_projection_region_outlines <- reactiveVal(FALSE)
 spatial_author_overridden <- new.env(parent = emptyenv())
@@ -19,6 +20,7 @@ observeEvent(
     controls <- c(
       group_labels = "spatial_projection_group_labels",
       draw_border = "spatial_projection_point_border",
+      picture_outline = "spatial_projection_picture_outline",
       keep_square = "spatial_projection_keep_square",
       region_outlines = "spatial_projection_show_region_outlines"
     )
@@ -268,6 +270,18 @@ observeEvent(
     if (spatial_update_appearance("draw_border", value)) {
       spatial_author_overridden$draw_border <- TRUE
       spatial_send_appearance(list(draw_border = value))
+    }
+  },
+  ignoreNULL = TRUE
+)
+
+observeEvent(
+  input[["spatial_projection_picture_outline"]],
+  {
+    value <- isTRUE(input[["spatial_projection_picture_outline"]])
+    if (spatial_update_appearance("picture_outline", value)) {
+      spatial_author_overridden$picture_outline <- TRUE
+      spatial_send_appearance(list(picture_outline = value))
     }
   },
   ignoreNULL = TRUE
@@ -615,6 +629,7 @@ spatial_projection_parameters_plot_current <- reactive({
     point_size = controls$point_size,
     point_opacity = controls$point_opacity,
     draw_border = isolate(spatial_projection_appearance$draw_border),
+    picture_outline = isolate(spatial_projection_appearance$picture_outline),
     group_labels = isolate(spatial_projection_appearance$group_labels),
     keep_square = isolate(spatial_projection_appearance$keep_square),
     show_region_outlines = isolate(spatial_projection_region_outlines()),

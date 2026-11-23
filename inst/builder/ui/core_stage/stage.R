@@ -515,12 +515,18 @@ builder_viewer_display_ui <- function(id, entry, epoch) {
           "spatial_region_outlines",
           "Outline group regions (convex hull)"
         ),
+        ## Light outline around points over a dark picture (on unless the
+        ## author turns it off).
+        flag(
+          "spatial_picture_outline",
+          "Outline points on dark pictures"
+        ),
         ## Which sections the Spatial page starts with: all of them draw the
         ## grid. A data set with one section ignores it.
         select(
           "spatial_layout",
           "Open Spatial with (data sets with several sections)",
-          c("The first section" = "single", "All sections" = "grid")
+          c("All sections" = "grid", "The first section" = "single")
         )
       )
     ),

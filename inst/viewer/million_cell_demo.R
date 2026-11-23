@@ -231,7 +231,7 @@ viewerAddVisiumDemos <- function(
       options,
       file.path(root, demo$crb),
       label,
-      demo$point_size %||% 5,
+      demo$point_size %||% 4,
       demo$point_opacity %||% 1
     )
     options <- viewerLinkDemoPictures(

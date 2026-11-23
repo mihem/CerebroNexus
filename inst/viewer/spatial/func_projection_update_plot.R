@@ -277,7 +277,8 @@ spatial_projection_update_plot <- function(input) {
         appearance = list(
           group_labels = FALSE,
           draw_border = isTRUE(plot_parameters[["draw_border"]]),
-          keep_square = isTRUE(plot_parameters[["keep_square"]])
+          keep_square = isTRUE(plot_parameters[["keep_square"]]),
+          picture_outline = !isFALSE(plot_parameters[["picture_outline"]])
         )
       )
     )
@@ -361,6 +362,7 @@ spatial_projection_update_plot <- function(input) {
     point_opacity = plot_parameters[["point_opacity"]],
     group_labels = plot_parameters[["group_labels"]],
     keep_square = plot_parameters[["keep_square"]],
+    picture_outline = plot_parameters[["picture_outline"]],
     point_line = point_line,
     x_range = x_range_out,
     y_range = y_range_out,
