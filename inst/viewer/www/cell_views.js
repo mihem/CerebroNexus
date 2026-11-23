@@ -132,7 +132,6 @@
   var nicheSet = null;          // cell indices inside the picked nucleus's niche
   var colorBy = null;           // group name
   var DEFAULT_POINT_SIZE = 4;   // the size a view starts with when nothing configures one
-  var GRID_POINT_SIZE = 2;      // the default size in the panels of a grid of sections
   var ps = DEFAULT_POINT_SIZE;  // point diameter in CSS pixels
   var pointOpacity = 1;         // base draw opacity (no-selection view)
   var bordersOn = false;        // outline cell points in the active view
@@ -210,10 +209,14 @@
     return !tab || tab === 'Clonal UMAP';
   }
   var lastScatterEdit = 0, lastScatterEditContext = null;
+  // The data set in which the reader moved a point-size slider: from then on
+  // the size is theirs, also when it is the default's value.
+  var pointSizeUserContext = null;
   function publishScatterEdit(field, value) {
     if (!field || !currentDatasetContext()) return;
     lastScatterEdit = Date.now();
     lastScatterEditContext = currentDatasetContext();
+    if (field === 'point_size') pointSizeUserContext = lastScatterEditContext;
     var known = sharedScatterValues();
     var values = Object.assign({}, known || {});
     values[field] = value;
@@ -1968,15 +1971,36 @@
     if (!pointSizeEdited && sp && sp.builder_point_size != null) {
       size = Math.max(1, Math.min(20, Number(sp.builder_point_size)));
     }
-    // The default size (nothing configured it, no slider moved it) is smaller
-    // in the panels of a grid of sections, where many cells share a small
-    // panel, and the default again in the panel enlarged.
-    if (!pointSizeEdited && size === DEFAULT_POINT_SIZE && sp &&
+    // The default size (nothing configured it, no slider moved it) in the
+    // panels of a grid of sections follows how densely the section's cells
+    // sit in its panel.
+    if (size === DEFAULT_POINT_SIZE && sp &&
         (sp._gridSection != null || (!singleActive && isSpatialSpace(sp))) &&
-        !(focusPanel && p.key === focusPanel)) {
-      return GRID_POINT_SIZE;
+        !(pointSizeUserContext &&
+          sameDatasetContext(pointSizeUserContext, currentDatasetContext()))) {
+      return densityPointSize(p, sp);
     }
     return size;
+  }
+  // About the spacing of the points on screen: the area of the tissue in the
+  // panel (the panel's plot area times the share of the unit box its cells
+  // occupy) over the number of cells, as a side. Never above the default
+  // size, so sparse data keeps it and dense data (66,000 cells in a small
+  // panel) shrinks to a point or two; enlarging the panel grows it back.
+  var DENSITY_POINT_FACTOR = 1.3;
+  function densityPointSize(p, sp) {
+    var u = sp._unit;
+    var n = sp._cells ? sp._cells.length : (D ? D.n : 0);
+    if (!u || !u.occ || !(p._SX > 0) || !(p._SY > 0) || !(n > 0)) return DEFAULT_POINT_SIZE;
+    if (u._occShare == null) {
+      var filled = 0;
+      for (var i = 0; i < u.occ.length; i++) if (u.occ[i]) filled++;
+      // A unit not normalised yet has an empty lattice: half the box.
+      u._occShare = filled ? filled / u.occ.length : 0.5;
+    }
+    var side = Math.sqrt(p._SX * p._SY * u._occShare / n);
+    var size = Math.round(DENSITY_POINT_FACTOR * side * 10) / 10;
+    return Math.max(1, Math.min(DEFAULT_POINT_SIZE, size));
   }
   function pointOpacityOf(p) {
     var sp = spaceById[p.spaceId];
