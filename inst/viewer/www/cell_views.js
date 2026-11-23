@@ -1506,13 +1506,14 @@
     return dark;
   }
   // The outline of a panel's points: light, when the picture drawn under them
-  // is dark and the outline is on; else none.
+  // is dark and the outline is on; else none. Faint (alpha .35), so the
+  // outlines of overlapping points do not add up to white.
   function pictureOutline(p) {
     if (!pictureOutlineOn || (!singleActive && !linkedBackgroundsOn)) return null;
     var sp = spaceById[p.spaceId];
     var state = sp && sp._imgState;
     if (!sp || !currentImage(sp) || !sp._imgEl || !sp._imgReady || !state || !state.show) return null;
-    return pictureIsDark(sp._imgEl) ? { color: 'rgba(255,255,255,.85)', width: 0.8 } : null;
+    return pictureIsDark(sp._imgEl) ? { color: 'rgba(255,255,255,.35)', width: 0.8 } : null;
   }
 
   function drawImage(p, context) {
