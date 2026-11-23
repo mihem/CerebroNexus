@@ -326,9 +326,9 @@ window.viewerScenarios = {
       t.dataset(key,generation);t.resetPaint();t.linked({spaces:[space()]});await t.settle();
       t.equal(requests().length,generation,'New generation requests its own image');
       sendAsset(a,uri);await t.settle();
-      t.check(!t.paints.some(p=>p.method==='drawImage'&&p.args[0] instanceof HTMLImageElement),'Retired image cannot paint');
+      t.check(!t.paints.some(p=>p.method==='drawImage'&&p.args[0] instanceof HTMLImageElement&&!p.canvas.hasAttribute('data-cv-probe')),'Retired image cannot paint');
       sendAsset({...t.context},uri);await t.settle();
-      t.check(t.paints.some(p=>p.method==='drawImage'&&p.args[0] instanceof HTMLImageElement),'Fresh image paints');
+      t.check(t.paints.some(p=>p.method==='drawImage'&&p.args[0] instanceof HTMLImageElement&&!p.canvas.hasAttribute('data-cv-probe')),'Fresh image paints');
     }
     const config=cerebroLinkedViewsState.capture();
     const rgbMode=t.choices('cv-pick-color').find(o=>o.text.includes('RGB')).value;
@@ -343,7 +343,7 @@ window.viewerScenarios = {
     const identity={image:'slice'},id='spatial_projection';
     await t.render({}, {is_spatial:true,background_image:image.toDataURL(),image_bounds:{xmin:0,xmax:20,ymin:0,ymax:10},
       background_identity:identity,background_opacity:.4},id,{background_identity:identity});
-    const draw=()=>t.paints.findLast(p=>p.method==='drawImage'&&p.args[0] instanceof HTMLImageElement);
+    const draw=()=>t.paints.findLast(p=>p.method==='drawImage'&&p.args[0] instanceof HTMLImageElement&&!p.canvas.hasAttribute('data-cv-probe'));
     t.check(draw(),'Background decoded and painted');t.equal(draw().alpha,.4);
     for(const patch of [{dataset_context:{...t.context,generation:0}},{background_identity:{image:'other'}}]) {
       t.send('cell_view_background',{id,dataset_context:{...t.context},background_identity:identity,values:{opacity:.1},...patch});

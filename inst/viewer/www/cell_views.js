@@ -3128,6 +3128,9 @@
   function drawPanel(p) {
     if (drawAllDeferred || !p || !p.spaceId ||
         (awaitingSupplement && awaitingSupplement === D)) return;
+    // A panel not on stage (offStage()) is drawn when it comes near, also
+    // when its cells arrive.
+    if (offStage(p)) { p._resizedUndrawn = true; return; }
     var state = shownState(p);
     draw(p, state.mask, state.count);
     updateResetButtons();
