@@ -9,8 +9,7 @@ output[["spatial_projection_scatter_parameters_UI"]] <- renderUI({
   section_appearance <- spatialPointAppearance(
     Cerebro.options,
     viewer_current_dataset_key(),
-    spatial_projection_single_section(input, availableSpatial()),
-    n_cells = getNumberOfCells()
+    spatial_projection_single_section(input, availableSpatial())
   )
   if (!is.null(section_appearance)) {
     appearance$point_size <- section_appearance$point_size

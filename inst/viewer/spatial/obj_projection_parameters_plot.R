@@ -424,8 +424,7 @@ spatial_projection_parameters_plot_current <- reactive({
     section_appearance <- spatialPointAppearance(
       Cerebro.options,
       dataset,
-      spatial_name,
-      n_cells = getNumberOfCells()
+      spatial_name
     )
     if (!is.null(section_appearance)) {
       default_appearance[names(section_appearance)] <- section_appearance

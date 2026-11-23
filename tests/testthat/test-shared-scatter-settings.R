@@ -241,3 +241,22 @@ test_that("Builder, function and Viewer agree on coordinate appearance bounds", 
     }
   }
 })
+
+test_that("no Viewer code passes a cell count to the point-size defaults", {
+  ## They take none: an extra argument stops the page that calls them.
+  files <- list.files(
+    viewer_test_path(),
+    pattern = "[.]R$",
+    recursive = TRUE,
+    full.names = TRUE
+  )
+  call <- "(viewerScatterDefaults|spatialPointAppearance)[(]([^()]|[(][^()]*[)])*n_cells"
+  offenders <- Filter(
+    function(file) {
+      text <- paste(readLines(file, warn = FALSE), collapse = " ")
+      grepl(call, text, perl = TRUE)
+    },
+    files
+  )
+  expect_identical(offenders, character())
+})
