@@ -117,9 +117,14 @@ or the export.
   column or gene. A group has one colour in every section, and a gene has one
   colour scale whose range covers all sections, so the same value has the same
   colour in each section.
-- **Own image**: each section shows the first histology image bound to it
-  (embedded, or from `spatial_images`). A section without an image shows its
-  cells without one.
+- **Own image**: each section starts with the first histology image bound to
+  it (embedded, or from `spatial_images`), and the **Background images** field
+  lists the images grouped by section, so a section's image can be changed or
+  removed. A section without an image shows its cells without one.
+- **Dark pictures**: over a dark picture, such as a fluorescence image, points
+  are drawn with a light outline so they stay visible. It is on by default and
+  can be switched off with *Outline points on dark pictures* in the page's
+  settings.
 - **Order** and **Columns**: the panels follow the order of the sections in
   the field; remove a section to hide it, and add it back to move it to the
   end. **Columns** fixes the number of columns; *Auto* fits them to the window.
@@ -135,10 +140,10 @@ or the export.
   the sections and picks the columns that show the most tissue; *Square* draws
   square panels. Every panel has the same size, so all sections are drawn at
   one scale.
-- **Opening in the grid**: in the Builder, the Spatial card of the Viewer
-  display settings has *Open Spatial with: All sections*, which makes a data
-  set with several sections open Spatial in the grid. Readers can still pick
-  one section.
+- **Opening in the grid**: a data set with several sections opens Spatial in
+  the grid. In the Builder, the Spatial card of the Viewer display settings has
+  *Open Spatial with*, which can be set to *The first section*. Readers can
+  always pick one section or all of them.
 
 Each panel zooms and pans on its own and shows the usual tooltips. RGB
 co-expression works in the grid: *RGB layout* shows one composite panel per

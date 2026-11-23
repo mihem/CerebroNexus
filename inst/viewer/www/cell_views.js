@@ -11207,7 +11207,10 @@
       return '<div class="cv-grid-skeleton-card"><div class="cv-grid-skeleton-title">' +
         esc(label) + '</div><div class="cv-grid-skeleton-plot" style="height:' +
         Math.round(pack.height) + 'px"></div></div>';
-    }).join('');
+    }).join('') +
+      // A turning ring, which a busy page keeps turning (a transform
+      // animation runs off the main thread) while the sections load.
+      '<div class="cv-grid-spinner" role="status" aria-label="Loading sections"></div>';
     host.parentNode.insertBefore(skeleton, host);
     host.classList.add('cv-panes-pending');
     gridSkeleton = skeleton;

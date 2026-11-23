@@ -1,295 +1,87 @@
 # CerebroNexus 8.5.0
 
-- **Linked views has a Columns field.** As on Spatial's grid, *Columns* sets
-  how many panels a row holds (Auto, or 1 to 8); both pages build the field
-  with one function, `cerebroColumnsInput()`, and lay the panels out with
-  one reading of it.
-- **One smallest panel size on every page.** Panels of Linked views, the
-  Spatial grid, Gene expression's separate panels and an enlarged view's
-  context keep plots of at least 250 pixels a side, and the page scrolls
-  below that. Before, Linked views kept 300 pixels (240 at a pinch), the
-  Spatial grid 160 (120 drawn) and an enlarged view's context 260.
-- **Multi-select fields show one item and a count.** On every page, a field
-  with more than one item chosen (Sections, Background images, genes) shows
-  its first item and a badge with the count, such as "12+", and is only as
-  wide as the two. Clicking the field or the badge opens the list, which
-  starts with every chosen item and its cross and shows everything when the
-  window is tall enough; clicking elsewhere closes it. The list opens over the
-  page, so the toolbar keeps its height and the field its width. Spatial's
-  Sections and Background images and Linked views' Sections show "12 of 12"
-  with *All* and *One* beside their label; in Background images, *All* gives
-  each section its first picture.
-- **The grid chooses each section's picture.** With several sections shown,
-  Spatial's *Background images* field lists the pictures grouped by section,
-  as the Sections field and Linked views' Colour by do. Every section starts
-  with its first picture, as in the single view; a chosen picture is a
-  removable chip such as "Br5292_151508: hires", a section shows at most one
-  (choosing another in its group replaces it), and it keeps its choice while
-  other sections are added or removed.
-- **An enlarged view's thumbnails only lead to their panel.** With a panel
-  enlarged, a click anywhere on a thumbnail, or on the Enlarge icon at its top
-  right, enlarges it; its cells no longer take hover, selection or zoom, and
-  its toolbar, tooltip, minimap and Moran's I badge are hidden. The enlarged
-  panel shows its Restore button without the "Enlarged" badge, and thumbnails
-  lose their "Context" badge.
-- **The Kukanja demos show each section's DAPI picture.** `run-demo.R
-  --data=eae,ms` now also writes the authors' picture of every section
-  (52 for EAE, 6 for MS) next to the CRB, turned into the cells' aligned
-  coordinates: the map from picture pixels to those coordinates is fitted on
-  each section's own cells, and a slide holding two sections is cut to each.
-  The Viewer shows them as the sections' Spatial images, in the single view
-  and in the grid. The CRBs are not rebuilt for this.
-- **Large data sets start with small points.** A data set of more than
-  100,000 cells opens every page (Projection, Gene expression, Spatial,
-  Linked views, Trajectory, Immune repertoire) with points of size 1, and the
-  sizes a Builder saved for its Spatial sections are capped the same way; the
-  slider still sets any size. `Cerebro.options$large_data_point_size_cells`
-  moves the threshold (`Inf` turns it off).
-- **Smaller grid panels draw smaller, lighter points.** A panel of the Spatial
-  grid narrower than 640 pixels scales its points down with its width (to 30
-  % at most, never below one pixel) and makes them more transparent, so the
-  tissue picture stays readable in a grid of many sections.
-- **A large grid reads its sections from the Viewer Pack.** A grid of more
-  than 400,000 cells names the Pack file that holds each whole, unrotated
-  section's positions, and the browser fetches those files side by side and
-  keeps them, so the server's batches carry only colours and names. A failed
-  file turns this off for the session and the batches carry the positions
-  again. On the Allen atlas (3.9 million cells in 59 sections; Windows,
-  Chrome) choosing every section sends 19.7 MB instead of 51.2 MB over the
-  connection; the second time, the first screen of panels is drawn after
-  2.1 s instead of 2.8 s and all 59 after 2.8 s instead of 4.0 s. The files
-  are fetched a few at a time, in the order of the panels, so that they do
-  not hold back the batches that bring the colours: on a 50 Mbit/s link the
-  first screen is drawn after 3.9 to 5.2 s the first time instead of 5.8 to
-  6.3 s with every file at once (0.2 to 0.5 s later on the same computer),
-  and all 59 after 4.1 to 4.3 s the second time instead of 9.9 to 11.8 s
-  without the files.
-- **Recolouring a grid keeps its panels.** Colouring the Spatial grid by
-  another column or gene updates the colours of the panels in place instead
-  of building them anew, and a gene that few cells express sends those cells
-  only. On the Allen atlas the page's longest stall falls from 1.1 s to 0.3 s
-  for a column and from 1.3 s to 0.7 s for a gene, and colouring by *Vip*
-  sends 7.4 MB instead of 31.5 MB.
-- **Moran's I finds neighbours through buckets.** Each cell's six nearest
-  cells are looked up in a grid of buckets instead of among all cells of its
-  section, with the same neighbours in the same order: 1.6 ms a section
-  instead of 26 ms on the Allen atlas.
-- **Linked views draws its sections first.** The columns a selection needs
-  are read after the sections are drawn, and a section's ROI context reads
-  its rows as they are when it holds all of them. On the Allen atlas Linked
-  views has its sections after 2.4 s instead of 4.1 s and is ready after
-  6.7 s instead of 8.1 s. The sections of a data set without ROIs are built
-  from the rows the Viewer Pack stores, without reading the 3.9 million cell
-  names: opened right after loading, Linked views is ready after 3.5 s
-  instead of 12 s on an idle machine.
-- **Cell names are made only for the cells that need them.** A table of
-  selected cells, a hover or a click on one cell takes the names of those
-  cells from the Viewer Pack's names file instead of reading all of them
-  first; Trajectory's table and distribution plot name their own cells;
-  Colour management and Trekker read the first-frame metadata instead of the
-  whole CRB; and the Viewer no longer reads every name ahead while idle
-  (4 s of the R process and 400 MB on the Allen atlas).
-- **Colour management opens faster with many groups.** The colour pickers
-  of a column's groups are written at once instead of one by one: with the
-  1,640 groups of the Allen atlas the page opens in 1.0 to 1.8 s instead of
-  3.5 to 4.1 s.
-- **Enlarge and background pictures stall less.** Thumbnails off the strip
-  of an enlarged view are sized and drawn when the strip brings them in, so
-  Enlarge on the 59 Allen sections stalls the page for about 60 ms instead
-  of 130 to 180 ms. A background picture that arrives redraws only its own
-  panels, and Linked views fetches the pictures kept in files over HTTP, not
-  as base64 through the websocket: the 52 Kukanja EAE pictures cost 0.13 s of
-  script instead of 1.7 s of long frames.
-- **The GPU draws the highest expression on top.** With WebGPU, a view
-  coloured by a gene keeps its points in cell order and hands the renderer
-  the paint order as a list of indices, so a new gene rebuilds colours and
-  that list, not every point's position. The picture is the same to the
-  pixel. On the Allen atlas (3.9 million cells) the page stalls for 0.7 s
-  instead of 1.4 to 1.7 s on the first gene of Gene expression and 0.4 s
-  instead of 0.7 to 0.9 s on the next; Linked views with all 59 sections
-  for 0.8 s instead of 1.2 to 1.4 s. WebGL keeps the order on the CPU. The
-  order of an expression field is found by a radix sort on the float
-  values, 0.08 s instead of 0.3 s for 3.9 million cells in a script test.
-- **Spatial shows all sections side by side.** A data set with more than one
-  spatial entry (tissue sections, FOVs, capture areas) can show several of
-  them at once: the Spatial page's **Sections** field takes one section (the
-  single view as before) or several (a grid with one panel per section;
-  clicking a panel's title shows only that section). All sections are
-  coloured by the same metadata column or gene. A group has one colour in
-  every section, and a gene has one colour scale whose range covers all
-  sections, so a value has the same colour in each section. RGB
-  co-expression works in the grid too, as one composite panel per section or,
-  with *RGB layout: Separate channels*, one panel per section and channel.
-  Each section shows the first histology image bound to it, and a section
-  without one shows its cells without an image. The order of **Sections** is
-  the order of the panels, **Columns** fixes the number of columns, and
-  **Sync zoom** moves the other sections with the one being zoomed or panned;
-  none of them reloads data. **Embedding** adds a UMAP (or another
-  projection) panel: selecting cells in it highlights them in every section,
-  and the selected-cells plot and table list the cells of all sections. All
-  panels have one size, so the sections are drawn at one scale, and the
-  number of columns is chosen to show as much tissue as the window holds. A
-  switch between one section and several shows the coming panels at once,
-  titled, while the server prepares them, and the sections the grid will need
-  are read while the session is quiet. The panels share one copy of the
-  cells' positions instead of one per panel. Like the UMAP pages, Spatial has
-  a switch at the top right, **Panel shape**: *Fit tissue* (the default)
-  shapes the plot to the tissue, and *Square* draws every panel as a square.
-  With 1.2 million cells in 12 sections (Windows, Chrome, WebGPU), the grid
-  opens in 1.2 to 1.8 s, recolouring by a gene takes 1.4 to 2.1 s, and a
-  synced zoom 13 to 31 ms; with the 800,000 cells of the 8 sections of CosMx
-  NSCLC, 0.9 s to open and to recolour. Exports are unchanged. ROIs and region
+- **Spatial shows all sections side by side.** A data set with several spatial
+  entries (tissue sections, FOVs, capture areas) opens Spatial as a grid with
+  one panel per section; the Builder's *Open Spatial with* chooses the first
+  section instead. *Sections* takes one section or several, with *All* and
+  *One*; *Columns* fixes the number of columns; *Sync zoom* moves the panels
+  together; *Embedding* adds a UMAP whose selection highlights the cells in
+  every section; *Panel shape* is *Fit tissue* or *Square*. All sections share
+  their colours and one colour scale for a gene, RGB co-expression works in
+  the grid, and a panel's title shows only its section. ROIs and region
   outlines stay single-section views.
-- **Toolbars pack tighter on every page.** A single-choice field is as wide
-  as its value needs (at least 168 px), a multiple choice starts at 220 px and
-  grows with its selections, fields no longer stretch to fill a row, and
-  Share and Settings end the last row, so the controls take fewer rows and the
-  plot more of the window. Page titles sit closer to the top of the window.
-  Groups, Marker genes, Most expressed genes, Enriched pathways and Linked
-  views use the same toolbar. The composition plots of Groups and of
-  Trajectory's States by group pick *Plot type* and *Bars show* (number or
-  percent of cells) in fields instead of a button group and a switch.
-- **Every page names and orders its fields the same way.** A toolbar reads
-  data (Projection, Sections, Method, Receptor), then *Display mode* or
-  *Colour by*, then the genes, then that mode's options (Panel colours, RGB
-  layout). Spatial's Plot type is *Display mode* with the options *Groups*,
-  *Gene expression* and *RGB co-expression* (the values, and so shared
-  links, are unchanged); Linked views lists Gene expression's three modes
-  under the same names; Feature/Gene is *Gene*, Spatial data *Sections*,
-  Choose a method / trajectory *Method* / *Trajectory*, the switch at the
-  top right is *Panel shape* on every page (was UMAP layout or Trajectory
-  layout), and labels lose their colons. Settings drawers read Appearance (point size and opacity,
-  group labels, region outlines, borders, square plots), Data (*Show % of
-  cells*, on Spatial and Immune repertoire too), Analysis, then Group
-  filters, on HLA & TCR Motifs as well.
-- **Square keeps the canvas.** The *Square* layout of the cell views draws
-  the plot in the largest centred square of a canvas that keeps the panel's
-  size, outlined by a light grey frame, instead of shrinking the canvas to a
-  square on a grey mat.
-- **Point size, opacity and % of cells reach every panel.** On Linked views
-  each section kept the point size, opacity and share of cells of its Spatial
-  settings whatever the sliders said, so the sliders moved only the
-  embedding. A section's own settings now hold until the reader moves a
-  slider, as on the other pages, and then every panel follows it.
-- **Dragging Point size, Point opacity or Show % of cells no longer stalls.**
-  The server's echo of each step set the dragged slider and the drawing back
-  to an older step mid-drag, and every step filtered all cells of every panel
-  again (0.6 s a step on Linked views with a million cells). While a slider
-  is held, echoes are left out, the plot redraws once per frame (or, when a
-  draw is slow, without the GPU, once the slider rests or is let go), and
-  "% of cells" is applied when the slider rests or is let go.
-- **Enlarge reads like a photo viewer.** Enlarge in Linked views, the
-  Spatial grid or Gene expression's separate panels shows the enlarged panel
-  large and the others as one strip of thumbnails, below it or to its left,
-  wherever the enlarged plot is drawn larger (an embedding or most sections in
-  a wide window: to the left; a very wide section: below), instead of
-  wrapping them into rows with empty space around. The strip, its arrows
-  included, is as long as the enlarged panel is wide or tall. When the
-  thumbnails do not fit, the arrows at its ends (or the arrow keys) scroll it
-  smoothly, a thumbnail at a time, with the thumbnails at either end shown in
-  part, so many sections never shrink the enlarged panel; a thumbnail's title
-  enlarges
-  it. Enlarge and Restore move each panel at its own proportions instead of
-  stretching it, and draw the plots once instead of twice: with a million
-  cells in 13 panels, 70 to 74 frames a second instead of 42 to 60, with no
-  pause longer than 67 ms instead of up to 384 ms. Spatial's *Sync zoom* is a
-  switch, as Linked views' Cross-view highlight, with a short help on hover.
-- **Linked views fills the window.** Its panels have one size and their rows
-  share the window's height, so the views end at the window's bottom edge
-  instead of leaving it empty.
-- **The Builder can store Spatial images inside the CRB.** The Spatial
-  alignment panel of a data set with images asks where they go: as separate
-  files beside the Viewer App (the default: a smaller CRB that opens and
-  switches faster) or inside the CRB, which then carries its pictures alone and
-  can be built as CRB files only. Stored inside, a picture keeps the bytes as
-  uploaded and its alignment as live settings, so the Viewer draws it exactly
-  as the same picture kept as a file (prostate: 49 MB CRB with separate files,
-  65 MB with the pictures inside).
-- **Highest expression on top in Preferences, on by default.** The sidebar's
-  Preferences have a *Highest expression on top* switch, the same setting as
-  the one in Gene expression's settings: changing either changes the other.
-  Gene expression now draws the highest values on top by default; authors who
-  want the input order choose it in the Builder (*Input order*), as before.
-  Each Preferences switch has a small *i* that shows a short help on hover or
-  click, and the block takes less height.
-- **The Builder chooses how Spatial opens.** Its Viewer display settings have
-  *Open Spatial with: The first section | All sections* in the Spatial card,
-  stored as `spatial_layout` with the other page defaults; a data set with one
-  section always opens as one section, and Apps and projects without the
-  setting open as before. The card's square option reads *Square panels*, as
-  the Viewer's Panel shape switch does.
-- **A CRB no longer stores each spatial section's expression twice.** Every
-  section kept a copy of the expression matrix's columns for its cells. A CRB
-  now stores a reference to those columns instead, and
-  `getSpatialData()` rebuilds the section's matrix from the object's matrix
-  (`hydrate_expression = FALSE` leaves the reference, as the Viewer, the
-  Builder and `createShinyApp()` do). A section matrix that differs from the
-  object's matrix is still stored. For the Visium demos below, the CRBs are
-  half as large and are read in a third to a quarter of the time (DLPFC, 12
-  sections: 314 to 156 MB, 1.5 to 0.47 s). CRBs written before keep their
-  copies and read as before.
-- **Switching data sets no longer fetches the histology pictures again.** The
-  Viewer keeps decoded pictures by file (up to about 100 million pixels), so
-  returning to a data set shows its sections' pictures with its cells, and the
-  App sends pictures without gzip, which took 110 ms for a 6.7 MB PNG and made
-  it larger.
-- **Multi-section Visium demos for the Builder.** `Rscript run-demo.R
-  --data=dlpfc,mouse_brain,breast,prostate` downloads four public 10x Visium
-  data sets with the H&E picture of every section (human DLPFC, 12 sections;
-  mouse brain, 4; breast cancer, 2; prostate cancer and normal, 2), checks
-  each file's size and MD5, and writes one SingleCellExperiment file per data
-  set. The Builder's own build steps then turn each file into a CRB, every
-  section with its own picture and Spatial opening as the grid. The data sets
-  open in the same Viewer as the other large demos (`--data=1m,dlpfc` works),
-  and the file can still be imported in the Builder. Sources and licences are
-  in `data-raw/large-demo/visium.ATTRIBUTION.md`.
-- **Spatial demos with many sections.** `Rscript run-demo.R
-  --data=allen,eae,ms` prepares the Allen whole mouse brain MERFISH atlas
-  (3,938,808 cells in 59 coronal sections, 550 genes; Yao et al. 2023) and the
-  spinal cord data of Kukanja et al. 2024: mouse EAE by in situ sequencing
-  (592,421 cells, 52 sections) and human MS by Xenium (660,801 cells, 6
-  sections). Each section is one spatial entry, with the authors' cell types
-  and colours, so the data sets exercise the Spatial grid, its enlarged view
-  and Linked views with many panels. Sources and licences are in
-  `data-raw/large-demo/allen.ATTRIBUTION.md` and `kukanja.ATTRIBUTION.md`.
-- **A group with a thousand levels or more no longer stops the Viewer.** A data
-  set with such a group (the Allen atlas's 1,201 supertypes) ended the
-  session when it opened.
+- **The grid chooses each section's picture.** *Background images* lists the
+  pictures grouped by section; every section starts with its first picture, a
+  chosen picture is a removable chip, and a section keeps its choice while
+  other sections come and go.
+- **Points over a dark picture get a light outline.** Over a picture darker
+  than a mean brightness of 0.35 (a fluorescence image such as the Kukanja
+  DAPI sections) points are drawn with a light outline. It is on by default;
+  *Outline points on dark pictures* in the settings of Spatial and Linked
+  views, and in the Builder's Spatial display settings, turns it off.
+- **Points start at size 4.** The Viewer, `launchCerebro()`,
+  `createShinyApp()` and the Builder default to 4. The rules that changed the
+  size by themselves are gone: size 1 above 100,000 cells (and its option
+  `large_data_point_size_cells`), and smaller, lighter points in small grid
+  panels. The sliders and the author's settings still set any size.
+- **Enlarge reads like a photo viewer.** In Linked views, the Spatial grid and
+  Gene expression's separate panels, Enlarge shows one panel large and the
+  others as a strip of thumbnails beside or below it, scrolled by its arrows
+  or the arrow keys; a click on a thumbnail enlarges it. Enlarge and Restore
+  move each panel smoothly, and thumbnails off the strip are drawn only when
+  the strip shows them (on the 59 Allen sections Enlarge stalls the page for
+  about 60 ms instead of 130 to 180 ms).
+- **Every page lays out and names things the same way.** Panels are at least
+  250 pixels a side and the page scrolls below that; Linked views has a
+  *Columns* field and fills the window; toolbars pack tighter; fields read in
+  one order (data, *Display mode* or *Colour by*, genes, options) with the same
+  names (*Panel shape*, *Sections*, *Gene*); a multi-select shows its first
+  item and a count such as "12+"; the composition plots pick *Plot type* and
+  *Bars show* in fields; *Square* keeps the panel's canvas.
+- **Sliders and Preferences.** Point size, opacity and % of cells reach every
+  panel of Linked views once the reader moves a slider, and dragging them no
+  longer stalls. *Highest expression on top* is in the sidebar's Preferences,
+  the same setting as in Gene expression's settings, and is on by default.
 - **A grid of many sections opens in seconds.** On the Allen atlas (3.9
-  million cells in 59 sections; Windows, Chrome) a second section draws the
-  grid in 2.1 s instead of 31.5 s, and every section in about 4 s instead of
-  31 s. A data set of more than a million cells sends the chosen sections and
-  those nearest to them, up to a million cells, so most further choices are
-  drawn at once; a section beyond them shows the coming panels while it loads.
-  Colouring the grid by another column sends only the new colours (2 MB
-  instead of 51 MB), and adding a section no longer stalls the page for 300 ms:
-  the panels glide to their new places. The grid places cells without naming
-  them, and the Viewer reads the cell names of such a data set while it is
-  idle, so Linked views opens in 7 to 11 s instead of 15 to 24 s.
-- **The sections of a large grid draw as they arrive.** A grid of more than
-  400,000 cells sends the sections shown first with its first message and the
-  others in batches, each with the positions, colours and names of its own
-  cells; a panel draws when its cells come and shimmers until then. The
-  sections of a grid also share their drawing arrays (2 GB for the Allen
-  atlas before). On the Allen atlas, choosing every section fills the first
-  screen of panels after 2.1 s instead of 5.5 s and draws all 59 after 3.3 s;
-  the first message is 2 MB instead of 51 MB, and the page's longest stall
-  falls from 1.3 s to 0.4 s.
-- **Many sections no longer fill the browser's memory.** Every panel of a
-  section kept maps over all cells of the data set, and Linked views kept its
-  own copy of every cell's position per section. A panel now keeps them over
-  its own cells, sections share their positions, a gene's order of drawing is
-  taken per section, and Moran's I of each section is worked out a slice at a
-  time. On the Allen atlas (Windows, Chrome) the browser holds 1.0 GB instead
-  of 1.7 to 2.5 GB for the grid of all 59 sections, and Linked views with all
-  59 holds 1.4 GB instead of 5.5 GB. Colouring that Linked views by a gene
-  freezes the page for 1.9 s instead of 9.7 s and no longer grows it to
-  9.2 GB. A cell's card no longer gives it a position in sections it is not
-  in, and a frame that arrives during a lasso no longer breaks the drag.
-- **Long legends and many sections stay compact.** A colouring by more than
-  24 groups shows three rows of its legend and a *Show all* button. The
-  Sections field keeps its chosen sections in two scrolling rows, counts them
-  (*12 of 59*) and has two shortcuts: *All* and *One*.
+  million cells in 59 sections; Windows, Chrome) every section is drawn after
+  about 3 s instead of 31 s: the sections arrive in batches and draw as they
+  come, their positions are read from the Viewer Pack, recolouring updates the
+  panels in place (a gene few cells express sends those cells only), and a
+  panel keeps its maps over its own cells, so the browser holds 1.0 GB instead
+  of 1.7 to 2.5 GB. A grid of many sections shows a turning ring while it loads.
+- **Linked views and gene colouring are faster on large data.** Linked views
+  builds the sections of a data set without ROIs from the Viewer Pack's rows
+  and makes cell names only for the cells that need them, and draws its
+  sections first: opened right after loading, it is ready after 3.5 s instead
+  of 12 s on the Allen atlas, with 1.4 GB instead of 5.5 GB. With WebGPU the
+  GPU draws a gene's points through the paint order (0.7 s instead of 1.4 to
+  1.7 s on the first gene), the order is found by a radix sort, Moran's I
+  finds neighbours through buckets (1.6 ms a section instead of 26 ms), and
+  Colour management writes its pickers at once (1.0 to 1.8 s instead of 3.5 to
+  4.1 s with 1,640 groups).
+- **Background pictures cost less.** A picture that arrives redraws only its
+  own panels, Linked views fetches pictures kept in files over HTTP instead of
+  as base64 through the websocket (the 52 Kukanja EAE pictures: 0.13 s of
+  script instead of 1.7 s of long frames), and the Viewer keeps decoded
+  pictures, so returning to a data set shows them with its cells.
+- **The Builder stores Spatial images and layout.** The Spatial alignment panel
+  stores images as files beside the Viewer App (a smaller CRB, the default) or
+  inside the CRB; the Viewer display settings choose how Spatial opens and
+  whether points get the dark-picture outline. A CRB stores each section's
+  expression as a reference to the object's matrix instead of a second copy
+  (the Visium demos' CRBs are half as large and read in a quarter to a third
+  of the time); CRBs written before read as before.
+- **Demo data sets with many sections.** `Rscript run-demo.R
+  --data=allen,eae,ms` prepares the Allen MERFISH atlas (59 sections, 3.9
+  million cells) and the Kukanja et al. 2024 spinal cord data (EAE, 52
+  sections; MS, 6), the last two with the authors' DAPI picture of every
+  section, aligned to the cells. `--data=dlpfc,mouse_brain,breast,prostate`
+  prepares four public Visium data sets with their H&E pictures for the
+  Builder. Sources and licences are in `data-raw/large-demo/`.
+- **Fixes.** A data set with a group of a thousand levels or more (the Allen
+  atlas's 1,201 supertypes) no longer ends the session when it opens; a
+  colouring by more than 24 groups shows three rows of its legend and a *Show
+  all* button.
 
 # CerebroNexus 8.4.10
 

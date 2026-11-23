@@ -3302,6 +3302,16 @@ body.cerebro-composition-collapsed .cerebro-selection-composition-row {
 }
 @keyframes cv-skeleton-shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
 @keyframes cv-skeleton-in { from { opacity: 0; } to { opacity: 1; } }
+/* The ring over the skeleton: its transform animation is not held back by a
+   busy page, so the grid never looks frozen while its sections load. */
+.cv-grid-spinner {
+  position: absolute; z-index: 2; left: 50%; top: 110px;
+  width: 34px; height: 34px; margin-left: -17px; box-sizing: border-box;
+  border-radius: 50%; border: 3px solid rgba(15, 23, 42, 0.14);
+  border-top-color: var(--c-accent, #ea580c);
+  animation: cv-spinner-turn 0.8s linear infinite;
+}
+@keyframes cv-spinner-turn { to { transform: rotate(360deg); } }
 .cv-panes.cv-panes-pending { visibility: hidden; }
 .cv-panes.cv-panes-enter { animation: cv-skeleton-in 260ms ease-out; }
 /* A section of a streaming grid whose cells are on their way (cell_views.js,
@@ -3317,7 +3327,7 @@ body.cerebro-composition-collapsed .cerebro-selection-composition-row {
   animation: cv-skeleton-in 300ms ease-out;
 }
 @media (prefers-reduced-motion: reduce) {
-  .cv-grid-skeleton, .cv-grid-skeleton-plot, .cv-panes.cv-panes-enter,
+  .cv-grid-skeleton, .cv-grid-skeleton-plot, .cv-grid-spinner, .cv-panes.cv-panes-enter,
   .coordviews-page .cv-pane.cv-pane-pending .cv-canvas-wrap::after,
   .coordviews-page .cv-pane.cv-pane-arrived .cv-canvas-wrap { animation: none; }
 }
