@@ -2220,28 +2220,6 @@ cerebroCellViewRender <- function(
   invisible(message$render_token)
 }
 
-cerebroCellViewBackground <- function(
-  id,
-  values,
-  dataset_context,
-  background_identity = NULL
-) {
-  dataset_context <- viewerDatasetContext(
-    dataset_context[["epoch"]],
-    dataset_context[["dataset_key"]],
-    dataset_context[["generation"]]
-  )
-  session$sendCustomMessage(
-    "cell_view_background",
-    list(
-      id = id,
-      values = values,
-      dataset_context = dataset_context,
-      background_identity = background_identity
-    )
-  )
-}
-
 cerebroCellViewScatterPayload <- function(
   coordinates,
   color,

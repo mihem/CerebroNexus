@@ -345,12 +345,6 @@ window.viewerScenarios = {
       background_identity:identity,background_opacity:.4},id,{background_identity:identity});
     const draw=()=>t.paints.findLast(p=>p.method==='drawImage'&&p.args[0] instanceof HTMLImageElement&&!p.canvas.hasAttribute('data-cv-probe'));
     t.check(draw(),'Background decoded and painted');t.equal(draw().alpha,.4);
-    for(const patch of [{dataset_context:{...t.context,generation:0}},{background_identity:{image:'other'}}]) {
-      t.send('cell_view_background',{id,dataset_context:{...t.context},background_identity:identity,values:{opacity:.1},...patch});
-      await t.settle();t.equal(draw().alpha,.4,'Stale background adjustment ignored');
-    }
-    t.send('cell_view_background',{id,dataset_context:{...t.context},background_identity:identity,values:{opacity:.7}});
-    await t.settle();t.equal(draw().alpha,.7,'Matching background adjustment paints');
     t.dataset('B',2);t.check(!cerebroCellViews.summary(id).ready,'Dataset switch invalidates specialist');
     return true;
   },

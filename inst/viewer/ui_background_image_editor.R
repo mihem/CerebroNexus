@@ -25,11 +25,11 @@ viewerBackgroundImageEditor <- function(
     class = "cv-ctl cv-bg-ctl cerebro-settings-full",
     id = id("img-pick-ctl"),
     style = "display:none",
-    div(class = "cv-bg-space-tabs", id = id("bg-space-tabs")),
+    div(class = "cv-bg-space-tabs form-group", id = id("bg-space-tabs")),
     div(
       class = "cv-bg-settings",
       div(
-        class = "cv-bg-display",
+        class = "cv-bg-display form-group",
         style = if (!image_select) "display:none",
         tags$label(
           class = "cv-bg-display-title",

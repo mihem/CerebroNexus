@@ -12269,17 +12269,6 @@
       }
       loadSpaceImage(space);
     });
-    if (payload.backgroundState) updateSingleBackground({
-      id: id,
-      dataset_context: payload.dataset_context,
-      background_identity: payload.background_identity_value,
-      values: payload.backgroundState
-    });
-    Object.keys(payload.backgroundEdits || {}).forEach(function (key) {
-      var edit = payload.backgroundEdits[key];
-      updateSingleBackground({ id: id, dataset_context: payload.dataset_context,
-        background_identity: edit.identity, values: edit.values });
-    });
     colorBy = singleSpaceModes[singleSpaceIds[0]] || colorBy;
     hidden = new Set(); groupFilter = {}; deferredColorRequest = null;
     applySingleClientFilters(id);
@@ -12522,12 +12511,8 @@
     var pointCount = data.n != null ? Number(data.n) : (Array.isArray(keys[0])
       ? keys.reduce(function (total, values) { return total + values.length; }, 0)
       : keys.length);
-    var backgroundIdentityValue = message.background_identity != null
-      ? message.background_identity : meta.background_identity;
-    var backgroundIdentity = canonicalIdentity(backgroundIdentityValue);
-    if (previous.background_identity !== backgroundIdentity) {
-      previous.backgroundState = null;
-    }
+    var backgroundIdentity = canonicalIdentity(message.background_identity != null
+      ? message.background_identity : meta.background_identity);
     if (host) {
       host.dataset.datasetEpoch = String(context.epoch);
       host.dataset.datasetKey = String(context.dataset_key);
@@ -12548,8 +12533,7 @@
       extra: extra || {}, dataset_context: context,
       render_token: renderToken, aux_render_token: renderToken,
       datasetIdentity: message.dataset_identity || {},
-      background_identity: backgroundIdentity,
-      background_identity_value: backgroundIdentityValue
+      background_identity: backgroundIdentity
     });
     singleViews[cacheKey].unrequested = unrequested;
     drainGridRows(id, singleViews[cacheKey]);
@@ -12966,38 +12950,6 @@
   function dropPendingSingleState(id) {
     var view = id && singleView(id);
     if (view) view.pendingSavedState = null;
-  }
-
-  function updateSingleBackground(message) {
-    if (!message || !message.id || !datasetMessageFresh(message)) return false;
-    var id = message.id;
-    var view = singleView(id); if (!view) return false;
-    var incomingIdentity = canonicalIdentity(message.background_identity);
-    var panelMatch = (view.data && view.data.panels || []).some(function (panel) {
-      return canonicalIdentity(panel.image_identity) === incomingIdentity;
-    });
-    if (!incomingIdentity || (incomingIdentity !== view.background_identity && !panelMatch)) return false;
-    var values = message.values || {};
-    var names = ['opacity', 'offsetX', 'offsetY', 'scaleX', 'scaleY', 'flipX', 'flipY', 'rotate'];
-    view.backgroundEdits = view.backgroundEdits || {};
-    var oldEdit = view.backgroundEdits[incomingIdentity];
-    view.backgroundEdits[incomingIdentity] = { identity: message.background_identity,
-      values: Object.assign({}, oldEdit && oldEdit.values || {}, values) };
-    if (!panelMatch) view.backgroundState = Object.assign({}, view.backgroundState || {}, values);
-    if (singleActive !== id) return true;
-    var changed = false;
-    singleSpaceIds.forEach(function (spaceId) {
-      var space = spaceById[spaceId]; if (!space || !space._imgState) return;
-      if (panelMatch && space._backgroundIdentity !== incomingIdentity) return;
-      names.forEach(function (name) {
-        if (values[name] == null || space._imgState[name] === values[name]) return;
-        space._imgState[name] = values[name]; changed = true;
-      });
-      stashImgState(space);
-    });
-    // R's reply to a snapshot already drawn changes nothing.
-    if (changed) drawAll();
-    return true;
   }
 
   function onData(bundle) {
@@ -14837,15 +14789,6 @@
       if (!applyColorPatch(patch)) pendingColorPatch = patch;
     });
     Shiny.addCustomMessageHandler('cerebro_background_preset_code', showPresetCode);
-    Shiny.addCustomMessageHandler('cell_view_background', function (message) {
-      updateSingleBackground(message);
-    });
-    // Spatial background controls: draw the snapshot the page sends R at once.
-    window.jQuery(document).on('shiny:inputchanged.cerebroBackground', function (event) {
-      if (event.name === 'spatial_projection_background_controls' && event.value) {
-        updateSingleBackground(Object.assign({ id: 'spatial_projection' }, event.value));
-      }
-    });
     // Overlay data (region outlines) for the drawn frame: replaced in place,
     // without touching the frame's cells or their GPU data.
     Shiny.addCustomMessageHandler('cell_view_extra', function (message) {

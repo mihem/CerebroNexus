@@ -40,13 +40,6 @@ test_that("shared cluster labels are text without background boxes", {
   )
 })
 
-test_that("Spatial background accepts slider and native input events", {
-  expect_node_fixture(
-    "spatial-background-events.js",
-    viewer_test_path("spatial", "js_page_helpers.js")
-  )
-})
-
 test_that("shared lifecycle and background models preserve view semantics", {
   expect_node_fixture(
     "viewer-shared-models.js",

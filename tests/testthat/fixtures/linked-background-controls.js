@@ -25,7 +25,8 @@ const context = {
   $: id => elements[id], backgroundSpaces: () => active ? [active] : [],
   activeSpatial: () => active, spatialImages: sp => sp.images,
   activeSpatialId: null, IMG_NONE: '__none__', singleActive: null,
-  seedImgControls() {}, window: {}, linkedBackgroundsOn: true
+  seedImgControls() {}, window: {}, linkedBackgroundsOn: true,
+  imgId: name => 'cv-img-' + name, bgId: name => 'cv-bg-' + name
 };
 vm.createContext(context);
 vm.runInContext(extract('renderImagePicker', 'setSpatialImage'), context);

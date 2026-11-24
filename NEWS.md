@@ -16,6 +16,13 @@
   picture and *None* takes them all away, and a section keeps its choice while
   other sections come and go. Linked views has the same field in its toolbar,
   in place of the *Background images* switch, when its sections have pictures.
+- **Spatial aligns its pictures like Linked views.** *Background image* in the
+  Spatial settings is the editor Linked views has, one piece of code for both:
+  *Adjust background* picks the section on screen (one per panel in a grid or
+  ROI view), each section keeps its own opacity, position, scale, rotation and
+  flips, and moving a slider redraws the picture at once, with no round trip
+  to R. *Copy alignment as preset* writes the `spatial_image_settings` code
+  for the section chosen.
 - **Points over a dark picture get a light outline.** Over a picture darker
   than a mean brightness of 0.35 (a fluorescence image such as the Kukanja
   DAPI sections) points are drawn with a light outline. It is on by default;
