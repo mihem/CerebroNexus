@@ -28,3 +28,11 @@ test_that("the Spatial and Linked views pages carry the limit's note and the pre
   )
   expect_match(css, "html.cerebro-no-gpu .cerebro-pref-no-gpu", fixed = TRUE)
 })
+
+test_that("the selection's coverage chips are counted in turns, and a released panel is projected for Canvas", {
+  expect_node_fixture(
+    "selection-coverage.js",
+    viewer_test_path("www", "cell_views.js"),
+    pass = "PASS the coverage chips"
+  )
+})

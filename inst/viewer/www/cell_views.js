@@ -1348,7 +1348,9 @@
   }
 
   function ensureScreenProjection(p) {
-    if (p.gpuTransformOnly) project(p, true);
+    // Also a panel whose GPU renderer was given up (releaseGpu()) after it was
+    // projected for the GPU alone: it has no screen positions yet.
+    if (p.gpuTransformOnly || !p.sx) project(p, true);
   }
 
   // The panel's data rectangle on screen, as CBGeom and the GPU renderers take it.
@@ -2882,8 +2884,10 @@
         if (vertexIndex) vertexIndex[slot] = out + 1;
         positions[out * 2] = unit.nx[i];
         positions[out * 2 + 1] = unit.ny[i];
+        // A channel with no gene yet has no values (as rgbAt() reads it).
         var packedRgb = rgb
-          ? rgbGpuColor(D.rgb.r[i], D.rgb.g[i], D.rgb.b[i]) : 0;
+          ? rgbGpuColor(rgb.r ? rgb.r[i] : 0, rgb.g ? rgb.g[i] : 0,
+            rgb.b ? rgb.b[i] : 0) : 0;
         var fg = rgb ? !!(packedRgb & 0x1000000) : !!(hiSet && hiSet.has(i));
         var alpha = hiSet ? (fg ? 0.95 : 0.05)
           : rgb ? (fg ? 1 : 0.5 * pointOpacityOf(p)) : pointOpacityOf(p);
@@ -5177,9 +5181,53 @@
     return label;
   }
 
+  // How many of the selected cells each lens maps: a chip per panel, counted
+  // a slice of the main thread at a time and filled in as the counts come
+  // (tens of thousands of cells in the 60 sections of the Allen atlas took
+  // 0.2 s in the task that draws the selection).
+  var coverageTimer = 0;
+  function renderSelectionCoverage(sourceBaseId) {
+    clearTimeout(coverageTimer);
+    var coverage = $('cv-selcoverage');
+    if (!coverage) return;
+    var cohort = sel, total = sel.size, seenSpaces = {};
+    var queue = panels.filter(function (p) { return p.spaceId && p.ok; });
+    coverage.textContent = '';
+    coverage.hidden = true;
+    var step = function () {
+      var began = performance.now();
+      while (queue.length) {
+        if (sel !== cohort) return;
+        var p = queue.shift();
+        var space = spaceById[p.spaceId];
+        var baseId = (space && space._baseSpaceId) || p.spaceId;
+        if (baseId === sourceBaseId || seenSpaces[baseId]) continue;
+        seenSpaces[baseId] = true;
+        var n = 0; cohort.forEach(function (i) { if (p.ok[i]) n++; });
+        var baseSpace = spaceById[baseId] || space;
+        var label = baseSpace ? baseSpace.label : baseId;
+        var child = document.createElement('span');
+        var description = label + ': ' + fmt(n) + ' of ' + fmt(total) +
+          ' selected cells mapped';
+        child.className = 'cv-coverage-item';
+        child.textContent = compactSpaceLabel(baseSpace, label) + ' ' + fmt(n);
+        child.title = description;
+        child.setAttribute('aria-label', description);
+        coverage.appendChild(child);
+        coverage.hidden = false;
+        if (queue.length && performance.now() - began > 12) {
+          coverageTimer = setTimeout(step, 0);
+          return;
+        }
+      }
+    };
+    step();
+  }
+
   function renderSelbar() {
     var bar = $('cv-selbar');
     if (!bar) return;
+    clearTimeout(coverageTimer);
     if (sel && sel.size) {
       var kicker = $('cv-sel-kicker');
       if (kicker) {
@@ -5231,37 +5279,7 @@
 
       // A cohort remains the same set even when one lens cannot place every
       // member. Report that coverage rather than silently making it look smaller.
-      var mapped = [], seenSpaces = {};
-      panels.forEach(function (p) {
-        if (!p.spaceId || !p.ok) return;
-        var space = spaceById[p.spaceId];
-        var baseId = (space && space._baseSpaceId) || p.spaceId;
-        if (baseId === sourceBaseId || seenSpaces[baseId]) return;
-        seenSpaces[baseId] = true;
-        var n = 0; sel.forEach(function (i) { if (p.ok[i]) n++; });
-        var baseSpace = spaceById[baseId] || space;
-        mapped.push({
-          space: baseSpace,
-          label: baseSpace ? baseSpace.label : baseId,
-          count: n
-        });
-      });
-      var coverage = $('cv-selcoverage');
-      if (coverage) {
-        coverage.textContent = '';
-        coverage.hidden = !mapped.length;
-        mapped.forEach(function (item) {
-          var child = document.createElement('span');
-          var description = item.label + ': ' + fmt(item.count) + ' of ' +
-            fmt(sel.size) + ' selected cells mapped';
-          child.className = 'cv-coverage-item';
-          child.textContent = compactSpaceLabel(item.space, item.label) + ' ' +
-            fmt(item.count);
-          child.title = description;
-          child.setAttribute('aria-label', description);
-          coverage.appendChild(child);
-        });
-      }
+      renderSelectionCoverage(sourceBaseId);
     } else if (pick != null && nicheSet) {
       // A picked Trekker nucleus is the single-cell counterpart of an active
       // cohort. Keep it in the same shared-state surface so its identity,
