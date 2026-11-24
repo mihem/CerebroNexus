@@ -2886,8 +2886,9 @@
         positions[out * 2 + 1] = unit.ny[i];
         // A channel with no gene yet has no values (as rgbAt() reads it).
         var packedRgb = rgb
-          ? rgbGpuColor(rgb.r ? rgb.r[i] : 0, rgb.g ? rgb.g[i] : 0,
-            rgb.b ? rgb.b[i] : 0) : 0;
+          ? rgbGpuColor(D.rgb && D.rgb.r ? D.rgb.r[i] : 0,
+            D.rgb && D.rgb.g ? D.rgb.g[i] : 0,
+            D.rgb && D.rgb.b ? D.rgb.b[i] : 0) : 0;
         var fg = rgb ? !!(packedRgb & 0x1000000) : !!(hiSet && hiSet.has(i));
         var alpha = hiSet ? (fg ? 0.95 : 0.05)
           : rgb ? (fg ? 1 : 0.5 * pointOpacityOf(p)) : pointOpacityOf(p);

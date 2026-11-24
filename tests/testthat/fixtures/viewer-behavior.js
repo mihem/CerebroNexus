@@ -795,6 +795,16 @@ window.viewerScenarios = {
         channels.map((v,j)=>Math.round(grey[j]+(v/max*255-grey[j])*max/255));
       t.equal(byIndex.get(i),expected,'RGB blend '+channels);
     }
+    // A channel with no gene yet has no values: it counts as 0, and drawing goes on.
+    t.resetPaint();await t.render({n,selection_key:Array.from({length:n},(_,i)=>'c'+i),x,y,rgb:{r:rgb.r,g:null,b:null}},
+      {color_type:'rgb',color_variable:'RGB'});
+    const partial=t.uploads.at(-1);t.check(partial,'One channel alone reaches the GPU');
+    const partialByIndex=new Map();for(let j=0;j<partial.count;j++)partialByIndex.set(Math.round(partial.positions[j*2]*(n-1)),partial.colors.slice(j*4,j*4+3));
+    for(let i=0;i<combinations;i+=7) {
+      const max=rgb.r[i],grey=[217,219,222];
+      const expected=max<=28?grey:[max,0,0].map((v,j)=>Math.round(grey[j]+(v/max*255-grey[j])*max/255));
+      t.equal(partialByIndex.get(i),expected,'Red alone '+max);
+    }
     const color=Array(n).fill(0);[2,null,1,2,NaN,0,1].forEach((v,i)=>color[i]=v);
     t.resetPaint();await t.render({n,selection_key:Array.from({length:n},(_,i)=>'c'+i),x,y,color,paint_order:'highest'});
     const ordered=t.uploads.at(-1),indices=[];
