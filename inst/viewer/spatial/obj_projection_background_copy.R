@@ -10,16 +10,18 @@
 ##----------------------------------------------------------------------------##
 observeEvent(input[["spatial_projection_background_copy"]], {
   request <- input[["spatial_projection_background_copy"]]
-  req(is.list(request), is.list(request[["identity"]]), is.list(request[["state"]]))
+  req(
+    is.list(request),
+    is.list(request[["identity"]]),
+    is.list(request[["state"]])
+  )
   identity <- request[["identity"]]
   state <- request[["state"]]
   ## A request made before the data set changed describes another data set.
   req(identical(identity[["dataset"]], viewer_current_dataset_key()))
   number <- function(name, default) {
     value <- state[[name]]
-    if (
-      length(value) == 1L && is.numeric(value) && is.finite(value)
-    ) {
+    if (length(value) == 1L && is.numeric(value) && is.finite(value)) {
       as.numeric(value)
     } else {
       default
