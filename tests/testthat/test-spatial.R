@@ -183,7 +183,7 @@ test_that("validated spatial coordinates reuse canonical storage with fallback",
   calls <- 0L
   environment <- new.env(parent = baseenv())
   environment$data_set <- function() dataset
-  environment$getSpatialData <- function(name) {
+  environment$getSpatialData <- function(name, name_cells = TRUE) {
     calls <<- calls + 1L
     list(coordinates = coordinates)
   }
@@ -284,7 +284,7 @@ test_that("Moran's I reads Spatial data only after ImageFeaturePlot is requested
         )
       })
       getGeneNames <- function() "GeneA"
-      getSpatialData <- function(name) {
+      getSpatialData <- function(name, name_cells = TRUE) {
         spatial_reads(shiny::isolate(spatial_reads()) + 1L)
         list(coordinates = data.frame(x = seq_len(7L), y = seq_len(7L)))
       }
@@ -1191,7 +1191,7 @@ test_that("multi-spatial main UI preserves sliceB and uses its image choices", {
     }
     data_set <- function() TRUE
     availableSpatial <- function() names(atlas)
-    getSpatialData <- function(name) atlas[[name]]
+    getSpatialData <- function(name, name_cells = TRUE) atlas[[name]]
     getMetaData <- function() data.frame(group = c("a", "b"))
     viewerProjectionFirstFrameMetadata <- getMetaData
     viewerSpatialCoordinates <- function(name) atlas[[name]]$coordinates
@@ -1562,7 +1562,9 @@ test_that("sections a thin CRB stores by row are named only when shown", {
     }
     coordinates
   }
-  scope$getSpatialData <- function(name) stop("not needed for the samples")
+  scope$getSpatialData <- function(name, name_cells = TRUE) {
+    stop("not needed for the samples")
+  }
   scope$viewerPackCurrent <- function() list(cell_count = 4L)
   scope$viewerPackSpatialIndex <- function(pack, name) {
     list(A = c(3L, 1L), B = c(2L, 4L))[[name]]
@@ -1643,7 +1645,9 @@ test_that("a section's samples and ROIs are read at its Viewer Pack rows", {
   scope$viewerPackSpatialIndex <- function(pack, name) {
     list(A = c(4L, 1L, 2L), B = 3L)[[name]]
   }
-  scope$getSpatialData <- function(name) stop("no cell name is read")
+  scope$getSpatialData <- function(name, name_cells = TRUE) {
+    stop("no cell name is read")
+  }
   scope$getMetaData <- function() stop("no cell name is matched")
   metadata <- data.frame(
     sample = c("S1", "S2", "S2", "S1"),
@@ -1763,7 +1767,7 @@ test_that("spatial sampling is scoped to the selected FOV, sample, and ROI", {
     viewer_runtime_env(environment())
     getGroups <- function() character()
     getMetaData <- function() metadata
-    getSpatialData <- function(name) atlas[[name]]
+    getSpatialData <- function(name, name_cells = TRUE) atlas[[name]]
     availableSpatial <- function() names(atlas)
     viewerSpatialCoordinates <- function(name) atlas[[name]]$coordinates
     viewerPackCurrent <- function() NULL

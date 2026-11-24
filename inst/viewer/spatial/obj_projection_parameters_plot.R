@@ -380,7 +380,9 @@ spatial_projection_parameters_plot_current <- reactive({
     }
   }
 
-  spatial_data <- getSpatialData(controls$projection)
+  ## Its images and shape only: no cell name is read for it (the ROI scope
+  ## below names the cells itself when it needs them).
+  spatial_data <- getSpatialData(controls$projection, name_cells = FALSE)
   req(spatial_data, spatial_data$coordinates)
   n_dimensions <- ncol(spatial_data$coordinates)
   spatial_name <- controls$projection
@@ -396,7 +398,9 @@ spatial_projection_parameters_plot_current <- reactive({
         spatial_name,
         selected_sample,
         viewerProjectionFirstFrameMetadata(),
-        function() rownames(spatial_data$coordinates) %||% character()
+        function() {
+          rownames(getSpatialData(spatial_name)$coordinates) %||% character()
+        }
       )
       list(field = scope$roi_field, values = scope$roi_values)
     }

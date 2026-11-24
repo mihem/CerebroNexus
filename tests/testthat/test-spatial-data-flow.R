@@ -43,7 +43,7 @@ spatial_flow_server <- function(input, output, session) {
       metadata
     }
   }
-  viewerSpatialFirstFrameData <- function(name) {
+  viewerSpatialFirstFrameData <- function(name, name_cells = TRUE) {
     bounds <- c(xmin = 0, xmax = 10, ymin = 0, ymax = 10)
     if (isTRUE(input$list_bounds)) {
       bounds <- as.list(bounds)

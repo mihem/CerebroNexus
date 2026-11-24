@@ -5221,7 +5221,12 @@ availableSpatial <- function() {
 ## image (about a second for large images). Its result depends only on the
 ## loaded object, so keep it per section until data_set() changes.
 .viewer_spatial_data_cache <- new.env(parent = emptyenv())
-getSpatialData <- function(name) {
+## `name_cells = FALSE` is for a caller that reads only the images or the
+## shape: a section of a thin CRB whose rows the Viewer Pack's index states
+## then keeps its metadata rows as row names, and no cell name is read (about
+## 0.17 s for a section of 66,000 cells, the first time in the process). A
+## section named already, or one that cannot be read so, comes as usual.
+getSpatialData <- function(name, name_cells = TRUE) {
   ds <- data_set()
   if (!is_cerebro_dataset(ds)) {
     return(NULL)
@@ -5237,11 +5242,67 @@ getSpatialData <- function(name) {
   if (!is.null(key) && !is.null(cache[[key]])) {
     return(cache[[key]])
   }
+  if (!is.null(key) && !isTRUE(name_cells)) {
+    rows_key <- paste0("rows:", name)
+    if (is.null(cache[[rows_key]])) {
+      by_rows <- viewerSpatialDataByRows(ds, name)
+      if (!is.null(by_rows)) {
+        assign(rows_key, by_rows, envir = cache)
+      }
+    }
+    if (!is.null(cache[[rows_key]])) {
+      return(cache[[rows_key]])
+    }
+  }
   value <- viewerReadSpatialData(ds, name)
   if (!is.null(key) && !is.null(value)) {
     assign(key, value, envir = cache)
   }
   value
+}
+## The section as getSpatialData(name_cells = FALSE) and Linked views' compact
+## scenes read it, without a cell name: the coordinates keep the metadata rows
+## a thin CRB stores as their row names (so `rownames()` of them are row
+## numbers, not cell names). Only for a section whose rows the Viewer Pack's
+## index states the same way; NULL otherwise.
+viewerSpatialDataByRows <- function(crb, nm) {
+  coordinates <- tryCatch(
+    crb$spatial[[nm]][["coordinates"]],
+    error = function(error) NULL
+  )
+  pack <- attr(crb, "cerebro_viewer_pack", exact = TRUE)
+  if (
+    !is.data.frame(coordinates) ||
+      !isTRUE(attr(coordinates, "cerebro_cell_index_rownames", exact = TRUE)) ||
+      !viewerPackCanonical(pack)
+  ) {
+    return(NULL)
+  }
+  stored <- attr(coordinates, "row.names")
+  index <- tryCatch(viewerPackSpatialIndex(pack, nm), error = function(e) NULL)
+  if (
+    !is.integer(stored) ||
+      !identical(index, stored) ||
+      anyNA(stored) ||
+      any(stored < 1L) ||
+      anyDuplicated(stored)
+  ) {
+    return(NULL)
+  }
+  ## The object's getter names the cells of a thin CRB's section from its
+  ## metadata (and an object saved by an older release has no argument to
+  ## stop that): hand it the section without the flag, and put the stored
+  ## section back afterwards.
+  original <- crb$spatial
+  plain <- coordinates
+  attr(plain, "cerebro_cell_index_rownames") <- NULL
+  entry <- original[[nm]]
+  entry[["coordinates"]] <- plain
+  swapped <- original
+  swapped[[nm]] <- entry
+  crb$spatial <- swapped
+  on.exit(crb$spatial <- original, add = TRUE)
+  tryCatch(viewerGetSpatialData(crb, nm), error = function(error) NULL)
 }
 viewerReadSpatialData <- function(ds, name) {
   ## Rows a thin CRB stores as metadata rows get the Pack's cell names first.

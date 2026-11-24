@@ -489,7 +489,7 @@ output[["spatial_projection_background_selector_UI"]] <- renderUI({
   roi_values <- scope$roi_values
   selected_roi <- scope$roi
   current_sd <- tryCatch(
-    getSpatialData(current_spatial),
+    getSpatialData(current_spatial, name_cells = FALSE),
     error = function(e) NULL
   )
   embedded_images <- if (is.null(current_sd)) {

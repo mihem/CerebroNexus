@@ -956,50 +956,12 @@ cv_build_projections <- function(
 ##     and FOV, with an optional per-image alignment preset and explicit bounds.
 ## Returns list(name, x, y, image) or NULL.
 ## The section as Linked views' compact scenes use it, without reading a cell
-## name: the coordinates keep the metadata rows a thin CRB stores as their
-## row names (so `rownames()` of them are row numbers, not cell names). Only
-## for a section whose rows the Viewer Pack's index states the same way; NULL
-## otherwise, and `cv_spatial_data()` names the cells. A ROI of a cell is read
-## from the metadata at its row.
+## name (viewerSpatialDataByRows()); NULL when it cannot be read so, and
+## `cv_spatial_data()` names the cells. A ROI of a cell is read from the
+## metadata at its row.
 
 cv_spatial_data_by_rows <- function(crb, nm, metadata) {
-  coordinates <- tryCatch(
-    crb$spatial[[nm]][["coordinates"]],
-    error = function(error) NULL
-  )
-  pack <- attr(crb, "cerebro_viewer_pack", exact = TRUE)
-  if (
-    !is.data.frame(coordinates) ||
-      !isTRUE(attr(coordinates, "cerebro_cell_index_rownames", exact = TRUE)) ||
-      !viewerPackCanonical(pack)
-  ) {
-    return(NULL)
-  }
-  stored <- attr(coordinates, "row.names")
-  index <- tryCatch(viewerPackSpatialIndex(pack, nm), error = function(e) NULL)
-  if (
-    !is.integer(stored) ||
-      !identical(index, stored) ||
-      anyNA(stored) ||
-      any(stored < 1L) ||
-      anyDuplicated(stored)
-  ) {
-    return(NULL)
-  }
-  ## The object's getter names the cells of a thin CRB's section from its
-  ## metadata (and an object saved by an older release has no argument to
-  ## stop that): hand it the section without the flag, and put the stored
-  ## section back afterwards.
-  original <- crb$spatial
-  plain <- coordinates
-  attr(plain, "cerebro_cell_index_rownames") <- NULL
-  entry <- original[[nm]]
-  entry[["coordinates"]] <- plain
-  swapped <- original
-  swapped[[nm]] <- entry
-  crb$spatial <- swapped
-  on.exit(crb$spatial <- original, add = TRUE)
-  tryCatch(viewerGetSpatialData(crb, nm), error = function(error) NULL)
+  viewerSpatialDataByRows(crb, nm)
 }
 
 ## The ROI of each cell of a section named by metadata rows (NA where the

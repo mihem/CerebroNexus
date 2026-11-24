@@ -31,7 +31,7 @@ spatial_scene_controls_server <- function(input, output, session) {
     }
   }
   availableSpatial <- function() "fov"
-  getSpatialData <- function(name) {
+  getSpatialData <- function(name, name_cells = TRUE) {
     list(
       coordinates = data.frame(x = 1:6, y = 1:6, row.names = cells),
       histology_images = images
@@ -518,4 +518,41 @@ test_that("Separate ROIs groups and normalizes one background per ROI", {
       ROI4 = "none"
     )
   )
+})
+
+test_that("getSpatialData(name_cells = FALSE) reads no cell name for a section the Pack indexes, and names it when asked", {
+  scope <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("utility_functions.R"), scope)
+  named <- 0L
+  coordinates <- data.frame(x = c(1, 2, 3), y = c(4, 5, 6))
+  attr(coordinates, "row.names") <- c(4L, 1L, 2L)
+  attr(coordinates, "cerebro_cell_index_rownames") <- TRUE
+  dataset <- new.env()
+  dataset$spatial <- list(A = list(coordinates = coordinates))
+  dataset$getSpatialData <- function(name, hydrate_molecules = TRUE) {
+    list(coordinates = dataset$spatial[[name]][["coordinates"]])
+  }
+  attr(dataset, "cerebro_viewer_pack") <- structure(list(), class = "pack")
+  scope$data_set <- function() dataset
+  scope$is_cerebro_dataset <- function(x) TRUE
+  scope$viewerPackCanonical <- function(pack) TRUE
+  scope$viewerPackSpatialIndex <- function(pack, name) c(4L, 1L, 2L)
+  scope$viewerGetSpatialData <- function(ds, name) ds$getSpatialData(name)
+  scope$viewerPackRestoreSpatialNames <- function(pack, object, name) {
+    named <<- named + 1L
+    invisible(FALSE)
+  }
+  rows <- scope$getSpatialData("A", name_cells = FALSE)
+  expect_identical(attr(rows$coordinates, "row.names"), c(4L, 1L, 2L))
+  expect_identical(named, 0L)
+  ## The section is put back as it was stored.
+  expect_true(isTRUE(attr(
+    dataset$spatial$A$coordinates,
+    "cerebro_cell_index_rownames"
+  )))
+  ## Asked again, nothing is read again; asked with names, they are read.
+  expect_identical(scope$getSpatialData("A", name_cells = FALSE), rows)
+  expect_identical(named, 0L)
+  scope$getSpatialData("A")
+  expect_identical(named, 1L)
 })
