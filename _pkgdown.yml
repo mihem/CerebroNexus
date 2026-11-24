@@ -2,6 +2,7 @@ url: https://www.mheming.com/CerebroNexus/
 
 redirects:
   - ["articles/use_sce_and_anndata_data.html", "articles/import_your_analysis.html"]
+  - ["articles/export_a_data_set_in_SCE_format.html", "articles/import_your_analysis.html"]
   - ["articles/multi_crb.html", "articles/create_a_self_contained_shiny_app.html"]
   - ["articles/launch_cerebro_with_pre-loaded_data_set.html", "articles/create_a_self_contained_shiny_app.html"]
   - ["articles/host_cerebro_on_shinyapps.html", "articles/create_a_self_contained_shiny_app.html"]
