@@ -1,5 +1,16 @@
 # Changelog
 
+## CerebroNexus 8.4.11
+
+- **HLA & TCR Motifs no longer stays on “Still loading” when it opens on
+  another sub-tab than Motif Network**
+  ([\#270](https://github.com/mihem/CerebroNexus/issues/270)). The page
+  waited for its motif network canvas to paint, which never happens
+  while Data & QC, Network data or HLA Associations is showing. A canvas
+  page now waits for its canvas only while that canvas is on the visible
+  sub-tab; otherwise it finishes when its outputs settle, like the other
+  pages.
+
 ## CerebroNexus 8.4.10
 
 - The source-checkout demo launcher accepts `--data=xenium-prime`: the

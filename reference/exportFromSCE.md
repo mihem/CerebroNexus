@@ -192,21 +192,21 @@ exportFromSCE(
   use_delayed_array = FALSE,
   verbose = TRUE
 )
-#> [21:31:09] expression_matrix_mode = "auto": 80 cells, so "embedded".
-#> [21:31:09] Initializing Cerebro object...
-#> [21:31:09] Adding expression data (embedded)...
-#> [21:31:09] Collecting available meta data...
-#> [21:31:09] Extracting all meta data columns...
-#> [21:31:09] Extracting dimensional reductions...
-#> [21:31:09] Will export the following dimensional reductions: UMAP
-#> [21:31:09] No trajectories to extract...
-#> [21:31:09] Overview of Cerebro object:
+#> [15:53:16] expression_matrix_mode = "auto": 80 cells, so "embedded".
+#> [15:53:16] Initializing Cerebro object...
+#> [15:53:16] Adding expression data (embedded)...
+#> [15:53:16] Collecting available meta data...
+#> [15:53:16] Extracting all meta data columns...
+#> [15:53:16] Extracting dimensional reductions...
+#> [15:53:16] Will export the following dimensional reductions: UMAP
+#> [15:53:16] No trajectories to extract...
+#> [15:53:16] Overview of Cerebro object:
 #> class: Cerebro
-#> exporter package version: 8.4.10
+#> exporter package version: 8.4.11
 #> experiment name: PBMC
 #> organism: hg
 #> date of analysis: 
-#> date of export: 2026-11-22
+#> date of export: 2026-11-24
 #> number of cells: 80
 #> number of genes: 230
 #> grouping variables (2): sample, cluster
@@ -221,7 +221,7 @@ exportFromSCE(
 #> Immune repertoire:
 #> HLA typing: none
 #> Spatial data:
-#> [21:31:09] Saving Cerebro object to: /tmp/nix-shell-4225-3515665776/Rtmph43fUD/pbmc_SCE.crb
-#> [21:31:09] Done!
+#> [15:53:16] Saving Cerebro object to: /tmp/nix-shell-4436-2184230563/RtmpG6zWEz/pbmc_SCE.crb
+#> [15:53:16] Done!
 # }
 ```
