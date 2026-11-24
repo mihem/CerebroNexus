@@ -102,6 +102,13 @@
   // was never made for. Keyed `section|imageId`; cleared with the data set, since
   // the ids belong to the object that produced them.
   var imgStates = {};
+  // The background-image editor is one piece of markup mounted once per page
+  // that has one, its element ids carrying the page's prefix. The engine drives
+  // whichever editor belongs to the page on screen.
+  var imgPrefix = 'cv';
+  var IMG_ID_PATTERN = /^(cv|sp)-img-/;
+  function imgId(name) { return imgPrefix + '-img-' + name; }
+  function bgId(name) { return imgPrefix + '-bg-' + name; }
   // Which background each section was last showing, so returning to a section
   // returns the view of it the user left, not merely its alignment. Keyed by
   // section name; cleared with the data set.
@@ -7918,8 +7925,8 @@
   // Only sections carrying images are editable. Scope adjustments by stable
   // section/image identities; never modify the bundle's saved presets.
   function renderImagePicker() {
-    var ctl = $('cv-img-pick-ctl'), select = $('cv-bg-image-select');
-    var tabs = $('cv-bg-space-tabs');
+    var ctl = $(imgId('pick-ctl')), select = $(bgId('image-select'));
+    var tabs = $(bgId('space-tabs'));
     if (!ctl || !select) return;
     var allSpaces = backgroundSpaces().filter(function (sp) { return spatialImages(sp).length > 0; });
     var active = activeSpatial();
@@ -7929,11 +7936,11 @@
     if (section) section.style.display = active ? '' : 'none';
     ctl.style.display = active ? '' : 'none';
     if (tabs) {
-      var scope = $('cv-bg-space-select');
+      var scope = $(bgId('space-select'));
       if (!scope) {
-        tabs.innerHTML = '<label for="cv-bg-space-select">Adjust background</label>' +
-          '<select id="cv-bg-space-select" class="form-control"></select>';
-        scope = $('cv-bg-space-select');
+        tabs.innerHTML = '<label for="' + bgId('space-select') + '">Adjust background</label>' +
+          '<select id="' + bgId('space-select') + '" class="form-control"></select>';
+        scope = $(bgId('space-select'));
       }
       var scopeOptions = allSpaces.map(function (sp) {
         return { value: sp.id, text: (sp.label || sp._sampleName || sp.id).replace(/ \(spatial\)$/, '') };
@@ -7957,7 +7964,7 @@
         backgroundScopePulse = false;
       }
     }
-    var note = $('cv-bg-session-note');
+    var note = $(bgId('session-note'));
     if (note) note.textContent = !singleActive && !linkedBackgroundsOn
       ? 'Background images are hidden. Enable Background images to preview changes.'
       : 'Changes apply only to this session.';
@@ -8046,28 +8053,28 @@
         el.min = String(-lim); el.max = String(lim);
         el.step = 'any';
       };
-      rerange('cv-img-offx', span[0], v.offsetX);
-      rerange('cv-img-offy', span[1], v.offsetY);
+      rerange(imgId('offx'), span[0], v.offsetX);
+      rerange(imgId('offy'), span[1], v.offsetY);
     }
     var sLo = Math.min(0.3, v.scaleX * 0.9, v.scaleY * 0.9);
     var sHi = Math.max(3, v.scaleX * 1.1, v.scaleY * 1.1);
-    ['cv-img-scalex', 'cv-img-scaley'].forEach(function (id) {
+    [imgId('scalex'), imgId('scaley')].forEach(function (id) {
       var el = $(id); if (!el) return;
       el.min = String(sLo); el.max = String(sHi);
       el.step = 'any';
     });
-    var opacity = $('cv-img-opacity'); if (opacity) opacity.step = 'any';
-    var rotation = $('cv-img-rotate'); if (rotation) rotation.step = 'any';
-    set('cv-img-opacity', v.opacity);
-    set('cv-img-offx', v.offsetX);
-    set('cv-img-offy', v.offsetY);
-    set('cv-img-scalex', v.scaleX);
-    set('cv-img-scaley', v.scaleY);
-    tick('cv-img-lock', v.lock != null ? v.lock : (v.scaleX === v.scaleY));
-    set('cv-img-rotate', v.rotate || 0);
-    tick('cv-img-flipx', v.flipX);
-    tick('cv-img-flipy', v.flipY);
-    tick('cv-img-show', v.show !== false);
+    var opacity = $(imgId('opacity')); if (opacity) opacity.step = 'any';
+    var rotation = $(imgId('rotate')); if (rotation) rotation.step = 'any';
+    set(imgId('opacity'), v.opacity);
+    set(imgId('offx'), v.offsetX);
+    set(imgId('offy'), v.offsetY);
+    set(imgId('scalex'), v.scaleX);
+    set(imgId('scaley'), v.scaleY);
+    tick(imgId('lock'), v.lock != null ? v.lock : (v.scaleX === v.scaleY));
+    set(imgId('rotate'), v.rotate || 0);
+    tick(imgId('flipx'), v.flipX);
+    tick(imgId('flipy'), v.flipY);
+    tick(imgId('show'), v.show !== false);
   }
 
   // Back to the alignment THIS (section, image) shipped with -- and only this
@@ -8418,31 +8425,31 @@
     var imgState = sp._imgState;
     var num = function (id, cur) { var el = $(id); return el ? parseFloat(el.value) : cur; };
     var chk = function (id, cur) { var el = $(id); return el ? el.checked : cur; };
-    imgState.show = chk('cv-img-show', imgState.show);
-    imgState.opacity = num('cv-img-opacity', imgState.opacity);
-    imgState.offsetX = num('cv-img-offx', imgState.offsetX);   // data units
-    imgState.offsetY = num('cv-img-offy', imgState.offsetY);   // data units
+    imgState.show = chk(imgId('show'), imgState.show);
+    imgState.opacity = num(imgId('opacity'), imgState.opacity);
+    imgState.offsetX = num(imgId('offx'), imgState.offsetX);   // data units
+    imgState.offsetY = num(imgId('offy'), imgState.offsetY);   // data units
     // Two axes, read separately. One slider driving both meant that touching
     // ANY control in this bar rewrote the other axis from it, so a preset whose
     // calibration was genuinely non-uniform was squared up by a nudge to the
     // opacity. `changed` is the control the user just moved; with the aspect
     // locked the other follows it, and nothing else in the bar disturbs either.
-    var lock = chk('cv-img-lock', true);
+    var lock = chk(imgId('lock'), true);
     imgState.lock = lock;
-    var sxEl = $('cv-img-scalex'), syEl = $('cv-img-scaley');
-    var sxv = num('cv-img-scalex', imgState.scaleX);
-    var syv = num('cv-img-scaley', imgState.scaleY);
-    if (lock && changed === 'cv-img-scalex') {
+    var sxEl = $(imgId('scalex')), syEl = $(imgId('scaley'));
+    var sxv = num(imgId('scalex'), imgState.scaleX);
+    var syv = num(imgId('scaley'), imgState.scaleY);
+    if (lock && changed === imgId('scalex')) {
       syv = sxv; syncImgRangeValue(syEl, sxv);
-    } else if (lock && changed === 'cv-img-scaley') {
+    } else if (lock && changed === imgId('scaley')) {
       sxv = syv; syncImgRangeValue(sxEl, syv);
-    } else if (lock && changed === 'cv-img-lock') {
+    } else if (lock && changed === imgId('lock')) {
       syv = sxv; syncImgRangeValue(syEl, sxv);
     }
     imgState.scaleX = sxv; imgState.scaleY = syv;
-    imgState.rotate = num('cv-img-rotate', imgState.rotate);
-    imgState.flipX = chk('cv-img-flipx', imgState.flipX);
-    imgState.flipY = chk('cv-img-flipy', imgState.flipY);
+    imgState.rotate = num(imgId('rotate'), imgState.rotate);
+    imgState.flipX = chk(imgId('flipx'), imgState.flipX);
+    imgState.flipY = chk(imgId('flipy'), imgState.flipY);
     // Write through to the per-image store on every adjustment, so it is always
     // the authority. Recording only on a switch left the work in flight: a
     // bundle re-sent while the user was still adjusting reloaded from the preset
@@ -15159,7 +15166,7 @@
       // The pinned tooltip's two actions. Checked before anything else, because
       // the tooltip sits over a panel and the handlers below would otherwise
       // read the click as one on the workspace underneath.
-      if (t.id === 'cv-img-reset') { resetImgToPreset(); return; }
+      if (t.id === imgId('reset')) { resetImgToPreset(); return; }
       if (t.closest('.cv-tip-details')) {
         if (pinnedTip.panel && pinnedTip.cell != null) {
           openCard(pinnedTip.panel, pinnedTip.cell);
@@ -15361,7 +15368,7 @@
     // valid value applies; on commit an invalid one snaps back to the slider.
     function imgNumberEdited(target, commit) {
       var id = target && target.id;
-      if (!id || id.slice(-7) !== '-number' || id.indexOf('cv-img-') !== 0) return false;
+      if (!id || id.slice(-7) !== '-number' || !IMG_ID_PATTERN.test(id)) return false;
       var range = $(id.slice(0, -7));
       var valid = syncImgRangeValue(range, target.value);
       if (!valid && commit) syncImgRangeValue(range, range && range.value);
@@ -15372,7 +15379,7 @@
       var id = e.target && e.target.id;
       if (updateLinkedToggle(e.target)) return;
       if (imgNumberEdited(e.target, false)) return;
-      if (id && id.indexOf('cv-img-') === 0) {
+      if (id && IMG_ID_PATTERN.test(id)) {
         if (e.target.type === 'range') syncImgRangeValue(e.target, e.target.value);
         syncImgControls(id); drawAll();
       }
@@ -15380,7 +15387,7 @@
     document.addEventListener('change', function (e) {
       var id = e.target && e.target.id;
       if (imgNumberEdited(e.target, true)) return;
-      if (id && id.indexOf('cv-img-') === 0) { syncImgControls(id); drawAll(); return; }
+      if (id && IMG_ID_PATTERN.test(id)) { syncImgControls(id); drawAll(); return; }
       // The gene picker is read by the server directly, so without this the
       // client would not know a request was in flight and would keep drawing the
       // previous gene under the new gene's name until the reply landed.

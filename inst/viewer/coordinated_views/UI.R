@@ -416,33 +416,7 @@ tab_coordinated_views <- tabItem(
           shiny::tagAppendAttributes(
             cerebroSettingsSection(
               "Background image",
-              div(
-                class = "cv-ctl cv-bg-ctl cerebro-settings-full",
-                id = "cv-img-pick-ctl",
-                style = "display:none",
-                div(class = "cv-bg-space-tabs", id = "cv-bg-space-tabs"),
-                div(
-                  class = "cv-bg-settings",
-                  div(
-                    class = "cv-bg-display",
-                    tags$label(
-                      class = "cv-bg-display-title",
-                      `for` = "cv-bg-image-select",
-                      "Image"
-                    ),
-                    tags$select(
-                      id = "cv-bg-image-select",
-                      class = "form-control"
-                    )
-                  ),
-                  uiOutput("coordviews_image_ui"),
-                  tags$p(
-                    id = "cv-bg-session-note",
-                    class = "cv-bg-session-note",
-                    "Changes apply only to this session."
-                  )
-                )
-              )
+              viewerBackgroundImageEditor("cv", uiOutput("coordviews_image_ui"))
             ),
             style = "display:none"
           ),

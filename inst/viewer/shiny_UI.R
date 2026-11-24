@@ -7,6 +7,15 @@ source(
   local = TRUE
 )
 
+## The background-image editor of the pages that have one.
+source(
+  file.path(
+    Cerebro.options[["cerebro_root"]],
+    "viewer/ui_background_image_editor.R"
+  ),
+  local = TRUE
+)
+
 cerebroIcon <- function(name) {
   result <- icon(name)
   result$attribs[["aria-label"]] <- NULL
