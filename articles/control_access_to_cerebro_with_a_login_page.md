@@ -409,8 +409,7 @@ rollback window.
 
 ## See also
 
-- [Create a self-contained Shiny
-  App](https://www.mheming.com/CerebroNexus/articles/create_a_self_contained_shiny_app.md)
-- [Host CerebroNexus on
-  shinyapps.io](https://www.mheming.com/CerebroNexus/articles/host_cerebro_on_shinyapps.md)
+- [Share data sets as a Shiny
+  app](https://www.mheming.com/CerebroNexus/articles/create_a_self_contained_shiny_app.md),
+  including deployment to shinyapps.io
 - [`shinymanager::create_db()`](https://datastorm-open.github.io/shinymanager/reference/create_db.html)

@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1020" height="150" viewBox="0 0 1020 150" role="img" aria-labelledby="title desc">
+  <title id="title">The CerebroNexus workflow</title>
+  <desc id="desc">Prepared objects (Seurat, SingleCellExperiment, AnnData, SpatialData) go into the Builder, where data sets are added, configured, reviewed and built. The Viewer opens the result to select cells, compare them and export. Below, five pages of the Viewer: gene expression, linked views, spatial, immune repertoire, and HLA and TCR motifs.</desc>
+  <!-- The layout follows Figure 1b-c of the CerebroNexus manuscript. The step and
+       page names are those of the Builder (inst/builder/ui/workflow.R) and the
+       Viewer (inst/viewer/ui_page.R). -->
+  <defs>
+    <marker id="arrow" markerUnits="userSpaceOnUse" markerWidth="7" markerHeight="8" refX="6.6" refY="3.8" orient="auto">
+      <path d="M0 0 L6.6 3.8 L0 7.6 z" fill="#000"/>
+    </marker>
+  </defs>
+  <rect width="1020" height="150" fill="#fff"/>
+  <g font-family="Arial, Helvetica, sans-serif" font-size="15.6" text-anchor="middle" fill="#000">
+    <g fill="#f2f2f2" stroke="#7f7f7f" stroke-width="1.1">
+      <rect x="10.5" y="8" width="295.5" height="74.6"/>
+      <rect x="362.25" y="8" width="295.5" height="74.6"/>
+      <rect x="714" y="8" width="295.5" height="74.6"/>
+    </g>
+    <g stroke="#000" stroke-width="1.1" marker-end="url(#arrow)">
+      <line x1="313" y1="45.3" x2="355.2" y2="45.3"/>
+      <line x1="664.8" y1="45.3" x2="707" y2="45.3"/>
+    </g>
+    <g font-weight="bold">
+      <text x="158.25" y="36.4">Prepared objects</text>
+      <text x="510" y="36.4">Builder</text>
+      <text x="861.75" y="36.4">Viewer</text>
+    </g>
+    <text x="158.25" y="64.7">Seurat, SCE, AnnData, SpatialData</text>
+    <text x="510" y="64.7">Data → configure → review → build</text>
+    <text x="861.75" y="64.7">Select → compare → export</text>
+    <g fill="#fff" stroke="#7f7f7f" stroke-width="1.1">
+      <rect x="8.16" y="104.7" width="187.68" height="37.3"/>
+      <rect x="212.16" y="104.7" width="187.68" height="37.3"/>
+      <rect x="416.16" y="104.7" width="187.68" height="37.3"/>
+      <rect x="620.16" y="104.7" width="187.68" height="37.3"/>
+      <rect x="824.16" y="104.7" width="187.68" height="37.3"/>
+    </g>
+    <text x="102" y="127.8">Gene expression</text>
+    <text x="306" y="127.8">Linked views</text>
+    <text x="510" y="127.8">Spatial</text>
+    <text x="714" y="127.8">Immune repertoire</text>
+    <text x="918" y="127.8">HLA &amp; TCR Motifs</text>
+  </g>
+</svg>

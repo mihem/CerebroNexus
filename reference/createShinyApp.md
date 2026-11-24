@@ -363,7 +363,7 @@ app_dir <- createShinyApp(
 #> ========================================
 #> Shiny app successfully created!
 #> ========================================
-#> App directory: /tmp/nix-shell-4436-2184230563/RtmpG6zWEz/my_app
+#> App directory: /tmp/nix-shell-4222-2730196454/Rtmpox8NDy/my_app
 #> Data file(s):
 #>   - PBMC example : example.crb
 #> Port: 8080
@@ -371,7 +371,7 @@ app_dir <- createShinyApp(
 #> Launch browser: TRUE
 #> 
 #> To launch the app, run:
-#>   shiny::runApp('/tmp/nix-shell-4436-2184230563/RtmpG6zWEz/my_app')
+#>   shiny::runApp('/tmp/nix-shell-4222-2730196454/Rtmpox8NDy/my_app')
 #> ========================================
 # Run with shiny::runApp(app_dir) or deploy the directory to Shiny Server.
 # }

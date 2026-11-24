@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Create a self-contained Shiny app from a Cerebro data file • CerebroNexus</title>
+<title>Share data sets as a Shiny app • CerebroNexus</title>
 <script src="../lightswitch.js"></script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Create a self-contained Shiny app from a Cerebro data file">
+<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Share data sets as a Shiny app">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.11</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.12</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -33,34 +33,26 @@
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Workflows</h6></li>
-    <li><a class="dropdown-item" href="../articles/cerebronexus_workflow_seurat.html">Introduction to the CerebroNexus workflow (Seurat)</a></li>
-    <li><a class="dropdown-item" href="../articles/export_a_data_set_in_SCE_format.html">Export a data set in SCE format</a></li>
-    <li><a class="dropdown-item" href="../articles/use_sce_and_anndata_data.html">Use SingleCellExperiment and AnnData data</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Getting started</h6></li>
+    <li><a class="dropdown-item" href="../articles/import_your_analysis.html">From your analysis to an interactive Viewer</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Interface</h6></li>
     <li><a class="dropdown-item" href="../articles/overview_of_cerebro_class.html">Overview of the Cerebro class</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>How-to</h6></li>
     <li><a class="dropdown-item" href="../articles/build_a_data_set_by_pointing.html">Build a data set without writing code</a></li>
+    <li><a class="dropdown-item" href="../articles/cerebronexus_workflow_seurat.html">Prepare and export a Seurat object in R</a></li>
     <li><a class="dropdown-item" href="../articles/data_integrity_contracts.html">Data integrity from Seurat to a self-contained Cerebro app</a></li>
     <li><a class="dropdown-item" href="../articles/seurat_v5_layered_assays.html">Seurat v5 layered assays: complete and safe expression matrices</a></li>
-    <li><a class="dropdown-item" href="../articles/create_a_self_contained_shiny_app.html">Create a self-contained Shiny app from a Cerebro data file</a></li>
-    <li><a class="dropdown-item" href="../articles/create_expression_matrix_in_h5_format.html">Store the expression matrix in H5 format</a></li>
+    <li><a class="dropdown-item" href="../articles/create_a_self_contained_shiny_app.html">Share data sets as a Shiny app</a></li>
     <li><a class="dropdown-item" href="../articles/million_cell_crb_artifacts.html">Working with large datasets</a></li>
-    <li><a class="dropdown-item" href="../articles/launch_cerebro_with_pre-loaded_data_set.html">Launch Cerebro with pre-loaded data set</a></li>
-    <li><a class="dropdown-item" href="../articles/multi_crb.html">Loading multiple data sets (multi-crb) with a dataset switcher</a></li>
-    <li><a class="dropdown-item" href="../articles/export_and_visualize_custom_tables_and_plots.html">Export and visualize custom tables and plots</a></li>
     <li><a class="dropdown-item" href="../articles/control_access_to_cerebro_with_a_login_page.html">Control access to CerebroNexus with a login page</a></li>
-    <li><a class="dropdown-item" href="../articles/host_cerebro_on_shinyapps.html">Host Cerebro on shinyapps.io</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Benchmarks</h6></li>
     <li><a class="dropdown-item" href="../articles/expression_backend_benchmark.html">Large-dataset benchmarks: expression, storage and Viewer</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Modules</h6></li>
-    <li><a class="dropdown-item" href="../articles/most_expressed_genes.html">Most Expressed Genes</a></li>
-    <li><a class="dropdown-item" href="../articles/enriched_pathways.html">Enriched Pathways</a></li>
-    <li><a class="dropdown-item" href="../articles/extra_material.html">Extra Material</a></li>
+    <li><a class="dropdown-item" href="../articles/tables_and_plots.html">Tables and plots in the Viewer</a></li>
     <li><a class="dropdown-item" href="../articles/immune_repertoire_analysis.html">Immune Repertoire Analysis in CerebroNexus</a></li>
     <li><a class="dropdown-item" href="../articles/trajectory_analysis.html">Trajectory Analysis</a></li>
     <li><a class="dropdown-item" href="../articles/spatial_analysis.html">Spatial Transcriptomics Analysis</a></li>
@@ -98,9 +90,7 @@
 
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-      <img src="../logo.png" class="logo" alt=""><h1>Create a self-contained Shiny app from a Cerebro data file</h1>
-                        <h4 data-toc-skip class="author">Xuesong
-Wang</h4>
+      <img src="../logo.png" class="logo" alt=""><h1>Share data sets as a Shiny app</h1>
             
             <h4 data-toc-skip class="date">24 November, 2026</h4>
       
@@ -112,6 +102,75 @@ Wang</h4>
     
 <div class="section level2">
 <h2 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
+</h2>
+<p>There are two ways to let other people browse your <code>.crb</code>
+files:</p>
+<table class="table">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<thead><tr class="header">
+<th>Route</th>
+<th>Use it when</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><code>launchCerebro(mode = "closed")</code></td>
+<td>You start the app yourself, on your computer or on a server with
+CerebroNexus installed, and want to show fixed data sets without
+uploads.</td>
+</tr>
+<tr class="even">
+<td><code><a href="../reference/createShinyApp.html">createShinyApp()</a></code></td>
+<td>You want a directory that runs on its own: hand it to a colleague,
+or deploy it to Shiny Server, Posit Connect or shinyapps.io.</td>
+</tr>
+</tbody>
+</table>
+<p>Both can show several data sets with a switcher and your own welcome
+message; <code><a href="../reference/createShinyApp.html">createShinyApp()</a></code> can also set the page the App
+opens on.</p>
+</div>
+<div class="section level2">
+<h2 id="launch-with-pre-loaded-data-sets">Launch with pre-loaded data sets<a class="anchor" aria-label="anchor" href="#launch-with-pre-loaded-data-sets"></a>
+</h2>
+<p>Provide the data path and closed mode to
+<code><a href="../reference/launchCerebro.html">launchCerebro()</a></code>. In closed mode, users cannot upload their
+own data sets, which is useful when you share data on a web server, for
+example alongside a publication.</p>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/launchCerebro.html">launchCerebro</a></span><span class="op">(</span></span>
+<span>  crb_file_to_load <span class="op">=</span> <span class="st">"~/Cerebro/data_sets/pbmc_v3.crb"</span>,</span>
+<span>  mode <span class="op">=</span> <span class="st">"closed"</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>To offer several data sets in one launch, give every file a unique,
+non-empty name. The name is the data set identity used in links
+(<code>?dataset=sampleA</code>) and saved state;
+<code><a href="../reference/launchCerebro.html">launchCerebro()</a></code> stops with an error when more than one
+unnamed file is given.</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/launchCerebro.html">launchCerebro</a></span><span class="op">(</span></span>
+<span>  crb_file_to_load <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>sampleA <span class="op">=</span> <span class="st">"~/Cerebro/a.crb"</span>, sampleB <span class="op">=</span> <span class="st">"~/Cerebro/b.crb"</span><span class="op">)</span>,</span>
+<span>  mode <span class="op">=</span> <span class="st">"closed"</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>To change the message on the Data info page, for example to link to a
+publication or introduce the data set, use <code>welcome_message</code>.
+For <code><a href="../reference/launchCerebro.html">launchCerebro()</a></code> it can contain HTML:</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">custom_welcome_message</span> <span class="op">&lt;-</span> <span class="st">'&lt;h3 style="text-align: center; margin-top: 0px"&gt;&lt;strong&gt;This is a custom welcome message to Cerebro&lt;/strong&gt;&lt;/h3&gt;</span></span>
+<span><span class="st">  &lt;p style="margin-left: 10px;"&gt;This data set belongs to publication XY by Max Mustermann &lt;em&gt;et al.&lt;/em&gt;.&lt;br&gt;</span></span>
+<span><span class="st">  It contains the transcriptomic profiles of PBMC samples taken from mice undergoing treatment F.&lt;br&gt;</span></span>
+<span><span class="st">  Please contact us at ... if you have any questions.&lt;/p&gt;'</span></span>
+<span></span>
+<span><span class="fu"><a href="../reference/launchCerebro.html">launchCerebro</a></span><span class="op">(</span></span>
+<span>  crb_file_to_load <span class="op">=</span> <span class="st">"~/Cerebro/data_sets/pbmc_v3.crb"</span>,</span>
+<span>  mode <span class="op">=</span> <span class="st">"closed"</span>,</span>
+<span>  welcome_message <span class="op">=</span> <span class="va">custom_welcome_message</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="build-a-self-contained-app">Build a self-contained app<a class="anchor" aria-label="anchor" href="#build-a-self-contained-app"></a>
 </h2>
 <p><code><a href="../reference/createShinyApp.html">createShinyApp()</a></code> bundles a CerebroNexus Shiny app into a
 single output directory. It copies the Shiny sources shipped under
@@ -142,28 +201,29 @@ making them install the package themselves, pin the Shiny sources at a
 known revision alongside the data, or deploy to a host that doesn’t run
 R interactively (Shiny Server or <code>shinyapps.io</code>, for
 example).</p>
-</div>
-<div class="section level2">
-<h2 id="setup">Setup<a class="anchor" aria-label="anchor" href="#setup"></a>
-</h2>
+<div class="section level3">
+<h3 id="setup">Setup<a class="anchor" aria-label="anchor" href="#setup"></a>
+</h3>
 <p>The package ships an example <code>.crb</code> in
 <code>inst/extdata/examples/</code>, which we use throughout this
 vignette.</p>
-<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://www.mheming.com/CerebroNexus/">CerebroNexus</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">crb</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata/examples/example.crb"</span>, package <span class="op">=</span> <span class="st">"CerebroNexus"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.exists</a></span><span class="op">(</span><span class="va">crb</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
 </div>
-<div class="section level2">
-<h2 id="quick-start">Quick start<a class="anchor" aria-label="anchor" href="#quick-start"></a>
-</h2>
+<div class="section level3">
+<h3 id="quick-start">Quick start<a class="anchor" aria-label="anchor" href="#quick-start"></a>
+</h3>
 <p><code>cerebro_data</code> must be a <strong>named</strong> character
-vector (or list). Names must be non-missing and unique because they
-become the dataset labels shown in the Load Data tab; the values are
-paths to <code>.crb</code> (or <code>.rds</code>) files.</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+vector (or list). Names must be non-missing and unique because they are
+the data set identities used in links; unless you set
+<code>dataset_labels</code>, they are also the names shown in the
+<strong>Dataset</strong> dropdown. The values are paths to
+<code>.crb</code> (or <code>.rds</code>) files.</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">out_dir</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"cerebro_app"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="../reference/createShinyApp.html">createShinyApp</a></span><span class="op">(</span></span>
@@ -180,7 +240,7 @@ the data file(s) under <code>private-data/</code>, and a
 is private to the R process: the generated app does not register it as
 an HTTP resource.</p>
 <p>Launch it locally:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">shiny</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">runApp</a></span><span class="op">(</span><span class="va">out_dir</span><span class="op">)</span></span></code></pre></div>
 <p>On Linux, <code>bash viewer/start-linux.sh</code> from
 <code>out_dir</code> prepares authentication-file permissions and starts
@@ -190,9 +250,9 @@ using the real service account, then start the service normally. See
 <code>viewer/AUTHENTICATION-DEPLOYMENT.md</code> in the exported
 directory.</p>
 </div>
-<div class="section level2">
-<h2 id="common-parameters">Common parameters<a class="anchor" aria-label="anchor" href="#common-parameters"></a>
-</h2>
+<div class="section level3">
+<h3 id="common-parameters">Common parameters<a class="anchor" aria-label="anchor" href="#common-parameters"></a>
+</h3>
 <table class="table">
 <colgroup>
 <col width="50%">
@@ -243,7 +303,7 @@ host string; defaults to <code>8080</code> / <code>127.0.0.1</code>
 </tr>
 <tr class="odd">
 <td><code>welcome_message</code></td>
-<td>text shown in the Load Data tab</td>
+<td>text shown on the Data info page</td>
 </tr>
 <tr class="even">
 <td><code>colors</code></td>
@@ -261,28 +321,33 @@ host string; defaults to <code>8080</code> / <code>127.0.0.1</code>
 </td>
 </tr>
 <tr class="odd">
+<td><code>initial_dataset</code></td>
+<td>name of the data set loaded first; see <a href="#default-file-selection">Default file selection</a>
+</td>
+</tr>
+<tr class="even">
 <td><code>show_upload_ui</code></td>
 <td>allow dataset and session-only HLA typing uploads; defaults to
 <code>FALSE</code> for generated apps</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>initial_page</code></td>
 <td>stable Viewer page ID used once when the first dataset loads; Data
 info by default</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>
 <code>point_size</code>, <code>point_opacity</code>,
 <code>percentage_cells_to_show</code>
 </td>
 <td>scalar or named per-dataset scatter defaults</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>variable_to_compare</code></td>
 <td>forwarded into <code>Cerebro.options</code>
 </td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>
 <code>extra_tables</code>, <code>extra_tables_sheets</code>
 </td>
@@ -300,13 +365,95 @@ Closed mode also rejects HLA typing uploads server-side and hides the
 HLA override controls. Stored HLA typing, its analyses and downloads,
 and view-configuration JSON imports remain available.</p>
 </div>
+</div>
 <div class="section level2">
-<h2 id="bundling-multiple-datasets-available-since-2-0-0">Bundling multiple datasets (available since 2.0.0)<a class="anchor" aria-label="anchor" href="#bundling-multiple-datasets-available-since-2-0-0"></a>
+<h2 id="several-data-sets">Several data sets<a class="anchor" aria-label="anchor" href="#several-data-sets"></a>
 </h2>
+<p>CerebroNexus can load <strong>multiple <code>.crb</code>
+files</strong> in a single app. When more than one file is supplied to
+<code><a href="../reference/createShinyApp.html">createShinyApp()</a></code>, a <strong>Dataset</strong> dropdown
+appears in the sidebar so users can move between data sets without
+restarting the app. Each data set keeps its own expression data,
+metadata, and module-specific slots — including the immune repertoire —
+so conditional tabs (such as <em>Immune Repertoire</em>) appear or
+disappear as you switch.</p>
+<p>Pass a <strong>named vector</strong> of <code>.crb</code> paths. The
+demo data sets shipped with the package are genuinely different samples
+— a PBMC set (TCR + BCR + a monocle2 trajectory) and four real
+spatial-transcriptomics sections spanning distinct platforms — so the
+UMAP, the cell-type mix, and the conditional tabs all change as you
+switch:</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/createShinyApp.html">createShinyApp</a></span><span class="op">(</span></span>
+<span>  result_dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"cerebro_app_multi"</span><span class="op">)</span>,</span>
+<span>  cerebro_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>    <span class="st">"PBMC - Full (T+B)"</span>                <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata/examples/demo_full_tcr_bcr.crb"</span>,   package <span class="op">=</span> <span class="st">"CerebroNexus"</span><span class="op">)</span>,</span>
+<span>    <span class="st">"Mouse brain (Visium)"</span>             <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata/examples/demo_spatial_visium.crb"</span>,  package <span class="op">=</span> <span class="st">"CerebroNexus"</span><span class="op">)</span>,</span>
+<span>    <span class="st">"Mouse hippocampus (Slide-seq v2)"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata/examples/demo_spatial_slideseq.crb"</span>, package <span class="op">=</span> <span class="st">"CerebroNexus"</span><span class="op">)</span>,</span>
+<span>    <span class="st">"Mouse ileum (MERFISH)"</span>            <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata/examples/demo_spatial_merfish.crb"</span>, package <span class="op">=</span> <span class="st">"CerebroNexus"</span><span class="op">)</span>,</span>
+<span>    <span class="st">"Mouse brain (Xenium)"</span>             <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata/examples/demo_spatial_xenium.crb"</span>,  package <span class="op">=</span> <span class="st">"CerebroNexus"</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<table class="table">
+<colgroup>
+<col width="30%">
+<col width="18%">
+<col width="51%">
+</colgroup>
+<thead><tr class="header">
+<th>Data set</th>
+<th>Type</th>
+<th>Conditional tab</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td>PBMC - Full (T+B)</td>
+<td>scRNA-seq + TCR/BCR + trajectory</td>
+<td>Immune Repertoire, Trajectory</td>
+</tr>
+<tr class="even">
+<td>Mouse brain (Visium)</td>
+<td>spatial (spots, external H&amp;E)</td>
+<td>Spatial</td>
+</tr>
+<tr class="odd">
+<td>Mouse hippocampus (Slide-seq v2)</td>
+<td>spatial (beads, no image)</td>
+<td>Spatial</td>
+</tr>
+<tr class="even">
+<td>Mouse ileum (MERFISH)</td>
+<td>spatial (imaging, embedded DAPI)</td>
+<td>Spatial</td>
+</tr>
+<tr class="odd">
+<td>Mouse brain (Xenium)</td>
+<td>spatial (imaging, external DAPI variants)</td>
+<td>Spatial</td>
+</tr>
+</tbody>
+</table>
+<p>External images are separate files, not part of the
+<code>.crb</code>, so this call shows the Visium and Xenium sections
+without a tissue background. To add them, pass the image files through
+<code>spatial_images</code>; see <a href="spatial_analysis.html#placing-histological-images">Placing
+histological images</a>.</p>
+<p>When the app starts, the sidebar shows a dropdown with these samples.
+Switching changes the whole data set — the UMAP, the cell-type
+composition, and the conditional tabs (<em>Immune Repertoire</em> /
+<em>Trajectory</em> / <em>Spatial</em>), which appear only for the data
+sets that carry that content.</p>
+<p>The PBMC demo is derived from the public 10x Genomics
+<code>vdj_v1_hs_pbmc3</code> dataset and the spatial demos from public
+reference sections; see <code>data-raw/README.md</code> in the package
+source for the full, reproducible builds.</p>
+<div class="section level3">
+<h3 id="colours-and-scatter-defaults-per-data-set">Colours and scatter defaults per data set<a class="anchor" aria-label="anchor" href="#colours-and-scatter-defaults-per-data-set"></a>
+</h3>
 <p>The names of <code>cerebro_data</code> are what the user picks from
 inside Cerebro. You can also supply matching <code>colors</code> so each
 dataset gets a deterministic palette.</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">crb_pbmc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata/examples/example.crb"</span>, package <span class="op">=</span> <span class="st">"CerebroNexus"</span><span class="op">)</span></span>
 <span><span class="co"># crb_other &lt;- "/path/to/another_dataset.crb"</span></span>
 <span></span>
@@ -315,7 +462,7 @@ dataset gets a deterministic palette.</p>
 <span>    <span class="st">"PBMC example"</span>   <span class="op">=</span> <span class="va">crb_pbmc</span></span>
 <span>    <span class="co"># , "My dataset" = crb_other</span></span>
 <span>  <span class="op">)</span>,</span>
-<span>  result_dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"cerebro_app_multi"</span><span class="op">)</span>,</span>
+<span>  result_dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"cerebro_app_colors"</span><span class="op">)</span>,</span>
 <span>  colors <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>    <span class="st">"PBMC example"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>sample <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>pbmc_1 <span class="op">=</span> <span class="st">"#1f77b4"</span><span class="op">)</span><span class="op">)</span></span>
 <span>  <span class="op">)</span>,</span>
@@ -330,15 +477,84 @@ named level colours. The three scatter options may be one value shared
 by all datasets or a named numeric vector/list whose names exactly match
 <code>cerebro_data</code>.</p>
 </div>
+<div class="section level3">
+<h3 id="default-file-selection">Default file selection<a class="anchor" aria-label="anchor" href="#default-file-selection"></a>
+</h3>
+<p>By default the <strong>smallest <code>.crb</code> file</strong> (by
+size on disk) is loaded first. Set
+<code>crb_pick_smallest_file = FALSE</code> to load the first file in
+the vector instead:</p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/createShinyApp.html">createShinyApp</a></span><span class="op">(</span></span>
+<span>  result_dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"cerebro_app_order"</span><span class="op">)</span>,</span>
+<span>  cerebro_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>    a <span class="op">=</span> <span class="st">"file_a.crb"</span>,</span>
+<span>    b <span class="op">=</span> <span class="st">"file_b.crb"</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  crb_pick_smallest_file <span class="op">=</span> <span class="cn">FALSE</span> <span class="co"># loads file_a.crb</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>To open a particular data set whatever its size or position, name it
+with <code>initial_dataset</code>, for example
+<code>initial_dataset = "b"</code> to load <code>file_b.crb</code>. A
+link that names a data set (see below) takes precedence over both
+settings. Once a file is chosen from the dropdown, that selection
+persists until the user switches again.</p>
+</div>
+<div class="section level3">
+<h3 id="linking-to-a-specific-data-set">Linking to a specific data set<a class="anchor" aria-label="anchor" href="#linking-to-a-specific-data-set"></a>
+</h3>
+<p>When the app is deployed, a data set can be selected directly from
+the URL, so you can share a link that opens straight into one sample.
+Both a query string and a path segment are supported:</p>
+<pre><code>https://your-host/app/?dataset=TCR
+https://your-host/app/TCR</code></pre>
+<p>The token is the <strong>last path segment</strong> (so it works even
+when the app is mounted under a sub-path such as <code>/app/</code>), or
+the value of the <code>dataset</code> query parameter. It is matched
+against the <strong>names</strong> you gave in
+<code>cerebro_data</code>; file names are not links. A
+<code>?dataset=</code> value that matches no name opens the default data
+set (see <a href="#default-file-selection">Default file selection</a>)
+with a warning; a path that matches no name is not served (HTTP 404).
+The path form also works when you start the App yourself with
+<code><a href="../reference/launchCerebro.html">launchCerebro()</a></code> or <code><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">shiny::runApp()</a></code>; write it
+without a trailing slash (<code>/TCR</code>, not <code>/TCR/</code>).
+When both forms are present, the query parameter wins.</p>
+<p>The address bar follows the data set you are reading: when you pick
+another one from the dropdown, <code>?dataset=</code> changes to its
+name, so the copied URL reopens the same data set. The path is never
+rewritten, because under Shiny Server it is the App’s mount point.</p>
+</div>
+<div class="section level3">
+<h3 id="linking-to-a-specific-page">Linking to a specific page<a class="anchor" aria-label="anchor" href="#linking-to-a-specific-page"></a>
+</h3>
+<p>Add <code>page=</code> with a stable page ID to open the App on that
+page, with or without <code>dataset=</code>:</p>
+<pre><code>https://your-host/app/?dataset=TCR&amp;page=immune_repertoire</code></pre>
+<p>The IDs are those of <code>initial_page</code> in
+<code><a href="../reference/createShinyApp.html">createShinyApp()</a></code>: <code>data_info</code>,
+<code>projection</code>, <code>linked_views</code>, <code>groups</code>,
+<code>marker_genes</code>, <code>most_expressed_genes</code>,
+<code>enriched_pathways</code>, <code>extra_material</code>,
+<code>immune_repertoire</code>, <code>trajectory</code>,
+<code>spatial</code>, <code>trekker</code>, <code>hla_tcr_motifs</code>,
+<code>gene_expression</code>, <code>gene_id_conversion</code>,
+<code>color_management</code> and <code>about</code>. A link overrides
+the author’s <code>initial_page</code> for that visit. An unknown ID is
+ignored, and a page the data set does not have opens Data info. While
+you read, the address bar follows the page you are on, so the copied URL
+reopens it.</p>
+</div>
+</div>
 <div class="section level2">
-<h2 id="initial-page">Initial page<a class="anchor" aria-label="anchor" href="#initial-page"></a>
+<h2 id="start-page-and-welcome-message">Start page and welcome message<a class="anchor" aria-label="anchor" href="#start-page-and-welcome-message"></a>
 </h2>
 <p>Without <code>initial_page</code>, the App opens on Data info, and
 prepares the Projection while it is read: a click on Projection then
 shows the plot at once. Use <code>initial_page</code> with a stable page
 ID such as <code>"linked_views"</code>, <code>"extra_material"</code>,
 or <code>"spatial"</code>:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/createShinyApp.html">createShinyApp</a></span><span class="op">(</span></span>
 <span>  cerebro_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"PBMC example"</span> <span class="op">=</span> <span class="va">crb</span><span class="op">)</span>,</span>
 <span>  result_dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"cerebro_app_spatial"</span><span class="op">)</span>,</span>
@@ -350,6 +566,11 @@ If that dataset does not support a conditional page, the Viewer stays on
 its normal page; switching later to a compatible dataset does not
 redirect the user after manual navigation. Restored shared links take
 precedence over this default.</p>
+<p><code><a href="../reference/createShinyApp.html">createShinyApp()</a></code> has the same
+<code>welcome_message</code> argument as <code><a href="../reference/launchCerebro.html">launchCerebro()</a></code>
+(see <a href="#launch-with-pre-loaded-data-sets">Launch with pre-loaded
+data sets</a>); it sets the text on the Data info page of the generated
+app.</p>
 </div>
 <div class="section level2">
 <h2 id="external-extra-material-tables">External Extra material tables<a class="anchor" aria-label="anchor" href="#external-extra-material-tables"></a>
@@ -358,7 +579,7 @@ precedence over this default.</p>
 TXT, XLS, XLSX, or XLSM files. Excel workbooks expose each non-empty
 sheet separately. Use <code>extra_tables_sheets</code> to rename
 selected sheets while retaining unmapped sheet names:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/createShinyApp.html">createShinyApp</a></span><span class="op">(</span></span>
 <span>  cerebro_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"PBMC example"</span> <span class="op">=</span> <span class="va">crb</span><span class="op">)</span>,</span>
 <span>  result_dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"cerebro_app_tables"</span><span class="op">)</span>,</span>
@@ -378,8 +599,83 @@ neutralized and external table cells are HTML-escaped in the Viewer;
 downloads use the same neutralized data.</p>
 </div>
 <div class="section level2">
-<h2 id="sibling-files--h5-and--immune-qs2">Sibling files: <code>.h5</code> and <code>.immune.qs2</code><a class="anchor" aria-label="anchor" href="#sibling-files--h5-and--immune-qs2"></a>
+<h2 id="forwarding-extra-cerebro-options">Forwarding extra Cerebro options<a class="anchor" aria-label="anchor" href="#forwarding-extra-cerebro-options"></a>
 </h2>
+<p>Anything you want to surface in <code>Cerebro.options</code> that
+isn’t already a top-level argument can go through
+<code>cerebro_options</code>.</p>
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/createShinyApp.html">createShinyApp</a></span><span class="op">(</span></span>
+<span>  cerebro_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"PBMC example"</span> <span class="op">=</span> <span class="va">crb</span><span class="op">)</span>,</span>
+<span>  result_dir   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"cerebro_app_opts"</span><span class="op">)</span>,</span>
+<span>  cerebro_options <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>    exclude_trivial_metadata <span class="op">=</span> <span class="cn">TRUE</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  launch_browser <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p><code>mode</code>, <code>cerebro_version</code>,
+<code>crb_file_to_load</code>, <code>cerebro_root</code>, and the
+internal <code>.bundle_backend_plan</code> and
+<code>.bundle_run_options</code> are filled in by the function itself.
+Duplicate entries for either internal key are removed, and anything you
+supply for those keys is overwritten.</p>
+</div>
+<div class="section level2">
+<h2 id="deploying-the-bundle">Deploying the bundle<a class="anchor" aria-label="anchor" href="#deploying-the-bundle"></a>
+</h2>
+<p>The output directory is self-contained: shipping the folder is all
+that is required. Three common targets:</p>
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># 1. Local</span></span>
+<span><span class="fu">shiny</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">runApp</a></span><span class="op">(</span><span class="va">out_dir</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># 2. shiny-server / Posit Connect</span></span>
+<span><span class="co"># Drop the directory under the server's app root (e.g. /srv/shiny-server/),</span></span>
+<span><span class="co"># or use the Posit Connect publishing UI pointing at `app.R`.</span></span>
+<span></span>
+<span><span class="co"># 3. shinyapps.io</span></span>
+<span><span class="fu">rsconnect</span><span class="fu">::</span><span class="fu">deployApp</span><span class="op">(</span>appDir <span class="op">=</span> <span class="va">out_dir</span><span class="op">)</span></span></code></pre></div>
+<div class="section level3">
+<h3 id="shinyapps-io">shinyapps.io<a class="anchor" aria-label="anchor" href="#shinyapps-io"></a>
+</h3>
+<p>shinyapps.io is moving to Posit Connect Cloud. Accounts that have not
+moved themselves are migrated automatically in waves starting on January
+28, 2027; see the <a href="https://docs.posit.co/shinyapps.io/guide/migration/" class="external-link">shinyapps.io
+migration guide</a>.</p>
+<p>To deploy to shinyapps.io, you need an account there and the
+<code>rsconnect</code> package:</p>
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"rsconnect"</span><span class="op">)</span></span></code></pre></div>
+<p>Then, you need to provide <code>rsconnect</code> with your
+shinyapps.io account info. On the shinyapps.io website, in the left
+navigation bar, go to “Account” and then “Tokens”. A token should have
+already been generated for you. Take the token and secret, your account
+name, and run the command below.</p>
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">rsconnect</span><span class="fu">::</span><span class="fu">setAccountInfo</span><span class="op">(</span>name<span class="op">=</span><span class="st">"&lt;ACCOUNT&gt;"</span>, token<span class="op">=</span><span class="st">"&lt;TOKEN&gt;"</span>, secret<span class="op">=</span><span class="st">"&lt;SECRET&gt;"</span><span class="op">)</span></span></code></pre></div>
+<p>Build the app with <code><a href="../reference/createShinyApp.html">createShinyApp()</a></code> as above, then
+upload the generated directory:</p>
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">rsconnect</span><span class="fu">::</span><span class="fu">deployApp</span><span class="op">(</span><span class="va">out_dir</span>, appName <span class="op">=</span> <span class="st">"Cerebro"</span><span class="op">)</span></span></code></pre></div>
+<p>Uploading and preparing the app might take a few minutes. In the
+shinyapps.io dashboard you can manage the app and check usage metrics
+and logs. The “Instance size” in the “Settings” tab controls the
+available memory: the larger the data set, the more memory the app
+needs.</p>
+</div>
+<div class="section level3">
+<h3 id="login-page">Login page<a class="anchor" aria-label="anchor" href="#login-page"></a>
+</h3>
+<p>To restrict access, see <a href="control_access_to_cerebro_with_a_login_page.html">Control access
+to CerebroNexus with a login page</a>.</p>
+</div>
+</div>
+<div class="section level2">
+<h2 id="technical-details">Technical details<a class="anchor" aria-label="anchor" href="#technical-details"></a>
+</h2>
+<div class="section level3">
+<h3 id="sibling-files--h5-and--immune-qs2">Sibling files: <code>.h5</code> and <code>.immune.qs2</code><a class="anchor" aria-label="anchor" href="#sibling-files--h5-and--immune-qs2"></a>
+</h3>
 <p>If your <code>.crb</code> was exported with
 <code>expression_matrix_mode = "h5"</code> in
 <code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code>, its descriptor records the H5 file
@@ -408,32 +704,33 @@ before anything is written, with
 <code>uses a retired format ... Convert it once with CerebroNexus::convertCerebro()</code>.
 See <a href="data_integrity_contracts.html">Data integrity contracts</a>
 for what counts as retired.</p>
-<div class="section level3">
-<h3 id="private-data-and-spatial-assets">Private data and spatial assets<a class="anchor" aria-label="anchor" href="#private-data-and-spatial-assets"></a>
-</h3>
+<div class="section level4">
+<h4 id="private-data-and-spatial-assets">Private data and spatial assets<a class="anchor" aria-label="anchor" href="#private-data-and-spatial-assets"></a>
+</h4>
 <p>Files explicitly passed through <code>spatial_images</code> are
-copied under <code>spatial-assets/</code>. The server-side renderer
-reads them from disk and embeds them as data URIs when drawing the plot;
-the directory is not registered as an HTTP resource. Raw
-<code>.crb</code>, H5 and immune repertoire sidecar files stay under
-<code>private-data/</code>, which is likewise never registered with
-<code>addResourcePath()</code>. The historical <code>data/</code>
-directory name is deliberately not reused: a still-running older
-generated app can retain its former <code>/data</code> resource mapping
-while the bundle directory is replaced.</p>
+copied under <code>spatial-assets/</code>. The server exposes each
+selected image through a private, session-scoped URL; the image bytes
+are not Base64-encoded, and the directory is not registered as a public
+HTTP resource. Raw <code>.crb</code>, H5 and immune repertoire sidecar
+files stay under <code>private-data/</code>, which is likewise never
+registered with <code>addResourcePath()</code>. The historical
+<code>data/</code> directory name is deliberately not reused: a
+still-running older generated app can retain its former
+<code>/data</code> resource mapping while the bundle directory is
+replaced.</p>
 <p>This boundary prevents ordinary HTTP download through the generated
 Shiny app; it is not encryption or an operating-system access-control
 boundary. Anyone with filesystem access to the deployment account can
-still read the files. Missing optional spatial images are omitted with a
-warning.</p>
+still read the files. A <code>spatial_images</code> path that does not
+exist stops the build with an error.</p>
 <p>Generated bundles follow the standard Shiny deployment model of one
 app per R process. They use process-global <code>Cerebro.options</code>
 and do not claim isolation between separately sourced apps in the same
 process.</p>
 </div>
-<div class="section level3">
-<h3 id="single-writer-publication-and-recovery">Single-writer publication and recovery<a class="anchor" aria-label="anchor" href="#single-writer-publication-and-recovery"></a>
-</h3>
+<div class="section level4">
+<h4 id="single-writer-publication-and-recovery">Single-writer publication and recovery<a class="anchor" aria-label="anchor" href="#single-writer-publication-and-recovery"></a>
+</h4>
 <p>Each target has one atomic sibling lock named
 <code>.&lt;result-basename&gt;-build.lock</code>. A second build for the
 same canonical target stops immediately; builds for other targets
@@ -490,55 +787,20 @@ validation or turn <code><a href="https://rdrr.io/r/base/readRDS.html" class="ex
 files.</p>
 </div>
 </div>
-<div class="section level2">
-<h2 id="forwarding-extra-cerebro-options">Forwarding extra Cerebro options<a class="anchor" aria-label="anchor" href="#forwarding-extra-cerebro-options"></a>
-</h2>
-<p>Anything you want to surface in <code>Cerebro.options</code> that
-isn’t already a top-level argument can go through
-<code>cerebro_options</code>.</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/createShinyApp.html">createShinyApp</a></span><span class="op">(</span></span>
-<span>  cerebro_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"PBMC example"</span> <span class="op">=</span> <span class="va">crb</span><span class="op">)</span>,</span>
-<span>  result_dir   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"cerebro_app_opts"</span><span class="op">)</span>,</span>
-<span>  cerebro_options <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>    exclude_trivial_metadata <span class="op">=</span> <span class="cn">TRUE</span></span>
-<span>  <span class="op">)</span>,</span>
-<span>  launch_browser <span class="op">=</span> <span class="cn">FALSE</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p><code>mode</code>, <code>cerebro_version</code>,
-<code>crb_file_to_load</code>, <code>cerebro_root</code>, and the
-internal <code>.bundle_backend_plan</code> and
-<code>.bundle_run_options</code> are filled in by the function itself.
-Duplicate entries for either internal key are removed, and anything you
-supply for those keys is overwritten.</p>
-</div>
-<div class="section level2">
-<h2 id="deploying-the-bundle">Deploying the bundle<a class="anchor" aria-label="anchor" href="#deploying-the-bundle"></a>
-</h2>
-<p>The output directory is self-contained: shipping the folder is all
-that is required. Three common targets:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># 1. Local</span></span>
-<span><span class="fu">shiny</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">runApp</a></span><span class="op">(</span><span class="va">out_dir</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># 2. shiny-server / Posit Connect</span></span>
-<span><span class="co"># Drop the directory under the server's app root (e.g. /srv/shiny-server/),</span></span>
-<span><span class="co"># or use the Posit Connect publishing UI pointing at `app.R`.</span></span>
-<span></span>
-<span><span class="co"># 3. shinyapps.io</span></span>
-<span><span class="fu">rsconnect</span><span class="fu">::</span><span class="fu">deployApp</span><span class="op">(</span>appDir <span class="op">=</span> <span class="va">out_dir</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="reference">Reference<a class="anchor" aria-label="anchor" href="#reference"></a>
 </h2>
 <ul>
-<li><code><a href="../reference/createShinyApp.html">?createShinyApp</a></code></li>
 <li>
-<code><a href="../articles/cerebronexus_workflow_seurat.html">vignette("cerebronexus_workflow_seurat")</a></code> for end-to-end
-Seurat → <code>.crb</code> → app</li>
+<code><a href="../reference/createShinyApp.html">?createShinyApp</a></code>, <code><a href="../reference/launchCerebro.html">?launchCerebro</a></code>
+</li>
 <li>
-<code>vignette("host_cerebro_on_shinyapps")</code> for shinyapps.io
-specifics</li>
+<code><a href="../articles/import_your_analysis.html">vignette("import_your_analysis")</a></code> for getting a Seurat,
+scanpy or SingleCellExperiment analysis into a <code>.crb</code>
+file</li>
+<li><a href="control_access_to_cerebro_with_a_login_page.html">Control
+access to CerebroNexus with a login page</a></li>
 </ul>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

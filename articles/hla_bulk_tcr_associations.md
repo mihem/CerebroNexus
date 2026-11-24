@@ -15,10 +15,12 @@ A](#option-a-the-real-public-cohort-pubtcrs-emerson-2017)) or as a small
 synthetic object you can run in the next five minutes ([Option
 B](#option-b-a-small-synthetic-bulk-crb-you-can-run-now)).
 
-If you have not read the main guide, skim its “two ideas” section first
-— this one assumes you know what a CDR3, a motif, and an HLA allele are.
-As before, every code block runs on its own (base R + `Matrix` +
-`CerebroNexus`, no downloads), and we print each object as we build it.
+If you have not read [the main
+guide](https://www.mheming.com/CerebroNexus/articles/hla_tcr_motifs.md),
+skim its “two ideas” section first — this one assumes you know what a
+CDR3, a motif, and an HLA allele are. As before, every code block runs
+on its own (base R + `Matrix` + `CerebroNexus`, no downloads), and we
+print each object as we build it.
 
 ### How bulk data is different
 
@@ -434,9 +436,13 @@ key is `v_gene+cdr3` rather than CDR3 alone.
 
 ## See also
 
-- **HLA & TCR Motifs: from synthetic data to an interactive app** — the
-  single-cell workflow (Seurat → `.crb` → app) and a full tour of the
-  page.
+- [HLA & TCR Motifs: from synthetic data to an interactive
+  app](https://www.mheming.com/CerebroNexus/articles/hla_tcr_motifs.md)
+  — the single-cell workflow (Seurat → `.crb` → app) and a full tour of
+  the page.
+- [A real antigen-selected single-cell TCR demo, end to
+  end](https://www.mheming.com/CerebroNexus/articles/hla_tcr_antigen_selected.md)
+  — how the shipped single-cell HLA demo is built from public 10x data.
 - `data-raw/build_hla_tcr_bulk_demo.R` — the real pubtcrs → `.crb`
   pipeline.
 - `data-raw/DATASETS.md` — provenance for the shipped HLA demo, and for

@@ -311,5 +311,5 @@ Warnings mean that the result remains interpretable:
   app](https://www.mheming.com/CerebroNexus/articles/create_a_self_contained_shiny_app.md)
 - [Immune repertoire
   analysis](https://www.mheming.com/CerebroNexus/articles/immune_repertoire_analysis.md)
-- [Create an H5 expression
-  matrix](https://www.mheming.com/CerebroNexus/articles/create_expression_matrix_in_h5_format.md)
+- [Store the expression matrix in an H5
+  file](https://www.mheming.com/CerebroNexus/articles/million_cell_crb_artifacts.html#store-the-expression-matrix-in-an-h5-file)

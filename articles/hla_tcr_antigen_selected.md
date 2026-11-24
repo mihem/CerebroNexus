@@ -29,7 +29,9 @@ application, and a demo that is neither real nor single-cell earns its
 place only if nothing better exists. This one is both, so it replaces
 them. Their build pipelines remain in `data-raw/` (see
 `data-raw/hla.md`) if you want to reproduce them, and the bulk workflow
-now lives in its own guide as *bring your own cohort*.
+now lives in [its own
+guide](https://www.mheming.com/CerebroNexus/articles/hla_bulk_tcr_associations.md)
+as *bring your own cohort*.
 
 Replacing them required answering a fair objection first: *if the motif
 network is only legible on synthetic data, what is the feature for?*
@@ -507,3 +509,12 @@ Open the data set and go to **HLA & TCR Motifs**:
   reagent panel, so ascertainment and donor/panel confounding remain.
   These contrasts do **not** use the dextramer binder calls.
 - **Data & QC** — the published genotypes and their coverage.
+
+## See also
+
+- [HLA & TCR Motifs: from synthetic data to an interactive
+  app](https://www.mheming.com/CerebroNexus/articles/hla_tcr_motifs.md)
+  — the single-cell workflow and a full tour of the page.
+- [HLA Associations on bulk TCRβ with real donor
+  HLA](https://www.mheming.com/CerebroNexus/articles/hla_bulk_tcr_associations.md)
+  — bring your own bulk TCRβ cohort with real donor HLA.

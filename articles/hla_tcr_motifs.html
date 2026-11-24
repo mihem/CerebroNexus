@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.11</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.12</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -33,34 +33,26 @@
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Workflows</h6></li>
-    <li><a class="dropdown-item" href="../articles/cerebronexus_workflow_seurat.html">Introduction to the CerebroNexus workflow (Seurat)</a></li>
-    <li><a class="dropdown-item" href="../articles/export_a_data_set_in_SCE_format.html">Export a data set in SCE format</a></li>
-    <li><a class="dropdown-item" href="../articles/use_sce_and_anndata_data.html">Use SingleCellExperiment and AnnData data</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Getting started</h6></li>
+    <li><a class="dropdown-item" href="../articles/import_your_analysis.html">From your analysis to an interactive Viewer</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Interface</h6></li>
     <li><a class="dropdown-item" href="../articles/overview_of_cerebro_class.html">Overview of the Cerebro class</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>How-to</h6></li>
     <li><a class="dropdown-item" href="../articles/build_a_data_set_by_pointing.html">Build a data set without writing code</a></li>
+    <li><a class="dropdown-item" href="../articles/cerebronexus_workflow_seurat.html">Prepare and export a Seurat object in R</a></li>
     <li><a class="dropdown-item" href="../articles/data_integrity_contracts.html">Data integrity from Seurat to a self-contained Cerebro app</a></li>
     <li><a class="dropdown-item" href="../articles/seurat_v5_layered_assays.html">Seurat v5 layered assays: complete and safe expression matrices</a></li>
-    <li><a class="dropdown-item" href="../articles/create_a_self_contained_shiny_app.html">Create a self-contained Shiny app from a Cerebro data file</a></li>
-    <li><a class="dropdown-item" href="../articles/create_expression_matrix_in_h5_format.html">Store the expression matrix in H5 format</a></li>
+    <li><a class="dropdown-item" href="../articles/create_a_self_contained_shiny_app.html">Share data sets as a Shiny app</a></li>
     <li><a class="dropdown-item" href="../articles/million_cell_crb_artifacts.html">Working with large datasets</a></li>
-    <li><a class="dropdown-item" href="../articles/launch_cerebro_with_pre-loaded_data_set.html">Launch Cerebro with pre-loaded data set</a></li>
-    <li><a class="dropdown-item" href="../articles/multi_crb.html">Loading multiple data sets (multi-crb) with a dataset switcher</a></li>
-    <li><a class="dropdown-item" href="../articles/export_and_visualize_custom_tables_and_plots.html">Export and visualize custom tables and plots</a></li>
     <li><a class="dropdown-item" href="../articles/control_access_to_cerebro_with_a_login_page.html">Control access to CerebroNexus with a login page</a></li>
-    <li><a class="dropdown-item" href="../articles/host_cerebro_on_shinyapps.html">Host Cerebro on shinyapps.io</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Benchmarks</h6></li>
     <li><a class="dropdown-item" href="../articles/expression_backend_benchmark.html">Large-dataset benchmarks: expression, storage and Viewer</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Modules</h6></li>
-    <li><a class="dropdown-item" href="../articles/most_expressed_genes.html">Most Expressed Genes</a></li>
-    <li><a class="dropdown-item" href="../articles/enriched_pathways.html">Enriched Pathways</a></li>
-    <li><a class="dropdown-item" href="../articles/extra_material.html">Extra Material</a></li>
+    <li><a class="dropdown-item" href="../articles/tables_and_plots.html">Tables and plots in the Viewer</a></li>
     <li><a class="dropdown-item" href="../articles/immune_repertoire_analysis.html">Immune Repertoire Analysis in CerebroNexus</a></li>
     <li><a class="dropdown-item" href="../articles/trajectory_analysis.html">Trajectory Analysis</a></li>
     <li><a class="dropdown-item" href="../articles/spatial_analysis.html">Spatial Transcriptomics Analysis</a></li>
@@ -99,8 +91,6 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>HLA &amp; TCR Motifs: from synthetic data to an interactive app</h1>
-                        <h4 data-toc-skip class="author">Xuesong
-Wang</h4>
             
             <h4 data-toc-skip class="date">24 November, 2026</h4>
       
@@ -124,9 +114,9 @@ Every code block runs on its own — the only packages you need are base R
 plus <code>Matrix</code>, <code>Seurat</code>, and
 <code>CerebroNexus</code>, and nothing is downloaded.</p>
 <p>If your data is <strong>bulk</strong> TCR sequencing rather than
-single cells, read the companion guide <em>“HLA Associations on bulk
-TCRβ with real donor HLA”</em> instead; it uses real genotypes and a
-slightly different object.</p>
+single cells, read the companion guide <a href="hla_bulk_tcr_associations.html">HLA Associations on bulk TCRβ with
+real donor HLA</a> instead; it uses real genotypes and a slightly
+different object.</p>
 <div class="section level3">
 <h3 id="the-two-ideas-the-page-is-built-on">The two ideas the page is built on<a class="anchor" aria-label="anchor" href="#the-two-ideas-the-page-is-built-on"></a>
 </h3>
@@ -407,7 +397,7 @@ the whole family is automatically Hamming-1 connected.</p>
 <span>    <span class="va">base</span> <span class="op">&lt;-</span> <span class="va">members</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/sample.html" class="external-link">sample.int</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">members</span><span class="op">)</span>, <span class="fl">1</span><span class="op">)</span><span class="op">]</span>     <span class="co"># pick an existing member</span></span>
 <span>    <span class="va">chars</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/strsplit.html" class="external-link">strsplit</a></span><span class="op">(</span><span class="va">base</span>, <span class="st">""</span><span class="op">)</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span></span>
 <span>    <span class="va">pos</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sample.html" class="external-link">sample</a></span><span class="op">(</span><span class="fl">5</span><span class="op">:</span><span class="op">(</span><span class="va">len</span> <span class="op">-</span> <span class="fl">1</span><span class="op">)</span>, <span class="fl">1</span><span class="op">)</span>                        <span class="co"># choose an interior position</span></span>
-<span>    <span class="va">chars</span><span class="op">[</span><span class="va">pos</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sample.html" class="external-link">sample</a></span><span class="op">(</span><span class="fu"><a href="https://generics.r-lib.org/reference/setops.html" class="external-link">setdiff</a></span><span class="op">(</span><span class="va">AA</span>, <span class="va">chars</span><span class="op">[</span><span class="va">pos</span><span class="op">]</span><span class="op">)</span>, <span class="fl">1</span><span class="op">)</span>     <span class="co"># mutate it</span></span>
+<span>    <span class="va">chars</span><span class="op">[</span><span class="va">pos</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sample.html" class="external-link">sample</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/sets.html" class="external-link">setdiff</a></span><span class="op">(</span><span class="va">AA</span>, <span class="va">chars</span><span class="op">[</span><span class="va">pos</span><span class="op">]</span><span class="op">)</span>, <span class="fl">1</span><span class="op">)</span>     <span class="co"># mutate it</span></span>
 <span>    <span class="va">cand</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="va">chars</span>, collapse <span class="op">=</span> <span class="st">""</span><span class="op">)</span></span>
 <span>    <span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="va">cand</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="va">members</span><span class="op">)</span> <span class="va">members</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">members</span>, <span class="va">cand</span><span class="op">)</span></span>
 <span>  <span class="op">}</span></span>
@@ -462,7 +452,7 @@ family 5 lives in the CD4 T cells of <code>DRB1*15:01</code> carriers
 <span>  <span class="op">}</span></span>
 <span><span class="op">}</span></span>
 <span><span class="co"># every other T cell with a receptor gets a random singleton — the polyclonal background</span></span>
-<span><span class="va">bg</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://generics.r-lib.org/reference/setops.html" class="external-link">setdiff</a></span><span class="op">(</span><span class="va">t_meta</span><span class="op">$</span><span class="va">barcode</span>, <span class="va">assign</span><span class="op">$</span><span class="va">barcode</span><span class="op">)</span></span>
+<span><span class="va">bg</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sets.html" class="external-link">setdiff</a></span><span class="op">(</span><span class="va">t_meta</span><span class="op">$</span><span class="va">barcode</span>, <span class="va">assign</span><span class="op">$</span><span class="va">barcode</span><span class="op">)</span></span>
 <span><span class="va">assign</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span><span class="va">assign</span>, <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  barcode <span class="op">=</span> <span class="va">bg</span>,</span>
 <span>  v_gene <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sample.html" class="external-link">sample</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"TRBV%d-1"</span>, <span class="fl">2</span><span class="op">:</span><span class="fl">29</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">bg</span><span class="op">)</span>, <span class="cn">TRUE</span><span class="op">)</span>,</span>
@@ -907,18 +897,24 @@ contrast.</p>
 </h2>
 <ul>
 <li>
-<strong>Introduction to the CerebroNexus workflow (Seurat)</strong>
-— the general Seurat → <code>.crb</code> export basics, if this is your
-first CerebroNexus export; the HLA slots above just ride along with
-it.</li>
+<a href="cerebronexus_workflow_seurat.html">Prepare and export a
+Seurat object in R</a> — the general Seurat → <code>.crb</code> export
+basics, if this is your first CerebroNexus export; the HLA slots above
+just ride along with it.</li>
 <li>
-<strong>HLA Associations on bulk TCRβ with real donor HLA</strong> —
-the companion workflow for bulk immunosequencing: real genotypes, no
-single cells, and the positive-control caveat that comes with them.</li>
+<a href="hla_bulk_tcr_associations.html">HLA Associations on bulk
+TCRβ with real donor HLA</a> — the companion workflow for bulk
+immunosequencing: real genotypes, no single cells, and the
+positive-control caveat that comes with them.</li>
 <li>
-<strong>Immune Repertoire Analysis in CerebroNexus</strong> — the
-scRepertoire-based module that produces the same
-<code>@misc$immune_repertoire</code> slot from real 10x data.</li>
+<a href="hla_tcr_antigen_selected.html">A real antigen-selected
+single-cell TCR demo, end to end</a> — how the shipped
+<code>demo_hla_tcr_dextramer.crb</code> is built from public 10x data:
+real cells, real paired TCRs and real donor HLA.</li>
+<li>
+<a href="immune_repertoire_analysis.html">Immune Repertoire Analysis
+in CerebroNexus</a> — the scRepertoire-based module that produces the
+same <code>@misc$immune_repertoire</code> slot from real 10x data.</li>
 <li>
 <code><a href="../reference/exportFromSeurat.html">?exportFromSeurat</a></code>, <code><a href="../reference/createShinyApp.html">?createShinyApp</a></code>, and
 <code><a href="../reference/Cerebro.html">?Cerebro</a></code> (see <code>addHLATyping</code> /

@@ -13,8 +13,9 @@ block runs on its own — the only packages you need are base R plus
 `Matrix`, `Seurat`, and `CerebroNexus`, and nothing is downloaded.
 
 If your data is **bulk** TCR sequencing rather than single cells, read
-the companion guide *“HLA Associations on bulk TCRβ with real donor
-HLA”* instead; it uses real genotypes and a slightly different object.
+the companion guide [HLA Associations on bulk TCRβ with real donor
+HLA](https://www.mheming.com/CerebroNexus/articles/hla_bulk_tcr_associations.md)
+instead; it uses real genotypes and a slightly different object.
 
 ### The two ideas the page is built on
 
@@ -731,14 +732,21 @@ they were would inflate any apparent contrast.
 
 ## See also
 
-- **Introduction to the CerebroNexus workflow (Seurat)** — the general
-  Seurat → `.crb` export basics, if this is your first CerebroNexus
-  export; the HLA slots above just ride along with it.
-- **HLA Associations on bulk TCRβ with real donor HLA** — the companion
-  workflow for bulk immunosequencing: real genotypes, no single cells,
-  and the positive-control caveat that comes with them.
-- **Immune Repertoire Analysis in CerebroNexus** — the
-  scRepertoire-based module that produces the same
+- [Prepare and export a Seurat object in
+  R](https://www.mheming.com/CerebroNexus/articles/cerebronexus_workflow_seurat.md)
+  — the general Seurat → `.crb` export basics, if this is your first
+  CerebroNexus export; the HLA slots above just ride along with it.
+- [HLA Associations on bulk TCRβ with real donor
+  HLA](https://www.mheming.com/CerebroNexus/articles/hla_bulk_tcr_associations.md)
+  — the companion workflow for bulk immunosequencing: real genotypes, no
+  single cells, and the positive-control caveat that comes with them.
+- [A real antigen-selected single-cell TCR demo, end to
+  end](https://www.mheming.com/CerebroNexus/articles/hla_tcr_antigen_selected.md)
+  — how the shipped `demo_hla_tcr_dextramer.crb` is built from public
+  10x data: real cells, real paired TCRs and real donor HLA.
+- [Immune Repertoire Analysis in
+  CerebroNexus](https://www.mheming.com/CerebroNexus/articles/immune_repertoire_analysis.md)
+  — the scRepertoire-based module that produces the same
   `@misc$immune_repertoire` slot from real 10x data.
 - [`?exportFromSeurat`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md),
   [`?createShinyApp`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md),

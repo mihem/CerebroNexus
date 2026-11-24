@@ -72,8 +72,8 @@ CerebroNexus::launchCerebroBuilder()
 ```
 
 Add your data files, choose the groups and content, and build a `.crb`
-file or a standalone App. See [Build a data set by
-pointing](https://www.mheming.com/CerebroNexus/articles/build_a_data_set_by_pointing.html).
+file or a standalone App. See [Build a data set without writing
+code](https://www.mheming.com/CerebroNexus/articles/build_a_data_set_by_pointing.html).
 
 **From a script:**
 
@@ -98,8 +98,8 @@ createShinyApp(
 ```
 
 No Python is needed to read AnnData or SpatialData; see the vignette
-[Use SingleCellExperiment and AnnData
-data](https://www.mheming.com/CerebroNexus/vignettes/use_sce_and_anndata_data.Rmd).
+[From your analysis to an interactive
+Viewer](https://www.mheming.com/CerebroNexus/vignettes/import_your_analysis.Rmd).
 
 ## License
 

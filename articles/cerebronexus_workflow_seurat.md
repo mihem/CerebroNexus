@@ -1,285 +1,62 @@
-# Introduction to the CerebroNexus workflow (Seurat)
+# Prepare and export a Seurat object in R
 
 ## Overview
 
-The `CerebroNexus` package has two main purposes: (1) provide access to
-the CerebroNexus user interface, and (2) provide functions to
-pre-process and export scRNA-seq data for visualization in CerebroNexus.
-The Cerebro user interface was built using the Shiny framework and
-designed to provide numerous perspectives on a given data set that
-should facilitate data interpretation. This vignette will give you an
-example of how scRNA-seq data can be processed using the
-[Seurat](https://satijalab.org/seurat/) toolkit and then exported for
-visualization in Cerebro.
+This vignette starts from a Seurat object in which the analysis is
+already done, adds the tables that CerebroNexus pre-computes (most
+expressed genes, marker genes, enriched pathways), and exports
+everything to a `.crb` file. It does not cover quality control,
+normalization, clustering or dimensional reduction; for those steps,
+please see the [Seurat tutorials](https://satijalab.org/seurat/).
 
-Key features that can be accessed through Cerebro:
-
-- Interactive 2D and 3D dimensional reductions.
-- Overview panels for all grouping variables, e.g. samples and clusters.
-- Tables of most expressed genes and marker genes for subgroups of
-  grouping variables.
-- Tables of enriched pathways for subgroups of grouping variables.
-- Query gene(s) and gene sets from MSigDB and show their expression in
-  dimensional reductions.
-- Visualize trajectories calculated with Monocle v2.
-- Compatible plots can be exported to PNG from the plot toolbar.
-  Portable views also offer PNG export through **Share view**.
-- Tables can be downloaded in CSV or Excel format.
-
-For a direct image export, click **Download PNG** in the plot toolbar.
-If the current view supports portable sharing, you can instead open
-**Share view** and click **Download PNG** there. The Share view dialog
-also lets you download or open a portable JSON configuration containing
-the current display state and selected cell barcodes, so the same view
-can be restored in another compatible CerebroNexus session without
-including the source data.
+These steps are optional: a Seurat object can also be imported as it is,
+with the Builder or
+[`convertSeuratToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertSeuratToCerebro.md);
+see [From your analysis to an interactive
+Viewer](https://www.mheming.com/CerebroNexus/articles/import_your_analysis.md).
+The functions shown here take a Seurat object. The same steps, except
+the gene set enrichment, can also be switched on in the Builder
+([`launchCerebroBuilder()`](https://www.mheming.com/CerebroNexus/reference/launchCerebroBuilder.md));
+see [Build a data set without writing
+code](https://www.mheming.com/CerebroNexus/articles/build_a_data_set_by_pointing.html).
 
 ## Installation
 
-Before starting the workflow, install `CerebroNexus`, as well as the
-[`Seurat`](https://satijalab.org/seurat/),
-[`monocle`](https://cole-trapnell-lab.github.io/monocle-release/) and
-[`SingleR`](https://www.bioconductor.org/packages/release/bioc/html/SingleR.html)
-packages. The latter packages are optional because they are only needed
-for pre-processing scRNA-seq data. If you just want to launch the
-Cerebro user interface, e.g. because you already have the pre-processed
-data, you don’t need those packages.
+Install CerebroNexus as described in the [installation
+instructions](https://www.mheming.com/CerebroNexus/#id_1-installation).
+This guide also uses [Seurat](https://satijalab.org/seurat/)
+(`install.packages('Seurat')`).
+
+## Start from a processed Seurat object
+
+CerebroNexus expects an object in which the usual analysis is done:
+
+- normalized expression values,
+- at least one grouping variable in the meta data, e.g. samples or
+  clusters,
+- at least one dimensional reduction, e.g. UMAP or t-SNE.
+
+Here we use `pbmc_small`, a processed example of 80 cells and 230 genes
+that ships with Seurat. It carries clusters, an arbitrary two-level
+grouping (`groups`), and PCA and t-SNE coordinates. We copy the clusters
+to `seurat_clusters`, the column name Seurat uses in a standard
+analysis. With your own data, load your object instead and use your own
+column names.
 
 ``` r
-if ( 'BiocManager' %in% installed.packages() == FALSE ) install.packages('BiocManager')
-
-library(BiocManager)
-
-if ( !'CerebroNexus' %in% rownames(installed.packages()) ) remotes::install_github('mihem/CerebroNexus')
-if ( 'Seurat' %in% installed.packages() == FALSE ) install('Seurat')
-if ( 'SingleR' %in% installed.packages() == FALSE ) install('SingleR')
-if ( 'monocle' %in% installed.packages() == FALSE ) install('monocle')
-```
-
-## Setup
-
-Apart from the packages we just installed, we will also load the dplyr
-package and set a seed to make our analysis reproducible.
-
-``` r
-library(dplyr)
 library(Seurat)
-library(SingleR)
-library(monocle)
 library(CerebroNexus)
 
-options(width = 100)
-set.seed(1234567)
-```
-
-## Load count data
-
-In this example workflow, we will load a small transcript count table
-from the [Seurat](https://satijalab.org/seurat/) package containing 80
-cells and 230 genes. If you want to try the workflow with a real data
-set, you can find some transcript count matrices on the [Cerebro GitHub
-repo](https://github.com/romanhaa/Cerebro/tree/master/examples).
-
-``` r
-pbmc <- read.table(
-  file = system.file('extdata', 'pbmc_raw.txt', package = 'Seurat'),
-  as.is = TRUE
-)
-```
-
-## Pre-processing with Seurat
-
-Now, we create a `Seurat` object and filter out cells with less than
-`50` transcripts or fewer than `10` expressed genes. Those cut-offs are
-only reasonable for this example data set and will likely need to be
-adjusted in a real data set. Then, we follow the [standard Seurat
-workflow](https://satijalab.org/seurat/essential_commands.html),
-including…
-
-- log-normalization of transcript counts,
-- identification of highly variably genes,
-- scaling of expression values and regression for the number of
-  transcripts per cell,
-- principal component analysis (PCA).
-
-``` r
-seurat <- CreateSeuratObject(
-  project = 'pbmc',
-  counts = pbmc,
-  min.cells = 5
-)
-seurat <- subset(seurat, subset = nCount_RNA >= 50 & nFeature_RNA >= 10)
-seurat <- NormalizeData(seurat, verbose = FALSE)
-seurat <- FindVariableFeatures(seurat, verbose = FALSE)
-seurat <- ScaleData(seurat, vars.to.regress = 'nCount_RNA', verbose = FALSE)
-seurat <- RunPCA(seurat, features = seurat@assays$RNA@var.features, verbose = FALSE)
-```
-
-## Clustering
-
-Then, we identify clusters with a relatively low resolution, again,
-because of the small size of this data set.
-
-``` r
-seurat <- FindNeighbors(seurat)
-seurat <- FindClusters(seurat, resolution = 0.5)
-seurat@meta.data$RNA_snn_res.0.5 <- NULL
-```
-
-## Cell cycle analysis
-
-We could also perform cell cycle analysis using the
-[`CellCycleScoring()`](https://satijalab.org/seurat/reference/CellCycleScoring.html)
-built into Seurat. However, too few of the cell cycle genes are present
-in this example data set so we will skip it here. The code below should
-work with a real data set.
-
-``` r
-seurat <- CellCycleScoring(
-  seurat,
-  g2m.features = cc.genes$g2m.genes,
-  s.features = cc.genes$s.genes
-)
-
-seurat@misc$gene_lists$G2M_phase_genes <- cc.genes$g2m.genes
-seurat@misc$gene_lists$S_phase_genes <- cc.genes$s.genes
-```
-
-## Dimensional reduction
-
-Next, we use the UMAP technique to generate two- and three-dimensional
-projections.
-
-``` r
-seurat <- RunUMAP(
-  seurat,
-  reduction.name = 'UMAP',
-  reduction.key = 'UMAP_',
-  dims = 1:30,
-  n.components = 2,
-  seed.use = 100,
-  verbose = FALSE
-)
-
-seurat <- RunUMAP(
-  seurat,
-  reduction.name = 'UMAP_3D',
-  reduction.key = 'UMAP3D_',
-  dims = 1:30,
-  n.components = 3,
-  seed.use = 100,
-  verbose = FALSE
-)
-```
-
-## Curate meta data
-
-This example data set consists of a single sample so we just add that
-name to the meta data. Moreover, in order to be able to understand how
-we did the analysis later, we add some meta data to the `misc` slot of
-our `Seurat` object, e.g. an experiment name and the species. The info
-we store there will later be collected for visualization in Cerebro.
-
-``` r
-seurat@meta.data$sample <- factor('pbmc', levels = 'pbmc')
-
-seurat@misc$experiment <- list(
-  experiment_name = 'pbmc',
-  organism = 'hg',
-  date_of_analysis = Sys.Date()
-)
-
-seurat@misc$parameters <- list(
-  gene_nomenclature = 'gene_name',
-  discard_genes_expressed_in_fewer_cells_than = 10,
-  keep_mitochondrial_genes = TRUE,
-  variables_to_regress_out = 'nUMI',
-  number_PCs = 30,
-  cluster_resolution = 0.5
-)
-
-seurat@misc$parameters$filtering <- list(
-  UMI_min = 50,
-  UMI_max = Inf,
-  genes_min = 10,
-  genes_max = Inf
-)
-
-seurat@misc$technical_info$CerebroNexus_version <- utils::packageVersion('CerebroNexus')
-seurat@misc$technical_info$Seurat <- utils::packageVersion('Seurat')
-seurat@misc$technical_info <- list(
-  'R' = capture.output(devtools::session_info())
-)
-```
-
-## Assign cell types
-
-Using the
-[`SingleR`](https://www.bioconductor.org/packages/release/bioc/html/SingleR.html)
-package, we can get a suggestion of cell type for each cell. Apart from
-the suggested cell type, we also extract the score that might help us to
-understand how confident the assignment was.
-
-``` r
-singler_ref <- BlueprintEncodeData()
-
-singler_results_blueprintencode_main <- SingleR(
-  test = GetAssayData(seurat, assay = 'RNA', slot = 'data'),
-  ref = singler_ref,
-  labels = singler_ref@colData@listData$label.main
-)
-
-seurat@meta.data$cell_type_singler_blueprintencode_main <- singler_results_blueprintencode_main@listData$labels
-
-singler_scores <- singler_results_blueprintencode_main@listData$scores %>%
-  as_tibble() %>%
-  dplyr::mutate(assigned_score = NA)
-
-for ( i in seq_len(nrow(singler_scores)) ) {
-  singler_scores$assigned_score[i] <- singler_scores[[singler_results_blueprintencode_main@listData$labels[i]]][i]
-}
-
-seurat@meta.data$cell_type_singler_blueprintencode_main_score <- singler_scores$assigned_score
-```
-
-## Calculate relationship trees
-
-Here, we calculate phylogenetic trees that represent the similarity
-between different subgroups, in this case clusters and cell types. To do
-so, we need to set the identity in the Seurat object to the current
-grouping of interest, calculate the tree, and then copy the result to
-the `misc` slot in the Seurat object so it can be exported later.
-
-### Clusters
-
-``` r
-Idents(seurat) <- "seurat_clusters"
-seurat <- BuildClusterTree(
-  seurat,
-  dims = 1:30,
-  reorder = FALSE,
-  reorder.numeric = FALSE
-)
-seurat@misc$trees$seurat_clusters <- seurat@tools$BuildClusterTree
-```
-
-### Cell types
-
-``` r
-Idents(seurat) <- "cell_type_singler_blueprintencode_main"
-seurat <- BuildClusterTree(
-  seurat,
-  dims = 1:30,
-  reorder = FALSE,
-  reorder.numeric = FALSE
-)
-seurat@misc$trees$cell_type_singler_blueprintencode_main <- seurat@tools$BuildClusterTree
+data('pbmc_small')
+seurat <- UpdateSeuratObject(pbmc_small)
+seurat$seurat_clusters <- seurat$RNA_snn_res.1
 ```
 
 ## CerebroNexus functions
 
 Now we use CerebroNexus functions to obtain more information about the
-data set and its clusters and cell types.
+data set and its groups. Each function stores its result in the Seurat
+object, from where the export picks it up.
 
 ### Calculate percentage of mitochondrial and ribosomal transcripts
 
@@ -299,15 +76,14 @@ seurat <- addPercentMtRibo(
 ### Get most expressed genes
 
 Another interesting perspective is to look at the 100 most expressed
-genes across all cells and for every cluster and cell type. This can
-help in understanding the transcriptional activity of a given cell
-population.
+genes for every group. This can help in understanding the
+transcriptional activity of a given cell population.
 
 ``` r
 seurat <- getMostExpressedGenes(
   seurat,
   assay = 'RNA',
-  groups = c('sample','seurat_clusters','cell_type_singler_blueprintencode_main')
+  groups = c('seurat_clusters','groups')
 )
 ```
 
@@ -328,7 +104,7 @@ seurat <- getMarkerGenes(
   seurat,
   assay = 'RNA',
   organism = 'hg',
-  groups = c('seurat_clusters','cell_type_singler_blueprintencode_main'),
+  groups = c('seurat_clusters','groups'),
   name = 'cerebro_seurat',
   only_pos = TRUE
 )
@@ -365,7 +141,16 @@ file, e.g. from the
 function uses the
 [GSVA](https://bioconductor.org/packages/release/bioc/html/GSVA.html)
 method in combination with additional statistics as published by
-[Diaz-Mejia et. al.](https://f1000research.com/articles/8-296).
+[Diaz-Mejia et al.](https://f1000research.com/articles/8-296). It needs
+the Bioconductor packages
+[GSVA](https://bioconductor.org/packages/release/bioc/html/GSVA.html)
+and
+[qvalue](https://bioconductor.org/packages/release/bioc/html/qvalue.html):
+
+``` r
+install.packages('BiocManager')
+BiocManager::install(c('GSVA', 'qvalue'))
+```
 
 ``` r
 example_gene_set <- system.file("extdata/example_gene_set.gmt", package = "CerebroNexus")
@@ -374,36 +159,39 @@ seurat <- performGeneSetEnrichmentAnalysis(
   seurat,
   assay = 'RNA',
   GMT_file = example_gene_set,
-  groups = c('seurat_clusters','cell_type_singler_blueprintencode_main')
+  groups = c('seurat_clusters','groups')
 )
 ```
 
-## Trajectory analysis with Monocle (optional)
+## Optional extras
 
-Then, we perform trajectory analysis with [Monocle
-v2](https://cole-trapnell-lab.github.io/monocle-release/) using the
-previously identified highly variable genes. We extract the trajectory
-from the generated Monocle object with the CerebroNexus
+Two more kinds of information are exported if the Seurat object carries
+them.
+
+### Cell cycle
+
+If the meta data has a cell cycle column, e.g. `Phase` from Seurat’s
+[`CellCycleScoring()`](https://satijalab.org/seurat/reference/CellCycleScoring.html)
+(see the [Seurat cell cycle
+vignette](https://satijalab.org/seurat/articles/cell_cycle_vignette)),
+pass its name to the export with `cell_cycle = 'Phase'`. The viewer then
+colours it with its cell cycle palette. The example data has too few
+cell cycle genes to calculate it here.
+
+### 3D projections
+
+By default, every dimensional reduction except PCA is exported; one with
+three dimensions, such as a UMAP computed with `n.components = 3`, is
+shown as a 3D projection.
+
+## Trajectories (optional)
+
+A Monocle 2 trajectory can be attached to the Seurat object with
 [`extractMonocleTrajectory()`](https://www.mheming.com/CerebroNexus/reference/extractMonocleTrajectory.md)
-function and attach it to our Seurat object.
-
-``` r
-monocle <- newCellDataSet(
-  seurat@assays$RNA@counts,
-  phenoData = new('AnnotatedDataFrame', data = seurat@meta.data),
-  featureData = new('AnnotatedDataFrame', data = data.frame(
-    gene_short_name = rownames(seurat@assays$RNA@counts),
-    row.names = rownames(seurat@assays$RNA@counts))
-  )
-)
-
-monocle <- estimateSizeFactors(monocle)
-monocle <- setOrderingFilter(monocle, seurat@assays$RNA@var.features)
-monocle <- reduceDimension(monocle, max_components = 2, method = 'DDRTree')
-monocle <- orderCells(monocle)
-
-seurat <- extractMonocleTrajectory(monocle, seurat, 'highly_variable_genes')
-```
+before the export, and is then shown in the **Trajectory** tab. See
+[Trajectory
+analysis](https://www.mheming.com/CerebroNexus/articles/trajectory_analysis.html)
+for the code.
 
 ## Export to Cerebro format
 
@@ -413,14 +201,16 @@ to export our Seurat object to a `.crb` file which can be loaded into
 CerebroNexus.
 
 ``` r
+crb_file <- paste0('cerebro_pbmc_seurat_', Sys.Date(), '.crb')
+
 exportFromSeurat(
   seurat,
   assay = 'RNA',
   slot = 'data',
-  file = paste0('cerebro_pbmc_seurat_', Sys.Date(), '.crb'),
+  file = crb_file,
   experiment_name = 'pbmc',
   organism = 'hg',
-  groups = c('sample','seurat_clusters','cell_type_singler_blueprintencode_main'),
+  groups = c('seurat_clusters','groups'),
   nUMI = 'nCount_RNA',
   nGene = 'nFeature_RNA',
   add_all_meta_data = TRUE,
@@ -432,13 +222,51 @@ By default the expression matrix is embedded in the `.crb`. For large
 data sets, add `expression_matrix_mode = "h5"` to write the matrix to a
 sibling `.h5` file instead (the only other storage mode); keep the two
 files together. A very large immune repertoire is moved to a third
-sibling file (`immune_sidecar = "auto"`). See [Store the expression
-matrix in H5
-format](https://www.mheming.com/CerebroNexus/articles/create_expression_matrix_in_h5_format.html).
+sibling file (`immune_sidecar = "auto"`). See [Working with large
+datasets](https://www.mheming.com/CerebroNexus/articles/million_cell_crb_artifacts.html#store-the-expression-matrix-in-an-h5-file).
 
-The Cerebro use interface can be launched using the
-[`launchCerebro()`](https://www.mheming.com/CerebroNexus/reference/launchCerebro.md)
-function.
+## Open the result
+
+Open the file in the Viewer:
+
+``` r
+launchCerebro(crb_file_to_load = crb_file)
+```
+
+The pages **Marker genes**, **Most expressed genes** and **Enriched
+pathways** show the tables computed above:
+
+![The Marker genes page of the Viewer, annotated. 1: the Method field
+shows cerebro_seurat, the name given to getMarkerGenes(). 2: the
+Grouping variable field shows seurat_clusters, one of the groups given
+to getMarkerGenes(). 3: the subgroup filter shows cluster 1. 4: the
+table columns seurat_clusters, gene, p_val, avg_log2FC, pct.1, pct.2 and
+p_val_adj come from Seurat::FindAllMarkers(); the first rows are S100A8,
+TYMP, S100A9, LYZ and CST3. 5: the sidebar pages Marker genes, Most
+expressed genes and Enriched pathways, which appear once
+getMarkerGenes(), getMostExpressedGenes(), getEnrichedPathways() or
+performGeneSetEnrichmentAnalysis() have stored their
+tables.](../reference/figures/viewer-marker-genes.png)
+
+The Marker genes page for the exported example. The numbers link the
+code above to what the page shows.
+
+With this small example,
+[`performGeneSetEnrichmentAnalysis()`](https://www.mheming.com/CerebroNexus/reference/performGeneSetEnrichmentAnalysis.md)
+finds no gene set that meets its thresholds, and the Enriched pathways
+page says so for that method. Tables can be downloaded in CSV or Excel
+format.
+
+For a direct image export, click **Download PNG** in the plot toolbar.
+If the current view supports portable sharing, you can instead open
+**Share view** and click **Download PNG** there. The Share view dialog
+also lets you download or open a portable JSON configuration containing
+the current display state and selected cell barcodes, so the same view
+can be restored in another compatible CerebroNexus session without
+including the source data.
+
+To share the data set itself, see [Share data sets as a Shiny
+app](https://www.mheming.com/CerebroNexus/articles/create_a_self_contained_shiny_app.html).
 
 ## See also
 

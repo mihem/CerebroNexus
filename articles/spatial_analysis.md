@@ -245,8 +245,11 @@ no rotation).
 
 ## See also
 
-- [`vignette("cerebronexus_workflow_seurat")`](https://www.mheming.com/CerebroNexus/articles/cerebronexus_workflow_seurat.md)
-  for the complete export workflow.
-- `vignette("create_a_self_contained_shiny_app")` for app bundling
-  options.
-- `vignette("multi_crb")` for hosting several datasets in one app.
+- [`vignette("import_your_analysis")`](https://www.mheming.com/CerebroNexus/articles/import_your_analysis.md)
+  for converting Seurat, AnnData and SpatialData data to a `.crb` file.
+- [Share data sets as a Shiny
+  app](https://www.mheming.com/CerebroNexus/articles/create_a_self_contained_shiny_app.md)
+  for app bundling options and hosting several datasets in one app.
+- [Trekker single-cell spatial
+  mapping](https://www.mheming.com/CerebroNexus/articles/trekker_spatial_mapping.md)
+  for Trekker data, which has its own page.

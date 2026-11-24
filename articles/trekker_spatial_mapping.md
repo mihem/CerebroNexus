@@ -356,7 +356,10 @@ I](img/trekker_data_qc.png)
   page works out of the box — not a biological result to read off.
 
 See `data-raw/trekker.md` for the full design notes and
-`data-raw/DATASETS.md` for the one-line provenance entry.
+`data-raw/DATASETS.md` for the one-line provenance entry. For the
+**Spatial** tab and for preparing other spatial data, such as Xenium or
+Visium, see [Spatial Transcriptomics
+Analysis](https://www.mheming.com/CerebroNexus/articles/spatial_analysis.md).
 
 ``` r
 sessionInfo()

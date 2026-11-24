@@ -62,23 +62,43 @@ are enriched in specific trajectory branches.
 ## Data preparation
 
 Trajectories must be computed with Monocle 2 (or compatible) and
-exported via
+attached to the Seurat object with
 [`extractMonocleTrajectory()`](https://www.mheming.com/CerebroNexus/reference/extractMonocleTrajectory.md)
-before embedding in the `.crb` file.
+before the export. The function returns the Seurat object with the
+trajectory stored in it, and
+[`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
+writes it to the `.crb` file.
 
 ``` r
 library(CerebroNexus)
-traj <- extractMonocleTrajectory(
+
+seurat_object <- extractMonocleTrajectory(
   monocle_object,
-  seurat_object = seurat_object
+  seurat_object,
+  trajectory_name = "my_trajectory"
 )
-exportFromSeurat(seurat_object,
+
+exportFromSeurat(
+  seurat_object,
   file = "my_data.crb",
-  trajectories = list(monocle2 = traj)
+  experiment_name = "my_experiment",
+  organism = "hg",
+  groups = c("sample", "seurat_clusters"),
+  nUMI = "nCount_RNA",
+  nGene = "nFeature_RNA"
 )
 ```
+
+`monocle_object` is a Monocle 2 `CellDataSet` after `orderCells()`. With
+monocle 2.38.0 and a current igraph (tested with 2.3.4), `orderCells()`
+stops with “The `neimode` argument of `dfs()` … is now defunct”.
+[`data-raw/build_trajectory_demo.R`](https://github.com/mihem/CerebroNexus/blob/master/data-raw/build_trajectory_demo.R)
+contains the two compatibility patches that the bundled demo trajectory
+is built with.
 
 ## See also
 
 - [`vignette("cerebronexus_workflow_seurat")`](https://www.mheming.com/CerebroNexus/articles/cerebronexus_workflow_seurat.md)
-  for the complete export workflow
+  for exporting a Seurat object with marker genes and other tables
+- [`vignette("import_your_analysis")`](https://www.mheming.com/CerebroNexus/articles/import_your_analysis.md)
+  for PAGA, scVelo and pseudotime trajectories from scanpy (`.h5ad`)

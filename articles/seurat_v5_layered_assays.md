@@ -612,10 +612,10 @@ workflow discovers files by name alone.
 
 ## See also
 
-- [Introduction to the CerebroNexus workflow with
-  Seurat](https://www.mheming.com/CerebroNexus/articles/cerebronexus_workflow_seurat.md)
-- [Create an expression matrix in HDF5
-  format](https://www.mheming.com/CerebroNexus/articles/create_expression_matrix_in_h5_format.md)
+- [Prepare and export a Seurat object in
+  R](https://www.mheming.com/CerebroNexus/articles/cerebronexus_workflow_seurat.md)
+- [Store the expression matrix in an H5
+  file](https://www.mheming.com/CerebroNexus/articles/million_cell_crb_artifacts.html#store-the-expression-matrix-in-an-h5-file)
 - [Create a self-contained Shiny
   application](https://www.mheming.com/CerebroNexus/articles/create_a_self_contained_shiny_app.md)
 

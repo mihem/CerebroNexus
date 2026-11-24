@@ -1,5 +1,24 @@
 # Changelog
 
+## CerebroNexus 8.4.12
+
+- **Restructured guides
+  ([\#267](https://github.com/mihem/CerebroNexus/issues/267)).** The
+  documentation starts with a new “Getting started” vignette,
+  [`vignette("import_your_analysis")`](https://www.mheming.com/CerebroNexus/articles/import_your_analysis.md),
+  which leads with the workflow, the Builder and a runnable example. It
+  replaces the `use_sce_and_anndata_data` vignette, so
+  `vignette("use_sce_and_anndata_data")` no longer exists. The Seurat
+  workflow vignette moves to How-to, focuses on what CerebroNexus adds
+  and runs again on Seurat v5
+  ([`VariableFeatures()`](https://satijalab.github.io/seurat-object/reference/VariableFeatures.html),
+  [`LayerData()`](https://satijalab.github.io/seurat-object/reference/Layers.html),
+  `layer = 'data'`, `celldex::BlueprintEncodeData()`). On the website,
+  overlapping articles are merged: the three table guides into “Tables
+  and plots”, the app-sharing guides into “Create a self-contained Shiny
+  app”, and the H5 guide into the large-data guide; the old article
+  addresses redirect to the new ones.
+
 ## CerebroNexus 8.4.11
 
 - **HLA & TCR Motifs no longer stays on “Still loading” when it opens on
@@ -2658,9 +2677,8 @@ sidecar layout, or is a pre-spatial `Cerebro_v1.3` object.
 - **Deprecations**: replaced
   [`aes_string()`](https://ggplot2.tidyverse.org/reference/aes_.html)
   with the `.data[[ ]]` pronoun and wrapped tidy-select group variables
-  in [`all_of()`](https://tidyselect.r-lib.org/reference/all_of.html),
-  which also removes the per-call warning and roughly halves the
-  composition cross-tabulation on large tables.
+  in `all_of()`, which also removes the per-call warning and roughly
+  halves the composition cross-tabulation on large tables.
 
 ## Version 2.0.0
 

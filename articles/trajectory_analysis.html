@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.11</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.12</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -33,34 +33,26 @@
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Workflows</h6></li>
-    <li><a class="dropdown-item" href="../articles/cerebronexus_workflow_seurat.html">Introduction to the CerebroNexus workflow (Seurat)</a></li>
-    <li><a class="dropdown-item" href="../articles/export_a_data_set_in_SCE_format.html">Export a data set in SCE format</a></li>
-    <li><a class="dropdown-item" href="../articles/use_sce_and_anndata_data.html">Use SingleCellExperiment and AnnData data</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Getting started</h6></li>
+    <li><a class="dropdown-item" href="../articles/import_your_analysis.html">From your analysis to an interactive Viewer</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Interface</h6></li>
     <li><a class="dropdown-item" href="../articles/overview_of_cerebro_class.html">Overview of the Cerebro class</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>How-to</h6></li>
     <li><a class="dropdown-item" href="../articles/build_a_data_set_by_pointing.html">Build a data set without writing code</a></li>
+    <li><a class="dropdown-item" href="../articles/cerebronexus_workflow_seurat.html">Prepare and export a Seurat object in R</a></li>
     <li><a class="dropdown-item" href="../articles/data_integrity_contracts.html">Data integrity from Seurat to a self-contained Cerebro app</a></li>
     <li><a class="dropdown-item" href="../articles/seurat_v5_layered_assays.html">Seurat v5 layered assays: complete and safe expression matrices</a></li>
-    <li><a class="dropdown-item" href="../articles/create_a_self_contained_shiny_app.html">Create a self-contained Shiny app from a Cerebro data file</a></li>
-    <li><a class="dropdown-item" href="../articles/create_expression_matrix_in_h5_format.html">Store the expression matrix in H5 format</a></li>
+    <li><a class="dropdown-item" href="../articles/create_a_self_contained_shiny_app.html">Share data sets as a Shiny app</a></li>
     <li><a class="dropdown-item" href="../articles/million_cell_crb_artifacts.html">Working with large datasets</a></li>
-    <li><a class="dropdown-item" href="../articles/launch_cerebro_with_pre-loaded_data_set.html">Launch Cerebro with pre-loaded data set</a></li>
-    <li><a class="dropdown-item" href="../articles/multi_crb.html">Loading multiple data sets (multi-crb) with a dataset switcher</a></li>
-    <li><a class="dropdown-item" href="../articles/export_and_visualize_custom_tables_and_plots.html">Export and visualize custom tables and plots</a></li>
     <li><a class="dropdown-item" href="../articles/control_access_to_cerebro_with_a_login_page.html">Control access to CerebroNexus with a login page</a></li>
-    <li><a class="dropdown-item" href="../articles/host_cerebro_on_shinyapps.html">Host Cerebro on shinyapps.io</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Benchmarks</h6></li>
     <li><a class="dropdown-item" href="../articles/expression_backend_benchmark.html">Large-dataset benchmarks: expression, storage and Viewer</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Modules</h6></li>
-    <li><a class="dropdown-item" href="../articles/most_expressed_genes.html">Most Expressed Genes</a></li>
-    <li><a class="dropdown-item" href="../articles/enriched_pathways.html">Enriched Pathways</a></li>
-    <li><a class="dropdown-item" href="../articles/extra_material.html">Extra Material</a></li>
+    <li><a class="dropdown-item" href="../articles/tables_and_plots.html">Tables and plots in the Viewer</a></li>
     <li><a class="dropdown-item" href="../articles/immune_repertoire_analysis.html">Immune Repertoire Analysis in CerebroNexus</a></li>
     <li><a class="dropdown-item" href="../articles/trajectory_analysis.html">Trajectory Analysis</a></li>
     <li><a class="dropdown-item" href="../articles/spatial_analysis.html">Spatial Transcriptomics Analysis</a></li>
@@ -99,8 +91,6 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Trajectory Analysis</h1>
-                        <h4 data-toc-skip class="author">Xuesong
-Wang</h4>
             
             <h4 data-toc-skip class="date">24 November, 2026</h4>
       
@@ -189,26 +179,47 @@ in the current selection or state</li>
 <h2 id="data-preparation">Data preparation<a class="anchor" aria-label="anchor" href="#data-preparation"></a>
 </h2>
 <p>Trajectories must be computed with Monocle 2 (or compatible) and
-exported via <code><a href="../reference/extractMonocleTrajectory.html">extractMonocleTrajectory()</a></code> before embedding in
-the <code>.crb</code> file.</p>
+attached to the Seurat object with
+<code><a href="../reference/extractMonocleTrajectory.html">extractMonocleTrajectory()</a></code> before the export. The function
+returns the Seurat object with the trajectory stored in it, and
+<code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code> writes it to the <code>.crb</code>
+file.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://www.mheming.com/CerebroNexus/">CerebroNexus</a></span><span class="op">)</span></span>
-<span><span class="va">traj</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/extractMonocleTrajectory.html">extractMonocleTrajectory</a></span><span class="op">(</span></span>
+<span></span>
+<span><span class="va">seurat_object</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/extractMonocleTrajectory.html">extractMonocleTrajectory</a></span><span class="op">(</span></span>
 <span>  <span class="va">monocle_object</span>,</span>
-<span>  seurat_object <span class="op">=</span> <span class="va">seurat_object</span></span>
+<span>  <span class="va">seurat_object</span>,</span>
+<span>  trajectory_name <span class="op">=</span> <span class="st">"my_trajectory"</span></span>
 <span><span class="op">)</span></span>
-<span><span class="fu"><a href="../reference/exportFromSeurat.html">exportFromSeurat</a></span><span class="op">(</span><span class="va">seurat_object</span>,</span>
+<span></span>
+<span><span class="fu"><a href="../reference/exportFromSeurat.html">exportFromSeurat</a></span><span class="op">(</span></span>
+<span>  <span class="va">seurat_object</span>,</span>
 <span>  file <span class="op">=</span> <span class="st">"my_data.crb"</span>,</span>
-<span>  trajectories <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>monocle2 <span class="op">=</span> <span class="va">traj</span><span class="op">)</span></span>
+<span>  experiment_name <span class="op">=</span> <span class="st">"my_experiment"</span>,</span>
+<span>  organism <span class="op">=</span> <span class="st">"hg"</span>,</span>
+<span>  groups <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"sample"</span>, <span class="st">"seurat_clusters"</span><span class="op">)</span>,</span>
+<span>  nUMI <span class="op">=</span> <span class="st">"nCount_RNA"</span>,</span>
+<span>  nGene <span class="op">=</span> <span class="st">"nFeature_RNA"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
+<p><code>monocle_object</code> is a Monocle 2 <code>CellDataSet</code>
+after <code>orderCells()</code>. With monocle 2.38.0 and a current
+igraph (tested with 2.3.4), <code>orderCells()</code> stops with “The
+<code>neimode</code> argument of <code>dfs()</code> … is now defunct”.
+<a href="https://github.com/mihem/CerebroNexus/blob/master/data-raw/build_trajectory_demo.R" class="external-link"><code>data-raw/build_trajectory_demo.R</code></a>
+contains the two compatibility patches that the bundled demo trajectory
+is built with.</p>
 </div>
 <div class="section level2">
 <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a>
 </h2>
 <ul>
 <li>
-<code><a href="../articles/cerebronexus_workflow_seurat.html">vignette("cerebronexus_workflow_seurat")</a></code> for the
-complete export workflow</li>
+<code><a href="../articles/cerebronexus_workflow_seurat.html">vignette("cerebronexus_workflow_seurat")</a></code> for exporting
+a Seurat object with marker genes and other tables</li>
+<li>
+<code><a href="../articles/import_your_analysis.html">vignette("import_your_analysis")</a></code> for PAGA, scVelo and
+pseudotime trajectories from scanpy (<code>.h5ad</code>)</li>
 </ul>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
