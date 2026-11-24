@@ -2267,8 +2267,12 @@
   }
 
   function disableGpu(p) {
+    var previous = p.gpu;
     hideGpu(p);
     p.gpu = null;
+    if (previous && previous.release) {
+      try { previous.release(); } catch (error) { /* already gone */ }
+    }
     p.gpuTransformOnly = false;
     p.gpuData = null;
     p.gpuDataState = null;
@@ -2285,6 +2289,9 @@
     if (stats.backend === 'webgl2' && !again) return false;
     var previous = p.gpuCanvas;
     if (!previous.parentNode) return false;
+    if (renderer.release) {
+      try { renderer.release(); } catch (error) { /* already gone */ }
+    }
     var canvas = createLayerCanvas(null, 'cv-gpu-layer');
     previous.parentNode.replaceChild(canvas, previous);
     try {

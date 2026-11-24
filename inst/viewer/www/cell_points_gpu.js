@@ -121,10 +121,30 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
       a.drawOrder === b.drawOrder;
   }
 
+  // A draw's inputs as plain numbers: an unchanged frame is not drawn again.
+  // Callers may mutate their view/rect objects in place, hence the copy.
+  function drawFrame(options, width, height, pixelRatio, canvas) {
+    var view = options.view || { cx: 0.5, cy: 0.5, span: 1 };
+    var rect = options.rect || { x: 0, y: 0, width: width, height: height };
+    var border = options.border || null;
+    var borderValue = border && border.color ? border.color : [0, 0, 0, 0];
+    return [
+      Number(view.cx), Number(view.cy), Math.max(1e-9, Number(view.span)),
+      Number(rect.x), Number(rect.y), Number(rect.width), Number(rect.height),
+      Math.max(0, Number(options.pointSize) || 0),
+      border ? Math.max(0, Number(border.width) || 0) : 0,
+      borderValue[0], borderValue[1], borderValue[2], borderValue[3],
+      width, height, pixelRatio, canvas.width, canvas.height
+    ];
+  }
+  function sameFrame(a, b) {
+    return !!a && a.every(function (value, i) { return value === b[i]; });
+  }
+
   var sharedResources = null;
   function prepare() {
     if (sharedResources) return sharedResources;
-    sharedResources = (async function () {
+    var pending = (async function () {
       if (!navigator.gpu) throw new Error('WebGPU is unavailable.');
       var adapter = await navigator.gpu.requestAdapter({
         powerPreference: 'high-performance'
@@ -182,6 +202,7 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
       // without them every order stays on the CPU, as before.
       var orderedPipeline = null;
       var limits = device.limits || {};
+      var maxStorageBindingBytes = limits.maxStorageBufferBindingSize || 0;
       if ((limits.maxStorageBuffersPerShaderStage || 0) >= 4 &&
           (limits.maxStorageBuffersInVertexStage === undefined ||
             limits.maxStorageBuffersInVertexStage >= 4)) {
@@ -196,38 +217,71 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
           orderedPipeline = null;
         }
       }
-      return {
+      var resources = {
         adapter: adapter, device: device, format: format, pipeline: pipeline,
         orderedPipeline: orderedPipeline,
+        maxStorageBindingBytes: maxStorageBindingBytes,
         // Cells one storage binding holds: positions take 8 bytes a cell.
         orderLimit: orderedPipeline
-          ? Math.floor((limits.maxStorageBufferBindingSize || 0) / 8) : 0
+          ? Math.floor(maxStorageBindingBytes / 8) : 0,
+        renderers: [],
+        lost: false,
+        lostInfo: null
       };
+      // One listener pair on the shared device dispatches to active panels
+      // instead of stacking one closure per panel on the singleton device.
+      if (device.lost && device.lost.then) {
+        device.lost.then(function (info) {
+          resources.lost = true;
+          resources.lostInfo = info || 'WebGPU device lost.';
+          if (sharedResources === pending) sharedResources = null;
+          resources.renderers.slice().forEach(function (handle) {
+            handle.lose(resources.lostInfo);
+          });
+          resources.renderers = [];
+        });
+      }
+      if (device.addEventListener) {
+        device.addEventListener('uncapturederror', function (event) {
+          var err = (event && event.error) || 'Uncaptured WebGPU error.';
+          resources.renderers.slice().forEach(function (handle) {
+            handle.error(err);
+          });
+        });
+      }
+      return resources;
     })();
+    sharedResources = pending;
     return sharedResources;
   }
 
   function createWebGpu(canvas) {
     var initializationStarted = performance.now();
+    var shared = null;
     var adapter = null;
     var device = null;
     var context = null;
     var pipeline = null;
     var orderedPipeline = null;
     var orderLimit = 0;
+    var maxStorageBindingBytes = 0;
     var uniformBuffers = [];
     var bindGroups = [];
     var orderedBindGroups = [];
-    var positionBuffer = null;
-    var colorBuffer = null;
-    var layerBuffer = null;
-    var orderBuffer = null;
+    var uniformData = new Float32Array(20);
+    var positionSlot = { buffer: null, size: 0 };
+    var colorSlot = { buffer: null, size: 0 };
+    var layerSlot = { buffer: null, size: 0 };
+    var orderSlot = { buffer: null, size: 0 };
     var pointsGroup = null;
     var data = null;
+    var lastFrame = null;
     var width = 1;
     var height = 1;
+    var pixelRatio = 1;
     var ready = false;
     var contextLost = false;
+    var released = false;
     var gpuError = '';
     var metrics = {
       backend: 'webgpu', ready: false, pointCount: 0, positionUploads: 0
@@ -235,21 +289,81 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
     var resolveFailure;
     var failed = new Promise(function (resolve) { resolveFailure = resolve; });
 
+    function destroySlot(slot) {
+      if (slot.buffer) {
+        try { slot.buffer.destroy(); } catch (error) { /* already gone */ }
+      }
+      slot.buffer = null;
+      slot.size = 0;
+    }
+
+    function cleanupGpuObjects() {
+      destroySlot(positionSlot);
+      destroySlot(colorSlot);
+      destroySlot(layerSlot);
+      destroySlot(orderSlot);
+      uniformBuffers.forEach(function (buffer) {
+        if (buffer) {
+          try { buffer.destroy(); } catch (error) { /* already gone */ }
+        }
+      });
+      uniformBuffers = [];
+      bindGroups = [];
+      orderedBindGroups = [];
+      pointsGroup = null;
+      if (context && context.unconfigure) {
+        try { context.unconfigure(); } catch (error) { /* already gone */ }
+      }
+    }
+
+    function detachFromShared() {
+      if (!shared) return;
+      var at = shared.renderers.indexOf(handle);
+      if (at >= 0) shared.renderers.splice(at, 1);
+    }
+
     function fail(error) {
       if (!ready && gpuError) return;
+      lastFrame = null;
       gpuError = error && (error.message || error.reason)
         ? error.message || error.reason : String(error || 'WebGPU failed.');
       ready = false;
       metrics.ready = false;
+      detachFromShared();
+      cleanupGpuObjects();
       resolveFailure(gpuError);
     }
 
+    var handle = {
+      lose: function (info) {
+        contextLost = true;
+        if (!released) fail(info || 'WebGPU device lost.');
+      },
+      error: function (error) {
+        if (!released) fail(error || 'Uncaptured WebGPU error.');
+      }
+    };
+
+    // Releases this panel's GPU buffers and canvas swap chain without failing
+    // the renderer or disturbing other panels on the shared device.
+    function release() {
+      if (released) return;
+      released = true;
+      ready = false;
+      metrics.ready = false;
+      lastFrame = null;
+      data = null;
+      detachFromShared();
+      cleanupGpuObjects();
+    }
+
     function resize(cssWidth, cssHeight, dpr) {
+      lastFrame = null;
       width = Math.max(1, Number(cssWidth) || 1);
       height = Math.max(1, Number(cssHeight) || 1);
-      dpr = Math.max(1, Number(dpr) || 1);
-      canvas.width = Math.max(1, Math.round(width * dpr));
-      canvas.height = Math.max(1, Math.round(height * dpr));
+      pixelRatio = Math.max(1, Number(dpr) || 1);
+      canvas.width = Math.max(1, Math.round(width * pixelRatio));
+      canvas.height = Math.max(1, Math.round(height * pixelRatio));
       canvas.style.width = width + 'px';
       canvas.style.height = height + 'px';
     }
@@ -263,22 +377,22 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
 
     var initialized = (async function () {
       var resources = await prepare();
+      if (released) return;
+      if (resources.lost) {
+        contextLost = true;
+        throw resources.lostInfo || new Error('WebGPU device lost.');
+      }
+      shared = resources;
       adapter = resources.adapter;
       device = resources.device;
       pipeline = resources.pipeline;
       orderedPipeline = resources.orderedPipeline;
       orderLimit = resources.orderLimit;
+      maxStorageBindingBytes = resources.maxStorageBindingBytes;
       metrics.adapter = adapter.info
         ? [adapter.info.vendor, adapter.info.architecture,
           adapter.info.device, adapter.info.description].filter(Boolean).join(' ')
         : '';
-      device.lost.then(function (info) {
-        contextLost = true;
-        fail(info || 'WebGPU device lost.');
-      });
-      device.addEventListener('uncapturederror', function (event) {
-        fail(event.error || 'Uncaptured WebGPU error.');
-      });
       context = canvas.getContext('webgpu');
       if (!context) throw new Error('Could not create a WebGPU canvas context.');
       var format = resources.format;
@@ -301,67 +415,81 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
           entries: [{ binding: 0, resource: { buffer: buffer } }]
         });
       }) : [];
+      shared.renderers.push(handle);
       ready = true;
       metrics.ready = true;
       metrics.initializationMs = performance.now() - initializationStarted;
     })().catch(function (error) {
-      fail(error);
+      if (!released) fail(error);
       throw error;
     });
 
-    function replaceBuffer(current, array, usage) {
-      if (current) current.destroy();
-      var buffer = device.createBuffer({
-        // 8 bytes: the smallest storage binding of positions (one vec2f).
-        size: Math.max(8, array.byteLength),
-        usage: (usage === undefined ? GPUBufferUsage.VERTEX : usage) |
-          (orderedPipeline ? GPUBufferUsage.STORAGE : 0) | GPUBufferUsage.COPY_DST
-      });
+    // Writes `array` into `slot`, reusing the existing GPUBuffer in place when
+    // its capacity still fits (and is not more than 2x oversized) so recolouring
+    // or reordering avoids buffer reallocation and bind-group rebuilds.
+    // Returns true when the underlying GPUBuffer handle changed.
+    function uploadSlot(slot, array, usage) {
+      // 8 bytes: the smallest storage binding of positions (one vec2f), 4-byte aligned.
+      var needed = Math.max(8, Math.ceil(array.byteLength / 4) * 4);
+      var exceedsStorageLimit = !!(orderedPipeline && maxStorageBindingBytes &&
+        slot.size > maxStorageBindingBytes && needed <= maxStorageBindingBytes);
+      var reallocated = !(slot.buffer && slot.size >= needed &&
+        slot.size <= needed * 2 && !exceedsStorageLimit);
+      if (reallocated) {
+        destroySlot(slot);
+        slot.buffer = device.createBuffer({
+          size: needed,
+          usage: (usage === undefined ? GPUBufferUsage.VERTEX : usage) |
+            (orderedPipeline ? GPUBufferUsage.STORAGE : 0) | GPUBufferUsage.COPY_DST
+        });
+        slot.size = needed;
+      }
       if (array.byteLength) {
         device.queue.writeBuffer(
-          buffer,
+          slot.buffer,
           0,
           array.buffer,
           array.byteOffset,
           array.byteLength
         );
       }
-      return buffer;
+      return reallocated;
     }
 
     function setData(next) {
       if (!ready) throw new Error('WebGPU renderer is not ready.');
       next = checkData(next, 'WebGPU');
-      if (sameData(data, next)) return;
-      var started = performance.now();
-      if (!data || data.positions !== next.positions) {
-        positionBuffer = replaceBuffer(positionBuffer, next.positions);
-        metrics.positionUploads++;
-      }
-      if (!data || data.colors !== next.colors) {
-        colorBuffer = replaceBuffer(colorBuffer, next.colors);
-      }
-      if (!data || data.layers !== next.layers) {
-        layerBuffer = replaceBuffer(layerBuffer, next.layers);
-      }
       if (next.drawOrder && (!orderedPipeline || next.count > orderLimit)) {
         throw new Error('WebGPU cannot draw these points in order.');
       }
-      var groupStale = !data || data.positions !== next.positions ||
-        data.colors !== next.colors || data.layers !== next.layers;
-      if (next.drawOrder && (!data || data.drawOrder !== next.drawOrder)) {
-        orderBuffer = replaceBuffer(orderBuffer, next.drawOrder, 0);
-        groupStale = true;
-      } else if (!next.drawOrder && orderBuffer) {
-        orderBuffer.destroy(); orderBuffer = null;
+      if (sameData(data, next)) return;
+      lastFrame = null;
+      var started = performance.now();
+      var buffersChanged = false;
+      if (!data || data.positions !== next.positions) {
+        if (uploadSlot(positionSlot, next.positions)) buffersChanged = true;
+        metrics.positionUploads++;
       }
-      if (next.drawOrder && (groupStale || !pointsGroup)) {
+      if (!data || data.colors !== next.colors) {
+        if (uploadSlot(colorSlot, next.colors)) buffersChanged = true;
+      }
+      if (!data || data.layers !== next.layers) {
+        if (uploadSlot(layerSlot, next.layers)) buffersChanged = true;
+      }
+      if (next.drawOrder && (!data || data.drawOrder !== next.drawOrder)) {
+        if (uploadSlot(orderSlot, next.drawOrder, 0)) buffersChanged = true;
+      } else if (!next.drawOrder && orderSlot.buffer) {
+        destroySlot(orderSlot);
+      }
+      if (next.drawOrder && (buffersChanged || !pointsGroup)) {
         pointsGroup = device.createBindGroup({
           layout: orderedPipeline.getBindGroupLayout(1),
-          entries: [positionBuffer, colorBuffer, layerBuffer, orderBuffer].map(
-            function (buffer, binding) {
-              return { binding: binding, resource: { buffer: buffer } };
-            })
+          entries: [
+            positionSlot.buffer, colorSlot.buffer,
+            layerSlot.buffer, orderSlot.buffer
+          ].map(function (buffer, binding) {
+            return { binding: binding, resource: { buffer: buffer } };
+          })
         });
       } else if (!next.drawOrder) {
         pointsGroup = null;
@@ -372,21 +500,29 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
       metrics.uploadSubmitMs = performance.now() - started;
     }
 
-    function uniforms(options, passValue) {
-      var view = options.view || { cx: 0.5, cy: 0.5, span: 1 };
-      var rect = options.rect || { x: 0, y: 0, width: width, height: height };
-      var pointSize = Math.max(0, Number(options.pointSize) || 0);
-      var border = options.border;
-      var borderWidth = border ? Math.max(0, Number(border.width) || 0) : 0;
-      var borderColor = border && border.color ? border.color : [0, 0, 0, 0];
-      return new Float32Array([
-        Number(view.cx), Number(view.cy), Math.max(1e-9, Number(view.span)), 0,
-        Number(rect.x), Number(rect.y), Number(rect.width), Number(rect.height),
-        width, height, pointSize / 2, borderWidth,
-        borderColor[0] / 255, borderColor[1] / 255,
-        borderColor[2] / 255, borderColor[3] / 255,
-        pointSize / 2, borderWidth, passValue, 0
-      ]);
+    function fillUniforms(frame, passValue) {
+      var radius = frame[7] * 0.5;
+      uniformData[0] = frame[0];
+      uniformData[1] = frame[1];
+      uniformData[2] = frame[2];
+      uniformData[3] = 0;
+      uniformData[4] = frame[3];
+      uniformData[5] = frame[4];
+      uniformData[6] = frame[5];
+      uniformData[7] = frame[6];
+      uniformData[8] = width;
+      uniformData[9] = height;
+      uniformData[10] = radius;
+      uniformData[11] = frame[8];
+      uniformData[12] = frame[9] / 255;
+      uniformData[13] = frame[10] / 255;
+      uniformData[14] = frame[11] / 255;
+      uniformData[15] = frame[12] / 255;
+      uniformData[16] = radius;
+      uniformData[17] = frame[8];
+      uniformData[18] = passValue;
+      uniformData[19] = 0;
+      return uniformData;
     }
 
     // Clears the canvas and, when given, records the point draws in one pass.
@@ -407,9 +543,28 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
 
     function draw(options) {
       if (!ready || !data) return false;
-      options = options || {};
       var started = performance.now();
-      submitPass(data.count && Number(options.pointSize) ? function (pass) {
+      // Hover and drag outlines live on the separate 2-D overlay. Leaving the
+      // swap chain untouched preserves the last presented point layer on screen.
+      var frame = drawFrame(options || {}, width, height, pixelRatio, canvas);
+      if (sameFrame(lastFrame, frame)) {
+        metrics.drawSubmitMs = 0;
+        return true;
+      }
+      lastFrame = null;
+      var hasPoints = !!(data.count && frame[7]);
+      if (hasPoints) {
+        if (data.foreground) {
+          fillUniforms(frame, 0);
+          device.queue.writeBuffer(uniformBuffers[0], 0, uniformData);
+          uniformData[18] = 1;
+          device.queue.writeBuffer(uniformBuffers[1], 0, uniformData);
+        } else {
+          fillUniforms(frame, -1);
+          device.queue.writeBuffer(uniformBuffers[0], 0, uniformData);
+        }
+      }
+      submitPass(hasPoints ? function (pass) {
         var groups = bindGroups;
         if (data.drawOrder) {
           pass.setPipeline(orderedPipeline);
@@ -417,28 +572,27 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
           groups = orderedBindGroups;
         } else {
           pass.setPipeline(pipeline);
-          pass.setVertexBuffer(0, positionBuffer);
-          pass.setVertexBuffer(1, colorBuffer);
-          pass.setVertexBuffer(2, layerBuffer);
+          pass.setVertexBuffer(0, positionSlot.buffer);
+          pass.setVertexBuffer(1, colorSlot.buffer);
+          pass.setVertexBuffer(2, layerSlot.buffer);
         }
         if (data.foreground) {
-          device.queue.writeBuffer(uniformBuffers[0], 0, uniforms(options, 0));
-          device.queue.writeBuffer(uniformBuffers[1], 0, uniforms(options, 1));
           pass.setBindGroup(0, groups[0]);
           pass.draw(4, data.count);
           pass.setBindGroup(0, groups[1]);
           pass.draw(4, data.count);
         } else {
-          device.queue.writeBuffer(uniformBuffers[0], 0, uniforms(options, -1));
           pass.setBindGroup(0, groups[0]);
           pass.draw(4, data.count);
         }
       } : null);
       metrics.drawSubmitMs = performance.now() - started;
+      lastFrame = frame;
       return true;
     }
 
     function clear() {
+      lastFrame = null;
       if (ready) submitPass(null);
     }
 
@@ -453,6 +607,7 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
       drawsInOrder: function (count) {
         return ready && !!orderedPipeline && count <= orderLimit;
       },
+      release: release,
       resize: resize,
       setData: setData,
       draw: draw,
@@ -577,26 +732,6 @@ void main() {
         passValue: gl.getUniformLocation(program, 'passValue')
       }
     };
-  }
-
-  // A draw's inputs as plain numbers: an unchanged frame is not drawn again.
-  // Callers may mutate their view/rect objects in place, hence the copy.
-  function webGlFrame(options, width, height, pixelRatio, canvas) {
-    var view = options.view || { cx: 0.5, cy: 0.5, span: 1 };
-    var rect = options.rect || { x: 0, y: 0, width: width, height: height };
-    var border = options.border || null;
-    var borderValue = border && border.color ? border.color : [0, 0, 0, 0];
-    return [
-      Number(view.cx), Number(view.cy), Math.max(1e-9, Number(view.span)),
-      Number(rect.x), Number(rect.y), Number(rect.width), Number(rect.height),
-      Math.max(0, Number(options.pointSize) || 0),
-      border ? Math.max(0, Number(border.width) || 0) : 0,
-      borderValue[0], borderValue[1], borderValue[2], borderValue[3],
-      width, height, pixelRatio, canvas.width, canvas.height
-    ];
-  }
-  function sameFrame(a, b) {
-    return !!a && a.every(function (value, i) { return value === b[i]; });
   }
 
   // Sets the blending and uniforms of `frame` and draws the bound points.
@@ -759,7 +894,7 @@ void main() {
       var started = performance.now();
       // Hover and drag outlines live on the separate 2-D overlay. WebGL keeps
       // its drawing buffer, so an unchanged point layer can remain on screen.
-      var frame = webGlFrame(options || {}, width, height, pixelRatio, canvas);
+      var frame = drawFrame(options || {}, width, height, pixelRatio, canvas);
       if (sameFrame(lastFrame, frame)) {
         if (gl.getError() !== gl.NO_ERROR) { lastFrame = null; return false; }
         metrics.drawSubmitMs = 0;
@@ -951,7 +1086,7 @@ void main() {
       if (!ready || !data) return false;
       var started = performance.now();
       // The panel's canvas still shows an unchanged frame.
-      var frame = webGlFrame(options || {}, width, height, pixelRatio, canvas);
+      var frame = drawFrame(options || {}, width, height, pixelRatio, canvas);
       if (sameFrame(lastFrame, frame)) {
         metrics.drawSubmitMs = 0;
         return true;
