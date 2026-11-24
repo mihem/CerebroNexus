@@ -144,6 +144,11 @@
   // Every selected embedding is an independent panel. Colour/filter/selection
   // state remains global, while viewport and 3-D rotation live on the panel.
   var selectedProjections = [];
+  // The panels a page may show at once: 2 in a browser with no GPU until the
+  // reader lifts the limit (CerebroPanelCap, cell_points_gpu.js); 0 for no limit.
+  function panelCap() {
+    return window.CerebroPanelCap ? window.CerebroPanelCap.cap() : 0;
+  }
   var pctShow = 100;            // % of cells to render
   // The reader set "% of cells": every panel shows it, a section with an
   // author's own percentage too (panelPctMask()).
@@ -7611,11 +7616,44 @@
       persist: false,
       closeAfterSelect: false,
       onChange: function (values) {
-        setSelectedProjections(values == null ? [] : [].concat(values));
+        values = values == null ? [] : [].concat(values);
+        var kept = values.slice(0, capRoom('proj'));
+        if (kept.length < values.length) this.setValue(kept, true);
+        setSelectedProjections(kept);
       }
     });
     selEl.selectize.setValue(selectedProjections, true);
   }
+  // How many more panels a picker may take under the panel limit: the limit
+  // less what the other picker shows.
+  function capRoom(kind) {
+    var cap = panelCap();
+    if (!cap) return Infinity;
+    return Math.max(0, cap - (kind === 'proj' ? selectedSpatial : selectedProjections).length);
+  }
+  // At most the limit of panels, the embeddings first; whether it cut anything.
+  function trimSelectionToCap() {
+    var cap = panelCap();
+    if (!cap || selectedProjections.length + selectedSpatial.length <= cap) return false;
+    selectedProjections = selectedProjections.slice(0, cap);
+    selectedSpatial = selectedSpatial.slice(0, cap - selectedProjections.length);
+    return true;
+  }
+  // The limit came or went (cell_points_gpu.js): Linked views shows what it may,
+  // the Spatial grid is arranged again, the Columns field is fixed or freed.
+  function applyPanelCap() {
+    if (!D) return;
+    if (trimSelectionToCap()) {
+      setSelectedProjections(selectedProjections);
+      setSelectedSpatial(selectedSpatial);
+      fillProjPicker();
+      fillSpatialPicker();
+    }
+    lockColumns(document.getElementById('coordviews_columns'));
+    lockColumns(document.getElementById('spatial_projection_grid_columns'));
+    if (sectionGridActive()) applySectionGrid(); else if (!singleActive) { _layoutKey = null; resizeAll(); drawAll(); }
+  }
+  if (window.CerebroPanelCap) window.CerebroPanelCap.onChange(applyPanelCap);
   function setSelectedProjections(names) {
     var available = D && D.projections ? Object.keys(D.projections) : [];
     names = names.filter(function (name, index) {
@@ -8131,7 +8169,10 @@
       persist: false,
       closeAfterSelect: false,
       onChange: function (values) {
-        setSelectedSpatial(values == null ? [] : [].concat(values));
+        values = values == null ? [] : [].concat(values);
+        var kept = values.slice(0, capRoom('spatial'));
+        if (kept.length < values.length) this.setValue(kept, true);
+        setSelectedSpatial(kept);
       }
     });
     selEl.selectize.setValue(selectedSpatial, true);
@@ -8445,7 +8486,7 @@
       return out;
     }
     genePanelBaseCount = Math.max(1, out.length);
-    var maxGenes = Math.max(1, Math.floor(12 / Math.max(1, out.length)));
+    var maxGenes = Math.max(1, Math.floor((panelCap() || 12) / Math.max(1, out.length)));
     var genes = D.genePanels.slice(0, maxGenes), expanded = [];
     var distinct = $('cv-gene-panel-color') &&
       $('cv-gene-panel-color').value === 'distinct';
@@ -10912,8 +10953,12 @@
       var name = spaceById[spaceId]._gridSection;
       (bySection[name] = bySection[name] || []).push(spaceId);
     });
-    var out = [];
-    (gridSectionChoice() || []).forEach(function (name) {
+    var out = [], cap = panelCap();
+    var chosen = gridSectionChoice() || [];
+    // A browser without a GPU shows the first sections it may, however many
+    // are chosen (or none: the first sections of the frame).
+    if (cap) chosen = (chosen.length ? chosen : Object.keys(bySection)).slice(0, cap);
+    chosen.forEach(function (name) {
       (bySection[name] || []).forEach(function (spaceId) {
         if (out.indexOf(spaceId) < 0) out.push(spaceId);
       });
@@ -11289,7 +11334,25 @@
   function gridColumnsChoice(count) {
     var id = sectionGridActive() ? 'spatial_projection_grid_columns'
       : (singleActive ? null : 'coordviews_columns');
-    return columnsFrom(id && document.getElementById(id), count);
+    var el = id && document.getElementById(id);
+    lockColumns(el);
+    var cap = panelCap();
+    return cap && el ? Math.max(1, Math.min(cap, count || cap)) : columnsFrom(el, count);
+  }
+  // Under the panel limit the Columns field is fixed at the limit and cannot be
+  // changed; lifting the limit gives it back as it was.
+  function lockColumns(el) {
+    var instance = el && el.selectize;
+    if (!instance) return;
+    var cap = panelCap();
+    if (cap && !instance.isLocked) {
+      el._columnsBefore = instance.getValue();
+      instance.setValue(String(cap), true);
+      instance.lock();
+    } else if (!cap && instance.isLocked) {
+      instance.unlock();
+      instance.setValue(el._columnsBefore || 'auto', true);
+    }
   }
   function gridSyncZoom() {
     var el = document.getElementById('spatial_projection_grid_sync_zoom');
@@ -11438,6 +11501,7 @@
     var labels;
     if (layout === 'grid') {
       labels = selectLabels('spatial_projection_sections');
+      if (panelCap()) labels = labels.slice(0, panelCap());
       var embedding = document.getElementById('spatial_projection_grid_projection');
       if (embedding && embedding.value && embedding.value !== '__none__') {
         labels = [embedding.value].concat(labels);
@@ -13672,6 +13736,7 @@
         return sample.is_roi_overview !== true;
       }).map(function (sample) { return sample.name; });
     }
+    trimSelectionToCap();
     var activeName = !dataChanged && selectedSpatial.indexOf(previousActiveName) >= 0
       ? previousActiveName : selectedSpatial[0];
     activeSpatialId = activeName ? spatialId(activeName) : null;

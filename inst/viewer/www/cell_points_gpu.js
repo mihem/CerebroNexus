@@ -796,4 +796,92 @@ void main() {
 
   if (navigator.gpu) prepare().catch(function () {});
   global.CerebroPointRenderer = { create: create, createWebGl: createWebGl };
+
+  // ---- panels a page without a GPU may show ---------------------------------
+  // A browser with no GPU behind WebGPU or WebGL (software rendering, or only
+  // Canvas) draws every point on the CPU, so a page of many panels is slow to
+  // open and to scroll. It then shows 2 panels at a time until the user lifts
+  // the limit (the "Show all panels" preference, kept in the browser).
+  // cap() is 0 when nothing is limited. It is 0 until the check, which is
+  // asynchronous, has finished; onChange() tells the page when that changes.
+  var PANEL_CAP = 2, UNLOCK_KEY = 'cerebro_panel_cap_unlocked';
+  var noGpu = false, unlocked = false, capListeners = [];
+  var doc = global.document, hasDom = !!(doc && doc.addEventListener && doc.documentElement);
+  try { unlocked = global.localStorage.getItem(UNLOCK_KEY) === '1'; } catch (error) { /* no storage */ }
+
+  function capNow() { return noGpu && !unlocked ? PANEL_CAP : 0; }
+  function syncUnlockBox() {
+    var box = doc.getElementById('panel_cap_unlock_checkbox');
+    if (box && box.checked !== unlocked) box.checked = unlocked;
+  }
+  function capChanged() {
+    if (!hasDom) return;
+    var root = doc.documentElement;
+    root.classList.toggle('cerebro-no-gpu', noGpu);
+    root.classList.toggle('cerebro-panel-cap', capNow() > 0);
+    syncUnlockBox();
+    if (global.Shiny && global.Shiny.setInputValue) {
+      global.Shiny.setInputValue('cerebro_panel_cap', capNow());
+    }
+    capListeners.slice().forEach(function (fn) { fn(capNow()); });
+  }
+  // A real GPU behind WebGPU (a software "fallback adapter" is none) or WebGL2
+  // (failIfMajorPerformanceCaveat refuses software rendering in most browsers;
+  // the renderer's name catches what it lets through). ?gpu_cap=off skips it.
+  async function hasHardwareGpu() {
+    if (global.CerebroPanelCapOff ||
+        /[?&]gpu_cap=off\b/.test((global.location && global.location.search) || '')) return true;
+    if (navigator.gpu) {
+      try {
+        var adapter = await navigator.gpu.requestAdapter();
+        var info = adapter && adapter.info;
+        if (adapter && !adapter.isFallbackAdapter && !(info && info.isFallbackAdapter)) return true;
+      } catch (error) { /* try WebGL */ }
+    }
+    try {
+      var canvas = doc.createElement('canvas');
+      var gl = canvas.getContext('webgl2', { failIfMajorPerformanceCaveat: true });
+      if (gl) {
+        // Chrome with software rendering allowed still hands out a context
+        // here, so the renderer's name tells software from a GPU.
+        var debug = gl.getExtension('WEBGL_debug_renderer_info');
+        var renderer = String(debug ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL) : '');
+        var lose = gl.getExtension('WEBGL_lose_context');
+        if (lose) lose.loseContext();
+        return !/swiftshader|llvmpipe|softpipe|software|basic render/i.test(renderer);
+      }
+    } catch (error) { /* none */ }
+    return false;
+  }
+  var capReady = !hasDom ? Promise.resolve() : hasHardwareGpu().then(function (hardware) {
+    noGpu = !hardware;
+    capChanged();
+  }, function () { /* unknown: no limit */ });
+  if (hasDom) {
+    doc.addEventListener('shiny:value', function (event) {
+      if (event.name === 'preferences_options') global.setTimeout(syncUnlockBox, 0);
+    });
+    doc.addEventListener('shiny:connected', capChanged);
+    doc.addEventListener('change', function (event) {
+      if (event.target && event.target.id === 'panel_cap_unlock_checkbox') {
+        global.CerebroPanelCap.setUnlocked(event.target.checked);
+      }
+    });
+    doc.addEventListener('click', function (event) {
+      var button = event.target.closest && event.target.closest('[data-cerebro-cap-unlock]');
+      if (button) global.CerebroPanelCap.setUnlocked(true);
+    });
+  }
+  global.CerebroPanelCap = {
+    max: PANEL_CAP,
+    ready: capReady,
+    cap: capNow,
+    limited: function () { return noGpu; },
+    onChange: function (fn) { capListeners.push(fn); },
+    setUnlocked: function (value) {
+      unlocked = !!value;
+      try { global.localStorage.setItem(UNLOCK_KEY, unlocked ? '1' : '0'); } catch (error) { /* no storage */ }
+      capChanged();
+    }
+  };
 })(window);

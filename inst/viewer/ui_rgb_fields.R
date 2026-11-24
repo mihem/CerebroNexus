@@ -56,6 +56,23 @@ cerebroRgbGeneFields <- function(
 ## The Columns field of a page of panels (Spatial's grid, Linked views): Auto,
 ## or 1 to `most` columns, at most 8. cell_views.js (gridColumnsChoice())
 ## reads it; NULL `label` leaves the label to the caller's markup.
+## What a page of panels says in a browser without a GPU, which shows 2 panels
+## at a time (cell_points_gpu.js): hidden unless the page is limited, and the
+## button lifts the limit (also the "Show all panels" preference).
+cerebroPanelCapNote <- function() {
+  div(
+    class = "cerebro-cap-note",
+    role = "status",
+    tags$span("No GPU in this browser: showing 2 panels at a time."),
+    tags$button(
+      type = "button",
+      class = "btn btn-link",
+      `data-cerebro-cap-unlock` = "1",
+      "Show all (slow)"
+    )
+  )
+}
+
 cerebroColumnsInput <- function(
   id,
   most = 8L,

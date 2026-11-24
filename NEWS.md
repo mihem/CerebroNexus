@@ -64,7 +64,10 @@
   window hold them, a lost one is made again, and a grid of 59 sections no
   longer falls back to Canvas2D (0 of the 12 panels in sight on the GPU and
   43 contexts lost before, 12 of 12 and none lost now; longest stall 0.7 s
-  instead of 1.7 to 1.9 s).
+  instead of 1.7 to 1.9 s). A browser with no GPU behind WebGPU or WebGL
+  (software rendering, or Canvas only) draws every point on the CPU, so
+  Spatial and Linked views show 2 panels at a time there, with the Columns
+  field fixed at 2; the *Show all panels* preference lifts it.
 - **Linked views and gene colouring are faster on large data.** Linked views
   builds the sections of a data set without ROIs from the Viewer Pack's rows
   and makes cell names only for the cells that need them, and draws its

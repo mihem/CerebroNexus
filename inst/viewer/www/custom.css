@@ -347,6 +347,15 @@ body .sidebar .cerebro-sidebar-preferences .shiny-input-container {
 /* A Preferences switch's "i": a small ring raised to the label's cap height.
    Its help bubble opens above the row on hover, on focus or after a click. */
 .cerebro-preference { position: relative; }
+/* A browser without a GPU (cell_points_gpu.js) shows 2 panels at a time. */
+.cerebro-pref-no-gpu { display: none; }
+html.cerebro-no-gpu .cerebro-pref-no-gpu { display: block; }
+.cerebro-cap-note { display: none; }
+html.cerebro-panel-cap .cerebro-cap-note {
+  display: flex; flex: 1 0 100%; align-items: center; gap: 8px;
+  margin: 0 0 6px; font-size: 12px; line-height: 20px; color: #5a6470;
+}
+.cerebro-cap-note .btn-link { padding: 0; font-size: 12px; line-height: 20px; }
 .cerebro-pref-label { display: inline-flex; align-items: flex-start; gap: 3px; white-space: nowrap; }
 .cerebro-pref-info {
   display: inline-flex; align-items: center; justify-content: center;

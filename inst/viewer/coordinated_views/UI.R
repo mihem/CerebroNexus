@@ -182,6 +182,7 @@ tab_coordinated_views <- tabItem(
       meta_id = "cv-meta"
     ),
     ## ---- horizontal control bar (the layout fix) ------------------------ ##
+    cerebroPanelCapNote(),
     div(
       class = "cv-topbar",
       div(

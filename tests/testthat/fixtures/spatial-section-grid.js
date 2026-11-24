@@ -36,6 +36,7 @@ var document = {
   getElementById: function (id) { return elements[id] || null; }
 };
 var PANEL_MIN_SIDE = 250, BALANCED_SIZE_TOLERANCE = 0.85;
+function panelCap() { return 0; }
 
 eval(between('  function keysArePositional(', '  function buildSpecialistPanels('));
 eval(between('  function bestOverviewGrid(', '  // `ifChanged`'));

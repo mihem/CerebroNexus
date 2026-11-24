@@ -6,7 +6,7 @@
 output[["preferences_options"]] <- renderUI({
   ## A switch with a small "i" after its label: hovering it, focusing it or
   ## clicking it (viewer-shell.js) shows the help in a bubble.
-  preference <- function(id, label, value, help) {
+  preference <- function(id, label, value, help, class = NULL) {
     help_id <- paste0(id, "_help")
     control <- checkboxInput(
       id,
@@ -30,7 +30,7 @@ output[["preferences_options"]] <- renderUI({
       `aria-describedby` = help_id
     )$allTags()
     div(
-      class = "cerebro-preference",
+      class = paste(c("cerebro-preference", class), collapse = " "),
       `data-help` = help,
       control,
       tags$span(
@@ -48,6 +48,18 @@ output[["preferences_options"]] <- renderUI({
       "GPU acceleration",
       TRUE,
       "Draws plots with WebGPU or WebGL. Off uses the CPU."
+    ),
+    ## Only shown by a browser without a GPU (cell_points_gpu.js sets the
+    ## class on the page), where Spatial and Linked views show 2 panels.
+    preference(
+      "panel_cap_unlock_checkbox",
+      "Show all panels",
+      FALSE,
+      paste(
+        "This browser has no GPU, so Spatial and Linked views show 2 panels",
+        "at a time. On shows as many as you pick; it can be slow."
+      ),
+      class = "cerebro-pref-no-gpu"
     ),
     preference(
       "hover_info_in_projections_checkbox",

@@ -132,6 +132,16 @@ spatial_projection_scene <- reactive({
   } else {
     current_spatial
   }
+  ## A browser without a GPU shows 2 panels at a time (the browser reports the
+  ## limit; read without a dependency, lifting it keeps the sections shown).
+  panel_cap <- suppressWarnings(as.integer(isolate(input[[
+    "cerebro_panel_cap"
+  ]])))
+  if (length(panel_cap) == 1L && !is.na(panel_cap) && panel_cap > 0L) {
+    sections_default <- sections_default[
+      seq_len(min(length(sections_default), panel_cap))
+    ]
+  }
   list(
     dataset_changed = dataset_changed,
     colour_groups = colour_groups,
@@ -243,6 +253,7 @@ output[["spatial_projection_scene_UI"]] <- renderUI({
   }
   tagList(
     sections,
+    cerebroPanelCapNote(),
     conditionalPanel(
       condition = paste0("!(", grid_js, ")"),
       div(class = "spatial-single-controls", single_controls)

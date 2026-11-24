@@ -42,6 +42,7 @@
     select._cerebroMultiSelectInstance = instance;
     collapse(instance);
     if (COUNTED.indexOf(select.id) >= 0) countTools(select, instance);
+    if (CAPPED.indexOf(select.id) >= 0) applyCap(select);
   }
 
   // A multi-select with more than one item shows only its first, and a badge
@@ -207,9 +208,12 @@
     var update = function () {
       var total = units();
       var chosen = instance.items.length;
+      var cap = panelCap();
       tools.style.display = total < 3 ? "none" : "";
       tools.querySelector(".cv-sections-count").textContent = chosen + " of " + total;
-      tools.querySelector('[data-sections="all"]').disabled = chosen >= total;
+      var all = tools.querySelector('[data-sections="all"]');
+      all.disabled = chosen >= total || (cap > 0 && chosen >= cap);
+      all.title = cap > 0 ? "Without a GPU only " + cap + " are shown at a time" : "";
       var one = tools.querySelector('[data-sections="one"]');
       if (one) one.disabled = chosen <= 1;
       var none = tools.querySelector('[data-sections="none"]');
@@ -243,7 +247,33 @@
     };
     instance.on("change", update);
     instance.on("option_add", update);
+    select._cerebroCountUpdate = update;
     update();
+  }
+
+  // A browser without a GPU shows 2 panels at a time (cell_points_gpu.js): the
+  // fields that choose panels take no more, and All is off, until the reader
+  // lifts the limit. cv-pick-* are trimmed together by cell_views.js (the
+  // embeddings and the sections share the limit); the Spatial field is
+  // trimmed here, its change reaching the server like any other.
+  var CAPPED = ["spatial_projection_sections", "cv-pick-spatial", "cv-pick-proj"];
+  function panelCap() {
+    return window.CerebroPanelCap ? window.CerebroPanelCap.cap() : 0;
+  }
+  function applyCap(select) {
+    var instance = select && select.selectize;
+    if (!instance) return;
+    var cap = panelCap();
+    instance.settings.maxItems = cap || null;
+    if (cap && select.id === "spatial_projection_sections" && instance.items.length > cap) {
+      instance.setValue(instance.items.slice(0, cap));
+    }
+    if (select._cerebroCountUpdate) select._cerebroCountUpdate();
+  }
+  if (window.CerebroPanelCap) {
+    window.CerebroPanelCap.onChange(function () {
+      CAPPED.forEach(function (id) { applyCap(document.getElementById(id)); });
+    });
   }
 
   function enhanceAll(root) {
