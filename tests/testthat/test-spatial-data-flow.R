@@ -430,6 +430,8 @@ test_that("a Spatial frame draws the current region-outline switch", {
       drawn[[length(drawn) + 1L]] <<- data$plot_parameters
       .cerebro_cell_view_render_serial <<- .cerebro_cell_view_render_serial + 1L
     }
+    ## The frame is sent in its own turn of the event loop; here at once.
+    spatial_projection_defer <- function(task) task()
     sys.source(
       viewer_test_path("spatial", "event_projection_update_plot.R"),
       envir = environment()
@@ -452,6 +454,99 @@ test_that("a Spatial frame draws the current region-outline switch", {
     state <- session$userData$state()
     expect_length(state$drawn, 1L)
     expect_true(state$drawn[[1]]$show_region_outlines)
+  })
+})
+
+test_that("a Spatial frame is sent in a turn of its own, and a newer one replaces it", {
+  server <- function(input, output, session) {
+    context <- list(epoch = "test", dataset_key = "A", generation = 1L)
+    current_context <- reactiveVal(context)
+    viewer_loaded_dataset_context <- function() current_context()
+    viewerDatasetContextEqual <- function(a, b) identical(a, b)
+    viewerDatasetContextToken <- function(context) context$generation
+    cerebroFeedbackControls <- function(id, input) list()
+    cerebroSendViewFeedback <- function(...) invisible(NULL)
+    spatial_projection_group_filters <- function() list()
+    spatial_projection_region_outlines <- reactiveVal(FALSE)
+    colour <- reactiveVal("a")
+    spatial_projection_data_to_plot_raw <- reactive(
+      list(
+        dataset_context = current_context(),
+        plot_parameters = list(colour = colour())
+      )
+    )
+    spatial_projection_data_to_plot <- spatial_projection_data_to_plot_raw
+    spatial_projection_controls <- function() list()
+    .cerebro_cell_view_render_serial <- 0L
+    drawn <- list()
+    spatial_projection_update_plot <- function(data) {
+      drawn[[length(drawn) + 1L]] <<- list(
+        colour = data$plot_parameters$colour,
+        whole = data$fresh_render
+      )
+      .cerebro_cell_view_render_serial <<- .cerebro_cell_view_render_serial + 1L
+    }
+    ## Tasks wait for the test to give them their turn.
+    waiting <- list()
+    spatial_projection_defer <- function(task) {
+      waiting[[length(waiting) + 1L]] <<- task
+    }
+    sys.source(
+      viewer_test_path("spatial", "event_projection_update_plot.R"),
+      envir = environment()
+    )
+    session$userData$state <- function() {
+      list(drawn = drawn, waiting = length(waiting))
+    }
+    session$userData$turn <- function() {
+      tasks <- waiting
+      waiting <<- list()
+      for (task in tasks) {
+        task()
+      }
+    }
+    session$userData$colour <- colour
+    session$userData$context <- current_context
+  }
+  shiny::testServer(server, {
+    request <- function(nonce, generation = 1L) {
+      list(
+        nonce = nonce,
+        dataset_context = list(
+          epoch = "test",
+          dataset_key = "A",
+          generation = generation
+        )
+      )
+    }
+    session$setInputs(sidebar = "spatial")
+    session$setInputs(spatial_projection_render_request = request(1))
+    ## Nothing is sent in the flush that asked for it.
+    expect_length(session$userData$state()$drawn, 0L)
+    expect_identical(session$userData$state()$waiting, 1L)
+    ## A frame that comes before its turn is whole as well, and replaces it.
+    session$userData$colour("b")
+    session$flushReact()
+    expect_identical(session$userData$state()$waiting, 2L)
+    session$userData$turn()
+    drawn <- session$userData$state()$drawn
+    expect_length(drawn, 1L)
+    expect_identical(drawn[[1]]$colour, "b")
+    expect_true(drawn[[1]]$whole)
+    ## Once sent, a new colouring is a frame of its own, sent at once.
+    session$userData$colour("c")
+    session$flushReact()
+    expect_length(session$userData$state()$drawn, 2L)
+    expect_identical(session$userData$state()$drawn[[2]]$colour, "c")
+    expect_false(session$userData$state()$drawn[[2]]$whole)
+    ## A data set that has gone by its turn is not drawn, and is drawn anew.
+    session$setInputs(spatial_projection_render_request = request(2))
+    expect_identical(session$userData$state()$waiting, 1L)
+    session$userData$context(
+      list(epoch = "test", dataset_key = "B", generation = 2L)
+    )
+    session$userData$turn()
+    expect_length(session$userData$state()$drawn, 2L)
   })
 })
 
