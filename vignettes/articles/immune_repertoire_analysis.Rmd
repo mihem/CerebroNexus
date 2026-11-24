@@ -11,6 +11,8 @@ vignette: >
   %\VignetteIndexEntry{Immune Repertoire Analysis in CerebroNexus}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
+resource_files:
+  - img/immune-repertoire-contract.svg
 ---
 
 # Overview
@@ -152,8 +154,13 @@ CSV inputs require either a named path vector or an explicit `sample_names`
 argument. CerebroNexus does not guess biological sample identities from file
 or directory names.
 
+```{r repertoire-contract, echo=FALSE, eval=TRUE, fig.align="center", out.width="100%", fig.alt="TCR, BCR, metadata, and Cell Ranger inputs are normalized, validated for one globally unique cell barcode per row, and exported as one named table per sample."}
+knitr::include_graphics("img/immune-repertoire-contract.svg")
+```
+
 Each data.frame must contain the scRepertoire clonotype columns `barcode`,
-`CTgene`, `CTnt`, `CTaa`, and `CTstrict`. The `barcode` values should match
+`CTgene`, `CTnt`, `CTaa`, and `CTstrict`, each a one-dimensional vector with one
+value per row, and a non-empty barcode in every row. The `barcode` values should match
 the cell barcodes in the Seurat object's metadata. Chains (e.g. TRA/TRB,
 IGH/IGK/IGL) are detected automatically from `CTgene`, and grouping variables
 (sample, condition, cell type, ...) are read from the cell metadata at runtime —
@@ -177,8 +184,10 @@ no separate `tcr_data` or `bcr_data` fields; `getTCR()` and `getBCR()` derive
 their tables from the repertoire (rows whose `CTgene` names a `TR[ABGD]` or
 `IG[HKL]` chain, samples without such rows dropped), and `getImmuneRepertoire()`
 returns the whole list. `exportFromSeurat()` still accepts Seurat objects that
-keep receptors in `object@misc$tcr_data` and `object@misc$bcr_data` and merges
-them into the unified repertoire, so older preparation workflows keep working.
+keep receptors in `object@misc$tcr_data` and `object@misc$bcr_data`, validates
+them and merges them into the unified repertoire, so older preparation workflows
+keep working. A valid `object@misc$immune_repertoire` is authoritative: stale
+`tcr_data` / `bcr_data` slots next to it do not block it.
 A `.crb` from an older release that stored receptors in those fields is a
 retired format; convert it once with `convertCerebro()`.
 

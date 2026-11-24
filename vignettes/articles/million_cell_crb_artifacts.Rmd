@@ -106,7 +106,8 @@ The cell names are kept once, in the H5 file: `/expression/genes` holds the
 **cell** names and `/expression/barcodes` the **gene** names (the axis names
 follow the 10x convention for a genes-by-cells matrix, which is transposed
 here). The `.crb` itself is *thin* (schema version 5). It drops
-`meta_data$cell_barcode` and the row names of the projections, and instead
+`meta_data$cell_barcode` and the row names of every projection that carries the
+same cell names, and instead
 stores a checksum of the cell names (`cell_names_hash`) together with the cell
 count. `readCerebro()` and the Viewer read the cell names back from the H5 file,
 verify the checksum and restore both fields, so the object you work with is
@@ -119,21 +120,46 @@ rownames(crb$projections[[1]])[1:3]
 
 If the `.crb` and the H5 file do not belong together, for example because the
 H5 file was re-exported with a different cell order, loading stops with an error
-instead of attaching expression values to the wrong cells (see
-[Data integrity contracts](data_integrity_contracts.html)).
+instead of attaching expression values to the wrong cells.
+
+The `crb_schema` field of the `.crb` records the checksum, the cell count and
+which projections were compacted. Schema 5 also supports the `cell_indexed`
+fields introduced by schema 4.
 
 Schema 5 uses a versioned XXH3-128 checksum (seed 0) of the ordered UTF-8 names,
 each terminated by a zero byte, independently of `rlang` and R-object
-serialization. Raw-byte encoding and hashing run in native code without
-temporary files. Existing schema-3/4 files require a one-time
-`convertCerebro("dataset.crb")` with the updated package; stop apps using the
-export first. Conversion validates the old checksum and reuses the H5 matrix
-without re-exporting expression. Rebuild its Viewer Pack if conversion did not
-already rebuild it. This applies to any thin H5 CRB, not just large datasets;
-embedded-expression CRBs are unaffected. Normal ordered-name validation still
-runs before expression access in each new Viewer process, without legacy-hash
-retries. Opening a schema-5 file requires an updated reader, including updated
-standalone apps.
+serialization. The checksum is tagged `xxh3-128-cell-order-v1:`. R strings
+cannot contain an embedded zero byte, so the boundaries are unambiguous.
+XXH3-128 hashes those raw bytes directly (`digest`, with serialization
+disabled). `digest` is optional: without a supported version, the existing
+`rlang::hash_file()` hashes a temporary file containing exactly the same bytes
+and produces the same value; that fallback never passes an R object to
+`rlang::hash()`. Both checksum paths explicitly use
+`writeBin(..., useBytes = TRUE)` after UTF-8 normalization: non-ASCII names are
+never translated to the session's native encoding, including when R starts with
+`LC_ALL=C`. On the accelerated path, raw-byte encoding and hashing run in native
+code without temporary files or per-cell text-prefix allocations; one temporary
+raw buffer is proportional to the total UTF-8 name bytes plus one byte per cell.
+
+Existing schema-3/4 files require a one-time
+`convertCerebro("dataset.crb")` with the updated package; ordinary readers
+reject them with that message before reading H5 names or trying historical
+hashes. Stop apps using the export first. Conversion validates the old checksum
+once and reuses the H5 matrix without re-exporting expression. Rebuild its
+Viewer Pack if conversion did not already rebuild it. This applies to any thin
+H5 CRB, not just large datasets; embedded-expression CRBs are unaffected. Older
+releases that do not support schema 5 refuse new files explicitly, so opening a
+schema-5 file requires an updated reader, including updated standalone apps. An
+H5-backed `.crb` written by CerebroNexus 5.1.x without a `crb_schema` field is
+still read as it is.
+
+Conversion does not turn off validation: normal ordered-name checks still run
+before expression access in each new Viewer process, without legacy-hash
+retries, and are cached for that process and file version. In a Viewer session,
+a cell-name mismatch notifies the user and aborts the current reactive read at
+the shared sidecar boundary, so all expression pages remain connected and never
+substitute synthetic expression values. Outside Shiny, the runtime and package
+readers raise a hard mismatch error.
 
 ## Launch or bundle an H5-backed dataset
 
@@ -175,6 +201,34 @@ happens for H5-backed `.crb` files whose repertoire has at least
 `immune_sidecar_threshold = 100000L` rows; `"always"` and `"never"` override
 that decision. Move and bundle the sidecar together with the `.crb` like the H5
 file.
+
+## Replace an existing export
+
+All artifacts are written in a private sibling stage. On POSIX systems the
+stage is mode `0700`, new H5, immune sidecar and CRB files are `0600`; an
+existing CRB keeps its previous mode. Only those POSIX mode bits
+are set or preserved. Ownership, ACLs, extended attributes, and security labels
+remain the deployment system's responsibility on every platform. Later
+validation of repertoire, HLA, markers, projections, and spatial data happens
+before publication.
+
+Before replacing an existing sidecar, the exporter reads the current CRB's
+plain backend field without calling a serialized getter. Replacement proceeds
+only when that descriptor claims the exact sidecar path and type; an unrelated
+same-name file is a collision and remains untouched; the same holds for the
+immune repertoire sidecar. If publication fails, the previous CRB and sidecars
+are restored on a best-effort basis. A successful backend switch removes the
+previous sidecar only after the new CRB is committed.
+
+This is not an atomic transaction across two paths. Stop every app or other
+reader using the export before replacing it: a live reader can otherwise load
+the old CRB during the sidecar swap. Process termination and concurrent writers
+are also outside the guarantee. A failed restoration is reported rather than
+hidden.
+
+The `h5` mode requires a portable `.crb` filename. Empty stems, Windows
+reserved names, and filesystem-invalid punctuation are rejected before any
+artifact is written.
 
 ## Convert an existing embedded `.crb`
 
@@ -403,9 +457,18 @@ trajectory, spatial, Trekker and HLA/TCR demos. See the
 # Older files and retired formats
 
 Only the current layout is read. `readCerebro()`, `launchCerebro()`,
-`createShinyApp()` and the Viewer reject an older `.crb`, for example one that
-has no expression-backend descriptor, uses a thin schema other than version 5,
-or still stores receptors in the `bcr_data` / `tcr_data` fields, with
+`createShinyApp()` and the Viewer all reject a `.crb` that
+
+- has no `expression_backend` descriptor;
+- has a thin schema other than version 5 (versions 3/4 require conversion);
+- still stores receptors in non-empty `bcr_data` / `tcr_data` fields;
+- records an immune repertoire sidecar of any type other than `"file"`;
+- predates spatial support (the Cerebro v1.3 class), HLA typing support,
+  Trekker support or the enriched-pathways page, so its stored object lacks the
+  `availableSpatial()`, `getHLATyping()`, `getTrekker()` or
+  `getMethodsForEnrichedPathways()` method.
+
+The message is the same everywhere:
 
 ```text
 The Cerebro data file 'x.crb' uses a retired format: <reason>.
@@ -413,7 +476,8 @@ Convert it once with CerebroNexus::convertCerebro().
 ```
 
 `convertCerebro()` is the only migration path. It sets a missing descriptor to
-`embedded`, merges the old receptor fields into the unified immune repertoire,
+`embedded`, rebuilds an object that lacks one of those methods on the current
+class, merges the old receptor fields into the unified immune repertoire,
 updates the ordered-name checksum of schema-3/4 files to portable schema 5,
 and rewrites an H5-backed `.crb` from CerebroNexus 5.1.x (which carried its cell
 names in the `.crb`) as a thin one next to its existing H5 file:
@@ -428,7 +492,30 @@ immune sidecar of another type than `"file"`) is rejected and cannot be
 converted. Re-export it from the source Seurat object with
 `exportFromSeurat(..., expression_matrix_mode = "h5")`.
 
+# Recommended workflow
+
+1. Keep source Seurat layers in memory for export, or materialize every intended
+   split layer first (see
+   [Seurat v5 layered assays](seurat_v5_layered_assays.html)).
+2. Export to a `.crb` path and choose `embedded` or `h5`.
+3. Add repertoire data through `addImmuneRepertoire()` rather than assigning an
+   unchecked shape (see
+   [Immune repertoire analysis](immune_repertoire_analysis.html)).
+4. Keep the H5 file, and the immune repertoire sidecar if there is one, beside
+   its CRB under the names recorded in the CRB.
+5. Build the app with `createShinyApp()` and treat any error it raises as a
+   request to fix identity, not as a file-copy inconvenience.
+6. Move or deploy the resulting app directory as one unit.
+
 # Troubleshooting
+
+Errors mean that continuing would reinterpret identity or publish an unusable
+artifact: an ambiguous or incomplete expression partition, a matrix/object cell
+mismatch, a target-path collision, a missing or escaping bundle input, a
+malformed or duplicate repertoire identity, or zero repertoire/cell overlap.
+Warnings mean that the result remains interpretable: repertoire rows or samples
+absent from the object were removed, or publication succeeded but an old backup
+could not be removed.
 
 - **Missing sidecar:** restore the recorded sibling `.h5` (or
   `.immune.qs2`) file. A thin CRB alone is not a complete external dataset.
@@ -448,7 +535,8 @@ converted. Re-export it from the source Seurat object with
 
 - [Share data sets as a Shiny app](create_a_self_contained_shiny_app.html)
 - [Prepare and export a Seurat object in R](cerebronexus_workflow_seurat.html)
-- [Data integrity contracts](data_integrity_contracts.html)
+- [Seurat v5 layered assays](seurat_v5_layered_assays.html)
+- [Immune repertoire analysis](immune_repertoire_analysis.html)
 - [Large-dataset benchmarks](expression_backend_benchmark.html)
 - `?exportFromSeurat`, `?saveCerebro`, `?convertCerebro`
 

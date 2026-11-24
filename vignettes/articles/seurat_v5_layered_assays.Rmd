@@ -334,6 +334,9 @@ A partial matrix is never accepted for a full-object operation.
 
 Layer support is not limited to export. All CerebroNexus functions that directly
 need a complete expression matrix use the same resolver and cell validator.
+The validator applies one final check: the unique cells of the matrix must equal
+the unique cells of the Seurat object. If the sets match but the order differs,
+CerebroNexus reorders the matrix once; missing or unexpected cells are an error.
 
 ```{r entry-points-diagram, echo=FALSE, eval=TRUE}
 knitr::include_graphics("img/seurat-v5-layer-entry-points.svg")
@@ -404,7 +407,7 @@ partition is rejected regardless of layer order.
 
 - `"embedded"`: inside the `.crb`;
 - `"h5"`: a sibling HDF5 file (the `.crb` is then thin; see
-  [Data integrity contracts](data_integrity_contracts.html)).
+  [Working with large datasets](million_cell_crb_artifacts.html#store-the-expression-matrix-in-an-h5-file)).
 
 Choosing `expression_matrix_mode = "h5"` does not make a disk-backed source
 assay readable. Source resolution happens first; output storage happens after
