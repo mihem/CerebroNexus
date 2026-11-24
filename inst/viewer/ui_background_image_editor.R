@@ -11,9 +11,17 @@
 
 ## The container: the section picker, the image picker, the controls (`bar`,
 ## rendered by the server from the image's preset, or empty) and the note.
-viewerBackgroundImageEditor <- function(prefix, bar) {
+## `image_select = FALSE` hides the image picker, for a page that chooses the
+## image elsewhere. The styles are scoped under `.coordviews-page`, which a page
+## other than Linked views asks for with `page_scope = TRUE`.
+viewerBackgroundImageEditor <- function(
+  prefix,
+  bar,
+  image_select = TRUE,
+  page_scope = FALSE
+) {
   id <- function(name) paste0(prefix, "-", name)
-  div(
+  editor <- div(
     class = "cv-ctl cv-bg-ctl cerebro-settings-full",
     id = id("img-pick-ctl"),
     style = "display:none",
@@ -22,6 +30,7 @@ viewerBackgroundImageEditor <- function(prefix, bar) {
       class = "cv-bg-settings",
       div(
         class = "cv-bg-display",
+        style = if (!image_select) "display:none",
         tags$label(
           class = "cv-bg-display-title",
           `for` = id("bg-image-select"),
@@ -37,13 +46,22 @@ viewerBackgroundImageEditor <- function(prefix, bar) {
       )
     )
   )
+  if (page_scope) div(class = "coordviews-page", editor) else editor
 }
 
 ## The controls, seeded from the alignment `preset` of the image the editor
 ## opens on, so an external image (Visium H&E) opens pre-aligned. The Move
 ## sliders are in data units, ranged to the section's coordinate `span`.
-viewerBackgroundImageBar <- function(prefix, preset, span) {
+## `copy_preset` adds the button that turns the alignment into code to paste
+## into `Cerebro.options`.
+viewerBackgroundImageBar <- function(
+  prefix,
+  preset,
+  span,
+  copy_preset = FALSE
+) {
   pr <- preset
+  `%||%` <- function(x, y) if (is.null(x)) y else x
   if (is.null(span) || length(span) < 2) {
     span <- c(400, 400)
   }
@@ -136,6 +154,17 @@ viewerBackgroundImageBar <- function(prefix, preset, span) {
       id = id("reset"),
       class = "cv-imgbar-reset",
       "Reset to preset"
-    )
+    ),
+    if (copy_preset) {
+      tagList(
+        tags$button(
+          type = "button",
+          id = id("copy"),
+          class = "cv-imgbar-reset",
+          "Copy alignment as preset"
+        ),
+        tags$pre(id = id("code"), class = "cv-img-code", hidden = NA)
+      )
+    }
   )
 }

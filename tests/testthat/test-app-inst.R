@@ -266,17 +266,13 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
     ),
     timeout = 30000
   )
-  wait_for_input(app, "spatial_projection_background_scale", timeout = 30000)
-  wait_for_input(app, "spatial_projection_background_scale_x", timeout = 30000)
-  wait_for_input(app, "spatial_projection_background_scale_y", timeout = 30000)
+  ## The Spatial page's background editor is the one Linked views has, seeded
+  ## from the image's alignment preset.
   app$wait_for_js(
     paste0(
-      "document.getElementById('spatial_projection_background_scale').value ",
-      "=== '1.55' && ",
-      "document.getElementById('spatial_projection_background_scale_x').value ",
-      "=== '1.55' && ",
-      "document.getElementById('spatial_projection_background_scale_y').value ",
-      "=== '1.55'"
+      "document.getElementById('sp-img-scalex')?.value === '1.55' && ",
+      "document.getElementById('sp-img-scaley')?.value === '1.55' && ",
+      "document.getElementById('sp-img-scalex-number')?.value === '1.55'"
     ),
     timeout = 30000
   )

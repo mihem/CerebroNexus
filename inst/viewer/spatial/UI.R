@@ -80,12 +80,27 @@ tab_spatial <- tabItem(
             "Data",
             uiOutput("spatial_projection_data_parameters_UI")
           ),
-          cerebroSettingsSection(
-            "Background image",
-            div(
-              class = "spatial-image-controls",
-              uiOutput("spatial_projection_background_parameters_UI")
-            )
+          ## The image is chosen in the toolbar; this adjusts the one on screen,
+          ## in the browser, like the same section of Linked views.
+          shiny::tagAppendAttributes(
+            cerebroSettingsSection(
+              "Background image",
+              viewerBackgroundImageEditor(
+                "sp",
+                div(
+                  id = "spatial_projection_image_ui",
+                  viewerBackgroundImageBar(
+                    "sp",
+                    list(),
+                    NULL,
+                    copy_preset = TRUE
+                  )
+                ),
+                image_select = FALSE,
+                page_scope = TRUE
+              )
+            ),
+            style = "display:none"
           ),
           cerebroSettingsSection(
             "Group filters",

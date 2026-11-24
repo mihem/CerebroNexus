@@ -105,10 +105,13 @@
   // The background-image editor is one piece of markup mounted once per page
   // that has one, its element ids carrying the page's prefix. The engine drives
   // whichever editor belongs to the page on screen.
-  var imgPrefix = 'cv';
+  function imgPrefix() { return singleActive === 'spatial_projection' ? 'sp' : 'cv'; }
   var IMG_ID_PATTERN = /^(cv|sp)-img-/;
-  function imgId(name) { return imgPrefix + '-img-' + name; }
-  function bgId(name) { return imgPrefix + '-bg-' + name; }
+  function imgId(name) { return imgPrefix() + '-img-' + name; }
+  function bgId(name) { return imgPrefix() + '-bg-' + name; }
+  function imageBarEl() {
+    return $(imgPrefix() === 'sp' ? 'spatial_projection_image_ui' : 'coordviews_image_ui');
+  }
   // Which background each section was last showing, so returning to a section
   // returns the view of it the user left, not merely its alignment. Keyed by
   // section name; cleared with the data set.
@@ -7139,7 +7142,7 @@
     var sp = activeSpatial();
     var hasImg = !!(sp && currentImage(sp));
     revealEl($('cv-clone-layout-ctl'), hasClone);
-    revealEl($('coordviews_image_ui'), hasImg);
+    revealEl(imageBarEl(), hasImg);
   }
 
   // ---- clonal-panel layout (client-side, instant) -------------------------
@@ -7689,6 +7692,11 @@
     return !!(sp && (sp._spatialSample || sp.background_scope));
   }
   function backgroundSpaces() {
+    // Spatial shows its own sections, one panel each; not Linked views' picks.
+    if (singleActive) {
+      return singleSpaceIds.map(function (spaceId) { return spaceById[spaceId]; })
+        .filter(isSpatialSpace);
+    }
     var out = selectedSpatial.map(function (name) {
       return spaceById[spatialId(name)];
     }).filter(Boolean);
@@ -8030,6 +8038,29 @@
   // Back to the alignment the data set shipped with. Alignment is fiddly and
   // easy to lose, and the preset is the only reference point in the bar; without
   // this the way back was reloading the page.
+  // The extent of a section's coordinates, for the Move ranges, when its image
+  // does not carry it (Spatial's do not). Computed once per space.
+  function coordinateSpan(sp) {
+    if (!sp) return null;
+    if (sp._coordSpan) return sp._coordSpan;
+    var range = function (values, bounds) {
+      if (Array.isArray(bounds) && bounds.length >= 2 && isFinite(bounds[1] - bounds[0])) {
+        return Math.abs(bounds[1] - bounds[0]);
+      }
+      var lo = Infinity, hi = -Infinity;
+      for (var i = 0; values && i < values.length; i++) {
+        var v = values[i];
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+      }
+      return hi > lo ? hi - lo : 0;
+    };
+    var x = range(sp.x, sp.xRange), y = range(sp.y, sp.yRange);
+    if (!(x > 0) || !(y > 0)) return null;
+    sp._coordSpan = [x, y];
+    return sp._coordSpan;
+  }
+
   // Write a state object into the bar's controls, including the ranges: the Move
   // sliders are in DATA units, ranged to the section's coordinate span, so
   // carrying the previous section's range over can put the target's own offset
@@ -8042,7 +8073,7 @@
     var v = st || sp._imgState || presetState(cur);
     var set = function (id, x) { syncImgRangeValue($(id), x); };
     var tick = function (id, on) { var el = $(id); if (el) el.checked = !!on; };
-    var span = (cur && cur.coord_span) || null;
+    var span = (cur && cur.coord_span) || coordinateSpan(sp);
     if (span && span.length >= 2) {
       // Ranged on the section's coordinate span, but never tighter than the
       // value being written: a range that excludes its own value clamps it, and
@@ -8089,6 +8120,50 @@
     if (k) delete imgStates[k];   // forget the adjustments, for this pair only
     seedImgControls(sp._imgState);
     drawAll();
+  }
+
+  // Spatial's "Copy alignment as preset": R writes the code for the image on
+  // screen, from the alignment the bar holds and the image's identity.
+  function requestPresetCode() {
+    var sp = activeSpatial(), img = sp && currentImage(sp);
+    if (!img || !sp._imgState || typeof Shiny === 'undefined' || !Shiny.setInputValue) return;
+    var identity = null;
+    try { identity = JSON.parse(img.id); } catch (ignore) { /* not an identity */ }
+    if (!identity || typeof identity !== 'object') return;
+    syncImgControls();
+    Shiny.setInputValue('spatial_projection_background_copy', {
+      identity: identity,
+      state: Object.assign({}, sp._imgState),
+      nonce: Date.now()
+    }, { priority: 'event' });
+  }
+  function showPresetCode(message) {
+    if (!message || !message.text) return;
+    var box = $(message.prefix + '-img-code'), button = $(message.prefix + '-img-copy');
+    if (box) { box.textContent = message.text; box.hidden = false; }
+    var done = function (label) {
+      if (!button) return;
+      var previous = button.getAttribute('data-label') || button.textContent;
+      button.setAttribute('data-label', previous);
+      button.textContent = label;
+      window.setTimeout(function () { button.textContent = previous; }, 1200);
+    };
+    var area;
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(message.text)
+        .then(function () { done('Copied'); }, function () { done('Copy failed'); });
+      return;
+    }
+    // Local HTTP sessions have no secure Clipboard API.
+    area = document.createElement('textarea');
+    area.value = message.text;
+    area.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(area);
+    area.select();
+    var copied = false;
+    try { copied = document.execCommand('copy'); } catch (ignore) { /* refused */ }
+    area.remove();
+    done(copied ? 'Copied' : 'Copy failed');
   }
 
   function spatialId(name) { return 'spatial::' + name; }
@@ -12286,6 +12361,11 @@
       renderGroupFilters();
       updateSpaceScopedControls();
     }
+    // The Spatial page's own background editor follows the sections on screen.
+    if (id === 'spatial_projection') {
+      renderImagePicker();
+      updateSpaceScopedControls();
+    }
     setTrekkerSettingsVisible(!!D.trekker);
     var trekkerInsights = $('cv-tk-insights');
     if (trekkerInsights) trekkerInsights.style.display = D.trekker ? '' : 'none';
@@ -14756,6 +14836,7 @@
       if (!datasetMessageFresh(patch)) return;
       if (!applyColorPatch(patch)) pendingColorPatch = patch;
     });
+    Shiny.addCustomMessageHandler('cerebro_background_preset_code', showPresetCode);
     Shiny.addCustomMessageHandler('cell_view_background', function (message) {
       updateSingleBackground(message);
     });
@@ -15167,6 +15248,7 @@
       // the tooltip sits over a panel and the handlers below would otherwise
       // read the click as one on the workspace underneath.
       if (t.id === imgId('reset')) { resetImgToPreset(); return; }
+      if (t.id === imgId('copy')) { requestPresetCode(); return; }
       if (t.closest('.cv-tip-details')) {
         if (pinnedTip.panel && pinnedTip.cell != null) {
           openCard(pinnedTip.panel, pinnedTip.cell);

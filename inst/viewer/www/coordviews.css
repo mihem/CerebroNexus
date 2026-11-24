@@ -943,12 +943,15 @@
 /* The image bar sits ABOVE the panels, so its HEIGHT must collapse too — else the
    panels jump up when it hits display:none. Animate max-height (overflow clipped)
    so they slide, exactly like .cv-selbar. */
-.coordviews-page #coordviews_image_ui {
+.coordviews-page #coordviews_image_ui,
+.coordviews-page #spatial_projection_image_ui {
   overflow: visible; max-height: none; margin-top: 10px;
   transition: opacity .18s ease, transform .18s ease;
 }
-.coordviews-page #coordviews_image_ui.cv-collapse { max-height: 0; }
 .coordviews-page #coordviews_image_ui.cv-collapse,
+.coordviews-page #spatial_projection_image_ui.cv-collapse { max-height: 0; }
+.coordviews-page #coordviews_image_ui.cv-collapse,
+.coordviews-page #spatial_projection_image_ui.cv-collapse,
 .coordviews-page #cv-clone-layout-ctl.cv-collapse {
   opacity: 0; transform: translateY(-4px); pointer-events: none;
 }
@@ -1407,6 +1410,13 @@
   background: var(--c-amber-50); color: var(--c-amber-700);
 }
 
+/* The code "Copy alignment as preset" produced. */
+.coordviews-page .cv-img-code {
+  margin: 0; padding: 8px; font-size: 11px; white-space: pre-wrap;
+  word-break: break-word; background: var(--c-surface);
+  border: 1px solid var(--c-border); border-radius: 6px;
+}
+.coordviews-page .cv-img-code[hidden] { display: none; }
 /* "Reset to preset" sits at the end of the histology alignment bar. Quiet: it
    undoes work rather than doing any, and it is next to the controls it undoes. */
 .coordviews-page .cv-imgbar-reset {

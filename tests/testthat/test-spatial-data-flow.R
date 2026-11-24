@@ -172,6 +172,10 @@ spatial_flow_server <- function(input, output, session) {
     viewer_test_path("spatial", "obj_projection_background_controls.R"),
     scope
   )
+  sys.source(
+    viewer_test_path("spatial", "obj_projection_background_copy.R"),
+    scope
+  )
   observe({
     spatial_projection_data_to_plot_raw()
     frames <<- frames + 1L
@@ -445,6 +449,62 @@ test_that("Spatial image controls seed and reset presets, synchronize values and
       spatial_projection_background_copy_preset = 2
     )
     expect_null(spatial_preset_code())
+  })
+})
+
+test_that("The client-owned background editor copies the alignment it holds as a preset", {
+  shiny::testServer(spatial_flow_server, {
+    session$setInputs(
+      spatial_projection_render_request = 1,
+      spatial_projection_to_display = "slice",
+      background = TRUE
+    )
+    session$setInputs(spatial_projection_background_image = "embedded::tissue")
+    identity <- spatial_projection_parameters_plot()$background_identity
+    state <- list(
+      opacity = .6,
+      offsetX = 12,
+      offsetY = -3,
+      scaleX = 2,
+      scaleY = 2,
+      flipX = FALSE,
+      flipY = TRUE,
+      rotate = 15
+    )
+    session$setInputs(
+      spatial_projection_background_copy = list(
+        identity = identity,
+        state = state,
+        nonce = 1
+      )
+    )
+    copied <- Filter(
+      function(x) x$type == "cerebro_background_preset_code",
+      scope$sent
+    )
+    expect_length(copied, 1L)
+    leaf <- eval(parse(text = copied[[1]]$message$text))$tiny$slice$tissue
+    expect_equal(leaf$scale_x, 2)
+    expect_equal(leaf$offset_x, 12)
+    expect_true(leaf$flip_y)
+    expect_equal(leaf$rotation, 15)
+    ## An alignment made for another data set is not turned into code.
+    other <- identity
+    other$dataset <- "another"
+    session$setInputs(
+      spatial_projection_background_copy = list(
+        identity = other,
+        state = state,
+        nonce = 2
+      )
+    )
+    expect_length(
+      Filter(
+        function(x) x$type == "cerebro_background_preset_code",
+        scope$sent
+      ),
+      1L
+    )
   })
 })
 
