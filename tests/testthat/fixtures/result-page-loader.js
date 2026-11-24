@@ -32,6 +32,7 @@ function scenario(page = 'markerGenes') {
     matches(s) {
       if (s.includes(',')) return s.split(',').some(x=>this.matches(x.trim()));
       if (s.startsWith('#')) return this.id === s.slice(1);
+      if (s.startsWith('[id$=')) return this.id.endsWith(s.slice(6, -2));
       if (s.startsWith('.')) return s.slice(1).split('.').every(c=>this.classList.contains(c));
       return this.tagName === s.toUpperCase();
     }
@@ -40,7 +41,8 @@ function scenario(page = 'markerGenes') {
       return s === '*' ? all : all.filter(n=>s.split(',').some(x=>n.matches(x.trim())));
     }
     querySelector(s) { return this.querySelectorAll(s)[0] || null; }
-    closest(s) { return s.startsWith('.tab-pane') ? (this.id.startsWith('shiny-tab-') ? this : this.parent?.closest(s)) :
+    closest(s) { if (s.startsWith('.tab-pane:not')) return this.classList.contains('tab-pane') && !this.id.startsWith('shiny-tab-') ? this : this.parent?.closest(s);
+      return s.startsWith('.tab-pane') ? (this.id.startsWith('shiny-tab-') ? this : this.parent?.closest(s)) :
       this.matches(s) ? this : this.parent?.closest(s); }
   }
   const content = new Node('main-content');
@@ -277,5 +279,26 @@ function replaceTable(s) {
   s.emit('shiny:outputinvalidated',s.table);
   s.table.__cerebroWaitTimer.fn();
   check(s.table.classList.contains('cerebro-output-waiting'),'an output still waiting at 400 ms is dimmed');
+}
+{
+  // HLA & TCR Motifs is a canvas page, but its canvas sits on the Motif Network
+  // sub-tab. Opened on another sub-tab the canvas never paints, so the page
+  // must finish on its outputs instead of waiting forever (#270).
+  function hla(networkActive) {
+    const s=scenario('hla_tcr_motifs');
+    const network=new s.Node('hla-network-tab','tab-pane'+(networkActive?' active':''),s.pane);
+    const qc=new s.Node('hla-qc-tab','tab-pane'+(networkActive?'':' active'),s.pane);
+    new s.Node('hla_motif_network_cell_view_host','',network);
+    return {s,network,qc};
+  }
+  function settle(s) { s.emit('shiny:busy');s.values();s.emit('shiny:idle');s.flush();s.frame();s.frame();s.flush(); }
+  const shown=hla(true);shown.s.start();settle(shown.s);
+  check(shown.s.pane.getAttribute('aria-busy')==='true','HLA on Motif Network waits for its canvas');
+  const qc=hla(false);qc.s.start();settle(qc.s);
+  check(qc.s.pane.getAttribute('aria-busy')===null && qc.s.loader.hidden,'HLA opened on Data & QC finishes on its outputs');
+  const moved=hla(true);moved.s.start();settle(moved.s);
+  moved.network.classList.remove('active');moved.qc.classList.add('active');
+  moved.s.emit('shown',moved.s.pane);moved.s.flush();moved.s.frame();moved.s.frame();moved.s.flush();
+  check(moved.s.pane.getAttribute('aria-busy')===null,'switching to Data & QC before the network paints finishes the page');
 }
 console.log(count+' result page loader assertions passed');
