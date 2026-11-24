@@ -87,14 +87,14 @@ seurat <- getMarkerGenes(
 For enriched pathways, run `getEnrichedPathways()` on the marker genes (it
 queries the Enrichr web service) or `performGeneSetEnrichmentAnalysis()` with
 your own gene sets; see
-[Introduction to the CerebroNexus workflow](cerebronexus_workflow_seurat.html).
+[Prepare and export a Seurat object in R](cerebronexus_workflow_seurat.html).
 
 `convertSeuratToCerebro()`, `convertSCEToCerebro()` and `convertH5adToCerebro()`
 add the most expressed genes and the mean expression per group on their own
 (`add_most_expressed_genes = TRUE`). They can read a marker gene table from a
 file (`marker_file`), and `convertH5adToCerebro()` takes the marker genes that
 scanpy ranked; see
-[Import your analysis](import_your_analysis.html).
+[From your analysis to an interactive Viewer](import_your_analysis.html).
 
 # Add your own tables and plots
 
@@ -192,7 +192,7 @@ launchCerebro(crb_file_to_load = "pbmc_tables.crb")
 
 # See also
 
-- [Introduction to the CerebroNexus workflow](cerebronexus_workflow_seurat.html)
+- [Prepare and export a Seurat object in R](cerebronexus_workflow_seurat.html)
   for computing the tables, including enriched pathways
 - [Overview of the Cerebro class](overview_of_cerebro_class.html) for the
   structure of a `.crb` file, and `?Cerebro` for its methods

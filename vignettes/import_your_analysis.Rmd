@@ -1,11 +1,11 @@
 ---
-title: "Import your analysis"
+title: "From your analysis to an interactive Viewer"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   rmarkdown::html_vignette:
     toc: true
 vignette: >
-  %\VignetteIndexEntry{Import your analysis}
+  %\VignetteIndexEntry{From your analysis to an interactive Viewer}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 resource_files:
@@ -124,7 +124,7 @@ crb <- convertSeuratToCerebro(
 ```
 
 To add tables of marker genes and enriched pathways before the export, see
-[Introduction to the CerebroNexus workflow](cerebronexus_workflow_seurat.html).
+[Prepare and export a Seurat object in R](cerebronexus_workflow_seurat.html).
 
 ## From a SingleCellExperiment
 
@@ -203,6 +203,6 @@ spatial data, coordinates and tissue images are written. A message lists what
   **Open App**.
 * To add CerebroNexus analyses to a Seurat object first (marker genes,
   enriched pathways, gene set enrichment), see
-  [Introduction to the CerebroNexus workflow](cerebronexus_workflow_seurat.html).
+  [Prepare and export a Seurat object in R](cerebronexus_workflow_seurat.html).
 * To share the result, see
   [Share data sets as a Shiny app](https://www.mheming.com/CerebroNexus/articles/create_a_self_contained_shiny_app.html).

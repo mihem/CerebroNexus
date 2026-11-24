@@ -1,11 +1,11 @@
 ---
-title: "Introduction to the CerebroNexus workflow"
+title: "Prepare and export a Seurat object in R"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   rmarkdown::html_vignette:
     toc: true
 vignette: >
-  %\VignetteIndexEntry{Introduction to the CerebroNexus workflow}
+  %\VignetteIndexEntry{Prepare and export a Seurat object in R}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -22,7 +22,7 @@ knitr::opts_chunk$set(
 This vignette starts from a Seurat object in which the analysis is already done, adds the tables that CerebroNexus pre-computes (most expressed genes, marker genes, enriched pathways), and exports everything to a `.crb` file.
 It does not cover quality control, normalization, clustering or dimensional reduction; for those steps, please see the [Seurat tutorials](https://satijalab.org/seurat/).
 
-These steps are optional: a Seurat object can also be imported as it is, with the Builder or `convertSeuratToCerebro()`; see [Import your analysis](import_your_analysis.html).
+These steps are optional: a Seurat object can also be imported as it is, with the Builder or `convertSeuratToCerebro()`; see [From your analysis to an interactive Viewer](import_your_analysis.html).
 The functions shown here take a Seurat object.
 The same steps, except the gene set enrichment, can also be switched on in the Builder (`launchCerebroBuilder()`); see [Build a data set without writing code](https://www.mheming.com/CerebroNexus/articles/build_a_data_set_by_pointing.html).
 

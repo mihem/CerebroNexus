@@ -614,7 +614,7 @@ workflow discovers files by name alone.
 
 # See also
 
-- [Introduction to the CerebroNexus workflow with Seurat](cerebronexus_workflow_seurat.html)
+- [Prepare and export a Seurat object in R](cerebronexus_workflow_seurat.html)
 - [Store the expression matrix in an H5 file](million_cell_crb_artifacts.html#store-the-expression-matrix-in-an-h5-file)
 - [Create a self-contained Shiny application](create_a_self_contained_shiny_app.html)
 

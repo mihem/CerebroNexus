@@ -58,11 +58,10 @@ reference:
       - starts_with(".")
 
 articles:
-  - title: "Workflows"
-    navbar: Workflows
+  - title: "Getting started"
+    navbar: Getting started
     contents:
       - import_your_analysis
-      - cerebronexus_workflow_seurat
   - title: "Data model"
     navbar: Interface
     contents:
@@ -71,6 +70,7 @@ articles:
     navbar: How-to
     contents:
       - articles/build_a_data_set_by_pointing
+      - cerebronexus_workflow_seurat
       - articles/data_integrity_contracts
       - articles/seurat_v5_layered_assays
       - articles/create_a_self_contained_shiny_app

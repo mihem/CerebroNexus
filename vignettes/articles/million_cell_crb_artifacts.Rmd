@@ -447,7 +447,7 @@ converted. Re-export it from the source Seurat object with
 # See also
 
 - [Share data sets as a Shiny app](create_a_self_contained_shiny_app.html)
-- [Introduction to the CerebroNexus workflow](cerebronexus_workflow_seurat.html)
+- [Prepare and export a Seurat object in R](cerebronexus_workflow_seurat.html)
 - [Data integrity contracts](data_integrity_contracts.html)
 - [Large-dataset benchmarks](expression_backend_benchmark.html)
 - `?exportFromSeurat`, `?saveCerebro`, `?convertCerebro`
