@@ -78,3 +78,19 @@ test_that("the browser table of selected cells matches the DT table's rules", {
     viewer_test_path("www", "selection-table.js")
   )
 })
+
+test_that("a colour-only change of a panel's GPU points writes the bytes the byte-by-byte version wrote", {
+  expect_node_fixture(
+    "gpu-colours-fast.js",
+    viewer_test_path("www", "cell_views.js"),
+    pass = "PASS the colour update writes the bytes"
+  )
+})
+
+test_that("a panel's paint sequence by radix sort is the one the float-key sort found", {
+  expect_node_fixture(
+    "paint-sequence-radix.js",
+    viewer_test_path("www", "cell_views.js"),
+    pass = "PASS a panel paint sequence by radix sort"
+  )
+})

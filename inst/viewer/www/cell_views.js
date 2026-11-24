@@ -2546,12 +2546,26 @@
       paintRank = { order: order, rank: rank };
     }
     var ranks = paintRank.rank, k = cells.length, pos;
-    // rank * k + position sorts numerically, without a comparator.
-    var keys = new Float64Array(k);
-    for (pos = 0; pos < k; pos++) keys[pos] = ranks[cells[pos]] * k + pos;
-    keys.sort();
-    var seq = new Int32Array(k);
-    for (pos = 0; pos < k; pos++) seq[pos] = keys[pos] % k;
+    // The positions by their cells' ranks, ascending, ties by position: a
+    // radix sort in 11-bit digits (sorting 66,000 float keys took 3 to 4 ms a
+    // panel, 60 to 85 ms for the 20 panels near the window on the Allen atlas).
+    var keys = new Uint32Array(k), seq = new Int32Array(k);
+    for (pos = 0; pos < k; pos++) { keys[pos] = ranks[cells[pos]]; seq[pos] = pos; }
+    var keysOut = new Uint32Array(k), seqOut = new Int32Array(k);
+    var digits = new Uint32Array(2048), highest = Math.max(1, order.length - 1);
+    for (var shift = 0; shift < 32 && (highest >>> shift) > 0; shift += 11) {
+      digits.fill(0);
+      for (pos = 0; pos < k; pos++) digits[(keys[pos] >>> shift) & 2047]++;
+      for (var digit = 0, before = 0; digit < 2048; digit++) {
+        var inDigit = digits[digit]; digits[digit] = before; before += inDigit;
+      }
+      for (pos = 0; pos < k; pos++) {
+        var key = keys[pos], slot = digits[(key >>> shift) & 2047]++;
+        keysOut[slot] = key; seqOut[slot] = seq[pos];
+      }
+      var swapKeys = keys; keys = keysOut; keysOut = swapKeys;
+      var swapSeq = seq; seq = seqOut; seqOut = swapSeq;
+    }
     if (paintSequences) paintSequences.set(cells, { order: order, seq: seq });
     return seq;
   }
@@ -2602,7 +2616,8 @@
     p.gpuData = {positions: previous.positions, colors: colors, layers: layers,
       count: previous.count, foreground: foreground, opaque: true,
       vertexIndex: previous.vertexIndex, vertexCells: previous.vertexCells,
-      ordered: previous.ordered, drawOrder: previous.drawOrder};
+      ordered: previous.ordered, drawOrder: previous.drawOrder,
+      shownMask: previous.shownMask, okRef: previous.okRef};
     return p.gpuData;
   }
 
@@ -2610,6 +2625,7 @@
   // selection) of a panel that still draws the same cells in the same order
   // keeps its positions: only colour and layer bytes are rebuilt, and the
   // renderer uploads no new geometry.
+  var GPU_LITTLE_ENDIAN = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
   var GPU_COLOUR_KEYS = ['mode', 'gene', 'fieldValues', 'fieldColors', 'fieldPalette',
     'fieldConstantColor', 'groupValues', 'groupColors', 'clip', 'opacity', 'selection', 'niche'];
   function updateGpuColors(p, state, hiSet, shownMask) {
@@ -2625,13 +2641,18 @@
     var cells = space && space._cells && space._cells.length <= n ? space._cells : null;
     if ((previous.vertexCells || null) !== cells) return null;
     var visits = cells ? cells.length : n, drawn = 0, at, i;
-    for (at = 0; at < visits; at++) {
-      i = cells ? cells[at] : at;
-      var shown = !!(unit.ok[i] && shownMask[i]);
-      if (shown !== (vertexIndex[at] > 0)) return null;
-      if (shown) drawn++;
+    // The vertices were laid out from a mask and positions: with the very same
+    // ones (a colour change keeps both) they still fit, and the cells need not
+    // be visited again to find out.
+    if (previous.shownMask !== shownMask || previous.okRef !== unit.ok) {
+      for (at = 0; at < visits; at++) {
+        i = cells ? cells[at] : at;
+        var shown = !!(unit.ok[i] && shownMask[i]);
+        if (shown !== (vertexIndex[at] > 0)) return null;
+        if (shown) drawn++;
+      }
+      if (drawn !== previous.count) return null;
     }
-    if (drawn !== previous.count) return null;
     var colors = new Uint8Array(previous.colors.length);
     // Layers follow only the selection/niche: keep them, and their upload,
     // when only the colours change.
@@ -2647,9 +2668,70 @@
     // buildGpuData(); a value off the scale (NaN) takes colorOf().
     var scale = group ? null : continuousColours(p), stepRgba = scale ? [] : null;
     var opacity = pointOpacityOf(p), opaque = true, foreground = false;
-    for (at = 0; at < visits; at++) {
+    var vertex, fastColoured = false;
+    if (!hiSet && GPU_LITTLE_ENDIAN && (group || scale)) {
+      // No selection: every colour is one of a few (a level's or a step's),
+      // written as one 32-bit word, red in the lowest byte.
+      var colors32 = new Uint32Array(colors.buffer);
+      var word = function (rgba) {
+        return ((rgba[0] & 255) | ((rgba[1] & 255) << 8) | ((rgba[2] & 255) << 16) |
+          ((Math.round(rgba[3] * opacity) & 255) << 24)) >>> 0;
+      };
+      if (group) {
+        var levels = palette.length, levelWords = palette.map(word), missingWord = word(missing);
+        var levelSeen = new Uint8Array(levels + 1), levelValues = group.values;
+        for (at = 0; at < visits; at++) {
+          vertex = vertexIndex[at] - 1;
+          if (vertex < 0) continue;
+          var level = levelValues[cells ? cells[at] : at];
+          if (level == null || level < 0 || level >= levels) {
+            levelSeen[levels] = 1; colors32[vertex] = missingWord;
+          } else {
+            levelSeen[level] = 1; colors32[vertex] = levelWords[level];
+          }
+        }
+        if (levelSeen[levels] && missing[3] !== 255) opaque = false;
+        for (var seenLevel = 0; seenLevel < levels; seenLevel++) {
+          if (levelSeen[seenLevel] && palette[seenLevel][3] !== 255) opaque = false;
+        }
+      } else {
+        var stepWords = new Uint32Array(256), stepKnown = new Uint8Array(256);
+        var scaleValues = scale.values, scaleRange = scale.range || _clipVal, scaleSpan = scale.span;
+        var scaleMissing = scale.missing, fullRange = scaleRange && scaleRange.hi > scaleRange.lo;
+        var rangeLow = scaleRange ? scaleRange.lo : 0;
+        var rangeWidth = scaleRange ? scaleRange.hi - scaleRange.lo : 1;
+        for (at = 0; at < visits; at++) {
+          vertex = vertexIndex[at] - 1;
+          if (vertex < 0) continue;
+          i = cells ? cells[at] : at;
+          var cellValue = scaleValues[i], colourStep = -1, colourWord;
+          if (!(scaleMissing && (cellValue == null || isNaN(cellValue)))) {
+            // clipT(), inlined.
+            colourStep = Math.round((!scaleRange ? cellValue / scaleSpan
+              : !fullRange ? 0
+              : Math.max(0, Math.min(1, (cellValue - rangeLow) / rangeWidth))) * 255);
+          }
+          if (colourStep >= 0 && colourStep <= 255) {
+            if (!stepKnown[colourStep]) {
+              var stepRgbaNow = gpuColor(scale.colour(colourStep));
+              stepWords[colourStep] = word(stepRgbaNow);
+              stepKnown[colourStep] = 1;
+              if (stepRgbaNow[3] !== 255) opaque = false;
+            }
+            colourWord = stepWords[colourStep];
+          } else {
+            var offScale = gpuColor(colorOf(i, p));
+            if (offScale[3] !== 255) opaque = false;
+            colourWord = word(offScale);
+          }
+          colors32[vertex] = colourWord;
+        }
+      }
+      fastColoured = true;
+    }
+    for (at = 0; !fastColoured && at < visits; at++) {
       i = cells ? cells[at] : at;
-      var vertex = vertexIndex[at] - 1;
+      vertex = vertexIndex[at] - 1;
       if (vertex < 0) continue;
       var fg = !!(hiSet && hiSet.has(i));
       var alpha = hiSet ? (fg ? 0.95 : 0.05) : opacity;
@@ -2681,7 +2763,8 @@
       vertexIndex: vertexIndex, vertexCells: cells, ordered: false,
       drawOrder: order ? (previous.drawOrder && previous.drawOrderOf === order
         ? previous.drawOrder : gpuDrawOrder(order, cells, vertexIndex, previous.count)) : null,
-      drawOrderOf: order || null};
+      drawOrderOf: order || null,
+      shownMask: shownMask, okRef: unit.ok};
     return p.gpuData;
   }
 
@@ -2936,7 +3019,9 @@
       foreground: foreground,
       ordered: !!order,
       drawOrder: gpuOrder && out ? gpuDrawOrder(gpuOrder, cells, vertexIndex, out) : null,
-      drawOrderOf: gpuOrder && out ? gpuOrder : null
+      drawOrderOf: gpuOrder && out ? gpuOrder : null,
+      shownMask: shownMask,
+      okRef: unit.ok
     };
     return p.gpuData;
   }
