@@ -537,19 +537,8 @@ void main() {
   outputColor.a *= coverage;
 }`;
 
-  function createWebGl(canvas) {
-    var initializationStarted = performance.now();
-    // The fragment shader already smooths each point's edge by its coverage;
-    // multisampling on top of it costs about 140 ms per million-point frame
-    // on an integrated GPU (Intel UHD 770) for no visible difference.
-    var gl = canvas.getContext('webgl2', {
-      alpha: true,
-      antialias: false,
-      premultipliedAlpha: true,
-      preserveDrawingBuffer: true
-    });
-    if (!gl) throw new Error('WebGL2 is unavailable.');
-
+  // The point program of a WebGL2 context and its uniforms' locations.
+  function webGlProgram(gl) {
     function compile(type, source) {
       var shader = gl.createShader(type);
       gl.shaderSource(shader, source);
@@ -575,17 +564,108 @@ void main() {
       gl.deleteProgram(program);
       throw new Error(linkMessage);
     }
-
-    var locations = {
-      view: gl.getUniformLocation(program, 'view'),
-      rect: gl.getUniformLocation(program, 'rect'),
-      canvasSize: gl.getUniformLocation(program, 'canvasSize'),
-      pointSize: gl.getUniformLocation(program, 'pointSize'),
-      borderWidth: gl.getUniformLocation(program, 'borderWidth'),
-      borderColor: gl.getUniformLocation(program, 'borderColor'),
-      pixelRatio: gl.getUniformLocation(program, 'pixelRatio'),
-      passValue: gl.getUniformLocation(program, 'passValue')
+    return {
+      program: program,
+      locations: {
+        view: gl.getUniformLocation(program, 'view'),
+        rect: gl.getUniformLocation(program, 'rect'),
+        canvasSize: gl.getUniformLocation(program, 'canvasSize'),
+        pointSize: gl.getUniformLocation(program, 'pointSize'),
+        borderWidth: gl.getUniformLocation(program, 'borderWidth'),
+        borderColor: gl.getUniformLocation(program, 'borderColor'),
+        pixelRatio: gl.getUniformLocation(program, 'pixelRatio'),
+        passValue: gl.getUniformLocation(program, 'passValue')
+      }
     };
+  }
+
+  // A draw's inputs as plain numbers: an unchanged frame is not drawn again.
+  // Callers may mutate their view/rect objects in place, hence the copy.
+  function webGlFrame(options, width, height, pixelRatio, canvas) {
+    var view = options.view || { cx: 0.5, cy: 0.5, span: 1 };
+    var rect = options.rect || { x: 0, y: 0, width: width, height: height };
+    var border = options.border || null;
+    var borderValue = border && border.color ? border.color : [0, 0, 0, 0];
+    return [
+      Number(view.cx), Number(view.cy), Math.max(1e-9, Number(view.span)),
+      Number(rect.x), Number(rect.y), Number(rect.width), Number(rect.height),
+      Math.max(0, Number(options.pointSize) || 0),
+      border ? Math.max(0, Number(border.width) || 0) : 0,
+      borderValue[0], borderValue[1], borderValue[2], borderValue[3],
+      width, height, pixelRatio, canvas.width, canvas.height
+    ];
+  }
+  function sameFrame(a, b) {
+    return !!a && a.every(function (value, i) { return value === b[i]; });
+  }
+
+  // Sets the blending and uniforms of `frame` and draws the bound points.
+  function drawWebGlPoints(gl, locations, frame, count, foreground, width, height, pixelRatio) {
+    gl.enable(gl.BLEND);
+    gl.blendFuncSeparate(
+      gl.SRC_ALPHA,
+      gl.ONE_MINUS_SRC_ALPHA,
+      gl.ONE,
+      gl.ONE_MINUS_SRC_ALPHA
+    );
+    gl.uniform3f(locations.view, frame[0], frame[1], frame[2]);
+    gl.uniform4f(locations.rect, frame[3], frame[4], frame[5], frame[6]);
+    gl.uniform2f(locations.canvasSize, width, height);
+    gl.uniform1f(locations.pointSize, frame[7]);
+    gl.uniform1f(locations.borderWidth, frame[8]);
+    gl.uniform4f(locations.borderColor,
+      frame[9] / 255, frame[10] / 255, frame[11] / 255, frame[12] / 255);
+    gl.uniform1f(locations.pixelRatio, pixelRatio);
+    if (!count || !frame[7]) return;
+    var passes = foreground ? [0, 1] : [-1];
+    passes.forEach(function (passValue) {
+      gl.uniform1f(locations.passValue, passValue);
+      gl.drawArrays(gl.POINTS, 0, count);
+    });
+  }
+
+  // Points one attribute of the bound vertex array at `buffer`, filled with
+  // `array`. `uploaded` holds each attribute's bytes: an array of the same
+  // size is written into the existing store instead of reallocating it.
+  function uploadWebGlAttribute(gl, uploaded, buffer, location, array, integer) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    if (uploaded[location] === array.byteLength) {
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, array);
+    } else {
+      gl.bufferData(gl.ARRAY_BUFFER, array, gl.STATIC_DRAW);
+      uploaded[location] = array.byteLength;
+    }
+    gl.enableVertexAttribArray(location);
+    if (integer) {
+      gl.vertexAttribIPointer(location, 1, gl.UNSIGNED_INT, 0, 0);
+    } else {
+      gl.vertexAttribPointer(
+        location,
+        location === 0 ? 2 : 4,
+        location === 1 ? gl.UNSIGNED_BYTE : gl.FLOAT,
+        location === 1,
+        0,
+        0
+      );
+    }
+  }
+
+  function createWebGl(canvas) {
+    var initializationStarted = performance.now();
+    // The fragment shader already smooths each point's edge by its coverage;
+    // multisampling on top of it costs about 140 ms per million-point frame
+    // on an integrated GPU (Intel UHD 770) for no visible difference.
+    var gl = canvas.getContext('webgl2', {
+      alpha: true,
+      antialias: false,
+      premultipliedAlpha: true,
+      preserveDrawingBuffer: true
+    });
+    if (!gl) throw new Error('WebGL2 is unavailable.');
+
+    var built = webGlProgram(gl);
+    var program = built.program;
+    var locations = built.locations;
     var positionBuffer = gl.createBuffer();
     var colorBuffer = gl.createBuffer();
     var layerBuffer = gl.createBuffer();
@@ -646,30 +726,9 @@ void main() {
       gl.viewport(0, 0, canvas.width, canvas.height);
     }
 
-    // Bytes held by each attribute's buffer: an array of the same size is
-    // written into the existing store instead of reallocating it.
     var uploadedBytes = [-1, -1, -1];
     function upload(buffer, location, array, integer) {
-      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-      if (uploadedBytes[location] === array.byteLength) {
-        gl.bufferSubData(gl.ARRAY_BUFFER, 0, array);
-      } else {
-        gl.bufferData(gl.ARRAY_BUFFER, array, gl.STATIC_DRAW);
-        uploadedBytes[location] = array.byteLength;
-      }
-      gl.enableVertexAttribArray(location);
-      if (integer) {
-        gl.vertexAttribIPointer(location, 1, gl.UNSIGNED_INT, 0, 0);
-      } else {
-        gl.vertexAttribPointer(
-          location,
-          location === 0 ? 2 : 4,
-          location === 1 ? gl.UNSIGNED_BYTE : gl.FLOAT,
-          location === 1,
-          0,
-          0
-        );
-      }
+      uploadWebGlAttribute(gl, uploadedBytes, buffer, location, array, integer);
     }
 
     function setData(next) {
@@ -695,31 +754,13 @@ void main() {
       metrics.uploadSubmitMs = performance.now() - started;
     }
 
-    function drawPass(passValue) {
-      gl.uniform1f(locations.passValue, passValue);
-      gl.drawArrays(gl.POINTS, 0, data.count);
-    }
-
     function draw(options) {
       if (!ready || !data) return false;
-      options = options || {};
       var started = performance.now();
-      var view = options.view || { cx: 0.5, cy: 0.5, span: 1 };
-      var rect = options.rect || { x: 0, y: 0, width: width, height: height };
-      var border = options.border || null;
-      var borderValue = border && border.color ? border.color : [0, 0, 0, 0];
       // Hover and drag outlines live on the separate 2-D overlay. WebGL keeps
       // its drawing buffer, so an unchanged point layer can remain on screen.
-      // Copy scalar values: callers may mutate their view/rect objects in place.
-      var frame = [
-        Number(view.cx), Number(view.cy), Math.max(1e-9, Number(view.span)),
-        Number(rect.x), Number(rect.y), Number(rect.width), Number(rect.height),
-        Math.max(0, Number(options.pointSize) || 0),
-        border ? Math.max(0, Number(border.width) || 0) : 0,
-        borderValue[0], borderValue[1], borderValue[2], borderValue[3],
-        width, height, pixelRatio, canvas.width, canvas.height
-      ];
-      if (lastFrame && frame.every(function (value, i) { return value === lastFrame[i]; })) {
+      var frame = webGlFrame(options || {}, width, height, pixelRatio, canvas);
+      if (sameFrame(lastFrame, frame)) {
         if (gl.getError() !== gl.NO_ERROR) { lastFrame = null; return false; }
         metrics.drawSubmitMs = 0;
         return true;
@@ -729,29 +770,8 @@ void main() {
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
-      gl.enable(gl.BLEND);
-      gl.blendFuncSeparate(
-        gl.SRC_ALPHA,
-        gl.ONE_MINUS_SRC_ALPHA,
-        gl.ONE,
-        gl.ONE_MINUS_SRC_ALPHA
-      );
-      gl.uniform3f(locations.view, frame[0], frame[1], frame[2]);
-      gl.uniform4f(locations.rect, frame[3], frame[4], frame[5], frame[6]);
-      gl.uniform2f(locations.canvasSize, width, height);
-      gl.uniform1f(locations.pointSize, frame[7]);
-      gl.uniform1f(locations.borderWidth, frame[8]);
-      gl.uniform4f(locations.borderColor,
-        frame[9] / 255, frame[10] / 255, frame[11] / 255, frame[12] / 255);
-      gl.uniform1f(locations.pixelRatio, pixelRatio);
-      if (data.count && Number(options.pointSize)) {
-        if (data.foreground) {
-          drawPass(0);
-          drawPass(1);
-        } else {
-          drawPass(-1);
-        }
-      }
+      drawWebGlPoints(gl, locations, frame, data.count, data.foreground,
+        width, height, pixelRatio);
       gl.flush();
       metrics.drawSubmitMs = performance.now() - started;
       var succeeded = gl.getError() === gl.NO_ERROR;
@@ -789,13 +809,227 @@ void main() {
     };
   }
 
+  // ---- one WebGL2 context for every panel -------------------------------------
+  // A page keeps about 16 WebGL contexts and drops the oldest of any more, so
+  // one context per panel cannot serve a grid of 59 sections, and making and
+  // dropping contexts as panels scroll by costs about 11 ms a panel (context,
+  // shaders) plus rebuilding its data. Here every panel shares one hidden
+  // context, as WebGPU's panels share one device: the program is compiled
+  // once, each panel keeps its own buffers in the context, and a panel is
+  // drawn into the corner of the shared canvas and copied into its own canvas
+  // (2-D). That canvas keeps the picture while the panel scrolls away and back.
+  var sharedWebGlState = null;
+  function sharedWebGl() {
+    if (sharedWebGlState) return sharedWebGlState;
+    var doc = global.document;
+    if (!doc || !doc.createElement) throw new Error('WebGL2 is unavailable.');
+    var canvas = doc.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    // The drawing buffer is copied out right after each draw, in the same
+    // task, so it need not be kept for the compositor.
+    var gl = canvas.getContext('webgl2', {
+      alpha: true,
+      antialias: false,
+      premultipliedAlpha: true,
+      preserveDrawingBuffer: false
+    });
+    if (!gl) throw new Error('WebGL2 is unavailable.');
+    var built = webGlProgram(gl);
+    var state = {
+      gl: gl, canvas: canvas, program: built.program, locations: built.locations,
+      renderers: [], adapter: gl.getParameter(gl.RENDERER) || ''
+    };
+    canvas.addEventListener('webglcontextlost', function (event) {
+      event.preventDefault();
+      // Every panel's buffers went with the context: each renderer fails, and
+      // the next one asked for makes a new context.
+      if (sharedWebGlState === state) sharedWebGlState = null;
+      state.renderers.slice().forEach(function (renderer) {
+        renderer.lose('WebGL2 context lost.');
+      });
+      state.renderers = [];
+    });
+    sharedWebGlState = state;
+    return state;
+  }
+
+  function createSharedWebGl(canvas) {
+    var initializationStarted = performance.now();
+    var shared = sharedWebGl();
+    var gl = shared.gl;
+    var target = canvas.getContext('2d');
+    if (!target) throw new Error('A 2-D canvas is unavailable.');
+    var vertexArray = gl.createVertexArray();
+    var positionBuffer = gl.createBuffer();
+    var colorBuffer = gl.createBuffer();
+    var layerBuffer = gl.createBuffer();
+    var uploadedBytes = [-1, -1, -1];
+    var data = null;
+    var width = 1;
+    var height = 1;
+    var pixelRatio = 1;
+    var ready = true;
+    var contextLost = false;
+    var released = false;
+    var gpuError = '';
+    var metrics = {
+      backend: 'webgl2', shared: true, ready: true, pointCount: 0, positionUploads: 0,
+      initializationMs: performance.now() - initializationStarted
+    };
+    var lastFrame = null;
+    var resolveFailure;
+    var failed = new Promise(function (resolve) { resolveFailure = resolve; });
+
+    function fail(error) {
+      if (!ready && gpuError) return;
+      lastFrame = null;
+      gpuError = error && error.message ? error.message : String(error || 'WebGL2 failed.');
+      ready = false;
+      metrics.ready = false;
+      resolveFailure(gpuError);
+    }
+    var handle = {
+      lose: function (message) {
+        contextLost = true;
+        if (!released) fail(message);
+      }
+    };
+    shared.renderers.push(handle);
+
+    // Gives the panel's buffers back; the shared context stays.
+    function release() {
+      if (released) return;
+      released = true;
+      ready = false;
+      lastFrame = null;
+      var at = shared.renderers.indexOf(handle);
+      if (at >= 0) shared.renderers.splice(at, 1);
+      if (contextLost || gl.isContextLost()) return;
+      gl.deleteBuffer(positionBuffer);
+      gl.deleteBuffer(colorBuffer);
+      gl.deleteBuffer(layerBuffer);
+      gl.deleteVertexArray(vertexArray);
+    }
+
+    function resize(cssWidth, cssHeight, dpr) {
+      lastFrame = null;
+      width = Math.max(1, Number(cssWidth) || 1);
+      height = Math.max(1, Number(cssHeight) || 1);
+      pixelRatio = Math.max(1, Number(dpr) || 1);
+      canvas.width = Math.max(1, Math.round(width * pixelRatio));
+      canvas.height = Math.max(1, Math.round(height * pixelRatio));
+      canvas.style.width = width + 'px';
+      canvas.style.height = height + 'px';
+    }
+
+    function setData(next) {
+      if (!ready) throw new Error('WebGL2 renderer is not ready.');
+      next = checkData(next, 'WebGL2');
+      if (next.drawOrder) throw new Error('WebGL2 draws points in buffer order only.');
+      if (sameData(data, next)) return;
+      lastFrame = null;
+      var started = performance.now();
+      gl.bindVertexArray(vertexArray);
+      if (!data || data.positions !== next.positions) {
+        uploadWebGlAttribute(gl, uploadedBytes, positionBuffer, 0, next.positions, false);
+        metrics.positionUploads++;
+      }
+      if (!data || data.colors !== next.colors) {
+        uploadWebGlAttribute(gl, uploadedBytes, colorBuffer, 1, next.colors, false);
+      }
+      if (!data || data.layers !== next.layers) {
+        uploadWebGlAttribute(gl, uploadedBytes, layerBuffer, 2, next.layers, true);
+      }
+      gl.bindVertexArray(null);
+      data = next;
+      metrics.pointCount = next.count;
+      metrics.uploadSubmitMs = performance.now() - started;
+    }
+
+    function draw(options) {
+      if (!ready || !data) return false;
+      var started = performance.now();
+      // The panel's canvas still shows an unchanged frame.
+      var frame = webGlFrame(options || {}, width, height, pixelRatio, canvas);
+      if (sameFrame(lastFrame, frame)) {
+        metrics.drawSubmitMs = 0;
+        return true;
+      }
+      lastFrame = null;
+      var source = shared.canvas, w = canvas.width, h = canvas.height;
+      // The shared canvas only grows: resizing it reallocates its buffer.
+      if (source.width < w || source.height < h) {
+        source.width = Math.max(source.width, w);
+        source.height = Math.max(source.height, h);
+      }
+      gl.useProgram(shared.program);
+      gl.bindVertexArray(vertexArray);
+      // The panel is drawn in the bottom-left corner of the shared canvas,
+      // which is the top-left w x h of its picture counted from its bottom.
+      gl.viewport(0, 0, w, h);
+      gl.enable(gl.SCISSOR_TEST);
+      gl.scissor(0, 0, w, h);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      drawWebGlPoints(gl, shared.locations, frame, data.count, data.foreground,
+        width, height, pixelRatio);
+      gl.disable(gl.SCISSOR_TEST);
+      gl.bindVertexArray(null);
+      if (gl.isContextLost()) return false;
+      target.save();
+      target.setTransform(1, 0, 0, 1, 0, 0);
+      target.globalAlpha = 1;
+      target.globalCompositeOperation = 'copy';
+      target.drawImage(source, 0, source.height - h, w, h, 0, 0, w, h);
+      target.restore();
+      metrics.drawSubmitMs = performance.now() - started;
+      lastFrame = frame;
+      return true;
+    }
+
+    function clear() {
+      lastFrame = null;
+      target.save();
+      target.setTransform(1, 0, 0, 1, 0, 0);
+      target.clearRect(0, 0, canvas.width, canvas.height);
+      target.restore();
+    }
+
+    resize(canvas.clientWidth || 1, canvas.clientHeight || 1,
+      global.devicePixelRatio || 1);
+    return {
+      ready: Promise.resolve(),
+      failed: failed,
+      isReady: function () { return ready; },
+      drawsInOrder: function () { return false; },
+      release: release,
+      resize: resize,
+      setData: setData,
+      draw: draw,
+      clear: clear,
+      idle: function () { return Promise.resolve(); },
+      stats: function () {
+        return Object.assign({}, metrics, {
+          contextLost: contextLost,
+          error: gpuError,
+          adapter: shared.adapter
+        });
+      }
+    };
+  }
+
   function create(canvas) {
     if (navigator.gpu) return createWebGpu(canvas);
     return createWebGl(canvas);
   }
 
   if (navigator.gpu) prepare().catch(function () {});
-  global.CerebroPointRenderer = { create: create, createWebGl: createWebGl };
+  global.CerebroPointRenderer = {
+    create: create,
+    createWebGl: createWebGl,
+    createSharedWebGl: createSharedWebGl
+  };
 
   // ---- panels a page without a GPU may show ---------------------------------
   // A browser with no GPU behind WebGPU or WebGL (software rendering, or only

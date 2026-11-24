@@ -1458,8 +1458,9 @@
         typeof p.pane.getBoundingClientRect !== 'function') return false;
     var r = p.pane.getBoundingClientRect(), h = window.innerHeight || 0;
     if (!(r.width > 0) || !(h > 0)) return false;
-    // A grid on WebGL2 has about 14 contexts to share: a smaller margin.
-    var margin = webglPool ? 0.15 * h : h;
+    // A grid on WebGL2 with a context per panel has about 14 to share: a
+    // smaller margin. The shared renderer has no such limit.
+    var margin = webglPool && !sharedWebGlRenderer() ? 0.15 * h : h;
     return r.bottom < -margin || r.top > h + margin;
   }
   var stageFrame = 0;
@@ -2307,7 +2308,13 @@
   // sent its panel to Canvas2D for good. A panel takes a context when it is
   // on stage and gives it up when it is not (or has it taken for a panel that
   // is), a lost one is made again.
+  // With the shared renderer (createSharedWebGl()) every panel draws through
+  // one context: no panel waits for one or gives its up, so the limit does
+  // not apply and a panel keeps its buffers.
   var WEBGL_CONTEXT_LIMIT = 15, webglPool = false;
+  function sharedWebGlRenderer() {
+    return !!(window.CerebroPointRenderer && window.CerebroPointRenderer.createSharedWebGl);
+  }
   // How far a panel is from the window, in pixels (0 in it; far when it has no
   // place, as one off an enlarged view's strip).
   function windowDistance(p) {
@@ -2338,7 +2345,9 @@
   function acquireWebGl(p) {
     if (p.gpu || !p.gpuCanvas || !window.CerebroPointRenderer ||
         !window.CerebroPointRenderer.createWebGl) return !!p.gpu;
-    var holders = panels.filter(function (q) { return q !== p && q.gpuPool && q.gpu; });
+    var shared = sharedWebGlRenderer();
+    var holders = shared ? [] :
+      panels.filter(function (q) { return q !== p && q.gpuPool && q.gpu; });
     if (holders.length >= WEBGL_CONTEXT_LIMIT) {
       // The panel holding one that is farthest from the window gives it up, if
       // it is farther than this one.
@@ -2357,7 +2366,8 @@
     }
     try {
       p.gpuCanvas = canvas;
-      p.gpu = window.CerebroPointRenderer.createWebGl(canvas);
+      p.gpu = shared ? window.CerebroPointRenderer.createSharedWebGl(canvas) :
+        window.CerebroPointRenderer.createWebGl(canvas);
       canvas._cerebroPointRenderer = p.gpu;
       p.gpu.resize(p.W || canvas.clientWidth || 1, p.H || canvas.clientHeight || 1,
         window.devicePixelRatio || 1);
