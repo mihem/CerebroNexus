@@ -15,6 +15,15 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
+## The screenshot appears on the website only: it is left out of the package
+## (see .Rbuildignore), and pkgdown sets IN_PKGDOWN. Its chunk sets fig.class,
+## because pkgdown inverts images of the class r-plt in dark mode.
+website_figure <- function(file) {
+  path <- file.path("..", "man", "figures", file)
+  if (identical(Sys.getenv("IN_PKGDOWN"), "true") && file.exists(path)) {
+    knitr::include_graphics(path)
+  }
+}
 ```
 
 # Overview
@@ -161,11 +170,13 @@ See [Trajectory analysis](https://www.mheming.com/CerebroNexus/articles/trajecto
 Finally, we use CerebroNexus `exportFromSeurat()` to export our Seurat object to a `.crb` file which can be loaded into CerebroNexus.
 
 ```{r export_data, eval=FALSE}
+crb_file <- paste0('cerebro_pbmc_seurat_', Sys.Date(), '.crb')
+
 exportFromSeurat(
   seurat,
   assay = 'RNA',
   slot = 'data',
-  file = paste0('cerebro_pbmc_seurat_', Sys.Date(), '.crb'),
+  file = crb_file,
   experiment_name = 'pbmc',
   organism = 'hg',
   groups = c('seurat_clusters','groups'),
@@ -181,8 +192,22 @@ By default the expression matrix is embedded in the `.crb`. For large data sets,
 
 # Open the result
 
-Open the file in the CerebroNexus user interface with `launchCerebro()`.
-Tables can be downloaded in CSV or Excel format.
+Open the file in the Viewer:
+
+```{r launch, eval=FALSE}
+launchCerebro(crb_file_to_load = crb_file)
+```
+
+The pages **Marker genes**, **Most expressed genes** and **Enriched pathways**
+show the tables computed above:
+
+```{r viewer-marker-genes, echo = FALSE, out.width = "100%", fig.class = "img-fluid", fig.cap = "The Marker genes page for the exported example. The numbers link the code above to what the page shows.", fig.alt = "The Marker genes page of the Viewer, annotated. 1: the Method field shows cerebro_seurat, the name given to getMarkerGenes(). 2: the Grouping variable field shows seurat_clusters, one of the groups given to getMarkerGenes(). 3: the subgroup filter shows cluster 1. 4: the table columns seurat_clusters, gene, p_val, avg_log2FC, pct.1, pct.2 and p_val_adj come from Seurat::FindAllMarkers(); the first rows are S100A8, TYMP, S100A9, LYZ and CST3. 5: the sidebar pages Marker genes, Most expressed genes and Enriched pathways, which appear once getMarkerGenes(), getMostExpressedGenes(), getEnrichedPathways() or performGeneSetEnrichmentAnalysis() have stored their tables."}
+website_figure("viewer-marker-genes.png")
+```
+
+With this small example, `performGeneSetEnrichmentAnalysis()` finds no gene set
+that meets its thresholds, and the Enriched pathways page says so for that
+method. Tables can be downloaded in CSV or Excel format.
 
 For a direct image export, click **Download PNG** in the plot toolbar. If the current view supports portable sharing, you can instead open **Share view** and click **Download PNG** there. The Share view dialog also lets you download or open a portable JSON configuration containing the current display state and selected cell barcodes, so the same view can be restored in another compatible CerebroNexus session without including the source data.
 
