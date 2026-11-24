@@ -1,6 +1,5 @@
 ---
 title: "Large-dataset benchmarks: expression, storage and Viewer"
-author: "Xuesong Wang"
 output:
   html_document:
     toc: true

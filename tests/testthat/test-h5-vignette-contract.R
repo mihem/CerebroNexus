@@ -26,7 +26,7 @@ test_that("legacy H5 guidance persists a portable backend descriptor", {
     "..",
     "vignettes",
     "articles",
-    "create_expression_matrix_in_h5_format.Rmd"
+    "million_cell_crb_artifacts.Rmd"
   )
   skip_if_not(
     file.exists(vignette_path),

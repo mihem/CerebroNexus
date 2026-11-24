@@ -1,6 +1,5 @@
 ---
 title: "HLA & TCR Motifs: from synthetic data to an interactive app"
-author: "Xuesong Wang"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:
@@ -35,7 +34,7 @@ This guide takes you all the way from *nothing* to *a running app on that page*:
 You will build the data set step by step, and after each step we print the object you just made so you can see exactly what changed.
 Every code block runs on its own — the only packages you need are base R plus `Matrix`, `Seurat`, and `CerebroNexus`, and nothing is downloaded.
 
-If your data is **bulk** TCR sequencing rather than single cells, read the companion guide *"HLA Associations on bulk TCRβ with real donor HLA"* instead; it uses real genotypes and a slightly different object.
+If your data is **bulk** TCR sequencing rather than single cells, read the companion guide [HLA Associations on bulk TCRβ with real donor HLA](hla_bulk_tcr_associations.html) instead; it uses real genotypes and a slightly different object.
 
 ## The two ideas the page is built on
 
@@ -624,9 +623,10 @@ Cells from one donor share that genotype, so they are not independent observatio
 
 # See also
 
-- **Introduction to the CerebroNexus workflow (Seurat)** — the general Seurat → `.crb` export basics, if this is your first CerebroNexus export; the HLA slots above just ride along with it.
-- **HLA Associations on bulk TCRβ with real donor HLA** — the companion workflow for bulk immunosequencing: real genotypes, no single cells, and the positive-control caveat that comes with them.
-- **Immune Repertoire Analysis in CerebroNexus** — the scRepertoire-based module that produces the same `@misc$immune_repertoire` slot from real 10x data.
+- [Prepare and export a Seurat object in R](cerebronexus_workflow_seurat.html) — the general Seurat → `.crb` export basics, if this is your first CerebroNexus export; the HLA slots above just ride along with it.
+- [HLA Associations on bulk TCRβ with real donor HLA](hla_bulk_tcr_associations.html) — the companion workflow for bulk immunosequencing: real genotypes, no single cells, and the positive-control caveat that comes with them.
+- [A real antigen-selected single-cell TCR demo, end to end](hla_tcr_antigen_selected.html) — how the shipped `demo_hla_tcr_dextramer.crb` is built from public 10x data: real cells, real paired TCRs and real donor HLA.
+- [Immune Repertoire Analysis in CerebroNexus](immune_repertoire_analysis.html) — the scRepertoire-based module that produces the same `@misc$immune_repertoire` slot from real 10x data.
 - `?exportFromSeurat`, `?createShinyApp`, and `?Cerebro` (see `addHLATyping` / `getHLATyping`).
 
 # Getting help
