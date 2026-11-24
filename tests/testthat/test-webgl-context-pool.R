@@ -64,3 +64,11 @@ test_that("in Chrome the WebGL2 contexts of 60 panels coming and going stay with
   expect_identical(held$ready, 15L)
   expect_identical(held$lost, 0L)
 })
+
+test_that("a WebGL2 panel out of the window waits for its context instead of drawing on Canvas", {
+  expect_node_fixture(
+    "webgl-waiting-panels.js",
+    viewer_test_path("www", "cell_views.js"),
+    pass = "PASS a panel out of the window waits"
+  )
+})

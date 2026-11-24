@@ -2220,8 +2220,15 @@
     return Object.keys(a).every(function (key) { return a[key] === b[key]; });
   }
 
+  // A panel of a grid on WebGL2 that has no context yet and is not in the
+  // window (the page had none to spare for it) waits for one: it is neither
+  // projected for Canvas (two arrays of every cell of the data set, and a pass
+  // over them, for each of 44 panels on the Allen atlas) nor drawn on it.
+  function waitsForGpu(p) {
+    return !p.gpu && !!p.gpuPool && windowDistance(p) > 0;
+  }
   function gpuCandidate(p) {
-    if (!gpuAcceleration || !p.gpu || !D || D.n < GPU_MIN_CELLS) return false;
+    if (!gpuAcceleration || (!p.gpu && !waitsForGpu(p)) || !D || D.n < GPU_MIN_CELLS) return false;
     var space = spaceById[p.spaceId], unit = space && space._unit;
     // Images, hulls and trajectories live on the CPU underlay; axes, labels and
     // interaction marks live on the CPU overlay. Only features that change the
@@ -2229,7 +2236,7 @@
     return !!(space && unit && !unit.nz && !space.pointSizes);
   }
   function gpuEligible(p) {
-    return gpuCandidate(p) && p.gpu.isReady();
+    return gpuCandidate(p) && !!p.gpu && p.gpu.isReady();
   }
 
   function hideGpu(p) {
@@ -2241,6 +2248,7 @@
   function disableGpu(p) {
     hideGpu(p);
     p.gpu = null;
+    p.gpuPool = false;
     p.gpuTransformOnly = false;
     p.gpuData = null;
     p.gpuDataState = null;
@@ -2357,7 +2365,9 @@
       watchGpu(p, p.gpu);
       return true;
     } catch (error) {
+      // WebGL2 cannot be made for this panel: it is drawn on Canvas.
       p.gpu = null;
+      p.gpuPool = false;
       return false;
     }
   }
@@ -3196,7 +3206,11 @@
     // they are created as their first member is met, and object keys keep
     // insertion order, so filling them low-to-high paints them low-to-high.
     var pointsDrawn = cachedBase || drawGpuPoints(p, shownMask, shownCount, border);
-    if (!pointsDrawn && p.gpuTransformOnly) return;
+    if (!pointsDrawn && p.gpuTransformOnly) {
+      // Waiting for a context: asked again when the panel is drawn next.
+      if (!p.gpu && p.gpuPool) p._resizedUndrawn = true;
+      return;
+    }
     if (!pointsDrawn) ensureScreenProjection(p);
     var ord = pointsDrawn ? null : paintOrder(p);
     // Colour buckets reorder interleaved cells. Preserve input order for
