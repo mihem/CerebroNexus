@@ -1219,7 +1219,6 @@
       p.sx = null; p.sy = null; p.gpuTransformOnly = false;
       return;
     }
-    if (!forceCpu) wakeGpu(p);
     if (!sp._unit) sp._unit = deferredUnitOf(sp) || unitOf(sp);
     var u = sp._unit, n = D.n;
     // Axis'd spaces (the clone panel) reserve room on the left for the y-label
@@ -1348,8 +1347,8 @@
   }
 
   function ensureScreenProjection(p) {
-    // Also a panel whose GPU renderer was given up (releaseGpu()) after it was
-    // projected for the GPU alone: it has no screen positions yet.
+    // Also a panel whose GPU renderer went away after it was projected for the
+    // GPU alone: it has no screen positions yet.
     if (p.gpuTransformOnly || !p.sx) project(p, true);
   }
 
@@ -1451,17 +1450,39 @@
   // page scrolls). Opening the 59 sections of the Allen atlas then draws the
   // dozen the window shows. Without a layout (hidden tab, no geometry) every
   // panel counts as on stage.
-  var OFFSTAGE_MIN_PANELS = 8, stagePanels = 0;
+  var OFFSTAGE_MIN_PANELS = 8, stagePanels = 0, stageObserver = null;
+  function observeStagePanels(list) {
+    if (typeof window.IntersectionObserver !== 'function') return false;
+    if (!stageObserver) {
+      stageObserver = new window.IntersectionObserver(function (entries) {
+        var wake = false;
+        entries.forEach(function (entry) {
+          var p = entry.target && entry.target._cvStagePanel;
+          if (!p) return;
+          p._stageNear = !!entry.isIntersecting;
+          if (p._stageNear && p.spaceId && (p._pendingSize || p._resizedUndrawn)) {
+            wake = true;
+          }
+        });
+        if (wake) onStageScroll();
+      }, { root: null, rootMargin: '100% 0px' });
+    }
+    list.forEach(function (p) {
+      if (!p.pane || p._stageObserved) return;
+      p.pane._cvStagePanel = p;
+      p._stageObserved = true;
+      stageObserver.observe(p.pane);
+    });
+    return true;
+  }
   function offStage(p) {
     if (offStrip(p)) return true;
     if (focusPanel || stagePanels < OFFSTAGE_MIN_PANELS || !p.pane ||
         typeof p.pane.getBoundingClientRect !== 'function') return false;
+    if (stageObserver && typeof p._stageNear === 'boolean') return !p._stageNear;
     var r = p.pane.getBoundingClientRect(), h = window.innerHeight || 0;
     if (!(r.width > 0) || !(h > 0)) return false;
-    // A grid on WebGL2 with a context per panel has about 14 to share: a
-    // smaller margin. The shared renderer has no such limit.
-    var margin = webglPool && !sharedWebGlRenderer() ? 0.15 * h : h;
-    return r.bottom < -margin || r.top > h + margin;
+    return r.bottom < -h || r.top > 2 * h;
   }
   var stageFrame = 0;
   function onStageScroll() {
@@ -1472,13 +1493,17 @@
     });
   }
   // A panel that was off stage, now near: sized as the layout meanwhile
-  // asked, then drawn.
+  // asked, then drawn without re-reading layout (avoids forced reflow).
   function drawOnStage(p) {
     if (p._pendingSize) {
       var size = p._pendingSize;
       resizePanel(p, size[0], size[1]);
     }
-    drawPanel(p);
+    if (drawAllDeferred || !p || !p.spaceId ||
+        (awaitingSupplement && awaitingSupplement === D)) return false;
+    var state = shownState(p);
+    draw(p, state.mask, state.count);
+    return true;
   }
   function drawNearPanels() {
     var waiting = panels.filter(function (p) {
@@ -1486,9 +1511,11 @@
     });
     if (!waiting.length) return;
     var off = waiting.map(offStage);
+    var drewAny = false;
     waiting.forEach(function (p, i) {
-      if (!off[i]) drawOnStage(p);
+      if (!off[i] && drawOnStage(p)) drewAny = true;
     });
+    if (drewAny) updateResetButtons();
   }
   function resizePanel(p, width, height) {
     var dpr = window.devicePixelRatio || 1;
@@ -2221,15 +2248,8 @@
     return Object.keys(a).every(function (key) { return a[key] === b[key]; });
   }
 
-  // A panel of a grid on WebGL2 that has no context yet and is not in the
-  // window (the page had none to spare for it) waits for one: it is neither
-  // projected for Canvas (two arrays of every cell of the data set, and a pass
-  // over them, for each of 44 panels on the Allen atlas) nor drawn on it.
-  function waitsForGpu(p) {
-    return !p.gpu && !!p.gpuPool && windowDistance(p) > 0;
-  }
   function gpuCandidate(p) {
-    if (!gpuAcceleration || (!p.gpu && !waitsForGpu(p)) || !D || D.n < GPU_MIN_CELLS) return false;
+    if (!gpuAcceleration || !p.gpu || !D || D.n < GPU_MIN_CELLS) return false;
     var space = spaceById[p.spaceId], unit = space && space._unit;
     // Images, hulls and trajectories live on the CPU underlay; axes, labels and
     // interaction marks live on the CPU overlay. Only features that change the
@@ -2237,7 +2257,7 @@
     return !!(space && unit && !unit.nz && !space.pointSizes);
   }
   function gpuEligible(p) {
-    return gpuCandidate(p) && !!p.gpu && p.gpu.isReady();
+    return gpuCandidate(p) && p.gpu.isReady();
   }
 
   function hideGpu(p) {
@@ -2249,26 +2269,27 @@
   function disableGpu(p) {
     hideGpu(p);
     p.gpu = null;
-    p.gpuPool = false;
     p.gpuTransformOnly = false;
     p.gpuData = null;
     p.gpuDataState = null;
     if (D && p.spaceId) project(p, true);
   }
 
-  function replaceGpuWithWebGl(p, renderer) {
-    if (!p.gpuCanvas || p.gpu !== renderer ||
-        !window.CerebroPointRenderer ||
-        !window.CerebroPointRenderer.createWebGl) return false;
+  // `again`: the renderer is a WebGL2 one whose shared context was lost; the
+  // next one made takes a new context.
+  function replaceGpuWithWebGl(p, renderer, again) {
+    var api = window.CerebroPointRenderer;
+    var make = api && (api.createSharedWebGl || api.createWebGl);
+    if (!p.gpuCanvas || p.gpu !== renderer || !make) return false;
     var stats = renderer.stats ? renderer.stats() : {};
-    if (stats.backend === 'webgl2') return false;
+    if (stats.backend === 'webgl2' && !again) return false;
     var previous = p.gpuCanvas;
     if (!previous.parentNode) return false;
     var canvas = createLayerCanvas(null, 'cv-gpu-layer');
     previous.parentNode.replaceChild(canvas, previous);
     try {
       p.gpuCanvas = canvas;
-      p.gpu = window.CerebroPointRenderer.createWebGl(canvas);
+      p.gpu = make(canvas);
       canvas._cerebroPointRenderer = p.gpu;
       p.gpu.resize(p.W || canvas.clientWidth || 1,
         p.H || canvas.clientHeight || 1, window.devicePixelRatio || 1);
@@ -2283,108 +2304,14 @@
   // Swaps the panel's failed renderer for WebGL2, or drops it to Canvas.
   // Returns whether a GPU renderer is still attached.
   function failOver(p) {
+    // A lost shared WebGL2 context fails every panel's renderer at once; each
+    // takes a new one, a few times, then drops to Canvas.
     var stats = p.gpu && p.gpu.stats ? p.gpu.stats() : {};
-    // A panel of a grid has WebGL2 when it is drawn and the page has a context
-    // to spare (acquireWebGl()); a lost context is made again, a few times.
-    if (stats.backend === 'webgpu' || p.gpuPool) {
-      if (stats.backend === 'webgl2' && ++p._webglLosses > 3) {
-        disableGpu(p);
-        return false;
-      }
-      releaseGpu(p);
-      p.gpuPool = true;
-      webglPool = true;
-      return false;
-    }
-    if (replaceGpuWithWebGl(p, p.gpu)) { watchGpu(p, p.gpu); return true; }
+    var lost = stats.backend === 'webgl2' && stats.shared &&
+      (p._webglLosses = (p._webglLosses || 0) + 1) <= 3;
+    if (replaceGpuWithWebGl(p, p.gpu, lost)) { watchGpu(p, p.gpu); return true; }
     disableGpu(p);
     return false;
-  }
-
-  // ---- WebGL2 contexts of the panels of a grid ------------------------------
-  // A page keeps about 16 WebGL contexts and drops the oldest of any more. With
-  // WebGPU every panel has its own canvas on it; without, one context per panel
-  // made a grid of more than 16 sections lose most of them, and a lost context
-  // sent its panel to Canvas2D for good. A panel takes a context when it is
-  // on stage and gives it up when it is not (or has it taken for a panel that
-  // is), a lost one is made again.
-  // With the shared renderer (createSharedWebGl()) every panel draws through
-  // one context: no panel waits for one or gives its up, so the limit does
-  // not apply and a panel keeps its buffers.
-  var WEBGL_CONTEXT_LIMIT = 15, webglPool = false;
-  function sharedWebGlRenderer() {
-    return !!(window.CerebroPointRenderer && window.CerebroPointRenderer.createSharedWebGl);
-  }
-  // How far a panel is from the window, in pixels (0 in it; far when it has no
-  // place, as one off an enlarged view's strip).
-  function windowDistance(p) {
-    if (offStrip(p) || !p.pane || typeof p.pane.getBoundingClientRect !== 'function') {
-      return Infinity;
-    }
-    var r = p.pane.getBoundingClientRect(), h = window.innerHeight || 0;
-    if (!(r.width > 0)) return Infinity;
-    return Math.max(0, r.top - h, -r.bottom);
-  }
-  function releaseGpu(p) {
-    var renderer = p.gpu;
-    if (!renderer) return;
-    p.gpu = null; p.gpuData = null; p.gpuDataState = null;
-    p.gpuTransformOnly = false;
-    try { if (renderer.release) renderer.release(); } catch (error) { /* gone */ }
-    var old = p.gpuCanvas;
-    if (old && old.parentNode) {
-      // A canvas whose context was lost cannot take another.
-      var canvas = createLayerCanvas(null, 'cv-gpu-layer');
-      old.parentNode.replaceChild(canvas, old);
-      p.gpuCanvas = canvas;
-    }
-    p._resizedUndrawn = true;
-  }
-  // A WebGL2 context for the panel, if the page has one to spare or a panel off
-  // stage holds one it can give up.
-  function acquireWebGl(p) {
-    if (p.gpu || !p.gpuCanvas || !window.CerebroPointRenderer ||
-        !window.CerebroPointRenderer.createWebGl) return !!p.gpu;
-    var shared = sharedWebGlRenderer();
-    var holders = shared ? [] :
-      panels.filter(function (q) { return q !== p && q.gpuPool && q.gpu; });
-    if (holders.length >= WEBGL_CONTEXT_LIMIT) {
-      // The panel holding one that is farthest from the window gives it up, if
-      // it is farther than this one.
-      var mine = windowDistance(p), victim = null, far = mine;
-      holders.forEach(function (q) {
-        var d = windowDistance(q);
-        if (d > far) { far = d; victim = q; }
-      });
-      if (!victim) return false;
-      releaseGpu(victim);
-    }
-    var old = p.gpuCanvas, canvas = old;
-    if (old.parentNode && old._cerebroPointRenderer) {
-      canvas = createLayerCanvas(null, 'cv-gpu-layer');
-      old.parentNode.replaceChild(canvas, old);
-    }
-    try {
-      p.gpuCanvas = canvas;
-      p.gpu = shared ? window.CerebroPointRenderer.createSharedWebGl(canvas) :
-        window.CerebroPointRenderer.createWebGl(canvas);
-      canvas._cerebroPointRenderer = p.gpu;
-      p.gpu.resize(p.W || canvas.clientWidth || 1, p.H || canvas.clientHeight || 1,
-        window.devicePixelRatio || 1);
-      p.gpuData = null; p.gpuDataState = null;
-      watchGpu(p, p.gpu);
-      return true;
-    } catch (error) {
-      // WebGL2 cannot be made for this panel: it is drawn on Canvas.
-      p.gpu = null;
-      p.gpuPool = false;
-      return false;
-    }
-  }
-  // Before a panel on stage is laid out or drawn: it has a context if it can.
-  function wakeGpu(p) {
-    if (p.gpu || !p.gpuPool || !gpuAcceleration || !D || D.n < GPU_MIN_CELLS) return;
-    acquireWebGl(p);
   }
 
   function watchGpu(p, renderer) {
@@ -2404,17 +2331,13 @@
     if (!window.CerebroPointRenderer || !window.CerebroPointRenderer.create) return;
     if (p.gpuCanvas) p.gpuCanvas.remove();
     var canvas = createLayerCanvas(p, 'cv-gpu-layer');
-    // No WebGPU: WebGL2 only, a context when the panel is drawn (see above).
-    if (!navigator.gpu && window.CerebroPointRenderer.createWebGl) {
-      p.gpuCanvas = canvas;
-      p.gpuPool = true;
-      p._webglLosses = 0;
-      webglPool = true;
-      return;
-    }
     try {
       p.gpuCanvas = canvas;
-      p.gpu = window.CerebroPointRenderer.create(canvas);
+      // Without WebGPU every panel draws through the page's one shared WebGL2
+      // context (its own canvas stays 2-D and keeps the picture).
+      var api = window.CerebroPointRenderer;
+      p.gpu = !navigator.gpu && api.createSharedWebGl
+        ? api.createSharedWebGl(canvas) : api.create(canvas);
       canvas._cerebroPointRenderer = p.gpu;
       if (p.W && p.H) p.gpu.resize(p.W, p.H, window.devicePixelRatio || 1);
       var renderer = p.gpu;
@@ -3154,12 +3077,6 @@
   }
   function draw(p, shownMask, shownCount) {
     p._resizedUndrawn = false;
-    // A panel that gave its WebGL2 context up takes one again and lays itself
-    // out for it.
-    if (p.gpuPool && !p.gpu) {
-      wakeGpu(p);
-      if (p.gpu && p.spaceId) project(p);
-    }
     markGridPending(p);
     var c = p.ctx; clearPanelLayers(p);
     if (needsUnderlay(p)) attachUnderlay(p);
@@ -3216,11 +3133,7 @@
     // they are created as their first member is met, and object keys keep
     // insertion order, so filling them low-to-high paints them low-to-high.
     var pointsDrawn = cachedBase || drawGpuPoints(p, shownMask, shownCount, border);
-    if (!pointsDrawn && p.gpuTransformOnly) {
-      // Waiting for a context: asked again when the panel is drawn next.
-      if (!p.gpu && p.gpuPool) p._resizedUndrawn = true;
-      return;
-    }
+    if (!pointsDrawn && p.gpuTransformOnly) return;
     if (!pointsDrawn) ensureScreenProjection(p);
     var ord = pointsDrawn ? null : paintOrder(p);
     // Colour buckets reorder interleaved cells. Preserve input order for
@@ -9437,7 +9350,8 @@
     var resized = false;
     stagePanels = k;
     var stageOff = vis.map(function (p) { return offStage(p); });
-    if (scrollHost && !scrollHost._cvStageWired && scrollHost.addEventListener) {
+    if (!observeStagePanels(vis) && scrollHost && !scrollHost._cvStageWired &&
+        scrollHost.addEventListener) {
       scrollHost._cvStageWired = true;
       scrollHost.addEventListener('scroll', onStageScroll, { passive: true });
     }

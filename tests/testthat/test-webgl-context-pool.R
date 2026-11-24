@@ -1,4 +1,4 @@
-test_that("without WebGPU a grid of many panels keeps within the page's WebGL contexts", {
+test_that("without WebGPU a renderer that failed is replaced by a shared WebGL2 one, a few times, then Canvas", {
   expect_node_fixture(
     "webgl-context-pool.js",
     viewer_test_path("www", "cell_points_gpu.js"),
@@ -148,10 +148,10 @@ test_that("in Chrome 60 panels draw through one shared WebGL2 context and keep t
   expect_identical(shared$ready, 59L)
 })
 
-test_that("a WebGL2 panel out of the window waits for its context instead of drawing on Canvas", {
+test_that("the stage observer tells the panels near the window from the far ones", {
   expect_node_fixture(
-    "webgl-waiting-panels.js",
+    "stage-observer.js",
     viewer_test_path("www", "cell_views.js"),
-    pass = "PASS a panel out of the window waits"
+    pass = "PASS the stage observer"
   )
 })

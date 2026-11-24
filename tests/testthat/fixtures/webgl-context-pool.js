@@ -1,7 +1,7 @@
-// WebGL2 without WebGPU: a grid of more than 16 panels never holds more than
-// the page's contexts. Part 1 runs the real renderer on a fake gl (release()
-// gives the context back and is not a failure); part 2 runs the panel pool
-// code of cell_views.js against 59 fake panels.
+// WebGL2 without WebGPU. Part 1 runs the real per-context renderer on a fake gl
+// (release() gives the context back and is not a failure); part 2 runs the
+// failover code of cell_views.js: a renderer that failed is replaced by a
+// shared WebGL2 one, a few times, then the panel drops to Canvas.
 const fs = require('fs'), assert = require('assert/strict'), vm = require('vm');
 const gpuSource = fs.readFileSync(process.argv[2], 'utf8');
 const viewSource = fs.readFileSync(process.argv[3], 'utf8');
@@ -47,63 +47,65 @@ const viewSource = fs.readFileSync(process.argv[3], 'utf8');
   });
 }
 
-// ---- part 2: the panels' contexts -------------------------------------------
+// ---- part 2: a failed renderer is replaced -------------------------------------
 function part2() {
-  const start = viewSource.indexOf('  // ---- WebGL2 contexts of the panels of a grid');
+  const start = viewSource.indexOf('  // `again`: the renderer is a WebGL2 one');
   const end = viewSource.indexOf('  function watchGpu(p, renderer)');
-  assert.ok(start > 0 && end > start, 'pool code found');
-  let active = 0, peak = 0, created = 0;
-  const makeRenderer = () => {
-    active++; created++; peak = Math.max(peak, active);
-    let live = true;
-    return {
-      stats: () => ({backend: 'webgl2'}),
-      resize() {}, isReady: () => live,
-      release() { if (live) { live = false; active--; } }
-    };
-  };
-  const panels = Array.from({length: 59}, (_, i) => ({
-    key: 'p' + i, gpuPool: true, gpu: null, W: 300, H: 250, gpuCanvas: {parentNode: {replaceChild(next) {}}, _cerebroPointRenderer: null},
-    pane: {rect: {top: i * 300, bottom: i * 300 + 290, width: 300}, getBoundingClientRect() { return this.rect; }}
-  }));
-  const context = {
-    panels, D: {n: 3938808}, GPU_MIN_CELLS: 1, gpuAcceleration: true,
-    window: {innerHeight: 1000, CerebroPointRenderer: {createWebGl: () => makeRenderer()}},
-    document: {}, console,
-    createLayerCanvas: () => ({parentNode: null, _cerebroPointRenderer: null}),
-    watchGpu() {}, offStrip: () => false, offStage: () => false, webglPool: true
-  };
-  // The pool code and the two helpers it calls, as one script.
-  vm.createContext(context);
-  vm.runInContext(viewSource.slice(start, end), context);
-  const scroll = top => panels.forEach((p, i) => {
-    p.pane.rect = {top: i * 300 - top, bottom: i * 300 + 290 - top, width: 300};
+  assert.ok(start > 0 && end > start, 'failover code found');
+  let made = 0;
+  const makeRenderer = shared => ({
+    id: ++made, stats: () => ({backend: 'webgl2', shared}), resize() {}
   });
-  const inView = () => panels.filter(p => p.pane.rect.bottom > 0 && p.pane.rect.top < 1000);
-  const wake = list => list.forEach(p => vm.runInContext('wakeGpu', context)(p));
+  const newPanel = gpu => ({
+    W: 300, H: 250, gpu, disabled: false,
+    gpuCanvas: {parentNode: {replaceChild() {}}, _cerebroPointRenderer: null}
+  });
+  const build = api => {
+    const context = {
+      window: {CerebroPointRenderer: api, devicePixelRatio: 1}, console,
+      createLayerCanvas: () => ({parentNode: {replaceChild() {}}, _cerebroPointRenderer: null}),
+      watchGpu() {}, disableGpu(p) { p.gpu = null; p.disabled = true; }
+    };
+    vm.createContext(context);
+    vm.runInContext(viewSource.slice(start, end), context);
+    return vm.runInContext('failOver', context);
+  };
+  const api = {createSharedWebGl: () => makeRenderer(true), createWebGl: () => makeRenderer(false)};
+  const failOver = build(api);
 
-  // Open: the panels in the window take contexts, in order.
-  wake(inView());
-  assert.equal(inView().filter(p => p.gpu).length, inView().length);
-  assert.ok(peak <= 15, 'contexts never pass the limit: ' + peak);
-  // Scroll to the end in steps: panels coming into the window get contexts, the
-  // farthest ones give theirs up.
-  for (let top = 0; top <= 59 * 300 - 1000; top += 400) {
-    scroll(top);
-    wake(inView());
-    assert.ok(active <= 15, 'at ' + top + ': ' + active);
-    assert.ok(inView().filter(p => p.gpu).length >= Math.min(15, inView().length),
-      'the panels in the window have contexts at ' + top);
+  // WebGPU fails: the panel takes a shared WebGL2 renderer.
+  let p = newPanel({stats: () => ({backend: 'webgpu'})});
+  assert.equal(failOver(p), true);
+  assert.deepEqual(p.gpu.stats(), {backend: 'webgl2', shared: true});
+  assert.equal(p.disabled, false);
+
+  // The shared context is lost: each panel takes a renderer on the new one, a
+  // few times, and then drops to Canvas.
+  p = newPanel(makeRenderer(true));
+  for (let loss = 1; loss <= 3; loss++) {
+    const before = p.gpu;
+    assert.equal(failOver(p), true, 'loss ' + loss + ' is recovered');
+    assert.notEqual(p.gpu, before, 'a new renderer after loss ' + loss);
   }
-  assert.ok(created > 15, 'contexts were made again as panels came and went');
-  // A window with more panels than contexts: the ones beyond have none, and
-  // none of the panels in it loses its own to a farther one.
-  scroll(0);
-  panels.forEach(p => { p.pane.rect = {top: 0, bottom: 200, width: 300}; });
-  panels.forEach(p => { if (p.gpu) vm.runInContext('releaseGpu', context)(p); });
-  assert.equal(active, 0);
-  wake(panels);
-  assert.equal(active, 15, 'the limit holds when every panel asks');
-  assert.equal(panels.filter(p => p.gpu).length, 15);
-  console.log('PASS the renderer releases its context without failing; 59 panels never hold more than 15 contexts while scrolling');
+  assert.equal(failOver(p), false, 'the fourth loss drops the panel to Canvas');
+  assert.equal(p.disabled, true);
+
+  // A per-context WebGL2 renderer that fails, with nothing to take its place
+  // but itself, drops to Canvas as before.
+  p = newPanel(makeRenderer(false));
+  assert.equal(failOver(p), false);
+  assert.equal(p.disabled, true);
+
+  // No WebGL2 renderer to make: Canvas.
+  const bare = build({});
+  p = newPanel({stats: () => ({backend: 'webgpu'})});
+  assert.equal(bare(p), false);
+  assert.equal(p.disabled, true);
+
+  // WebGL2 cannot be made for the panel: Canvas.
+  const broken = build({createSharedWebGl() { throw new Error('no context'); }});
+  p = newPanel({stats: () => ({backend: 'webgpu'})});
+  assert.equal(broken(p), false);
+  assert.equal(p.disabled, true);
+  console.log('PASS the renderer releases its context without failing; a panel whose renderer failed takes a shared WebGL2 one, a few times, then Canvas');
 }
