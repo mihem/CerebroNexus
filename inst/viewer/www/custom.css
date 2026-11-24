@@ -3991,7 +3991,11 @@ body .cerebro-ms-collapse.is-many.selectize-control.multi {
 body .cerebro-ms-collapse.selectize-control.multi .selectize-input {
   height: auto !important;
   min-height: var(--c-toolbar-control-height, 34px) !important;
-  padding-block: 5px !important;
+  /* As high as a single select (34px), and on the field's bottom edge: an
+     inline-block on the baseline left a gap under the box and lifted the
+     field and its label above the selects beside it. */
+  padding-block: 4px !important;
+  vertical-align: top;
   flex-wrap: nowrap !important;
   overflow: hidden !important;
   white-space: nowrap !important;
