@@ -64,8 +64,9 @@
   about 3 s instead of 31 s: the sections arrive in batches and draw as they
   come, their positions are read from the Viewer Pack, recolouring updates the
   panels in place (a gene few cells express sends those cells only), and a
-  panel keeps its maps over its own cells, so the browser holds 1.0 GB instead
-  of 1.7 to 2.5 GB. A grid of many sections shows a turning ring while it loads.
+  panel keeps its maps over its own cells, so a tab of its own with all 59
+  sections holds 0.75 GB of JavaScript heap instead of 1.9 to 2.1 GB. A grid
+  of many sections shows a turning ring while it loads.
   Without WebGPU (no adapter, Firefox, Safari) the panels take turns at the
   page's WebGL2 contexts, which Chrome limits to about 16: the panels near the
   window hold them, a lost one is made again, and a grid of 59 sections no
@@ -80,7 +81,8 @@
   and makes cell names only for the cells that need them, and draws its
   sections first: opened by its tab after loading, it is ready after about 1.6 s
   instead of 5 to 10 s on the Allen atlas (the Viewer builds its sections while
-  idle after loading), with 1.4 GB instead of 5.5 GB. With WebGPU the
+  idle after loading), and a tab of its own with all 59 sections holds 0.45 GB
+  of JavaScript heap instead of 5.2 GB. With WebGPU the
   GPU draws a gene's points through the paint order (1.2 s instead of 2.4 s on
   the first gene of Gene expression, 0.65 s instead of 1.05 s on the next), the order is found by a radix sort, Moran's I
   finds neighbours through buckets (1.6 ms a section instead of 26 ms), and
