@@ -105,3 +105,12 @@ test_that("WebGL2 fallback submits a million points in one GPU draw", {
     "assert.strictEqual(renderer.stats().contextLost,true);"
   ))
 })
+
+test_that("WebGPU caches unchanged frames, reuses buffers in place and releases cleanly", {
+  expect_node_fixture(
+    "webgpu-renderer-opt.js",
+    viewer_test_path("www", "cell_points_gpu.js"),
+    viewer_test_path("www", "cell_views.js"),
+    pass = "PASS viewer lazy attachGpu, uniform alpha opacity/selection, and post-upload scratch release"
+  )
+})

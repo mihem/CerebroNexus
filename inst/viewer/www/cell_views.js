@@ -2248,8 +2248,12 @@
     return Object.keys(a).every(function (key) { return a[key] === b[key]; });
   }
 
+  function gpuAvailable(p) {
+    return !!(p.gpu || (!p._gpuDisabled &&
+      window.CerebroPointRenderer && window.CerebroPointRenderer.create));
+  }
   function gpuCandidate(p) {
-    if (!gpuAcceleration || !p.gpu || !D || D.n < GPU_MIN_CELLS) return false;
+    if (!gpuAcceleration || !gpuAvailable(p) || !D || D.n < GPU_MIN_CELLS) return false;
     var space = spaceById[p.spaceId], unit = space && space._unit;
     // Images, hulls and trajectories live on the CPU underlay; axes, labels and
     // interaction marks live on the CPU overlay. Only features that change the
@@ -2257,7 +2261,7 @@
     return !!(space && unit && !unit.nz && !space.pointSizes);
   }
   function gpuEligible(p) {
-    return gpuCandidate(p) && p.gpu.isReady();
+    return gpuCandidate(p) && !!(p.gpu && p.gpu.isReady());
   }
 
   function hideGpu(p) {
@@ -2267,8 +2271,13 @@
   }
 
   function disableGpu(p) {
+    var previous = p.gpu;
     hideGpu(p);
     p.gpu = null;
+    p._gpuDisabled = true;
+    if (previous && previous.release) {
+      try { previous.release(); } catch (error) { /* already gone */ }
+    }
     p.gpuTransformOnly = false;
     p.gpuData = null;
     p.gpuDataState = null;
@@ -2285,6 +2294,9 @@
     if (stats.backend === 'webgl2' && !again) return false;
     var previous = p.gpuCanvas;
     if (!previous.parentNode) return false;
+    if (renderer.release) {
+      try { renderer.release(); } catch (error) { /* already gone */ }
+    }
     var canvas = createLayerCanvas(null, 'cv-gpu-layer');
     previous.parentNode.replaceChild(canvas, previous);
     try {
@@ -2327,7 +2339,7 @@
   }
 
   function attachGpu(p) {
-    if (!gpuAcceleration || p.gpu) return;
+    if (!gpuAcceleration || p.gpu || p._gpuDisabled) return;
     if (!window.CerebroPointRenderer || !window.CerebroPointRenderer.create) return;
     if (p.gpuCanvas) p.gpuCanvas.remove();
     var canvas = createLayerCanvas(p, 'cv-gpu-layer');
@@ -2346,6 +2358,7 @@
     } catch (error) {
       canvas.remove();
       p.gpuCanvas = null;
+      p._gpuDisabled = true;
     }
   }
 
@@ -2354,9 +2367,9 @@
     if (gpuAcceleration === enabled) { reportRendererStatus(); return; }
     gpuAcceleration = enabled;
     panels.forEach(function (p) {
-      // Keep a working renderer available for a later toggle. Redrawing the
-      // same panel preserves the camera, filters, brush and cell identities.
-      if (enabled) attachGpu(p); else hideGpu(p);
+      // Keep a working renderer available for a later toggle, and let off-stage
+      // panels attach lazily when they scroll near the window.
+      if (enabled) p._gpuDisabled = false; else hideGpu(p);
       p.cloneBase = null;
       if (D && p.spaceId) project(p, !enabled);
     });
@@ -2525,15 +2538,24 @@
   // The points of a panel in paint order: drawOrder[k] is the vertex drawn
   // k-th. vertexIndex maps a slot (a position in `cells`, else a cell) to
   // its vertex + 1, 0 for a cell not drawn.
-  function gpuDrawOrder(order, cells, vertexIndex, count) {
+  function gpuDrawOrder(order, cells, vertexIndex, count, useScratch) {
     if (!cells && count === order.length) return order;
     var seq = cells ? panelPaintSequence(cells, order) : order;
-    var drawOrder = new Uint32Array(count), k = 0, vertex;
+    var drawOrder = useScratch && typeof gpuScratchOrder === 'function'
+      ? gpuScratchOrder(count) : new Uint32Array(count);
+    var k = 0, vertex;
     for (var r = 0; r < seq.length; r++) {
       vertex = vertexIndex[seq[r]];
       if (vertex > 0) drawOrder[k++] = vertex - 1;
     }
     return drawOrder;
+  }
+
+  function gpuUsesUniformAlpha(p) {
+    return !!(p.gpu && p.gpu.supportsUniformAlpha && p.gpu.supportsUniformAlpha());
+  }
+  function gpuUsesBufferIds(p) {
+    return !!(p.gpu && p.gpu.supportsBufferIds && p.gpu.supportsBufferIds());
   }
 
   function updateGpuSelection(p, state, hiSet) {
@@ -2543,24 +2565,54 @@
           return key !== 'selection' && key !== 'niche' && key !== 'opacity' &&
             state[key] !== oldState[key];
         })) return null;
-    // Selection only changes alpha and foreground layers. Keep the sorted
-    // positions and RGB bytes; the vertex map preserves filtered/invalid cells.
-    // Translucent palettes and RGB retain the general colour preparation path.
-    var colors = previous.colors.slice(), layers = new Uint32Array(previous.layers.length);
+    if (gpuUsesUniformAlpha(p)) {
+      // Opaque points take their opacity and selection fade from shader uniforms
+      // (drawGpuPoints passes options.alpha), so changing opacity alone uploads
+      // nothing and changing selection updates only the compact 1-byte layer mask.
+      var sameSelection = state.selection === oldState.selection &&
+        state.niche === oldState.niche;
+      if (sameSelection) {
+        p.gpuDataState = state;
+        return previous;
+      }
+      var layers = null, layersId = 0, foreground = false;
+      if (hiSet) {
+        layers = gpuScratchLayers(previous.count);
+        forEachHeldCell(hiSet, previous.vertexCells, function (slot) {
+          var vertex = previous.vertexIndex[slot] - 1;
+          if (!(vertex >= 0)) return;
+          layers[vertex] = 1; foreground = true;
+        });
+        if (foreground) layersId = ++gpuBufferSeq; else layers = null;
+      }
+      p.gpuDataState = state;
+      p.gpuData = {positions: previous.positions, positionsId: previous.positionsId,
+        colors: previous.colors, colorsId: previous.colorsId,
+        layers: layers, layersId: layersId,
+        count: previous.count, foreground: foreground, opaque: true,
+        vertexIndex: previous.vertexIndex, vertexCells: previous.vertexCells,
+        ordered: previous.ordered, drawOrder: previous.drawOrder,
+        drawOrderId: previous.drawOrderId, drawOrderOf: previous.drawOrderOf,
+        shownMask: previous.shownMask, okRef: previous.okRef};
+      return p.gpuData;
+    }
+    // Fallback for custom/mock renderers without shader alpha override.
+    var colors = previous.colors.slice(), fallbackLayers = new Uint32Array(previous.count);
     var alpha = Math.round(255 * (hiSet ? 0.05 : pointOpacityOf(p)));
     for (var i = 0; i < previous.count; i++) colors[i * 4 + 3] = alpha;
-    var foreground = false;
+    var fallbackFg = false;
     if (hiSet) forEachHeldCell(hiSet, previous.vertexCells, function (slot) {
       var vertex = previous.vertexIndex[slot] - 1;
       if (!(vertex >= 0)) return;
       colors[vertex * 4 + 3] = Math.round(255 * 0.95);
-      layers[vertex] = 1; foreground = true;
+      fallbackLayers[vertex] = 1; fallbackFg = true;
     });
     p.gpuDataState = state;
-    p.gpuData = {positions: previous.positions, colors: colors, layers: layers,
-      count: previous.count, foreground: foreground, opaque: true,
+    p.gpuData = {positions: previous.positions, colors: colors, layers: fallbackLayers,
+      count: previous.count, foreground: fallbackFg, opaque: true,
       vertexIndex: previous.vertexIndex, vertexCells: previous.vertexCells,
       ordered: previous.ordered, drawOrder: previous.drawOrder,
+      drawOrderOf: previous.drawOrderOf,
       shownMask: previous.shownMask, okRef: previous.okRef};
     return p.gpuData;
   }
@@ -2570,6 +2622,38 @@
   // keeps its positions: only colour and layer bytes are rebuilt, and the
   // renderer uploads no new geometry.
   var GPU_LITTLE_ENDIAN = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
+  // Reusable upload scratch buffers: both WebGL2 bufferData/bufferSubData and
+  // WebGPU queue.writeBuffer copy synchronously, so panels upload from shared
+  // scratch views and keep only monotonic buffer IDs instead of pinning
+  // redundant per-panel TypedArrays on the JS heap.
+  var gpuBufferSeq = 0;
+  var gpuScratch = { positions: null, colors: null, layers: null, order: null };
+  function gpuScratchPositions(len) {
+    if (!gpuScratch.positions || gpuScratch.positions.length < len) {
+      gpuScratch.positions = new Float32Array(len);
+    }
+    return gpuScratch.positions.subarray(0, len);
+  }
+  function gpuScratchColors(len) {
+    if (!gpuScratch.colors || gpuScratch.colors.length < len) {
+      gpuScratch.colors = new Uint8Array(len);
+    }
+    return gpuScratch.colors.subarray(0, len);
+  }
+  function gpuScratchLayers(len) {
+    if (!gpuScratch.layers || gpuScratch.layers.length < len) {
+      gpuScratch.layers = new Uint8Array(len);
+    }
+    var view = gpuScratch.layers.subarray(0, len);
+    view.fill(0);
+    return view;
+  }
+  function gpuScratchOrder(len) {
+    if (!gpuScratch.order || gpuScratch.order.length < len) {
+      gpuScratch.order = new Uint32Array(len);
+    }
+    return gpuScratch.order.subarray(0, len);
+  }
   var GPU_COLOUR_KEYS = ['mode', 'gene', 'fieldValues', 'fieldColors', 'fieldPalette',
     'fieldConstantColor', 'groupValues', 'groupColors', 'clip', 'opacity', 'selection', 'niche'];
   function updateGpuColors(p, state, hiSet, shownMask) {
@@ -2597,12 +2681,15 @@
       }
       if (drawn !== previous.count) return null;
     }
-    var colors = new Uint8Array(previous.colors.length);
+    var count = previous.count;
+    var useScratch = typeof gpuUsesBufferIds === 'function' && gpuUsesBufferIds(p);
+    var colors = useScratch ? gpuScratchColors(count * 4) : new Uint8Array(count * 4);
     // Layers follow only the selection/niche: keep them, and their upload,
     // when only the colours change.
     var sameLayers = state.selection === oldState.selection &&
       state.niche === oldState.niche;
-    var layers = sameLayers ? previous.layers : new Uint32Array(previous.layers.length);
+    var layers = sameLayers ? previous.layers
+      : (useScratch ? (hiSet ? gpuScratchLayers(count) : null) : new Uint32Array(count));
     var group = catOf(panelColorMode(p));
     var palette = group ? group.levels.map(function (_level, index) {
       return gpuColor((group.colors && group.colors[index]) || PAL[index % PAL.length]);
@@ -2616,7 +2703,7 @@
     if (!hiSet && GPU_LITTLE_ENDIAN && (group || scale)) {
       // No selection: every colour is one of a few (a level's or a step's),
       // written as one 32-bit word, red in the lowest byte.
-      var colors32 = new Uint32Array(colors.buffer);
+      var colors32 = new Uint32Array(colors.buffer, colors.byteOffset, count);
       var word = function (rgba) {
         return ((rgba[0] & 255) | ((rgba[1] & 255) << 8) | ((rgba[2] & 255) << 16) |
           ((Math.round(rgba[3] * opacity) & 255) << 24)) >>> 0;
@@ -2698,15 +2785,28 @@
       colors[vertex * 4 + 1] = rgba[1];
       colors[vertex * 4 + 2] = rgba[2];
       colors[vertex * 4 + 3] = Math.round(rgba[3] * alpha);
-      if (!sameLayers) layers[vertex] = fg ? 1 : 0;
+      if (!sameLayers && layers) layers[vertex] = fg ? 1 : 0;
       foreground = foreground || fg;
     }
+    var nextLayers = sameLayers ? previous.layers
+      : (useScratch ? (foreground ? layers : null) : layers);
+    var nextLayersId = !useScratch ? null
+      : (sameLayers ? previous.layersId : (foreground ? ++gpuBufferSeq : 0));
+    var sameOrder = !!(order && previous.drawOrderOf === order &&
+      (previous.drawOrder || previous.drawOrderId > 0));
+    var nextDrawOrder = !order ? null
+      : (sameOrder ? previous.drawOrder : gpuDrawOrder(order, cells, vertexIndex, count, useScratch));
+    var nextDrawOrderId = !useScratch ? null
+      : (!order ? 0 : (sameOrder ? previous.drawOrderId : ++gpuBufferSeq));
     p.gpuDataState = state;
-    p.gpuData = {positions: previous.positions, colors: colors, layers: layers,
-      count: previous.count, foreground: foreground, opaque: opaque,
+    p.gpuData = {positions: previous.positions,
+      positionsId: useScratch ? previous.positionsId : null,
+      colors: colors, colorsId: useScratch ? ++gpuBufferSeq : null,
+      layers: nextLayers, layersId: nextLayersId,
+      count: count, foreground: foreground,
+      opaque: opaque,
       vertexIndex: vertexIndex, vertexCells: cells, ordered: false,
-      drawOrder: order ? (previous.drawOrder && previous.drawOrderOf === order
-        ? previous.drawOrder : gpuDrawOrder(order, cells, vertexIndex, previous.count)) : null,
+      drawOrder: nextDrawOrder, drawOrderId: nextDrawOrderId,
       drawOrderOf: order || null,
       shownMask: shownMask, okRef: unit.ok};
     return p.gpuData;
@@ -2721,6 +2821,7 @@
     if (selectionData) return selectionData;
     var colourData = updateGpuColors(p, state, hiSet, shownMask);
     if (colourData) return colourData;
+    var useScratch = gpuUsesBufferIds(p);
     var unit = state.unit, order = paintOrder(p), n = D.n;
     var gpuOrder = rgb ? null : gpuPaintOrder(p, order, shownCount);
     if (gpuOrder) order = null;
@@ -2748,12 +2849,16 @@
       positions.length === capacity * 2 && projectionCache &&
       Number.isInteger(projectionCache.gpuPositionCount));
     if (!positions || positions.length !== capacity * 2) {
-      positions = new Float32Array(capacity * 2);
-      if (sharedName) shared.gpuPositions[sharedName] = positions;
+      if (sharedName) {
+        positions = new Float32Array(capacity * 2);
+        shared.gpuPositions[sharedName] = positions;
+      } else {
+        positions = useScratch ? gpuScratchPositions(capacity * 2) : new Float32Array(capacity * 2);
+      }
       sharedPositionsReady = false;
     }
-    var colors = new Uint8Array(capacity * 4);
-    var layers = new Uint32Array(capacity);
+    var colors = useScratch ? gpuScratchColors(capacity * 4) : new Uint8Array(capacity * 4);
+    var layers = useScratch ? null : new Uint32Array(capacity);
     var categoricalGroup = rgb ? null : catOf(panelColorMode(p));
     var categoricalRgba = categoricalGroup
       ? categoricalGroup.levels.map(function (_level, index) {
@@ -2803,7 +2908,7 @@
       var flatAlpha = Math.round(flatRgba[3] * pointOpacityOf(p));
       var packedRgba = (flatRgba[0] | (flatRgba[1] << 8) |
         (flatRgba[2] << 16) | (flatAlpha << 24)) >>> 0;
-      new Uint32Array(colors.buffer).fill(packedRgba);
+      new Uint32Array(colors.buffer, colors.byteOffset, out).fill(packedRgba);
     } else if (categoricalGroup && !hiSet) {
       // Colour by group, nothing highlighted: one packed RGBA per level, with
       // the panel's opacity, written as one 32-bit word per cell (1.3 million
@@ -2817,7 +2922,8 @@
       var levelOpaque = categoricalRgba.map(function (rgba) { return rgba[3] === 255; });
       var missingWord = packLevel(missingCategoricalRgba);
       var missingOpaque = missingCategoricalRgba[3] === 255;
-      var levelCount = levelWords.length, words = new Uint32Array(colors.buffer);
+      var levelCount = levelWords.length;
+      var words = new Uint32Array(colors.buffer, colors.byteOffset, capacity);
       var levelValues = categoricalGroup.values;
       for (var cat_at = 0; cat_at < visits; cat_at++) {
         slot = cells ? (seq ? seq[cat_at] : cat_at) : (order ? order[cat_at] : cat_at);
@@ -2852,7 +2958,8 @@
       // the scale (NaN) takes colorOf() as before.
       var scale = continuousColours(p), stepAlpha = pointOpacityOf(p);
       var stepWords = new Uint32Array(256), stepOpaque = new Uint8Array(256);
-      var stepDone = new Uint8Array(256), stepWordsOut = new Uint32Array(colors.buffer);
+      var stepDone = new Uint8Array(256);
+      var stepWordsOut = new Uint32Array(colors.buffer, colors.byteOffset, capacity);
       var stepWord = function (rgba) {
         return (rgba[0] | (rgba[1] << 8) | (rgba[2] << 16) |
           (Math.round(rgba[3] * stepAlpha) << 24)) >>> 0;
@@ -2894,6 +3001,7 @@
         out++;
       }
     } else {
+      if (useScratch) layers = rgb || hiSet ? gpuScratchLayers(capacity) : null;
       for (var at = 0; at < visits; at++) {
         slot = cells ? (seq ? seq[at] : at) : (order ? order[at] : at);
         i = cells ? cells[slot] : slot;
@@ -2936,7 +3044,7 @@
           colors[out * 4 + 2] = rgba[2];
           colors[out * 4 + 3] = Math.round(rgba[3] * alpha);
         }
-        layers[out] = fg ? 1 : 0;
+        if (layers) layers[out] = fg ? 1 : 0;
         foreground = foreground || fg;
         out++;
       }
@@ -2951,18 +3059,29 @@
       projectionCache.unit = unit;
       projectionCache.gpuPositionCount = out;
     }
+    var drawOrder = gpuOrder && out ? gpuDrawOrder(gpuOrder, cells, vertexIndex, out, useScratch) : null;
+    var finalPositions = useScratch && out < positions.length / 2
+      ? positions.subarray(0, out * 2) : positions;
+    var finalColors = useScratch && out < colors.length / 4
+      ? colors.subarray(0, out * 4) : colors;
+    var finalLayers = !useScratch ? layers
+      : (foreground && layers ? (out < layers.length ? layers.subarray(0, out) : layers) : null);
     p.gpuDataState = state;
     p.gpuData = {
-      positions: positions,
-      colors: colors,
-      layers: layers,
+      positions: finalPositions,
+      positionsId: useScratch ? ++gpuBufferSeq : null,
+      colors: finalColors,
+      colorsId: useScratch ? ++gpuBufferSeq : null,
+      layers: finalLayers,
+      layersId: useScratch ? (finalLayers ? ++gpuBufferSeq : 0) : null,
       count: out,
       opaque: !rgb && opaque,
       vertexIndex: vertexIndex,
       vertexCells: cells,
       foreground: foreground,
       ordered: !!order,
-      drawOrder: gpuOrder && out ? gpuDrawOrder(gpuOrder, cells, vertexIndex, out) : null,
+      drawOrder: drawOrder,
+      drawOrderId: useScratch ? (drawOrder ? ++gpuBufferSeq : 0) : null,
       drawOrderOf: gpuOrder && out ? gpuOrder : null,
       shownMask: shownMask,
       okRef: unit.ok
@@ -2971,16 +3090,31 @@
   }
 
   function drawGpuPoints(p, shownMask, shownCount, border) {
+    if (gpuCandidate(p) && !p.gpu) attachGpu(p);
     if (!gpuEligible(p)) { hideGpu(p); return false; }
     var data, ok;
     try {
       data = buildGpuData(p, shownMask, shownCount);
       p.gpu.setData(data);
+      if (gpuUsesBufferIds(p)) {
+        // Both WebGL2 and WebGPU copy uploaded bytes synchronously, so release
+        // temporary scratch views immediately after upload; the renderer tracks
+        // unchanged buffers via `*Id` tokens.
+        data.positions = null;
+        data.colors = null;
+        data.layers = null;
+        data.drawOrder = null;
+      }
+      var hiSet = (sel && sel.size) ? sel : nicheSet;
+      var alpha = gpuUsesUniformAlpha(p) && data.opaque && panelColorMode(p) !== RGB_MODE
+        ? { background: hiSet ? 0.05 : pointOpacityOf(p), foreground: 0.95 }
+        : null;
       ok = p.gpu.draw({
         view: p.view || { cx: 0.5, cy: 0.5, span: 1 },
         rect: panelRect(p),
         pointSize: p._renderPointSize,
-        border: border ? { color: gpuColor(border.color), width: border.width } : null
+        border: border ? { color: gpuColor(border.color), width: border.width } : null,
+        alpha: alpha
       });
     } catch (error) {
       return failOver(p) && drawGpuPoints(p, shownMask, shownCount, border);
@@ -6769,8 +6903,7 @@
         underlayCanvas: null, underlayCtx: null,
         interactionCanvas: null, interactionCtx: null,
         gpu: null, gpuCanvas: null, gpuData: null, gpuDataState: null,
-        gpuTransformOnly: false };
-      attachGpu(p);
+        gpuTransformOnly: false, _gpuDisabled: false };
       attachInteractionLayer(p);
       prepareCanvasSemantics(p);
       // The minimap is a FIXED size, so its backing store is set once here
