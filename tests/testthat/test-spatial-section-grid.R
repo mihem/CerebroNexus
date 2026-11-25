@@ -916,7 +916,10 @@ test_that("multi-section grids below 400k cells stream and skip coordinate reads
     group_code = integer(n),
     panels = panels
   )
-  stream <- spatial_grid_stream_split(frame, shown = paste0("S", seq_len(n_sec)))
+  stream <- spatial_grid_stream_split(
+    frame,
+    shown = paste0("S", seq_len(n_sec))
+  )
   expect_false(is.null(stream))
   expect_identical(stream$batches, 2L)
   expect_length(unclass(stream$head$grid_stream$section), 10L)

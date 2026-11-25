@@ -636,7 +636,10 @@ morans_i <- function(x, y, values, k = 6) {
       rep(1L, n)
     }
     bucket_id <- gx + (gy - 1L) * gx_n
-    buckets <- split(seq_len(n), factor(bucket_id, levels = seq_len(gx_n * gy_n)))
+    buckets <- split(
+      seq_len(n),
+      factor(bucket_id, levels = seq_len(gx_n * gy_n))
+    )
     max_ring <- max(gx_n, gy_n)
     for (i in seq_len(n)) {
       cx <- gx[[i]]
@@ -2158,7 +2161,10 @@ spatial_grid_stream_split <- function(
       n < spatial_grid_stream_min &&
       length(section_at) >= spatial_grid_stream_min_sections
   ) {
-    dots$first <- min(spatial_grid_stream_first, spatial_grid_stream_first_multi)
+    dots$first <- min(
+      spatial_grid_stream_first,
+      spatial_grid_stream_first_multi
+    )
   }
   batches <- do.call(
     spatial_grid_stream_batches,
