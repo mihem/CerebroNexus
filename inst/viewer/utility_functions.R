@@ -6376,6 +6376,11 @@ registerCellViewPointBorder <- function(
   prefix,
   defaults = function() list(draw_border = FALSE, keep_square = FALSE)
 ) {
+  set_options <- if (exists("outputOptions", mode = "function")) {
+    outputOptions
+  } else {
+    shiny::outputOptions
+  }
   output_id <- paste0(prefix, "_point_border_UI")
   output[[output_id]] <- shiny::renderUI({
     shiny::checkboxInput(
@@ -6384,7 +6389,7 @@ registerCellViewPointBorder <- function(
       value = defaults()$draw_border
     )
   })
-  shiny::outputOptions(output, output_id, suspendWhenHidden = FALSE)
+  set_options(output, output_id, suspendWhenHidden = FALSE)
   square_id <- paste0(prefix, "_keep_square_UI")
   output[[square_id]] <- shiny::renderUI({
     shiny::checkboxInput(
@@ -6393,7 +6398,7 @@ registerCellViewPointBorder <- function(
       value = defaults()$keep_square
     )
   })
-  shiny::outputOptions(output, square_id, suspendWhenHidden = FALSE)
+  set_options(output, square_id, suspendWhenHidden = FALSE)
 }
 
 ## The switches of a stored-result table as it opens (cerebroResultTableControls()

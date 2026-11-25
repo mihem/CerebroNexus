@@ -632,18 +632,22 @@ server <- function(input, output, session) {
     }
     do.call(shiny::outputOptions, c(list(x = output, name = x), options))
   }
-  observeEvent(input[["sidebar"]], {
-    tab <- input[["sidebar"]]
-    ids <- names(viewer_hidden_output_options)
-    for (id in ids) {
-      options <- viewer_hidden_output_options[[id]]
-      options$suspendWhenHidden <- !identical(viewerOutputTab(id), tab)
-      do.call(
-        shiny::outputOptions,
-        c(list(x = output, name = id), options)
-      )
-    }
-  })
+  observeEvent(
+    input[["sidebar"]],
+    {
+      tab <- input[["sidebar"]]
+      ids <- names(viewer_hidden_output_options)
+      for (id in ids) {
+        options <- viewer_hidden_output_options[[id]]
+        options$suspendWhenHidden <- !identical(viewerOutputTab(id), tab)
+        do.call(
+          shiny::outputOptions,
+          c(list(x = output, name = id), options)
+        )
+      }
+    },
+    priority = 1000
+  )
 
   ## page ID -> sidebar tab (viewerPageTabs() in viewer/core/shared_resources.R)
   viewer_initial_page_tabs <- viewerPageTabs()
