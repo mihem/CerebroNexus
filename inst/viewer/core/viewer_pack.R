@@ -59,22 +59,31 @@ viewerPackDomainEligible <- function(pack, domain) {
   projections <- tryCatch(object$availableProjections(), error = function(e) {
     character()
   })
-  proj_data <- stats::setNames(
+  proj_digests <- stats::setNames(
     lapply(projections, function(nm) {
-      tryCatch(object$getProjection(nm), error = function(e) NULL)
+      hash_section(tryCatch(object$getProjection(nm), error = function(e) NULL))
     }),
     projections
   )
   metadata <- tryCatch(object$getMetaData(), error = function(e) NULL)
+  metadata_names <- if (is.data.frame(metadata)) {
+    setdiff(colnames(metadata), "cell_barcode")
+  } else {
+    character()
+  }
+  meta_col_digests <- stats::setNames(
+    lapply(metadata_names, function(col) hash_section(metadata[[col]])),
+    metadata_names
+  )
   spatial_names <- tryCatch(object$availableSpatial(), error = function(e) {
     character()
   })
-  spatial_coords <- stats::setNames(
+  spatial_digests <- stats::setNames(
     lapply(spatial_names, function(nm) {
-      tryCatch(
+      hash_section(tryCatch(
         object$getSpatialData(nm, hydrate_molecules = FALSE)[["coordinates"]],
         error = function(e) NULL
-      )
+      ))
     }),
     spatial_names
   )
@@ -108,16 +117,16 @@ viewerPackDomainEligible <- function(pack, domain) {
   has_hla_pkgs <- requireNamespace("igraph", quietly = TRUE) &&
     requireNamespace("stringdist", quietly = TRUE)
   list(
-    projections = hash_section(proj_data),
+    projections = hash_section(proj_digests),
     metadata = hash_section(list(
       groups = tryCatch(object$getGroups(), error = function(e) character()),
       cell_cycle = tryCatch(object$getCellCycle(), error = function(e) {
         character()
       }),
-      metadata = metadata
+      columns = meta_col_digests
     )),
     trajectories = hash_section(object$trajectories),
-    spatial = hash_section(spatial_coords),
+    spatial = hash_section(spatial_digests),
     immune = hash_section(list(
       version = ir_version,
       repertoire = repertoire
@@ -130,7 +139,7 @@ viewerPackDomainEligible <- function(pack, domain) {
         error = function(e) NULL
       ),
       repertoire = repertoire,
-      metadata = if (length(repertoire)) metadata else NULL
+      metadata = if (length(repertoire)) meta_col_digests else NULL
     ))
   )
 }

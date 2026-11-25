@@ -656,8 +656,90 @@
   } else {
     NULL
   }
+  old_indexes <- NULL
+  if (!is.null(existing_pack) && !is.null(existing_manifest)) {
+    idx_row <- existing_manifest$assets[
+      as.character(existing_manifest$assets$path) == "spatial/cell_index.qs2",
+      ,
+      drop = FALSE
+    ]
+    if (nrow(idx_row) == 1L) {
+      idx_file <- file.path(existing_pack, "spatial", "cell_index.qs2")
+      if (
+        file.exists(idx_file) &&
+          identical(
+            as.numeric(file.info(idx_file, extra_cols = FALSE)$size),
+            as.numeric(idx_row$bytes[[1L]])
+          ) &&
+          identical(.viewerPackMd5(idx_file), as.character(idx_row$checksum[[1L]]))
+      ) {
+        old_indexes <- tryCatch(qs2::qs_read(idx_file), error = function(e) NULL)
+      }
+    }
+  }
   for (i in seq_along(spatial_names)) {
     name <- spatial_names[[i]]
+    geometry_path <- file.path(
+      "spatial",
+      sprintf("%03d.geometry.bin", i)
+    )
+    reused_asset <- NULL
+    old_frame_row <- NULL
+    can_reuse_item <- !is.null(existing_pack) &&
+      !is.null(old_frames) &&
+      !is.null(old_spatial_digests) &&
+      !is.null(new_spatial_digests) &&
+      identical(
+        as.character(old_spatial_digests[[name]]),
+        as.character(new_spatial_digests[[name]])
+      )
+    if (isTRUE(can_reuse_item)) {
+      match_row <- which(as.character(old_frames$name) == name)
+      if (length(match_row) == 1L) {
+        old_path <- as.character(old_frames$geometry_path[[match_row]])
+        old_asset_row <- existing_manifest$assets[
+          as.character(existing_manifest$assets$path) == old_path,
+          ,
+          drop = FALSE
+        ]
+        if (nrow(old_asset_row) == 1L) {
+          reused_asset <- .viewerPackStageVerifiedRenamedAsset(
+            existing_pack,
+            old_asset_row,
+            stage,
+            geometry_path
+          )
+          if (!is.null(reused_asset)) {
+            old_frame_row <- old_frames[match_row, , drop = FALSE]
+          }
+        }
+      }
+    }
+    if (
+      !is.null(reused_asset) &&
+        !is.null(old_frame_row) &&
+        is.list(old_indexes) &&
+        !is.null(old_indexes[[name]])
+    ) {
+      indexes[[i]] <- as.integer(old_indexes[[name]])
+      assets <- rbind(assets, reused_asset)
+      x_min <- suppressWarnings(as.numeric(old_frame_row$x_min[[1L]]))
+      x_max <- suppressWarnings(as.numeric(old_frame_row$x_max[[1L]]))
+      y_min <- suppressWarnings(as.numeric(old_frame_row$y_min[[1L]]))
+      y_max <- suppressWarnings(as.numeric(old_frame_row$y_max[[1L]]))
+      frames[[length(frames) + 1L]] <- data.frame(
+        name = name,
+        cells = as.integer(old_frame_row$cells[[1L]]),
+        dimensions = as.integer(old_frame_row$dimensions[[1L]]),
+        geometry_path = geometry_path,
+        x_min = if (length(x_min) == 1L) x_min else NA_real_,
+        x_max = if (length(x_max) == 1L) x_max else NA_real_,
+        y_min = if (length(y_min) == 1L) y_min else NA_real_,
+        y_max = if (length(y_max) == 1L) y_max else NA_real_,
+        stringsAsFactors = FALSE
+      )
+      next
+    }
     data <- getter(name, hydrate_molecules = FALSE)
     coordinates <- data[["coordinates"]]
     spatial_cells <- rownames(coordinates)
@@ -680,43 +762,6 @@
         ncol(coordinate_matrix) != 2L
     ) {
       next
-    }
-    geometry_path <- file.path(
-      "spatial",
-      sprintf("%03d.geometry.bin", i)
-    )
-    reused_asset <- NULL
-    old_frame_row <- NULL
-    if (
-      !is.null(existing_pack) &&
-        !is.null(old_frames) &&
-        !is.null(old_spatial_digests) &&
-        !is.null(new_spatial_digests) &&
-        identical(
-          as.character(old_spatial_digests[[name]]),
-          as.character(new_spatial_digests[[name]])
-        )
-    ) {
-      match_row <- which(as.character(old_frames$name) == name)
-      if (length(match_row) == 1L) {
-        old_path <- as.character(old_frames$geometry_path[[match_row]])
-        old_asset_row <- existing_manifest$assets[
-          as.character(existing_manifest$assets$path) == old_path,
-          ,
-          drop = FALSE
-        ]
-        if (nrow(old_asset_row) == 1L) {
-          reused_asset <- .viewerPackStageVerifiedRenamedAsset(
-            existing_pack,
-            old_asset_row,
-            stage,
-            geometry_path
-          )
-          if (!is.null(reused_asset)) {
-            old_frame_row <- old_frames[match_row, , drop = FALSE]
-          }
-        }
-      }
     }
     if (!is.null(reused_asset)) {
       assets <- rbind(assets, reused_asset)
@@ -1174,14 +1219,23 @@
 
 .viewerPackDigests <- function(object, cells) {
   projections <- object$availableProjections()
-  proj_data <- stats::setNames(
+  proj_digests <- stats::setNames(
     lapply(projections, function(nm) {
-      tryCatch(object$getProjection(nm), error = function(e) NULL)
+      .viewerPackSectionDigest(tryCatch(
+        object$getProjection(nm),
+        error = function(e) NULL
+      ))
     }),
     projections
   )
   metadata <- object$getMetaData()
   metadata_names <- setdiff(colnames(metadata), "cell_barcode")
+  meta_col_digests <- stats::setNames(
+    lapply(metadata_names, function(col) {
+      .viewerPackSectionDigest(metadata[[col]])
+    }),
+    metadata_names
+  )
   groups <- intersect(object$getGroups(), colnames(metadata))
   metrics <- intersect(
     c("nUMI", "nGene", "percent_mt", "percent_ribo"),
@@ -1191,20 +1245,20 @@
   if (length(groups) && length(metrics)) {
     for (g in groups) {
       for (m in metrics) {
-        group_digests[[paste0(g, "::", m)]] <- .viewerPackSectionDigest(list(
-          metadata[[g]],
-          metadata[[m]]
+        group_digests[[paste0(g, "::", m)]] <- .viewerPackSectionDigest(c(
+          meta_col_digests[[g]],
+          meta_col_digests[[m]]
         ))
       }
     }
   }
   spatial_names <- object$availableSpatial()
-  spatial_coords <- stats::setNames(
+  spatial_digests <- stats::setNames(
     lapply(spatial_names, function(nm) {
-      tryCatch(
+      .viewerPackSectionDigest(tryCatch(
         object$getSpatialData(nm, hydrate_molecules = FALSE)[["coordinates"]],
         error = function(e) NULL
-      )
+      ))
     }),
     spatial_names
   )
@@ -1214,14 +1268,14 @@
   has_hla_pkgs <- requireNamespace("igraph", quietly = TRUE) &&
     requireNamespace("stringdist", quietly = TRUE)
   content_digests <- list(
-    projections = .viewerPackSectionDigest(proj_data),
+    projections = .viewerPackSectionDigest(proj_digests),
     metadata = .viewerPackSectionDigest(list(
       groups = object$getGroups(),
       cell_cycle = object$getCellCycle(),
-      metadata = metadata
+      columns = meta_col_digests
     )),
     trajectories = .viewerPackSectionDigest(object$trajectories),
-    spatial = .viewerPackSectionDigest(spatial_coords),
+    spatial = .viewerPackSectionDigest(spatial_digests),
     immune = .viewerPackSectionDigest(list(
       version = if (length(repertoire)) {
         .viewerPackImmuneEncoder()$IR_ENCODING_VERSION
@@ -1235,29 +1289,14 @@
       groups = object$getGroups(),
       lineage = object$getTechnicalInfo()$lineage_column,
       repertoire = repertoire,
-      metadata = if (length(repertoire)) metadata else NULL
+      metadata = if (length(repertoire)) meta_col_digests else NULL
     ))
   )
   item_digests <- list(
-    projections = stats::setNames(
-      lapply(projections, function(nm) {
-        .viewerPackSectionDigest(proj_data[[nm]])
-      }),
-      projections
-    ),
-    metadata = stats::setNames(
-      lapply(metadata_names, function(col) {
-        .viewerPackSectionDigest(metadata[[col]])
-      }),
-      metadata_names
-    ),
+    projections = proj_digests,
+    metadata = meta_col_digests,
     groups = group_digests,
-    spatial = stats::setNames(
-      lapply(spatial_names, function(nm) {
-        .viewerPackSectionDigest(spatial_coords[[nm]])
-      }),
-      spatial_names
-    )
+    spatial = spatial_digests
   )
   list(content_digests = content_digests, item_digests = item_digests)
 }
