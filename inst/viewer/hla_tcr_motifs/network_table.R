@@ -292,6 +292,10 @@ observe({
   }
 })
 
+output$hla_network_table_UI <- renderUI({
+  DT::dataTableOutput("hla_network_table")
+})
+
 output$hla_network_table <- viewerLazyRender(function() {
   DT::renderDataTable({
     df <- hla_network_table_data()

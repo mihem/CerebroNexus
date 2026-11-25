@@ -771,7 +771,9 @@
       if (!localCompletion(pane)) return true;
       if (!element.getClientRects().length) return false;
       return paneName(pane) !== 'groups' || element.id === 'groups_controls_UI' ||
-        element.id === 'groups_by_other_group_plot' || element.id === 'groups_by_other_group_table';
+        element.id === 'groups_by_other_group_plot' ||
+        element.id === 'groups_by_other_group_table_UI' ||
+        element.id === 'groups_by_other_group_table';
     }
     function localResultSettled(pane) {
       var phase = window.CerebroDatasetContext && window.CerebroDatasetContext.phase();

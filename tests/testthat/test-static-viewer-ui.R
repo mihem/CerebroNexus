@@ -51,3 +51,27 @@ test_that("static UI does not evaluate request-time tag functions at startup", {
   htmltools::renderTags(cached)
   expect_gt(calls, previous)
 })
+
+test_that("viewer UI head defers all app scripts and avoids eager DT dependencies", {
+  scope <- new.env(parent = globalenv())
+  scope$Cerebro.options <- list(
+    cerebro_root = dirname(viewer_test_path()),
+    cerebro_version = "0.0.0"
+  )
+  withr::local_package("shiny")
+  withr::local_package("shinydashboard")
+  withr::local_options(CerebroNexus.ui_cache = FALSE)
+  sys.source(viewer_test_path("shiny_UI.R"), envir = scope)
+  rendered <- htmltools::renderTags(scope$ui)
+  dep_names <- vapply(rendered$dependencies, `[[`, character(1), "name")
+  expect_false("datatables-binding" %in% dep_names)
+  expect_false("htmlwidgets" %in% dep_names)
+  expect_false("crosstalk" %in% dep_names)
+  head_scripts <- regmatches(
+    rendered$head,
+    gregexpr("<script[^>]*>", rendered$head)
+  )[[1L]]
+  app_scripts <- head_scripts[grepl("cerebro_www", head_scripts, fixed = TRUE)]
+  expect_gt(length(app_scripts), 15L)
+  expect_true(all(grepl("\\bdefer\\b", app_scripts)))
+})
