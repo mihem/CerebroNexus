@@ -829,3 +829,25 @@ test_that("the group colours show the cells of every level, not only the first 1
   expect_identical(builder_group_full_distribution(NULL, "cluster"), list())
   expect_identical(builder_group_full_distribution(profile, "other"), list())
 })
+
+test_that("every palette gives one distinct colour per level and a select lists them", {
+  for (palette in builder_palettes()) {
+    for (n in c(1L, 5L, 14L)) {
+      colors <- palette$colors(n)
+      expect_length(colors, n)
+      expect_true(all(grepl("^#[0-9A-Fa-f]{6}$", colors)), info = palette$id)
+    }
+  }
+  ids <- vapply(builder_palettes(), function(p) p$id, character(1))
+  expect_true(all(c("hue", "brewer_set1", "tableau10") %in% ids))
+  expect_false(anyDuplicated(ids) > 0L)
+  ## Seurat's DimPlot colours for three groups
+  expect_identical(
+    toupper(builder_palettes()[[which(ids == "hue")]]$colors(3L)),
+    c("#F8766D", "#00BA38", "#619CFF")
+  )
+  expect_match(
+    as.character(builder_palette_select_ui(shiny::NS("core"), "hue")),
+    "core-palette"
+  )
+})

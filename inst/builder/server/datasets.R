@@ -1173,6 +1173,29 @@ observeEvent(
 )
 
 observeEvent(
+  input[["core-palette"]],
+  {
+    entry <- rendered_core_entry()
+    palette <- input[["core-palette"]]
+    known <- vapply(builder_palettes(), function(p) p$id, character(1))
+    if (
+      is.null(entry) ||
+        !is.character(palette) ||
+        length(palette) != 1L ||
+        !palette %in% known ||
+        identical(entry$settings$palette %||% "cerebro", palette)
+    ) {
+      return()
+    }
+    entry$settings$palette <- palette
+    if (isTRUE(replace_entry(entry))) {
+      group_color_ui_revision(isolate(group_color_ui_revision()) + 1L)
+    }
+  },
+  ignoreInit = TRUE
+)
+
+observeEvent(
   input[["core-reset_colors"]],
   {
     entry <- rendered_core_entry()

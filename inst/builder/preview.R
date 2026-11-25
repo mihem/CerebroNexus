@@ -994,6 +994,126 @@ builder_palettes <- function() {
       }
     ),
     list(
+      id = "hue",
+      label = "Seurat / ggplot2 default",
+      note = "Evenly spaced hues, as DimPlot() and ggplot2 draw a discrete colour scale",
+      colors = function(n) {
+        n <- max(1L, as.integer(n))
+        grDevices::hcl(
+          h = seq(15, 375, length.out = n + 1L)[seq_len(n)],
+          c = 100,
+          l = 65
+        )
+      }
+    ),
+    list(
+      id = "brewer_set1",
+      label = "ColorBrewer Set1",
+      note = "Nine colours; interpolated beyond nine groups",
+      colors = function(n) {
+        builder_ramp(
+          c(
+            "#E41A1C",
+            "#377EB8",
+            "#4DAF4A",
+            "#984EA3",
+            "#FF7F00",
+            "#FFFF33",
+            "#A65628",
+            "#F781BF",
+            "#999999"
+          ),
+          n
+        )
+      }
+    ),
+    list(
+      id = "brewer_set2",
+      label = "ColorBrewer Set2",
+      note = "Eight soft colours; interpolated beyond eight groups",
+      colors = function(n) {
+        builder_ramp(
+          c(
+            "#66C2A5",
+            "#FC8D62",
+            "#8DA0CB",
+            "#E78AC3",
+            "#A6D854",
+            "#FFD92F",
+            "#E5C494",
+            "#B3B3B3"
+          ),
+          n
+        )
+      }
+    ),
+    list(
+      id = "brewer_dark2",
+      label = "ColorBrewer Dark2",
+      note = "Eight darker colours; interpolated beyond eight groups",
+      colors = function(n) {
+        builder_ramp(
+          c(
+            "#1B9E77",
+            "#D95F02",
+            "#7570B3",
+            "#E7298A",
+            "#66A61E",
+            "#E6AB02",
+            "#A6761D",
+            "#666666"
+          ),
+          n
+        )
+      }
+    ),
+    list(
+      id = "brewer_paired",
+      label = "ColorBrewer Paired",
+      note = "Twelve colours in light/dark pairs; interpolated beyond twelve groups",
+      colors = function(n) {
+        builder_ramp(
+          c(
+            "#A6CEE3",
+            "#1F78B4",
+            "#B2DF8A",
+            "#33A02C",
+            "#FB9A99",
+            "#E31A1C",
+            "#FDBF6F",
+            "#FF7F00",
+            "#CAB2D6",
+            "#6A3D9A",
+            "#FFFF99",
+            "#B15928"
+          ),
+          n
+        )
+      }
+    ),
+    list(
+      id = "tableau10",
+      label = "Tableau 10",
+      note = "Ten colours; interpolated beyond ten groups",
+      colors = function(n) {
+        builder_ramp(
+          c(
+            "#4E79A7",
+            "#F28E2B",
+            "#E15759",
+            "#76B7B2",
+            "#59A14F",
+            "#EDC948",
+            "#B07AA1",
+            "#FF9DA7",
+            "#9C755F",
+            "#BAB0AC"
+          ),
+          n
+        )
+      }
+    ),
+    list(
       id = "grey",
       label = "Greyscale",
       note = "Emphasises density without a categorical colour rhythm",
