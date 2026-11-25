@@ -1142,3 +1142,75 @@ test_that("a CRB replaced with the same size and mtime does not keep its md5", {
   expect_identical(runtime$.viewerCrbMd5(file), unname(tools::md5sum(file)))
   expect_false(identical(runtime$.viewerCrbMd5(file), first))
 })
+
+test_that("Viewer Pack records spatial extents and reuses unchanged assets incrementally", {
+  root <- tempfile("pack-incremental-")
+  dir.create(root)
+  on.exit(unlink(root, recursive = TRUE), add = TRUE)
+  crb <- viewer_pack_fixture(
+    file.path(root, "data.crb"),
+    n = 6L,
+    spatial = TRUE,
+    groups = TRUE
+  )
+  pack <- buildViewerPack(crb, viewer_binary = "always")
+  expect_true(validateViewerPack(crb, pack, full = TRUE)$valid)
+
+  ## Spatial frame extents are recorded and readable by runtime viewerPackSpatialFrame().
+  runtime <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("core", "viewer_pack.R"), envir = runtime)
+  opened <- runtime$viewerPackOpen(crb)
+  sf <- runtime$viewerPackSpatialFrame(opened, "slice")
+  expect_equal(sf$x_range, c(10, 30))
+  expect_equal(sf$y_range, c(1, 3))
+
+  ## Cell-order fingerprint matches legacy byte stream exactly.
+  cells <- sprintf("cell-%03d", 1:6)
+  expect_identical(
+    runtime$viewerPackCellOrderFingerprint(cells),
+    .viewerPackCellOrderFingerprint(cells)
+  )
+
+  ## 1) Non-Pack CRB edit (adding an extra material table): full asset reuse!
+  proj_file <- file.path(pack, "projections", "001.bin")
+  spatial_file <- file.path(pack, "spatial", "001.geometry.bin")
+  old_mtime <- as.POSIXct("2025-06-01 00:00:00", tz = "UTC")
+  Sys.setFileTime(c(proj_file, spatial_file), old_mtime)
+  old_fp <- opened$manifest$dataset_fingerprint
+
+  obj <- readCerebro(crb)
+  obj$addExtraMaterial("tables", "summary", data.frame(a = 1:2))
+  saveCerebro(obj, crb, codec = "rds")
+  ## Stale pack is rejected until rebuilt/rebound.
+  expect_null(runtime$viewerPackOpen(crb))
+
+  rebuilt <- buildViewerPack(crb, viewer_binary = "always", overwrite = TRUE)
+  expect_true(validateViewerPack(crb, rebuilt, full = TRUE)$valid)
+  opened2 <- runtime$viewerPackOpen(crb)
+  expect_false(identical(opened2$manifest$dataset_fingerprint, old_fp))
+  ## Unchanged asset files were reused in place (mtime preserved via hard link).
+  expect_equal(
+    as.numeric(file.info(proj_file)$mtime),
+    as.numeric(old_mtime),
+    tolerance = 2
+  )
+  expect_equal(
+    as.numeric(file.info(spatial_file)$mtime),
+    as.numeric(old_mtime),
+    tolerance = 2
+  )
+
+  ## 2) Partial CRB edit (new metadata column only): spatial & common reused, metadata rebuilt!
+  Sys.setFileTime(spatial_file, old_mtime)
+  obj$meta_data$new_score <- seq_len(nrow(obj$meta_data)) * 2
+  saveCerebro(obj, crb, codec = "rds")
+  rebuilt2 <- buildViewerPack(crb, viewer_binary = "always", overwrite = TRUE)
+  expect_true(validateViewerPack(crb, rebuilt2, full = TRUE)$valid)
+  opened3 <- runtime$viewerPackOpen(crb)
+  expect_true("new_score" %in% opened3$manifest$metadata_names)
+  expect_equal(
+    as.numeric(file.info(spatial_file)$mtime),
+    as.numeric(old_mtime),
+    tolerance = 2
+  )
+})

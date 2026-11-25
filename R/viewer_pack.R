@@ -89,6 +89,15 @@
   if (anyNA(cells) || any(!nzchar(cells)) || anyDuplicated(cells)) {
     stop("Viewer Pack cells must be unique, non-empty strings.", call. = FALSE)
   }
+  if ("bytes" %in% names(formals(tools::md5sum)) && length(cells) <= 2e5) {
+    raw_bytes <- charToRaw(paste0(
+      nchar(cells, type = "bytes"),
+      ":",
+      cells,
+      collapse = ""
+    ))
+    return(paste0("md5-cell-order-v1:", unname(tools::md5sum(bytes = raw_bytes))))
+  }
   path <- tempfile("viewer-pack-cell-order-")
   on.exit(unlink(path), add = TRUE)
   ## One string per cell, written as bytes: about half the time of collapsing
@@ -642,11 +651,21 @@
         dim(coordinate_matrix)
       )
     )
+    finite_x <- coordinate_matrix[, 1L][is.finite(coordinate_matrix[, 1L])]
+    finite_y <- coordinate_matrix[, 2L][is.finite(coordinate_matrix[, 2L])]
+    x_min <- if (length(finite_x)) min(finite_x) else NA_real_
+    x_max <- if (length(finite_x)) max(finite_x) else NA_real_
+    y_min <- if (length(finite_y)) min(finite_y) else NA_real_
+    y_max <- if (length(finite_y)) max(finite_y) else NA_real_
     frames[[length(frames) + 1L]] <- data.frame(
       name = name,
       cells = nrow(coordinate_matrix),
       dimensions = ncol(coordinate_matrix),
       geometry_path = geometry_path,
+      x_min = x_min,
+      x_max = x_max,
+      y_min = y_min,
+      y_max = y_max,
       stringsAsFactors = FALSE
     )
   }
@@ -658,6 +677,10 @@
       cells = integer(),
       dimensions = integer(),
       geometry_path = character(),
+      x_min = numeric(),
+      x_max = numeric(),
+      y_min = numeric(),
+      y_max = numeric(),
       stringsAsFactors = FALSE
     )
   }
@@ -866,15 +889,239 @@
   list(frames = frame_table, assets = assets)
 }
 
-.viewerPackBuildAssets <- function(object, stage) {
-  cells <- .viewerPackCells(object)
-  assets <- .viewerPackWriteAsset(
-    stage,
-    "common/cell_order.qs2",
-    cells,
-    "utf8",
-    length(cells)
+.viewerPackLinkOrCopy <- function(src, dst) {
+  dir.create(dirname(dst), recursive = TRUE, showWarnings = FALSE)
+  if (isTRUE(suppressWarnings(file.link(src, dst)))) {
+    return(TRUE)
+  }
+  isTRUE(file.copy(src, dst, overwrite = TRUE))
+}
+
+.viewerPackReadExistingManifest <- function(pack) {
+  manifest_file <- file.path(pack, "manifest.json")
+  if (!dir.exists(pack) || !file.exists(manifest_file)) {
+    return(NULL)
+  }
+  manifest <- tryCatch(
+    jsonlite::read_json(manifest_file, simplifyVector = TRUE),
+    error = function(error) NULL
   )
+  if (
+    !is.list(manifest) ||
+      !identical(manifest$schema_version, .viewerPackSchemaVersion) ||
+      !identical(
+        suppressWarnings(as.integer(manifest$format_revision)),
+        .viewerPackFormatRevision
+      ) ||
+      !is.data.frame(manifest$assets) ||
+      !all(
+        c("path", "dtype", "dimensions", "bytes", "checksum") %in%
+          names(manifest$assets)
+      )
+  ) {
+    return(NULL)
+  }
+  manifest
+}
+
+.viewerPackStageVerifiedAssets <- function(existing_pack, rows_df, stage) {
+  if (!is.data.frame(rows_df) || !nrow(rows_df)) {
+    return(NULL)
+  }
+  rel_paths <- as.character(rows_df$path)
+  src_paths <- file.path(existing_pack, rel_paths)
+  if (any(!file.exists(src_paths)) || any(dir.exists(src_paths))) {
+    return(NULL)
+  }
+  sizes <- unname(as.numeric(file.info(src_paths, extra_cols = FALSE)$size))
+  if (!identical(sizes, as.numeric(rows_df$bytes))) {
+    return(NULL)
+  }
+  if (
+    !identical(unname(tools::md5sum(src_paths)), as.character(rows_df$checksum))
+  ) {
+    return(NULL)
+  }
+  dst_paths <- file.path(stage, rel_paths)
+  ok <- vapply(
+    seq_along(src_paths),
+    function(i) .viewerPackLinkOrCopy(src_paths[[i]], dst_paths[[i]]),
+    logical(1)
+  )
+  if (!all(ok)) {
+    return(NULL)
+  }
+  rows_df
+}
+
+.viewerPackSectionDigest <- function(value) {
+  paste0("xxh128-v1:", rlang::hash(value))
+}
+
+.viewerPackContentDigests <- function(object, cells) {
+  projections <- object$availableProjections()
+  proj_data <- stats::setNames(
+    lapply(projections, function(nm) {
+      tryCatch(object$getProjection(nm), error = function(e) NULL)
+    }),
+    projections
+  )
+  metadata <- object$getMetaData()
+  spatial_names <- object$availableSpatial()
+  spatial_coords <- stats::setNames(
+    lapply(spatial_names, function(nm) {
+      tryCatch(
+        object$getSpatialData(nm, hydrate_molecules = FALSE)[["coordinates"]],
+        error = function(e) NULL
+      )
+    }),
+    spatial_names
+  )
+  repertoire <- tryCatch(object$getImmuneRepertoire(), error = function(e) {
+    list()
+  })
+  has_hla_pkgs <- requireNamespace("igraph", quietly = TRUE) &&
+    requireNamespace("stringdist", quietly = TRUE)
+  hla_cols <- intersect(
+    c("cell_barcode", "sample", object$getGroups()),
+    colnames(metadata)
+  )
+  list(
+    projections = .viewerPackSectionDigest(proj_data),
+    metadata = .viewerPackSectionDigest(list(
+      groups = object$getGroups(),
+      cell_cycle = object$getCellCycle(),
+      metadata = metadata
+    )),
+    trajectories = .viewerPackSectionDigest(object$trajectories),
+    spatial = .viewerPackSectionDigest(spatial_coords),
+    immune = .viewerPackSectionDigest(list(
+      version = if (length(repertoire)) {
+        .viewerPackImmuneEncoder()$IR_ENCODING_VERSION
+      } else {
+        0L
+      },
+      repertoire = repertoire
+    )),
+    hla_tcr = .viewerPackSectionDigest(list(
+      enabled = has_hla_pkgs,
+      groups = object$getGroups(),
+      lineage = object$getTechnicalInfo()$lineage_column,
+      repertoire = repertoire,
+      metadata = if (length(hla_cols)) metadata[hla_cols] else NULL
+    ))
+  )
+}
+
+.viewerPackTryReuseFull <- function(
+  existing_pack,
+  existing_manifest,
+  stage,
+  object,
+  cells,
+  cell_order_fingerprint,
+  content_digests
+) {
+  if (
+    is.null(existing_manifest) ||
+      !identical(as.integer(existing_manifest$n_cells), length(cells)) ||
+      !identical(
+        as.character(existing_manifest$cell_order_fingerprint),
+        as.character(cell_order_fingerprint)
+      ) ||
+      !is.list(existing_manifest$content_digests)
+  ) {
+    return(NULL)
+  }
+  for (nm in names(content_digests)) {
+    if (
+      !identical(
+        as.character(existing_manifest$content_digests[[nm]]),
+        as.character(content_digests[[nm]])
+      )
+    ) {
+      return(NULL)
+    }
+  }
+  staged_assets <- .viewerPackStageVerifiedAssets(
+    existing_pack,
+    existing_manifest$assets,
+    stage
+  )
+  if (is.null(staged_assets)) {
+    return(NULL)
+  }
+  list(
+    assets = staged_assets,
+    modules = existing_manifest$modules,
+    capabilities = .viewerDatasetCapabilities(object),
+    projection_names = existing_manifest$projection_names,
+    metadata_names = existing_manifest$metadata_names,
+    group_metric_frames = existing_manifest$group_metric_frames,
+    trajectory_frames = existing_manifest$trajectory_frames,
+    spatial_frames = existing_manifest$spatial_frames,
+    immune_receptors = existing_manifest$immune_receptors,
+    immune_encoding = existing_manifest$immune_encoding,
+    immune_clonal_frames = existing_manifest$immune_clonal_frames,
+    hla_chains = existing_manifest$hla_chains,
+    content_digests = content_digests,
+    reused_sections = names(content_digests)
+  )
+}
+
+.viewerPackBuildAssets <- function(
+  object,
+  stage,
+  existing_pack = NULL,
+  existing_manifest = NULL,
+  cell_order_fingerprint = NULL,
+  content_digests = NULL
+) {
+  cells <- .viewerPackCells(object)
+  can_reuse <- !is.null(existing_pack) &&
+    !is.null(existing_manifest) &&
+    identical(as.integer(existing_manifest$n_cells), length(cells)) &&
+    identical(
+      as.character(existing_manifest$cell_order_fingerprint),
+      as.character(cell_order_fingerprint)
+    )
+  reuse_prefix <- function(prefix) {
+    if (!can_reuse) {
+      return(NULL)
+    }
+    rows <- existing_manifest$assets[
+      startsWith(as.character(existing_manifest$assets$path), prefix),
+      ,
+      drop = FALSE
+    ]
+    if (!nrow(rows)) {
+      return(NULL)
+    }
+    .viewerPackStageVerifiedAssets(existing_pack, rows, stage)
+  }
+  section_unchanged <- function(section) {
+    can_reuse &&
+      is.list(existing_manifest$content_digests) &&
+      is.list(content_digests) &&
+      identical(
+        as.character(existing_manifest$content_digests[[section]]),
+        as.character(content_digests[[section]])
+      )
+  }
+  reused_sections <- character()
+  reused_common <- reuse_prefix("common/cell_order.qs2")
+  if (!is.null(reused_common)) {
+    assets <- reused_common
+    reused_sections <- c(reused_sections, "common")
+  } else {
+    assets <- .viewerPackWriteAsset(
+      stage,
+      "common/cell_order.qs2",
+      cells,
+      "utf8",
+      length(cells)
+    )
+  }
   modules <- "common"
   projections <- object$availableProjections()
   projection_values <- stats::setNames(
@@ -988,19 +1235,35 @@
       trajectory$assets
     )
   }
-  spatial <- .viewerPackSpatialAssets(object, cells, stage)
-  if (length(spatial$indexes)) {
+  reused_spatial <- if (section_unchanged("spatial")) {
+    reuse_prefix("spatial/")
+  } else {
+    NULL
+  }
+  if (!is.null(reused_spatial)) {
     modules <- c(modules, "spatial")
-    assets <- rbind(
-      assets,
-      .viewerPackWriteAsset(
-        stage,
-        file.path("spatial", "cell_index.qs2"),
-        spatial$indexes,
-        "canonical-cell-index"
-      ),
-      spatial$assets
+    assets <- rbind(assets, reused_spatial)
+    spatial <- list(
+      indexes = NULL,
+      frames = existing_manifest$spatial_frames,
+      assets = reused_spatial
     )
+    reused_sections <- c(reused_sections, "spatial")
+  } else {
+    spatial <- .viewerPackSpatialAssets(object, cells, stage)
+    if (length(spatial$indexes)) {
+      modules <- c(modules, "spatial")
+      assets <- rbind(
+        assets,
+        .viewerPackWriteAsset(
+          stage,
+          file.path("spatial", "cell_index.qs2"),
+          spatial$indexes,
+          "canonical-cell-index"
+        ),
+        spatial$assets
+      )
+    }
   }
   repertoire <- tryCatch(object$getImmuneRepertoire(), error = function(error) {
     list()
@@ -1149,7 +1412,9 @@
       0L
     },
     immune_clonal_frames = clonal_frames,
-    hla_chains = chains
+    hla_chains = chains,
+    content_digests = content_digests,
+    reused_sections = unique(reused_sections)
   )
 }
 
@@ -1405,7 +1670,32 @@ buildViewerPack <- function(
     },
     add = TRUE
   )
-  built <- .viewerPackBuildAssets(object, stage)
+  cell_order_fingerprint <- .viewerPackCellOrderFingerprint(cells)
+  content_digests <- .viewerPackContentDigests(object, cells)
+  existing_manifest <- if (dir.exists(pack) && isTRUE(overwrite)) {
+    .viewerPackReadExistingManifest(pack)
+  } else {
+    NULL
+  }
+  built <- .viewerPackTryReuseFull(
+    pack,
+    existing_manifest,
+    stage,
+    object,
+    cells,
+    cell_order_fingerprint,
+    content_digests
+  )
+  if (is.null(built)) {
+    built <- .viewerPackBuildAssets(
+      object,
+      stage,
+      existing_pack = if (!is.null(existing_manifest)) pack else NULL,
+      existing_manifest = existing_manifest,
+      cell_order_fingerprint = cell_order_fingerprint,
+      content_digests = content_digests
+    )
+  }
   ## The CRB is hashed once (0.7 s for 380 MB): the check of the staged pack
   ## below compares the manifest with the same file, unchanged since.
   crb_md5 <- .viewerPackMd5(file)
@@ -1413,7 +1703,7 @@ buildViewerPack <- function(
     schema_version = .viewerPackSchemaVersion,
     format_revision = .viewerPackFormatRevision,
     dataset_fingerprint = paste0("md5-crb-v1:", crb_md5),
-    cell_order_fingerprint = .viewerPackCellOrderFingerprint(cells),
+    cell_order_fingerprint = cell_order_fingerprint,
     n_cells = length(cells),
     modules = built$modules,
     capabilities = built$capabilities,
@@ -1426,6 +1716,7 @@ buildViewerPack <- function(
     immune_encoding = built$immune_encoding,
     immune_clonal_frames = built$immune_clonal_frames,
     hla_chains = built$hla_chains,
+    content_digests = built$content_digests,
     assets = built$assets
   )
   jsonlite::write_json(

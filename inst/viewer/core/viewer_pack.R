@@ -10,13 +10,21 @@ viewerPackCellOrderFingerprint <- function(cells) {
   if (anyNA(cells) || any(!nzchar(cells)) || anyDuplicated(cells)) {
     return(NA_character_)
   }
-  path <- tempfile("viewer-pack-cell-order-")
-  on.exit(unlink(path), add = TRUE)
-  writeBin(
-    charToRaw(paste0(nchar(cells, type = "bytes"), ":", cells, collapse = "")),
-    path
-  )
-  paste0("md5-cell-order-v1:", unname(tools::md5sum(path)))
+  raw_bytes <- charToRaw(paste0(
+    nchar(cells, type = "bytes"),
+    ":",
+    cells,
+    collapse = ""
+  ))
+  digest <- if ("bytes" %in% names(formals(tools::md5sum))) {
+    unname(tools::md5sum(bytes = raw_bytes))
+  } else {
+    path <- tempfile("viewer-pack-cell-order-")
+    on.exit(unlink(path), add = TRUE)
+    writeBin(raw_bytes, path)
+    unname(tools::md5sum(path))
+  }
+  paste0("md5-cell-order-v1:", digest)
 }
 
 viewerPackOpen <- function(file) {
@@ -239,9 +247,13 @@ viewerPackOpenCached <- function(file, cache) {
 }
 ## A file name for a file version key (its md5, of the key's bytes).
 .viewerCrbMd5Key <- function(key) {
+  raw_bytes <- charToRaw(enc2utf8(key))
+  if ("bytes" %in% names(formals(tools::md5sum))) {
+    return(unname(tools::md5sum(bytes = raw_bytes)))
+  }
   path <- tempfile("crb-md5-key-")
   on.exit(unlink(path), add = TRUE)
-  writeBin(charToRaw(enc2utf8(key)), path)
+  writeBin(raw_bytes, path)
   unname(tools::md5sum(path))
 }
 ## Viewer Pack assets are verified against their manifest checksum before a
@@ -614,6 +626,20 @@ viewerPackSpatialFrame <- function(pack, name) {
   frame <- lapply(frame, function(value) value[[1L]])
   frame$cells <- suppressWarnings(as.integer(frame$cells))
   frame$dimensions <- suppressWarnings(as.integer(frame$dimensions))
+  x_min <- suppressWarnings(as.numeric(frame$x_min))
+  x_max <- suppressWarnings(as.numeric(frame$x_max))
+  y_min <- suppressWarnings(as.numeric(frame$y_min))
+  y_max <- suppressWarnings(as.numeric(frame$y_max))
+  if (
+    length(x_min) == 1L &&
+      length(x_max) == 1L &&
+      length(y_min) == 1L &&
+      length(y_max) == 1L &&
+      all(is.finite(c(x_min, x_max, y_min, y_max)))
+  ) {
+    frame$x_range <- c(x_min, x_max)
+    frame$y_range <- c(y_min, y_max)
+  }
   valid <- length(frame$cells) == 1L &&
     !is.na(frame$cells) &&
     frame$cells >= 0L &&
