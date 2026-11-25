@@ -1024,11 +1024,17 @@ void main() {
     return createWebGl(canvas);
   }
 
-  if (navigator.gpu) prepare().catch(function () {});
+  // WebGPU is there (navigator.gpu) but gave no adapter or no device, as Chrome
+  // does without Vulkan: a panel then takes the shared WebGL2 renderer at once
+  // instead of making a WebGPU one that fails (59 failures and replacements
+  // when a grid of 59 sections opens).
+  var webGpuFailed = false;
+  if (navigator.gpu) prepare().catch(function () { webGpuFailed = true; });
   global.CerebroPointRenderer = {
     create: create,
     createWebGl: createWebGl,
-    createSharedWebGl: createSharedWebGl
+    createSharedWebGl: createSharedWebGl,
+    webGpuFailed: function () { return webGpuFailed; }
   };
 
   // ---- panels a page without a GPU may show ---------------------------------

@@ -2336,7 +2336,8 @@
       // Without WebGPU every panel draws through the page's one shared WebGL2
       // context (its own canvas stays 2-D and keeps the picture).
       var api = window.CerebroPointRenderer;
-      p.gpu = !navigator.gpu && api.createSharedWebGl
+      var noWebGpu = !navigator.gpu || (api.webGpuFailed && api.webGpuFailed());
+      p.gpu = noWebGpu && api.createSharedWebGl
         ? api.createSharedWebGl(canvas) : api.create(canvas);
       canvas._cerebroPointRenderer = p.gpu;
       if (p.W && p.H) p.gpu.resize(p.W, p.H, window.devicePixelRatio || 1);
@@ -9899,9 +9900,12 @@
         ).arrayBuffer() : response.arrayBuffer();
       }).then(function (buffer) {
         var downloadedAt = performance.now();
-        return Object.assign(decode(buffer), {
-          downloadMs: downloadedAt - downloadStarted,
-          decodeMs: performance.now() - downloadedAt
+        // `decode` may answer later (cell names are decoded a slice at a time).
+        return Promise.resolve(decode(buffer)).then(function (decoded) {
+          return Object.assign(decoded, {
+            downloadMs: downloadedAt - downloadStarted,
+            decodeMs: performance.now() - downloadedAt
+          });
         });
       });
       cache.set(key, pending);
@@ -9922,6 +9926,42 @@
   // strings in canonical order, downloaded once and shared by every view of
   // the data set. A view's aux message then carries canonical indices.
   var cellNamesResourceCache = new Map();
+  // The names of a NUL-terminated UTF-8 buffer, decoded a few milliseconds at a
+  // time in slices cut after a NUL (a name never straddles two): the 3.9
+  // million names of the Allen atlas took 0.6 to 0.77 s in one task, the longest
+  // frame of opening the grid.
+  function decodeCellNames(buffer) {
+    var bytes = new Uint8Array(buffer), names = [], at = 0, SLICE = 1 << 20;
+    var first = new TextDecoder('utf-8');
+    // Only the start of the file may hold a byte-order mark.
+    var later = new TextDecoder('utf-8', {ignoreBOM: true});
+    return new Promise(function (resolve, reject) {
+      function step() {
+        var began = performance.now();
+        try {
+          while (at < bytes.length) {
+            var end = Math.min(bytes.length, at + SLICE);
+            if (end < bytes.length) {
+              end = bytes.indexOf(0, end);
+              end = end < 0 ? bytes.length : end + 1;
+            }
+            var part = (at === 0 ? first : later).decode(bytes.subarray(at, end)).split('\0');
+            part.pop();
+            for (var i = 0; i < part.length; i++) names.push(part[i]);
+            at = end;
+            if (at < bytes.length && performance.now() - began > 8) {
+              setTimeout(step, 0);
+              return;
+            }
+          }
+          resolve(names);
+        } catch (error) {
+          reject(error);
+        }
+      }
+      step();
+    });
+  }
   function fetchCellNames(resource, identity) {
     if (!resource || resource.protocol !== 'canonical-cell-names-v1' ||
         !resource.url || !canonicalResourceIdentityMatches(resource, identity)) {
@@ -9934,10 +9974,10 @@
         if (Number(resource.bytes) && buffer.byteLength !== Number(resource.bytes)) {
           throw new Error('Cell names byte count mismatch');
         }
-        var names = new TextDecoder('utf-8').decode(buffer).split('\0');
-        names.pop();
-        if (names.length !== n) throw new Error('Cell names length mismatch');
-        return {names: names};
+        return decodeCellNames(buffer).then(function (names) {
+          if (names.length !== n) throw new Error('Cell names length mismatch');
+          return {names: names};
+        });
       },
       resource.encoding === 'gzip'
     );

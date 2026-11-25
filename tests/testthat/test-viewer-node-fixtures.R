@@ -94,3 +94,19 @@ test_that("a panel's paint sequence by radix sort is the one the float-key sort 
     pass = "PASS a panel paint sequence by radix sort"
   )
 })
+
+test_that("cell names are decoded in slices that give way to the event loop and are the names one decode gives", {
+  expect_node_fixture(
+    "cell-names-sliced.js",
+    viewer_test_path("www", "cell_views.js"),
+    pass = "PASS the cell names decoded in slices"
+  )
+})
+
+test_that("a page whose WebGPU gave no adapter says so", {
+  expect_node_fixture(
+    "webgpu-adapter-missing.js",
+    viewer_test_path("www", "cell_points_gpu.js"),
+    pass = "PASS a page without a WebGPU adapter says so"
+  )
+})
