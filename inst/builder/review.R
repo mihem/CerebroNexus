@@ -248,6 +248,10 @@ builder_review_snapshot <- function(
 }
 
 .builder_review_item_from_entry <- function(entry, state, index, total) {
+  ## Review shows what will be built: with a kept region, the cells inside it.
+  if (exists(".builder_plan_region_entry", mode = "function")) {
+    entry <- .builder_plan_region_entry(entry)
+  }
   saved <- if (identical(entry$load_state %||% "loaded", "artifact_ready")) {
     entry$project_artifact$plan_item %||% list()
   } else {

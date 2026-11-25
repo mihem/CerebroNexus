@@ -606,3 +606,383 @@ builder_spatial_contract <- function(
     image = selected_image
   )
 }
+
+##----------------------------------------------------------------------------##
+## Region subset: keep only the cells inside drawn regions of a section.
+##
+## A region is a polygon in the section's raw coordinate space (the space the
+## preview and the exported coordinates start from, before any rotation or
+## scale of the Viewer). A section with regions keeps the cells of that section
+## that fall inside at least one polygon; cells of other sections are not
+## touched. The Builder resolves the regions once, in the worker, and freezes
+## the identity of the cells that remain; the build repeats the same cut and
+## refuses to continue when it does not reproduce that identity.
+##----------------------------------------------------------------------------##
+
+BUILDER_REGION_MAX_POLYGONS <- 32L
+BUILDER_REGION_MAX_VERTICES <- 2000L
+
+.builder_region_plain_names <- function(value) {
+  is.list(value) &&
+    !is.object(value) &&
+    (!length(value) ||
+      (is.character(names(value)) &&
+        !anyNA(names(value)) &&
+        all(nzchar(names(value))) &&
+        !anyDuplicated(names(value))))
+}
+
+.builder_region_number_vector <- function(value) {
+  is.numeric(value) &&
+    !is.object(value) &&
+    !anyNA(value) &&
+    all(is.finite(value))
+}
+
+#' Validate the polygons drawn for one section.
+#'
+#' Returns a plain list of `list(x = numeric, y = numeric)`; every polygon has
+#' at least three vertices and is stored without attributes.
+builder_region_polygons_normalize <- function(value, context = "region") {
+  fail <- function(reason) {
+    stop(
+      "Region polygons for ",
+      context,
+      " are invalid: ",
+      reason,
+      ".",
+      call. = FALSE
+    )
+  }
+  if (!is.list(value) || is.object(value) || !length(value)) {
+    fail("at least one polygon is required")
+  }
+  if (length(value) > BUILDER_REGION_MAX_POLYGONS) {
+    fail(paste0(
+      "at most ",
+      BUILDER_REGION_MAX_POLYGONS,
+      " polygons are allowed"
+    ))
+  }
+  lapply(unname(value), function(polygon) {
+    x <- if (is.list(polygon)) polygon[["x"]] else NULL
+    y <- if (is.list(polygon)) polygon[["y"]] else NULL
+    x <- if (is.list(x)) unlist(x, use.names = FALSE) else x
+    y <- if (is.list(y)) unlist(y, use.names = FALSE) else y
+    if (
+      !.builder_region_number_vector(x) || !.builder_region_number_vector(y)
+    ) {
+      fail("vertices must be finite numbers")
+    }
+    if (length(x) != length(y) || length(x) < 3L) {
+      fail("a polygon needs at least three vertices")
+    }
+    if (length(x) > BUILDER_REGION_MAX_VERTICES) {
+      fail(paste0(
+        "a polygon may have at most ",
+        BUILDER_REGION_MAX_VERTICES,
+        " vertices"
+      ))
+    }
+    list(x = as.numeric(x), y = as.numeric(y))
+  })
+}
+
+#' Which points lie inside at least one polygon (even-odd rule).
+builder_region_points_inside <- function(x, y, polygons) {
+  inside <- rep(FALSE, length(x))
+  for (polygon in polygons) {
+    px <- polygon$x
+    py <- polygon$y
+    count <- length(px)
+    within <- rep(FALSE, length(x))
+    previous <- count
+    for (current in seq_len(count)) {
+      crossing <- (py[[current]] > y) != (py[[previous]] > y)
+      if (any(crossing)) {
+        slope <- (px[[previous]] - px[[current]]) /
+          (py[[previous]] - py[[current]])
+        at <- slope * (y - py[[current]]) + px[[current]]
+        within <- xor(within, crossing & x < at)
+      }
+      previous <- current
+    }
+    inside <- inside | within
+  }
+  inside
+}
+
+#' Raw coordinates of one section's cells, or `NULL` when it has none.
+builder_region_section_coordinates <- function(object, section) {
+  sections <- builder_spatial_alignment_sections(object)
+  ids <- vapply(sections, `[[`, character(1), "id")
+  if (!section %in% ids) {
+    return(NULL)
+  }
+  kind <- sections[[match(section, ids)]]$kind
+  frame <- tryCatch(
+    if (identical(kind, "trekker")) {
+      payload <- object@misc$trekker
+      data.frame(
+        cell_barcode = as.character(payload$barcodes),
+        x = as.numeric(payload$x),
+        y = as.numeric(payload$y),
+        stringsAsFactors = FALSE
+      )
+    } else if (identical(kind, "spatial_reduction")) {
+      embeddings <- SeuratObject::Embeddings(object[[section]])
+      data.frame(
+        cell_barcode = rownames(embeddings),
+        x = as.numeric(embeddings[, 1L]),
+        y = as.numeric(embeddings[, 2L]),
+        stringsAsFactors = FALSE
+      )
+    } else {
+      builder_spatial_contract(
+        object,
+        cells = SeuratObject::Cells(object),
+        image = section
+      )$coordinates[, c("cell_barcode", "x", "y")]
+    },
+    error = function(error) NULL
+  )
+  if (
+    is.null(frame) ||
+      !nrow(frame) ||
+      anyNA(frame$cell_barcode) ||
+      !all(is.finite(frame$x)) ||
+      !all(is.finite(frame$y))
+  ) {
+    return(NULL)
+  }
+  frame
+}
+
+#' Validate the stored region subset of one dataset (or `NULL`/empty).
+builder_region_subset_normalize <- function(value) {
+  if (is.null(value) || (is.list(value) && !length(value))) {
+    return(list())
+  }
+  fail <- function(reason) {
+    stop("Region subset is invalid: ", reason, ".", call. = FALSE)
+  }
+  if (
+    !.builder_region_plain_names(value) ||
+      !identical(sort(names(value)), c("resolved", "sections"))
+  ) {
+    fail("expected sections and resolved")
+  }
+  sections <- value$sections
+  if (!.builder_region_plain_names(sections) || !length(sections)) {
+    fail("sections must be a non-empty named list")
+  }
+  sections <- stats::setNames(
+    lapply(names(sections), function(name) {
+      record <- sections[[name]]
+      if (!.builder_region_plain_names(record)) {
+        fail(paste0("section ", name, " is not a record"))
+      }
+      list(
+        polygons = builder_region_polygons_normalize(
+          record$polygons,
+          paste0("section ", name)
+        )
+      )
+    }),
+    names(sections)
+  )
+  resolved <- value$resolved
+  scalar_count <- function(number) {
+    is.numeric(number) &&
+      length(number) == 1L &&
+      !is.na(number) &&
+      is.finite(number) &&
+      number >= 0 &&
+      number == floor(number)
+  }
+  cells <- builder_axis_identity_normalize(resolved$cells)
+  source_md5 <- resolved$source_md5
+  if (
+    !.builder_region_plain_names(resolved) ||
+      is.null(cells) ||
+      !is.character(source_md5) ||
+      length(source_md5) != 1L ||
+      is.na(source_md5) ||
+      !grepl("^[[:xdigit:]]{32}$", source_md5) ||
+      !scalar_count(resolved$kept) ||
+      !scalar_count(resolved$total) ||
+      resolved$kept < 1 ||
+      resolved$kept > resolved$total ||
+      !identical(as.numeric(cells$count), as.numeric(resolved$kept))
+  ) {
+    fail("the resolved cell identity is incomplete")
+  }
+  levels <- resolved$group_levels %||% list()
+  ## A Project file reads arrays back as lists.
+  if (.builder_region_plain_names(levels)) {
+    levels <- lapply(levels, function(entry) {
+      if (is.list(entry)) {
+        as.character(unlist(entry, use.names = FALSE))
+      } else {
+        entry
+      }
+    })
+  }
+  if (
+    !.builder_region_plain_names(levels) ||
+      !all(vapply(
+        levels,
+        function(entry) is.character(entry) && !anyNA(entry),
+        logical(1)
+      ))
+  ) {
+    fail("group levels must be named character vectors")
+  }
+  counts <- resolved$sections %||% list()
+  if (!.builder_region_plain_names(counts)) {
+    fail("section counts must be a named list")
+  }
+  list(
+    sections = sections,
+    resolved = list(
+      source_md5 = tolower(source_md5),
+      cells = cells,
+      kept = as.integer(resolved$kept),
+      total = as.integer(resolved$total),
+      group_levels = lapply(levels, unname),
+      sections = lapply(counts, function(entry) {
+        list(
+          kept = as.integer(entry$kept %||% 0L),
+          total = as.integer(entry$total %||% 0L)
+        )
+      })
+    )
+  )
+}
+
+#' The cells that remain after cutting every section that has regions.
+#'
+#' @return `list(kept, total, sections)`; `kept` keeps the object's cell order.
+builder_region_subset_cells <- function(object, sections) {
+  cells <- SeuratObject::Cells(object)
+  dropped <- character()
+  counts <- list()
+  for (section in names(sections)) {
+    polygons <- builder_region_polygons_normalize(
+      sections[[section]]$polygons,
+      paste0("section ", section)
+    )
+    frame <- builder_region_section_coordinates(object, section)
+    if (is.null(frame)) {
+      stop(
+        "Section ",
+        section,
+        " has no spatial coordinates to cut a region from.",
+        call. = FALSE
+      )
+    }
+    inside <- builder_region_points_inside(frame$x, frame$y, polygons)
+    if (!any(inside)) {
+      stop(
+        "The region drawn in section ",
+        section,
+        " contains no cells.",
+        call. = FALSE
+      )
+    }
+    dropped <- c(dropped, frame$cell_barcode[!inside])
+    counts[[section]] <- list(
+      kept = as.integer(sum(inside)),
+      total = as.integer(length(inside))
+    )
+  }
+  list(
+    kept = cells[!cells %in% dropped],
+    total = length(cells),
+    sections = counts
+  )
+}
+
+#' Resolve drawn regions against the open object (runs in the worker).
+#'
+#' Returns what the plan needs without the cell names: the identity of the
+#' remaining cells, the counts, and the group levels still present.
+builder_region_subset_resolve <- function(object, sections, levels = list()) {
+  cut <- builder_region_subset_cells(object, sections)
+  metadata <- object@meta.data
+  present <- lapply(names(levels %||% list()), function(group) {
+    full <- as.character(levels[[group]])
+    if (!group %in% colnames(metadata)) {
+      return(full)
+    }
+    values <- as.character(metadata[cut$kept, group])
+    full[full %in% values]
+  })
+  names(present) <- names(levels %||% list())
+  list(
+    cells = builder_axis_identity(cut$kept),
+    kept = length(cut$kept),
+    total = cut$total,
+    group_levels = present,
+    sections = cut$sections
+  )
+}
+
+#' Cut the Trekker payload down to the kept cells.
+#'
+#' Per-cell vectors, confidence, fields and evidence follow the kept cells.
+#' Summaries computed on the whole slide (Moran's I, per-type field medians,
+#' the QC table) are kept as they were.
+builder_region_subset_trekker <- function(trekker, keep) {
+  barcodes <- as.character(trekker$barcodes)
+  index <- which(barcodes %in% keep)
+  pick <- function(values) values[index]
+  for (name in c("barcodes", "x", "y", "ux", "uy", "clusters")) {
+    if (!is.null(trekker[[name]])) {
+      trekker[[name]] <- pick(trekker[[name]])
+    }
+  }
+  trekker$conf <- lapply(trekker$conf, pick)
+  trekker$fields <- lapply(trekker$fields, function(field) {
+    field$v <- pick(field$v)
+    field
+  })
+  new_position <- stats::setNames(seq_along(index) - 1L, index - 1L)
+  evidence <- Filter(
+    function(entry) as.character(entry$cell) %in% names(new_position),
+    trekker$evidence %||% list()
+  )
+  trekker$evidence <- lapply(unname(evidence), function(entry) {
+    entry$cell <- as.integer(new_position[[as.character(entry$cell)]])
+    entry
+  })
+  if (is.list(trekker$meta)) {
+    trekker$meta$n_cells <- length(index)
+  }
+  trekker
+}
+
+#' Cut a Seurat object down to the cells inside the frozen regions.
+builder_region_subset_apply <- function(
+  object,
+  region_subset,
+  expected = NULL
+) {
+  cut <- builder_region_subset_cells(object, region_subset$sections)
+  if (!is.null(expected)) {
+    observed <- builder_axis_identity(cut$kept)
+    if (!identical(observed, builder_axis_identity_normalize(expected))) {
+      stop(
+        "The cells inside the drawn regions differ from the frozen plan. ",
+        "Draw the regions again.",
+        call. = FALSE
+      )
+    }
+  }
+  trekker <- object@misc$trekker
+  object <- subset(object, cells = cut$kept)
+  if (is.list(trekker) && length(trekker$barcodes %||% character())) {
+    object@misc$trekker <- builder_region_subset_trekker(trekker, cut$kept)
+  }
+  object
+}

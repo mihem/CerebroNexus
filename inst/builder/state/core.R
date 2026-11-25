@@ -1083,6 +1083,17 @@ builder_upgrade_viewer_content_entry <- function(entry) {
   .builder_state_spatial_roi_settings(
     .subset2(settings, "spatial_roi_settings")
   )
+  tryCatch(
+    builder_region_subset_normalize(
+      .subset2(settings, "spatial_region_subset")
+    ),
+    error = function(error) {
+      .builder_state_abort(
+        "invalid_spatial_region_subset",
+        conditionMessage(error)
+      )
+    }
+  )
   text_vector <- function(value) {
     is.character(value) &&
       !is.object(value) &&

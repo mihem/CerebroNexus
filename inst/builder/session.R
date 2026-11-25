@@ -895,3 +895,30 @@ builder_session_drop <- function(worker, id, request = NULL) {
 builder_session_poll <- function(worker, timeout = 0) {
   builder_worker_poll(worker, timeout = timeout)
 }
+
+#' Cut drawn regions out of the open object and report what is left.
+#'
+#' Only the identity of the remaining cells, the counts and the group levels
+#' still present come back; the cell names stay in the worker. No regions at
+#' all answers `list(cleared = TRUE)` without touching the object.
+builder_session_region_resolve <- function(
+  worker,
+  id,
+  sections,
+  levels = list(),
+  request = NULL
+) {
+  .builder_session_object_call(
+    worker,
+    id,
+    request,
+    "spatial",
+    function(object, args) {
+      if (!length(args$sections)) {
+        return(list(cleared = TRUE))
+      }
+      builder_region_subset_resolve(object, args$sections, args$levels)
+    },
+    list(sections = sections, levels = levels)
+  )
+}

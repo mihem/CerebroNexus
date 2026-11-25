@@ -600,6 +600,11 @@ builder_spatial_alignment_server <- function(
     section <- active_section()
     !is.null(section) && builder_spatial_section_is_spatial(kind_for(section))
   })
+  output[["enhance-has_region_frame"]] <- shiny::reactive({
+    section <- active_section()
+    !is.null(section) &&
+      kind_for(section) %in% c("spatial", "spatial_reduction", "trekker")
+  })
   output[["enhance-has_rois"]] <- shiny::reactive({
     length(active_roi_values()) > 0L
   })
@@ -607,6 +612,7 @@ builder_spatial_alignment_server <- function(
     c(
       "enhance-has_image",
       "enhance-has_rois",
+      "enhance-has_region_frame",
       "enhance-has_multiple_images",
       "enhance-has_coordinate_frame"
     ),
@@ -1092,6 +1098,81 @@ builder_spatial_alignment_server <- function(
       )
       event$imageFitViewports <- image_fit_viewports[image_fit_valid]
       canvas_viewports(event)
+    },
+    ignoreInit = TRUE
+  )
+  ## Regions drawn on the canvas: "apply" keeps the cells inside the drawn
+  ## polygons of the section on screen, "clear" removes them again. Either way
+  ## the worker cuts the cells and the result is stored with the dataset.
+  shiny::observeEvent(
+    input[["builder_region_event"]],
+    {
+      event <- input[["builder_region_event"]]
+      contract <- shiny::isolate(canvas_contract())
+      entry <- if (is.list(contract)) {
+        shiny::isolate(entry_of(contract$dataset))
+      } else {
+        NULL
+      }
+      if (
+        !is.list(event) ||
+          !is.list(contract) ||
+          is.null(entry) ||
+          !identical(shiny::isolate(current()), contract$dataset) ||
+          !identical(
+            .builder_worker_identity(entry$snapshot),
+            contract$snapshotIdentity
+          ) ||
+          !identical(shiny::isolate(active_section()), contract$section) ||
+          !identical(shiny::isolate(roi_view()), "") ||
+          !identical(event$viewKey, contract$viewKey) ||
+          !event$action %in% c("apply", "clear", "clear_all")
+      ) {
+        return()
+      }
+      section <- contract$section
+      sections <- entry$settings$spatial_region_subset$sections %||% list()
+      if (identical(event$action, "apply")) {
+        if (
+          !kind_for(section) %in% c("spatial", "spatial_reduction", "trekker")
+        ) {
+          return()
+        }
+        polygons <- tryCatch(
+          builder_region_polygons_normalize(
+            event$polygons,
+            paste0("section ", section)
+          ),
+          error = function(error) error
+        )
+        if (inherits(polygons, "condition")) {
+          notify_alignment("error", conditionMessage(polygons))
+          return()
+        }
+        sections[[section]] <- list(polygons = polygons)
+      } else if (identical(event$action, "clear")) {
+        sections[[section]] <- NULL
+      } else {
+        sections <- list()
+      }
+      if (
+        !length(sections) &&
+          !length(entry$settings$spatial_region_subset$sections %||% list())
+      ) {
+        return()
+      }
+      enqueue(list(
+        kind = "region_resolve",
+        id = entry$id,
+        sections = sections,
+        levels = entry$levels %||% list(),
+        source_md5 = tolower(as.character(entry$snapshot$object_md5 %||% "")),
+        note = if (length(sections)) {
+          "Cutting the region…"
+        } else {
+          "Clearing the region…"
+        }
+      ))
     },
     ignoreInit = TRUE
   )
@@ -2707,7 +2788,8 @@ builder_spatial_alignment_server <- function(
         )[[group]] %||%
           character(),
         spatial_point_appearance = entry$settings$spatial_point_appearance %||%
-          list()
+          list(),
+        region_subset = entry$settings$spatial_region_subset %||% list()
       )
     }
     if (!identical(next_contract, shiny::isolate(scene_entry_contract()))) {
@@ -2843,7 +2925,8 @@ builder_spatial_alignment_server <- function(
         100,
       dataset = contract$id,
       snapshot_identity = contract$snapshot_identity,
-      section = section
+      section = section,
+      region_subset = contract$region_subset
     )
     scene$activeImage <- as.character(active_image() %||% "")[[1L]]
     cached_scene <- builder_spatial_canvas_cache_sources(

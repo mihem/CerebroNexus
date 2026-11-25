@@ -269,6 +269,67 @@
   nodes
 }
 
+## The entry as its artifact will see it once the drawn regions have been cut:
+## the frozen identity of the remaining cells and the group levels that are
+## still present. Without regions the entry is returned unchanged.
+.builder_plan_region_entry <- function(entry) {
+  region_subset <- entry$settings$spatial_region_subset
+  if (!length(region_subset$sections %||% list())) {
+    return(entry)
+  }
+  resolved <- region_subset$resolved
+  if (is.list(entry$dataset_profile)) {
+    entry$dataset_profile$identity$cells <- list(
+      axis_identity = resolved$cells
+    )
+  }
+  for (group in names(resolved$group_levels %||% list())) {
+    entry$levels[[group]] <- resolved$group_levels[[group]]
+  }
+  if (is.list(entry$profile)) {
+    entry$profile$n_cells <- resolved$kept
+  }
+  entry
+}
+
+## A region subset must belong to the snapshot the build will open, and it
+## cannot yet carry trajectories (their per-cell values are not cut).
+.builder_plan_region_error <- function(entry) {
+  region_subset <- entry$settings$spatial_region_subset
+  if (!length(region_subset$sections %||% list())) {
+    return(NULL)
+  }
+  name <- entry$settings$name %||% entry$id
+  if (
+    !identical(entry$load_state %||% "loaded", "artifact_ready") &&
+      !identical(
+        region_subset$resolved$source_md5,
+        tolower(as.character(entry$snapshot$object_md5 %||% ""))
+      )
+  ) {
+    return(builder_plan_error(
+      paste0(
+        "The region kept for dataset “",
+        name,
+        "” was drawn on a different copy of the data. Draw it again."
+      ),
+      "stale_region_subset"
+    ))
+  }
+  if (length(unlist(entry$settings$included_trajectories, use.names = FALSE))) {
+    return(builder_plan_error(
+      paste0(
+        "Dataset “",
+        name,
+        "” keeps a region, which cannot be combined with trajectories yet. ",
+        "Remove the trajectories or clear the region."
+      ),
+      "region_subset_with_trajectories"
+    ))
+  }
+  NULL
+}
+
 .builder_plan_artifact_identity <- function(
   entry,
   included_groups,

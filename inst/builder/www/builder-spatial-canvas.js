@@ -42,6 +42,16 @@
     observedCanvas: null,
     viewportSignature: null,
     viewportGeometry: null,
+    // Region drawing: polygons are kept in the section's raw coordinates, the
+    // space points are stored in, so rotating or scaling the points afterwards
+    // never moves a shape off its cells.
+    regionView: null,
+    region: {
+      drawing: false,
+      current: [],
+      polygons: [],
+      savedSignature: "",
+    },
   };
   window.__builderSpatialCanvasMetrics = window.__builderSpatialCanvasMetrics || {
     sceneMessages: 0, renders: 0, latestCoordinateRotation: 0,
@@ -170,6 +180,13 @@
         controlsAdopted = true;
       }
     }
+    // Shapes not yet applied belong to the view they were drawn on; once the
+    // stored regions change (applied or cleared) they have become those.
+    var savedSignature = JSON.stringify(message.regions || []);
+    if (viewChanged || savedSignature !== state.region.savedSignature) {
+      resetRegionDraft();
+    }
+    state.region.savedSignature = savedSignature;
     if (viewChanged) {
       state.controlsHeld = false;
       state.dragging = false;
@@ -222,6 +239,10 @@
     state.pendingAuthoritativeControls = null;
     state.pendingControlDirty = false;
     state.activeTransform = "points";
+    state.regionView = null;
+    state.region.savedSignature = "";
+    resetRegionDraft();
+    updateRegionPanel();
     if (node) node.getContext("2d").clearRect(0, 0, node.width, node.height);
   }
   function imageKey(image) {
@@ -453,6 +474,12 @@
           y: offsetY + plotHeight - (point.y - view.ymin) * scale,
         };
       },
+      unscreen: function (at) {
+        return {
+          x: view.xmin + (at.x - offsetX) / scale,
+          y: view.ymin + (offsetY + plotHeight - at.y) / scale,
+        };
+      },
     };
   }
   function publishViewports(scene, viewports, imageFitViewports) {
@@ -504,6 +531,7 @@
     if (!node || !scene) return;
     observeCanvas(node);
     setupCanvasHover(node);
+    setupRegionDrawing(node);
     window.__builderSpatialCanvasMetrics.renders += 1;
     var now = performance.now();
     pushMetric("renderTimes", now);
@@ -532,8 +560,12 @@
     ctx.fillStyle = "#fafbfa"; ctx.fillRect(0, 0, cssWidth, cssHeight);
     state.screenPoints = [];
     state.visiblePointCount = 0;
+    state.regionView = null;
     window.__builderSpatialCanvasMetrics.viewerFrames = [];
-    if (!scene.available || !scene.bounds) return;
+    if (!scene.available || !scene.bounds) {
+      updateRegionPanel();
+      return;
+    }
     if (scene.layout === "separate") {
       drawSeparate(
         ctx,
@@ -544,6 +576,7 @@
         viewportHeight
       );
       updateSummary(node, scene, " across separate ROI panels.");
+      updateRegionPanel();
       return;
     }
     var pad = VIEWER_FRAME_PADDING;
@@ -569,6 +602,12 @@
       1
     );
     var scale = layout.scale, screen = layout.screen;
+    state.regionView = {
+      layout: layout,
+      bounds: scene.bounds,
+      angle: angle,
+      pointScale: pointScale,
+    };
     window.__builderSpatialCanvasMetrics.latestViewport = {
       centerX: layout.offsetX + (layout.view.xmax - layout.view.xmin) * scale / 2,
       centerY: layout.offsetY + (layout.view.ymax - layout.view.ymin) * scale / 2,
@@ -583,6 +622,7 @@
     drawGrid(ctx, cssWidth, cssHeight, pad);
     var imageGeometry = drawImage(ctx, scene, screen);
     drawPoints(ctx, scene, screen);
+    drawRegions(ctx, scene, screen);
     if (imageGeometry) {
       drawImageFrame(ctx, imageGeometry, state.activeTransform === "image");
     }
@@ -593,7 +633,267 @@
       drawReference(ctx, scene.bounds, screen, angle, "Points", pointScale);
     }
     updateSummary(node, scene, ".");
+    updateRegionPanel();
   }
+
+  // ---- Region subset -------------------------------------------------------
+  // Raw section coordinates -> screen, and back, through the same rotation and
+  // scale the points get, so a shape drawn on rotated points is stored where
+  // the cells really are.
+  function regionToScreen(point) {
+    var view = state.regionView;
+    if (!view) return null;
+    var cx = (view.bounds.xmin + view.bounds.xmax) / 2;
+    var cy = (view.bounds.ymin + view.bounds.ymax) / 2;
+    var angle = view.angle * Math.PI / 180;
+    var x = point.x - cx, y = point.y - cy;
+    return view.layout.screen({
+      x: cx + view.pointScale * (x * Math.cos(angle) - y * Math.sin(angle)),
+      y: cy + view.pointScale * (x * Math.sin(angle) + y * Math.cos(angle)),
+    });
+  }
+  function regionToRaw(at) {
+    var view = state.regionView;
+    if (!view) return null;
+    var cx = (view.bounds.xmin + view.bounds.xmax) / 2;
+    var cy = (view.bounds.ymin + view.bounds.ymax) / 2;
+    var angle = view.angle * Math.PI / 180;
+    var world = view.layout.unscreen(at);
+    var x = (world.x - cx) / view.pointScale;
+    var y = (world.y - cy) / view.pointScale;
+    return {
+      x: cx + x * Math.cos(angle) + y * Math.sin(angle),
+      y: cy - x * Math.sin(angle) + y * Math.cos(angle),
+    };
+  }
+  function regionSceneDrawable(scene) {
+    // Only the overlay of one section has raw coordinates on screen; a single
+    // ROI or the separate panels show section-transformed points.
+    return !!scene && scene.available && scene.layout !== "separate" &&
+      !scene.activeRoi;
+  }
+  function tracePolygon(ctx, polygon, closed) {
+    polygon.forEach(function (vertex, index) {
+      var at = regionToScreen(vertex);
+      if (!at) return;
+      if (index) ctx.lineTo(at.x, at.y);
+      else ctx.moveTo(at.x, at.y);
+    });
+    if (closed) ctx.closePath();
+  }
+  function savedRegions(scene) {
+    return ((scene && scene.regions) || []).map(function (shape) {
+      return (shape.x || []).map(function (x, index) {
+        return {x: x, y: shape.y[index]};
+      });
+    });
+  }
+  function drawRegions(ctx, scene) {
+    var saved = savedRegions(scene);
+    var drafts = state.region.polygons;
+    var current = state.region.current;
+    if (!saved.length && !drafts.length && !current.length) return;
+    ctx.save();
+    ctx.lineJoin = "round";
+    saved.forEach(function (polygon) {
+      ctx.beginPath();
+      tracePolygon(ctx, polygon, true);
+      ctx.fillStyle = "rgba(22,124,120,.12)";
+      ctx.fill();
+      ctx.strokeStyle = "#167c78";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+      ctx.stroke();
+    });
+    drafts.forEach(function (polygon) {
+      ctx.beginPath();
+      tracePolygon(ctx, polygon, true);
+      ctx.fillStyle = "rgba(201,114,28,.14)";
+      ctx.fill();
+      ctx.strokeStyle = "#c9721c";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.stroke();
+    });
+    if (current.length) {
+      ctx.beginPath();
+      tracePolygon(ctx, current, false);
+      ctx.strokeStyle = "#c9721c";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+      ctx.stroke();
+      current.forEach(function (vertex, index) {
+        var at = regionToScreen(vertex);
+        if (!at) return;
+        ctx.beginPath();
+        ctx.arc(at.x, at.y, index === 0 ? 5 : 3, 0, Math.PI * 2);
+        ctx.fillStyle = index === 0 ? "#fff" : "#c9721c";
+        ctx.fill();
+        ctx.strokeStyle = "#c9721c";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      });
+    }
+    ctx.restore();
+  }
+  function regionStatusText(scene) {
+    var region = state.region;
+    if (!scene || !scene.available) return "";
+    if (!regionSceneDrawable(scene)) {
+      return "Choose \"All ROIs\" to draw a region on this section.";
+    }
+    if (region.drawing) {
+      if (region.current.length) {
+        return region.current.length + " point" +
+          (region.current.length === 1 ? "" : "s") +
+          ". Double-click or click the first point to close the shape.";
+      }
+      return region.polygons.length
+        ? region.polygons.length + " shape" +
+          (region.polygons.length === 1 ? "" : "s") +
+          " drawn. Click to start another, or choose \"Keep cells inside\"."
+        : "Click on the canvas to place the first point.";
+    }
+    if (region.polygons.length) {
+      return region.polygons.length + " shape" + (region.polygons.length === 1 ? "" : "s") +
+        " drawn. Choose \"Keep cells inside\" to apply.";
+    }
+    var summary = scene.regionSummary;
+    if (summary) {
+      var text = "Keeping " + summary.kept.toLocaleString() + " of " +
+        summary.total.toLocaleString() + " cells";
+      if (summary.sectionTotal) {
+        text += " (" + summary.sectionKept.toLocaleString() + " of " +
+          summary.sectionTotal.toLocaleString() + " in this section)";
+      }
+      return text + ".";
+    }
+    return "All cells are kept. Draw a shape around the cells to keep.";
+  }
+  function updateRegionPanel() {
+    var panel = document.getElementById("builder-region-panel");
+    if (!panel) return;
+    var scene = state.scene, region = state.region;
+    var drawable = regionSceneDrawable(scene);
+    var status = document.getElementById("builder-region-status");
+    if (status) status.textContent = regionStatusText(scene);
+    var enabled = {
+      draw: drawable,
+      undo: drawable && (region.current.length > 0 || region.polygons.length > 0),
+      apply: drawable && (region.polygons.length > 0 || region.current.length >= 3),
+      clear: !!(scene && scene.regions && scene.regions.length) ||
+        region.polygons.length > 0 || region.current.length > 0,
+      clear_all: !!(scene && scene.regionSummary),
+    };
+    panel.querySelectorAll("[data-region-action]").forEach(function (button) {
+      var action = button.getAttribute("data-region-action");
+      button.disabled = enabled[action] === false;
+      if (action === "draw") {
+        button.setAttribute("aria-pressed", region.drawing ? "true" : "false");
+        button.classList.toggle("is-active", region.drawing);
+      }
+    });
+    var node = canvas();
+    if (node) node.style.cursor = region.drawing && drawable ? "crosshair" : "";
+  }
+  function resetRegionDraft() {
+    state.region.drawing = false;
+    state.region.current = [];
+    state.region.polygons = [];
+  }
+  function closeRegionShape() {
+    var region = state.region;
+    if (region.current.length >= 3) region.polygons.push(region.current);
+    region.current = [];
+  }
+  function sendRegionEvent(action, polygons) {
+    var scene = state.scene;
+    if (!scene || !window.Shiny || typeof Shiny.setInputValue !== "function") return;
+    Shiny.setInputValue("builder_region_event", {
+      action: action,
+      polygons: polygons || [],
+      viewKey: scene.viewKey,
+      nonce: Date.now(),
+    }, {priority: "event"});
+  }
+  function handleRegionAction(action) {
+    var scene = state.scene, region = state.region;
+    if (action === "draw") {
+      if (!regionSceneDrawable(scene)) return;
+      if (region.drawing) closeRegionShape();
+      region.drawing = !region.drawing;
+    } else if (action === "undo") {
+      if (region.current.length) region.current.pop();
+      else if (region.polygons.length) region.current = region.polygons.pop();
+    } else if (action === "apply") {
+      closeRegionShape();
+      if (!region.polygons.length) return;
+      sendRegionEvent("apply", region.polygons.map(function (polygon) {
+        return {
+          x: polygon.map(function (vertex) { return vertex.x; }),
+          y: polygon.map(function (vertex) { return vertex.y; }),
+        };
+      }));
+      region.drawing = false;
+    } else if (action === "clear") {
+      var hadDraft = region.current.length || region.polygons.length;
+      resetRegionDraft();
+      if (!hadDraft || (scene && scene.regions && scene.regions.length)) {
+        sendRegionEvent("clear");
+      }
+    } else if (action === "clear_all") {
+      resetRegionDraft();
+      sendRegionEvent("clear_all");
+    }
+    schedule();
+    updateRegionPanel();
+  }
+  function setupRegionDrawing(node) {
+    if (node.dataset.builderRegionDrawing === "true") return;
+    node.dataset.builderRegionDrawing = "true";
+    node.addEventListener("click", function (event) {
+      var region = state.region;
+      if (!region.drawing || !regionSceneDrawable(state.scene)) return;
+      var rect = node.getBoundingClientRect();
+      var at = {x: event.clientX - rect.left, y: event.clientY - rect.top};
+      if (event.detail >= 2) {
+        closeRegionShape();
+      } else {
+        var first = region.current.length ? regionToScreen(region.current[0]) : null;
+        if (
+          first && region.current.length >= 3 &&
+          Math.hypot(first.x - at.x, first.y - at.y) <= 8
+        ) {
+          closeRegionShape();
+        } else {
+          var raw = regionToRaw(at);
+          if (raw) region.current.push(raw);
+        }
+      }
+      schedule();
+      updateRegionPanel();
+    });
+  }
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest && event.target.closest("[data-region-action]");
+    if (!button || button.disabled) return;
+    handleRegionAction(button.getAttribute("data-region-action"));
+  });
+  document.addEventListener("keydown", function (event) {
+    if (!state.region.drawing) return;
+    var tag = event.target && event.target.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+    if (event.key === "Escape") {
+      state.region.current = [];
+      state.region.drawing = false;
+    } else if (event.key === "Enter") {
+      closeRegionShape();
+    } else {
+      return;
+    }
+    schedule();
+    updateRegionPanel();
+  });
   function updateSummary(node, scene, suffix) {
     window.__builderSpatialCanvasMetrics.visiblePoints = state.visiblePointCount;
     var summary = document.getElementById(node.id + "-summary");

@@ -1791,8 +1791,43 @@ builder_verify_crb <- function(
   object
 }
 
+## Cut the object down to the cells inside the frozen regions, before any
+## analysis or export sees the rest. Per-cell content the cut does not
+## follow (trajectories, immune repertoire tables) is refused instead of
+## being exported out of step with the cells.
+.builder_build_prepare_region_subset <- function(object, item) {
+  region_subset <- item$spatial_region_subset
+  if (!length(region_subset$sections %||% list())) {
+    return(object)
+  }
+  immune_kept <- vapply(
+    c("immune_repertoire", "hla_tcr_motifs"),
+    function(key) {
+      (item$manifest[[key]]$disposition %||% "") %in%
+        c("preserved", "converted", "attached")
+    },
+    logical(1)
+  )
+  if (
+    length(unlist(item$included_trajectories, use.names = FALSE)) ||
+      any(immune_kept)
+  ) {
+    stop(
+      "A region subset cannot be combined with trajectories or immune ",
+      "repertoire tables yet.",
+      call. = FALSE
+    )
+  }
+  builder_region_subset_apply(
+    object,
+    region_subset,
+    expected = item$artifact_identity$cells
+  )
+}
+
 .builder_build_prepare <- function(object, item) {
   if (methods::is(object, "Seurat")) {
+    object <- .builder_build_prepare_region_subset(object, item)
     object@reductions <- object@reductions[item$included_projections]
     object@misc$trajectories <- .builder_build_select_trajectories(
       object@misc$trajectories %||% list(),

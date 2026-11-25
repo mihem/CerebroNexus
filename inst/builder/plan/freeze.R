@@ -703,7 +703,7 @@ builder_freeze_plan <- function(
         has_marker_genes
       )
       artifact_identity <- .builder_plan_artifact_identity(
-        entry,
+        .builder_plan_region_entry(entry),
         included_groups[[index]],
         included_projections[[index]],
         analyses,
@@ -808,8 +808,9 @@ builder_freeze_plan <- function(
           alignments$spatial
         ),
         spatial_roi_settings = settings$spatial_roi_settings %||% list(),
+        spatial_region_subset = settings$spatial_region_subset %||% list(),
         cell_count = as.integer(
-          entry$profile$n_cells %||%
+          .builder_plan_region_entry(entry)$profile$n_cells %||%
             artifact_identity$cells$count %||%
             0L
         ),

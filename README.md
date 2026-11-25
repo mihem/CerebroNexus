@@ -62,7 +62,9 @@ CerebroNexus::launchCerebroBuilder()
 ```
 
 Add your data files, choose the groups and content, and build a `.crb` file or a
-standalone App. See [Build a data set without writing code](https://www.mheming.com/CerebroNexus/articles/build_a_data_set_by_pointing.html).
+standalone App. On a spatial slide with several tissues, draw a shape around the
+tissue to keep ("Keep a region" in the Spatial alignment card) and the CRB holds
+only its cells. See [Build a data set without writing code](https://www.mheming.com/CerebroNexus/articles/build_a_data_set_by_pointing.html).
 
 **From a script:**
 
