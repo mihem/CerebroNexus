@@ -2236,6 +2236,9 @@
 #' @param file Path to the canonical CRB.
 #' @param pack Optional Viewer Pack directory.
 #' @param full Verify every asset size and checksum.
+#' @param allow_content_match Accept a pack whose dataset fingerprint differs from
+#'   the CRB's checksum when the content digests it stored still describe the
+#'   CRB (a CRB that was rewritten with the same content).
 #' @return A validation result.
 #' @examples
 #' dir <- tempfile("cerebro-")
