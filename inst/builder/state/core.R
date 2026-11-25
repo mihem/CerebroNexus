@@ -35,6 +35,35 @@ builder_default_percentage_cells_to_show <- function(
   as.numeric(min(100, max(baseline, ceiling(100 * minimum_cells / n_cells))))
 }
 
+## Store (or clear) the kept region of a dataset. The default overview share
+## of cells to draw depends on how many cells the dataset has, so a value that
+## still equals the default for the cells before the change moves to the
+## default for the cells after it; a value the user chose is left alone.
+builder_region_subset_set <- function(entry, region_subset) {
+  cells_of <- function(subset) {
+    if (length(subset$sections %||% list())) {
+      subset$resolved$kept
+    } else {
+      entry$profile$n_cells
+    }
+  }
+  current <- entry$settings$overview_percentage_cells_to_show
+  if (
+    .builder_state_number_in(current, 10, 100) &&
+      identical(
+        as.numeric(current),
+        builder_default_percentage_cells_to_show(
+          cells_of(entry$settings$spatial_region_subset)
+        )
+      )
+  ) {
+    entry$settings$overview_percentage_cells_to_show <-
+      builder_default_percentage_cells_to_show(cells_of(region_subset))
+  }
+  entry$settings$spatial_region_subset <- region_subset
+  entry
+}
+
 .builder_state_abort <- function(code, message) {
   condition <- structure(
     list(message = message, call = NULL, code = code),

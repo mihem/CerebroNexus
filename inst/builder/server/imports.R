@@ -3816,7 +3816,7 @@ commit_region_subset <- function(p, value) {
     )
     return(invisible(FALSE))
   }
-  entry$settings$spatial_region_subset <- next_subset
+  entry <- builder_region_subset_set(entry, next_subset)
   replace_entry(entry)
   if (length(next_subset)) {
     kept <- next_subset$resolved$kept

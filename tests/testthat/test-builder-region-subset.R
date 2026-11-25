@@ -634,3 +634,66 @@ test_that("a kept region builds into a generated Viewer app", {
   crb <- readCerebro(published$built[[1L]])
   expect_identical(length(crb$getCellNames()), resolved$kept)
 })
+
+test_that("the default overview share follows the cells a region keeps", {
+  stored <- function(kept) {
+    list(
+      sections = list(
+        slice1 = list(polygons = list(square(0, 1, 0, 1)))
+      ),
+      resolved = list(
+        source_md5 = strrep("a", 32L),
+        cells = list(schema_version = 2L, count = kept, md5 = strrep("a", 32L)),
+        kept = kept,
+        total = 5020L,
+        group_levels = list(),
+        sections = list()
+      )
+    )
+  }
+  entry_with <- function(percentage) {
+    list(
+      id = "ds",
+      profile = list(n_cells = 5020L),
+      settings = list(overview_percentage_cells_to_show = percentage)
+    )
+  }
+  full_default <- builder_default_percentage_cells_to_show(5020)
+  kept_default <- builder_default_percentage_cells_to_show(1251)
+  expect_identical(full_default, 20)
+  expect_identical(kept_default, 80)
+
+  ## The default becomes the one of a dataset of the kept size, and goes back
+  ## to the full-size default when the region is cleared.
+  entry <- builder_region_subset_set(entry_with(full_default), stored(1251L))
+  expect_identical(
+    entry$settings$overview_percentage_cells_to_show,
+    builder_default_percentage_cells_to_show(1251)
+  )
+  expect_identical(entry$settings$spatial_region_subset, stored(1251L))
+  ## A new region with another size moves it again.
+  entry <- builder_region_subset_set(entry, stored(2500L))
+  expect_identical(
+    entry$settings$overview_percentage_cells_to_show,
+    builder_default_percentage_cells_to_show(2500)
+  )
+  entry <- builder_region_subset_set(entry, list())
+  expect_identical(
+    entry$settings$overview_percentage_cells_to_show,
+    full_default
+  )
+  expect_identical(entry$settings$spatial_region_subset, list())
+
+  ## A value the user chose is never replaced.
+  chosen <- builder_region_subset_set(entry_with(35), stored(1251L))
+  expect_identical(chosen$settings$overview_percentage_cells_to_show, 35)
+  chosen <- builder_region_subset_set(chosen, list())
+  expect_identical(chosen$settings$overview_percentage_cells_to_show, 35)
+
+  ## Nothing is invented for a dataset without the setting.
+  bare <- builder_region_subset_set(
+    list(id = "ds", profile = list(n_cells = 5020L), settings = list()),
+    stored(1251L)
+  )
+  expect_null(bare$settings$overview_percentage_cells_to_show)
+})

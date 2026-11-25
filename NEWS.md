@@ -12,7 +12,11 @@
   "Clear all" remove them again. Other sections keep all their cells. The
   regions are saved with the Project. A region cannot yet be combined with
   trajectories or immune repertoire tables, and the Moran's I and per-type
-  summaries of a Trekker slide still describe the whole slide.
+  summaries of a Trekker slide still describe the whole slide. The default
+  share of cells the overview and linked views draw is that of a dataset
+  with the kept number of cells (80% instead of 20% for 1,251 of 5,020
+  cells) and returns to the full-size default when the region is cleared;
+  a value you set yourself is left alone.
 
 # CerebroNexus 8.5.3
 
