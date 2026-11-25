@@ -2002,3 +2002,29 @@ test_that("an H5-backed CRB keeps section references too", {
     fixture$counts[, cells, drop = FALSE]
   )
 })
+
+test_that("a qs2 without TBB falls back to one thread", {
+  state <- .cerebroQs2State
+  old <- state$no_tbb
+  on.exit(state$no_tbb <- old, add = TRUE)
+  state$no_tbb <- NULL
+  seen <- integer()
+  read <- function(file, nthreads) {
+    seen <<- c(seen, nthreads)
+    if (nthreads > 1L) {
+      stop("nthreads > 1 requires TBB", call. = FALSE)
+    }
+    "payload"
+  }
+  expect_identical(.cerebroQs2Read("x", read, threads = 8L), "payload")
+  expect_identical(seen, c(8L, 1L))
+  ## remembered: the next read goes straight to one thread
+  expect_identical(.cerebroQs2Read("x", read, threads = 8L), "payload")
+  expect_identical(seen, c(8L, 1L, 1L))
+  ## other errors are not swallowed
+  state$no_tbb <- NULL
+  expect_error(
+    .cerebroQs2Read("x", function(file, nthreads) stop("corrupt"), 8L),
+    "corrupt"
+  )
+})

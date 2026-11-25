@@ -1042,9 +1042,37 @@
 ## where R CMD check limits the cores.
 .readCerebroPayload <- function(file) {
   if (identical(.cerebroPayloadCodec(file), "qs2")) {
-    return(qs2::qs_read(file, nthreads = .cerebroReadThreads()))
+    return(.cerebroQs2Read(file, qs2::qs_read))
   }
   readRDS(file)
+}
+
+## A qs2 built without TBB refuses `nthreads > 1` ("nthreads > 1 requires
+## TBB"). The first such error is remembered for the session and the read is
+## repeated on one thread, which every build supports.
+.cerebroQs2State <- new.env(parent = emptyenv())
+
+.cerebroQs2Read <- function(
+  file,
+  read = qs2::qs_read,
+  threads = .cerebroReadThreads()
+) {
+  if (threads > 1L && !isTRUE(.cerebroQs2State$no_tbb)) {
+    result <- tryCatch(
+      list(value = read(file, nthreads = threads)),
+      error = function(error) {
+        if (!grepl("TBB", conditionMessage(error), fixed = TRUE)) {
+          stop(error)
+        }
+        NULL
+      }
+    )
+    if (!is.null(result)) {
+      return(result$value)
+    }
+    .cerebroQs2State$no_tbb <- TRUE
+  }
+  read(file, nthreads = 1L)
 }
 
 .cerebroReadThreads <- function(
