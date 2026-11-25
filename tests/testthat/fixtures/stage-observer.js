@@ -33,7 +33,7 @@ let panels = makePanels(20);
 stagePanels = 20;
 assert.equal(observeStagePanels(panels), true);
 assert.equal(observers.length, 1);
-assert.deepEqual(observers[0].options, {root: null, rootMargin: '100% 0px'});
+assert.deepEqual(observers[0].options, {root: null, rootMargin: '250px 0px'});
 assert.equal(observers[0].targets.length, 20);
 observeStagePanels(panels);
 assert.equal(observers[0].targets.length, 20, 'a pane is watched once');
@@ -58,12 +58,12 @@ focusPanel = 'A';
 assert.equal(offStage(panels[0]), false);
 focusPanel = null;
 
-// No IntersectionObserver: the rectangles are read, a window above and below.
+// No IntersectionObserver: the rectangles are read, a 250px margin above and below.
 window = {innerHeight: 1000};
 stageObserver = null;
 panels = makePanels(20);
 assert.equal(observeStagePanels(panels), false);
 assert.equal(offStage(panels[2]), false, 'top 600: in the window');
-assert.equal(offStage(panels[6]), false, 'top 1800: within a window height below it');
-assert.equal(offStage(panels[9]), true, 'top 2700: past it');
+assert.equal(offStage(panels[4]), false, 'top 1200: within 250px below it');
+assert.equal(offStage(panels[5]), true, 'top 1500: past the 250px margin');
 console.log('PASS the stage observer tells near panels from far ones, and the rectangles stand in without it');

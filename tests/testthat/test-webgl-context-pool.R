@@ -156,6 +156,14 @@ test_that("the stage observer tells the panels near the window from the far ones
   )
 })
 
+test_that("multi-panel grid draws time-slice across animation frames viewport-first", {
+  expect_node_fixture(
+    "grid-time-slice.js",
+    viewer_test_path("www", "cell_views.js"),
+    pass = "PASS grid time-sliced draw queue"
+  )
+})
+
 test_that("in Chrome shared WebGL2 draws indexed paint order, uniform alpha, and compact Uint8 layers", {
   skip_if_no_chrome()
   browser <- chromote::ChromoteSession$new()

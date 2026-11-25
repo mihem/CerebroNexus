@@ -1445,12 +1445,12 @@
   }
   // A panel that is not on stage is neither sized nor drawn: one off the
   // enlarged view's strip, or, in a grid of OFFSTAGE_MIN_PANELS panels or
-  // more, one more than a window above or below the window. It is sized and
-  // drawn when it comes near (the strip placing it, or drawNearPanels() as the
-  // page scrolls). Opening the 59 sections of the Allen atlas then draws the
-  // dozen the window shows. Without a layout (hidden tab, no geometry) every
-  // panel counts as on stage.
-  var OFFSTAGE_MIN_PANELS = 8, stagePanels = 0, stageObserver = null;
+  // more, one more than STAGE_MARGIN_PX above or below the window. It is sized
+  // and drawn when it comes near (the strip placing it, or drawNearPanels() as
+  // the page scrolls). Opening a 52-59 section grid then draws only the cards
+  // visible in the viewport plus a narrow 250px scroll buffer. Without a layout
+  // (hidden tab, no geometry) every panel counts as on stage.
+  var OFFSTAGE_MIN_PANELS = 8, STAGE_MARGIN_PX = 250, stagePanels = 0, stageObserver = null;
   function observeStagePanels(list) {
     if (typeof window.IntersectionObserver !== 'function') return false;
     if (!stageObserver) {
@@ -1465,7 +1465,7 @@
           }
         });
         if (wake) onStageScroll();
-      }, { root: null, rootMargin: '100% 0px' });
+      }, { root: null, rootMargin: STAGE_MARGIN_PX + 'px 0px' });
     }
     list.forEach(function (p) {
       if (!p.pane || p._stageObserved) return;
@@ -1482,7 +1482,7 @@
     if (stageObserver && typeof p._stageNear === 'boolean') return !p._stageNear;
     var r = p.pane.getBoundingClientRect(), h = window.innerHeight || 0;
     if (!(r.width > 0) || !(h > 0)) return false;
-    return r.bottom < -h || r.top > 2 * h;
+    return r.bottom < -STAGE_MARGIN_PX || r.top > h + STAGE_MARGIN_PX;
   }
   var stageFrame = 0;
   function onStageScroll() {
@@ -1491,6 +1491,86 @@
       stageFrame = 0;
       drawNearPanels();
     });
+  }
+  // Time-sliced rAF draw queue for multi-panel grids: draws visible-in-viewport
+  // cards first, then the 250px prefetch buffer, in <= DRAW_SLICE_MS slices so
+  // initial paint is progressive and scrolling/recolouring stays at 60 fps.
+  // A newer drawAll() / drawNearPanels() supersedes any pending slice via jobId.
+  var DRAW_SLICE_MS = 10;
+  var drawQueueJob = 0;
+  var drawQueueFrame = 0;
+  function cancelDrawQueue() {
+    drawQueueJob++;
+    if (drawQueueFrame && typeof window.cancelAnimationFrame === 'function') {
+      window.cancelAnimationFrame(drawQueueFrame);
+    }
+    drawQueueFrame = 0;
+  }
+  function shouldTimeSlicePanels(count) {
+    return !focusPanel &&
+      stagePanels >= OFFSTAGE_MIN_PANELS &&
+      count > 1 &&
+      typeof window.requestAnimationFrame === 'function';
+  }
+  function orderPanelsByViewport(list) {
+    if (list.length <= 1) return list.slice();
+    var h = window.innerHeight || 0;
+    var ranked = list.map(function (p, index) {
+      var r = p && p.pane && typeof p.pane.getBoundingClientRect === 'function'
+        ? p.pane.getBoundingClientRect() : null;
+      var inView = !!(r && r.width > 0 && h > 0 && r.bottom > 0 && r.top < h);
+      return {
+        panel: p,
+        tier: inView ? 0 : 1,
+        top: r && isFinite(r.top) ? r.top : index,
+        index: index
+      };
+    });
+    ranked.sort(function (a, b) {
+      return (a.tier - b.tier) || (a.top - b.top) || (a.index - b.index);
+    });
+    return ranked.map(function (entry) { return entry.panel; });
+  }
+  function runDrawQueue(list, options) {
+    cancelDrawQueue();
+    if (!list.length) {
+      if (options && options.onComplete) options.onComplete(false);
+      return;
+    }
+    var queue = orderPanelsByViewport(list);
+    var job = drawQueueJob;
+    var idx = 0;
+    var drewAny = false;
+    var firstShown = null;
+    var timed = shouldTimeSlicePanels(queue.length);
+    function step() {
+      drawQueueFrame = 0;
+      if (job !== drawQueueJob || drawAllDeferred ||
+          (awaitingSupplement && awaitingSupplement === D)) return;
+      var start = timed && typeof performance !== 'undefined' && performance.now
+        ? performance.now() : 0;
+      var drawnInSlice = 0;
+      while (idx < queue.length) {
+        var p = queue[idx++];
+        if (!p || !p.spaceId) continue;
+        if (options && options.prepare) options.prepare(p);
+        var state = shownState(p);
+        if (!firstShown) {
+          firstShown = state;
+          if (options && options.onFirstShown) options.onFirstShown(state);
+        }
+        draw(p, state.mask, state.count);
+        drewAny = true;
+        drawnInSlice++;
+        if (timed && idx < queue.length && drawnInSlice >= 1 &&
+            (performance.now() - start) >= DRAW_SLICE_MS) {
+          drawQueueFrame = window.requestAnimationFrame(step);
+          return;
+        }
+      }
+      if (options && options.onComplete) options.onComplete(drewAny);
+    }
+    step();
   }
   // A panel that was off stage, now near: sized as the layout meanwhile
   // asked, then drawn without re-reading layout (avoids forced reflow).
@@ -1511,11 +1591,22 @@
     });
     if (!waiting.length) return;
     var off = waiting.map(offStage);
-    var drewAny = false;
+    var near = [];
     waiting.forEach(function (p, i) {
-      if (!off[i] && drawOnStage(p)) drewAny = true;
+      if (!off[i]) near.push(p);
     });
-    if (drewAny) updateResetButtons();
+    if (!near.length) return;
+    runDrawQueue(near, {
+      prepare: function (p) {
+        if (p._pendingSize) {
+          var size = p._pendingSize;
+          resizePanel(p, size[0], size[1]);
+        }
+      },
+      onComplete: function (drewAny) {
+        if (drewAny) updateResetButtons();
+      }
+    });
   }
   function resizePanel(p, width, height) {
     var dpr = window.devicePixelRatio || 1;
@@ -3429,19 +3520,29 @@
   var drawAllDeferred = false;
   function drawAll() {
     if (drawAllDeferred || (awaitingSupplement && awaitingSupplement === D)) return;
-    var first = null;
     // Read every panel's place before any is drawn (drawing can dirty layout).
     var off = panels.map(function (p) { return p.spaceId ? offStage(p) : false; });
+    var onStage = [];
     panels.forEach(function (p, index) {
       if (!p.spaceId) { p.cloneBase = null; return; }
       // A panel not on stage is drawn when it comes near (offStage()).
       if (off[index]) { p._resizedUndrawn = true; return; }
-      var state = shownState(p);
-      if (!first) first = state;
-      draw(p, state.mask, state.count);
+      onStage.push(p);
     });
-    if (first) renderShownCount(first.count);
-    updateResetButtons();
+    runDrawQueue(onStage, {
+      prepare: function (p) {
+        if (p._pendingSize) {
+          var size = p._pendingSize;
+          resizePanel(p, size[0], size[1]);
+        }
+      },
+      onFirstShown: function (state) {
+        renderShownCount(state.count);
+      },
+      onComplete: function () {
+        updateResetButtons();
+      }
+    });
   }
   // One panel whose own view changed (zoom, reset): the others are unchanged.
   function drawPanel(p) {
