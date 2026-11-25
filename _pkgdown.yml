@@ -1,5 +1,17 @@
 url: https://www.mheming.com/CerebroNexus/
 
+redirects:
+  - ["articles/use_sce_and_anndata_data.html", "articles/import_your_analysis.html"]
+  - ["articles/export_a_data_set_in_SCE_format.html", "articles/import_your_analysis.html"]
+  - ["articles/multi_crb.html", "articles/create_a_self_contained_shiny_app.html"]
+  - ["articles/launch_cerebro_with_pre-loaded_data_set.html", "articles/create_a_self_contained_shiny_app.html"]
+  - ["articles/host_cerebro_on_shinyapps.html", "articles/create_a_self_contained_shiny_app.html"]
+  - ["articles/most_expressed_genes.html", "articles/tables_and_plots.html"]
+  - ["articles/enriched_pathways.html", "articles/tables_and_plots.html"]
+  - ["articles/extra_material.html", "articles/tables_and_plots.html"]
+  - ["articles/export_and_visualize_custom_tables_and_plots.html", "articles/tables_and_plots.html"]
+  - ["articles/create_expression_matrix_in_h5_format.html", "articles/million_cell_crb_artifacts.html"]
+
 template:
   bootstrap: 5
   light-switch: true
@@ -47,12 +59,10 @@ reference:
       - starts_with(".")
 
 articles:
-  - title: "Workflows"
-    navbar: Workflows
+  - title: "Getting started"
+    navbar: Getting started
     contents:
-      - cerebronexus_workflow_seurat
-      - articles/export_a_data_set_in_SCE_format
-      - use_sce_and_anndata_data
+      - import_your_analysis
   - title: "Data model"
     navbar: Interface
     contents:
@@ -61,16 +71,12 @@ articles:
     navbar: How-to
     contents:
       - articles/build_a_data_set_by_pointing
+      - cerebronexus_workflow_seurat
       - articles/data_integrity_contracts
       - articles/seurat_v5_layered_assays
       - articles/create_a_self_contained_shiny_app
-      - articles/create_expression_matrix_in_h5_format
       - articles/million_cell_crb_artifacts
-      - articles/launch_cerebro_with_pre-loaded_data_set
-      - articles/multi_crb
-      - articles/export_and_visualize_custom_tables_and_plots
       - articles/control_access_to_cerebro_with_a_login_page
-      - articles/host_cerebro_on_shinyapps
   - title: "Benchmarks"
     navbar: Benchmarks
     contents:
@@ -78,9 +84,7 @@ articles:
   - title: "Module guides"
     navbar: Modules
     contents:
-      - articles/most_expressed_genes
-      - articles/enriched_pathways
-      - articles/extra_material
+      - articles/tables_and_plots
       - articles/immune_repertoire_analysis
       - articles/trajectory_analysis
       - articles/spatial_analysis

@@ -31,7 +31,7 @@ Rplots\.pdf$
 
 # CRAN size (cran-size)
 ^vignettes/articles$
-^man/figures/(featured|builder)\.png$
+^man/figures/(featured|builder|builder-review|builder-build|viewer-expression|viewer-marker-genes)\.png$
 ## The AnnData .h5ad/.h5mu fixtures ship. The Zarr stores stay in git: their paths
 ## exceed the 100 bytes a tarball portably holds, and small_v2.zarr has hidden
 ## files.

@@ -118,6 +118,30 @@
   out the 8 brain sections of the authors' file and keeps the 44 spinal cord
   sections.
 
+# CerebroNexus 8.4.12
+
+- **Restructured guides (#267).** The documentation starts with a new
+  "Getting started" vignette, `vignette("import_your_analysis")`, which
+  leads with the workflow, the Builder and a runnable example. It replaces
+  the `use_sce_and_anndata_data` vignette, so
+  `vignette("use_sce_and_anndata_data")` no longer exists. The Seurat
+  workflow vignette moves to How-to, focuses on what CerebroNexus adds and
+  runs again on Seurat v5 (`VariableFeatures()`, `LayerData()`,
+  `layer = 'data'`, `celldex::BlueprintEncodeData()`). On the website,
+  overlapping articles are merged: the three table guides into "Tables and
+  plots", the app-sharing guides into "Create a self-contained Shiny app",
+  and the H5 guide into the large-data guide; the old article addresses
+  redirect to the new ones.
+
+# CerebroNexus 8.4.11
+
+- **HLA & TCR Motifs no longer stays on "Still loading" when it opens on
+  another sub-tab than Motif Network** (#270). The page waited for its motif
+  network canvas to paint, which never happens while Data & QC, Network data
+  or HLA Associations is showing. A canvas page now waits for its canvas only
+  while that canvas is on the visible sub-tab; otherwise it finishes when its
+  outputs settle, like the other pages.
+
 # CerebroNexus 8.4.10
 
 - The source-checkout demo launcher accepts `--data=xenium-prime`: the

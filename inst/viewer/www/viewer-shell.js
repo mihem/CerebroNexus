@@ -671,6 +671,18 @@
     function paneName(pane) {
       return pane && pane.id ? pane.id.replace(/^shiny-tab-/, "") : "";
     }
+    // A canvas page finishes when its canvas paints. A canvas on a hidden
+    // sub-tab (HLA & TCR Motifs opened on Data & QC) never paints, so that
+    // page finishes like any other, on its settled outputs (#270).
+    function waitsForCanvas(pane) {
+      if (!pane || !canvasTabs.has(paneName(pane))) return false;
+      var hosts = pane.querySelectorAll('[id$="_cell_view_host"]');
+      if (!hosts.length) return true;
+      return Array.prototype.some.call(hosts, function (host) {
+        var subTab = host.closest('.tab-pane:not([id^="shiny-tab-"])');
+        return !subTab || subTab.classList.contains('active');
+      });
+    }
     function pageLabel(pane) {
       return ({ overview: 'Projection', geneExpression: 'Gene expression',
         coordinated_views: 'Linked views', trajectory: 'Trajectory', spatial: 'Spatial',
@@ -866,7 +878,7 @@
     }
     function scheduleFinish(pane) {
       if (!pane || pane !== currentPane() ||
-          canvasTabs.has(paneName(pane))) return;
+          waitsForCanvas(pane)) return;
       if (localCompletion(pane)) {
         if (pane !== activePane || localFinishPending || !localResultSettled(pane)) return;
         localFinishPending = true;
@@ -959,7 +971,7 @@
       .on("shiny:idle.cerebroPageLoader", function () {
         shinyBusy = false;
         var pane = currentPane();
-        if (!pane || canvasTabs.has(paneName(pane))) return;
+        if (!pane || waitsForCanvas(pane)) return;
         scheduleFinish(pane);
       })
       .on("shiny:value.cerebroPageLoader", function (event) {
@@ -967,7 +979,7 @@
         drawnTables.delete(event.target);
         drawnPlots.delete(event.target);
         var pane = paneFor(event.target);
-        if (pane && pane === currentPane() && !canvasTabs.has(paneName(pane)) && ownsOutput(pane, event.target)) {
+        if (pane && pane === currentPane() && !waitsForCanvas(pane) && ownsOutput(pane, event.target)) {
           cancelScheduledFinish();
           // Shiny fires value before applying it to the DOM.
           window.setTimeout(function () {
@@ -1046,7 +1058,7 @@
     if (content && window.MutationObserver) {
       new MutationObserver(function (records) {
         var pane = activePane;
-        if (!pane || (!localCompletion(pane) && shinyBusy) || canvasTabs.has(paneName(pane))) return;
+        if (!pane || (!localCompletion(pane) && shinyBusy) || waitsForCanvas(pane)) return;
         var changed = records.some(function (record) {
           return pane.contains(record.target) && !loader.contains(record.target);
         });
