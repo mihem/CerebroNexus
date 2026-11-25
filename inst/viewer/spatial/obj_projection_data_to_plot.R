@@ -48,6 +48,30 @@ spatial_projection_full_ranges <- reactive({
     dataset,
     spatial_name
   )
+  ## Fast path: when unrotated and showing the whole section (no ROI split),
+  ## use the Viewer Pack's persisted spatial extents to avoid reading and
+  ## scanning 800k-cell coordinate matrices on the R server.
+  if (
+    identical(as.numeric(rotation_angle), 0) &&
+      !parameters[["roi_mode"]] %in% c("single", "separate") &&
+      exists("viewerPackCurrent", mode = "function", inherits = TRUE) &&
+      exists("viewerPackSpatialFrame", mode = "function", inherits = TRUE)
+  ) {
+    pack_frame <- viewerPackSpatialFrame(viewerPackCurrent(), spatial_name)
+    if (
+      is.list(pack_frame) &&
+        length(pack_frame$x_range) == 2L &&
+        length(pack_frame$y_range) == 2L &&
+        all(is.finite(c(pack_frame$x_range, pack_frame$y_range)))
+    ) {
+      x_full <- pack_frame$x_range
+      y_full <- pack_frame$y_range
+      return(list(
+        x_range = x_full + c(-1, 1) * diff(x_full) * 0.02,
+        y_range = y_full + c(-1, 1) * diff(y_full) * 0.02
+      ))
+    }
+  }
   full_coords <- viewerSpatialCoordinates(spatial_name)
   if (parameters[["roi_mode"]] %in% c("single", "separate")) {
     roi_context <- spatial_projection_roi_context(spatial_name, rotation_angle)
