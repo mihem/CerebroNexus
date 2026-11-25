@@ -1220,7 +1220,9 @@ test_that("Viewer Pack records spatial extents and reuses unchanged assets incre
   f_imm <- file.path(full_pack, "immune", "encoded.qs2")
   f_hla <- file.path(full_pack, "hla_tcr", "TRB.qs2")
   tracked <- c(f_proj, f_meta, f_grp, f_traj, f_spat, f_imm)
-  if (file.exists(f_hla)) tracked <- c(tracked, f_hla)
+  if (file.exists(f_hla)) {
+    tracked <- c(tracked, f_hla)
+  }
   Sys.setFileTime(tracked, old_mtime)
 
   ## 2a) Add a metadata column -> metadata rebuilds; projections, trajectory,
@@ -1233,7 +1235,12 @@ test_that("Viewer Pack records spatial extents and reuses unchanged assets incre
   opened_m <- runtime$viewerPackOpen(full_crb)
   expect_true("new_score" %in% opened_m$manifest$metadata_names)
   for (p in c(f_proj, f_traj, f_spat, f_imm)) {
-    expect_equal(as.numeric(file.info(p)$mtime), as.numeric(old_mtime), tolerance = 2, info = basename(p))
+    expect_equal(
+      as.numeric(file.info(p)$mtime),
+      as.numeric(old_mtime),
+      tolerance = 2,
+      info = basename(p)
+    )
   }
 
   ## 2b) Add a new projection -> projections rebuild; metadata, groups, spatial,
@@ -1253,9 +1260,16 @@ test_that("Viewer Pack records spatial extents and reuses unchanged assets incre
   opened_p <- runtime$viewerPackOpen(full_crb)
   expect_true("tsne" %in% opened_p$manifest$projection_names)
   reused_after_proj <- c(f_meta, f_grp, f_spat, f_imm)
-  if (file.exists(f_hla)) reused_after_proj <- c(reused_after_proj, f_hla)
+  if (file.exists(f_hla)) {
+    reused_after_proj <- c(reused_after_proj, f_hla)
+  }
   for (p in reused_after_proj) {
-    expect_equal(as.numeric(file.info(p)$mtime), as.numeric(old_mtime), tolerance = 2, info = basename(p))
+    expect_equal(
+      as.numeric(file.info(p)$mtime),
+      as.numeric(old_mtime),
+      tolerance = 2,
+      info = basename(p)
+    )
   }
 })
 
@@ -1308,8 +1322,16 @@ test_that("Viewer Pack persists projection/trajectory extents, reuses unchanged 
   saveCerebro(obj, crb, codec = "rds")
   buildViewerPack(crb, viewer_binary = "always", overwrite = TRUE)
   expect_true(validateViewerPack(crb, pack, full = TRUE)$valid)
-  expect_equal(as.numeric(file.info(f_meta1)$mtime), as.numeric(old_mtime), tolerance = 2)
-  expect_equal(as.numeric(file.info(f_grp1)$mtime), as.numeric(old_mtime), tolerance = 2)
+  expect_equal(
+    as.numeric(file.info(f_meta1)$mtime),
+    as.numeric(old_mtime),
+    tolerance = 2
+  )
+  expect_equal(
+    as.numeric(file.info(f_grp1)$mtime),
+    as.numeric(old_mtime),
+    tolerance = 2
+  )
 
   ## 2b) Adding a second projection reuses unchanged projection 001.bin
   Sys.setFileTime(c(f_proj1, f_meta1, f_grp1, f_spat1, f_spat2), old_mtime)
@@ -1324,7 +1346,11 @@ test_that("Viewer Pack persists projection/trajectory extents, reuses unchanged 
   saveCerebro(obj, crb, codec = "rds")
   buildViewerPack(crb, viewer_binary = "always", overwrite = TRUE)
   expect_true(validateViewerPack(crb, pack, full = TRUE)$valid)
-  expect_equal(as.numeric(file.info(f_proj1)$mtime), as.numeric(old_mtime), tolerance = 2)
+  expect_equal(
+    as.numeric(file.info(f_proj1)$mtime),
+    as.numeric(old_mtime),
+    tolerance = 2
+  )
 
   ## 2c) Editing slice2 reuses unchanged slice (001.geometry.bin)
   Sys.setFileTime(c(f_spat1, f_spat2), old_mtime)
@@ -1333,7 +1359,11 @@ test_that("Viewer Pack persists projection/trajectory extents, reuses unchanged 
   saveCerebro(obj, crb, codec = "rds")
   buildViewerPack(crb, viewer_binary = "always", overwrite = TRUE)
   expect_true(validateViewerPack(crb, pack, full = TRUE)$valid)
-  expect_equal(as.numeric(file.info(f_spat1)$mtime), as.numeric(old_mtime), tolerance = 2)
+  expect_equal(
+    as.numeric(file.info(f_spat1)$mtime),
+    as.numeric(old_mtime),
+    tolerance = 2
+  )
   expect_gt(as.numeric(file.info(f_spat2)$mtime), as.numeric(old_mtime) + 10)
 
   ## 3) Runtime domain-level decoupling without rebuilding Pack:
@@ -1341,7 +1371,12 @@ test_that("Viewer Pack persists projection/trajectory extents, reuses unchanged 
   obj$addExtraMaterial("tables", "notes", data.frame(a = 1L))
   saveCerebro(obj, crb, codec = "rds")
   expect_false(validateViewerPack(crb, pack, full = TRUE)$valid)
-  decoupled_val <- validateViewerPack(crb, pack, full = TRUE, allow_content_match = TRUE)
+  decoupled_val <- validateViewerPack(
+    crb,
+    pack,
+    full = TRUE,
+    allow_content_match = TRUE
+  )
   expect_true(decoupled_val$valid)
   expect_identical(decoupled_val$match_mode, "content_digest")
   expect_null(runtime$viewerPackOpen(crb))
@@ -1361,12 +1396,22 @@ test_that("Viewer Pack persists projection/trajectory extents, reuses unchanged 
   expect_false(runtime$viewerPackDomainEligible(opened_partial, "metadata"))
   expect_false(runtime$viewerPackDomainEligible(opened_partial, "groups"))
   expect_false(is.null(runtime$viewerPackSpatialFrame(opened_partial, "slice")))
-  expect_false(is.null(runtime$viewerPackReadAsset(opened_partial, "spatial/cell_index.qs2")))
-  expect_null(runtime$viewerPackVerifiedAsset(opened_partial, "metadata/001.codes.bin"))
+  expect_false(is.null(runtime$viewerPackReadAsset(
+    opened_partial,
+    "spatial/cell_index.qs2"
+  )))
+  expect_null(runtime$viewerPackVerifiedAsset(
+    opened_partial,
+    "metadata/001.codes.bin"
+  ))
 
   ## 3c) Cell-order mutation -> Pack rejected even with object provided
   obj_reordered <- readCerebro(crb)
-  obj_reordered$meta_data <- obj_reordered$meta_data[rev(seq_len(nrow(obj_reordered$meta_data))), , drop = FALSE]
+  obj_reordered$meta_data <- obj_reordered$meta_data[
+    rev(seq_len(nrow(obj_reordered$meta_data))),
+    ,
+    drop = FALSE
+  ]
   saveCerebro(obj_reordered, crb, codec = "rds")
   expect_null(runtime$viewerPackOpen(crb, object = readCerebro(crb)))
 })

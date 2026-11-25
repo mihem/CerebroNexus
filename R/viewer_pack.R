@@ -88,7 +88,11 @@
     parallel::detectCores(logical = FALSE),
     error = function(e) 1L
   ))
-  if (length(cores) != 1L || is.na(cores) || cores < 1L) 1L else min(4L, as.integer(cores))
+  if (length(cores) != 1L || is.na(cores) || cores < 1L) {
+    1L
+  } else {
+    min(4L, as.integer(cores))
+  }
 }
 
 .viewerPackCrbSample <- function(file, size, bytes = 2^20) {
@@ -180,7 +184,10 @@
     if (!is.na(info$size) && !isTRUE(info$isdir) && info$size >= 1048576) {
       store <- .viewerPackCrbMd5CachePath(path, info)
       if (!is.null(store) && file.exists(store)) {
-        stored <- tryCatch(readLines(store, n = 3L, warn = FALSE), error = function(e) character())
+        stored <- tryCatch(
+          readLines(store, n = 3L, warn = FALSE),
+          error = function(e) character()
+        )
         if (
           length(stored) == 3L &&
             identical(stored[[1L]], .viewerPackCrbVersionLine(path, info)) &&
@@ -214,7 +221,10 @@
       cells,
       collapse = ""
     ))
-    return(paste0("md5-cell-order-v1:", unname(tools::md5sum(bytes = raw_bytes))))
+    return(paste0(
+      "md5-cell-order-v1:",
+      unname(tools::md5sum(bytes = raw_bytes))
+    ))
   }
   path <- tempfile("viewer-pack-cell-order-")
   on.exit(unlink(path), add = TRUE)
@@ -752,7 +762,8 @@
   frames <- list()
   assets <- NULL
   old_frames <- if (
-    !is.null(existing_manifest) && is.data.frame(existing_manifest$spatial_frames)
+    !is.null(existing_manifest) &&
+      is.data.frame(existing_manifest$spatial_frames)
   ) {
     existing_manifest$spatial_frames
   } else {
@@ -789,9 +800,14 @@
             as.numeric(file.info(idx_file, extra_cols = FALSE)$size),
             as.numeric(idx_row$bytes[[1L]])
           ) &&
-          identical(.viewerPackMd5(idx_file), as.character(idx_row$checksum[[1L]]))
+          identical(
+            .viewerPackMd5(idx_file),
+            as.character(idx_row$checksum[[1L]])
+          )
       ) {
-        old_indexes <- tryCatch(qs2::qs_read(idx_file), error = function(e) NULL)
+        old_indexes <- tryCatch(qs2::qs_read(idx_file), error = function(e) {
+          NULL
+        })
       }
     }
   }
@@ -1280,7 +1296,10 @@
   }
   if (
     isTRUE(verify_md5) &&
-      !identical(unname(tools::md5sum(src_paths)), as.character(rows_df$checksum))
+      !identical(
+        unname(tools::md5sum(src_paths)),
+        as.character(rows_df$checksum)
+      )
   ) {
     return(NULL)
   }
@@ -1321,7 +1340,10 @@
   }
   if (
     isTRUE(verify_md5) &&
-      !identical(unname(tools::md5sum(src_paths)), as.character(rows_df$checksum))
+      !identical(
+        unname(tools::md5sum(src_paths)),
+        as.character(rows_df$checksum)
+      )
   ) {
     return(NULL)
   }
@@ -1829,9 +1851,15 @@
         ) {
           old_i <- match(col_name, old_meta_names)
           if (!is.na(old_i)) {
-            old_prefix <- paste0(file.path("metadata", sprintf("%03d", old_i)), ".")
+            old_prefix <- paste0(
+              file.path("metadata", sprintf("%03d", old_i)),
+              "."
+            )
             old_rows <- existing_manifest$assets[
-              startsWith(as.character(existing_manifest$assets$path), old_prefix),
+              startsWith(
+                as.character(existing_manifest$assets$path),
+                old_prefix
+              ),
               ,
               drop = FALSE
             ]
@@ -2341,7 +2369,11 @@ validateViewerPack <- function(
     if (!any(domain_matches)) {
       return(.viewerPackInvalid("Viewer Pack content digests mismatch"))
     }
-    match_mode <- if (all(domain_matches)) "content_digest" else "partial_domain"
+    match_mode <- if (all(domain_matches)) {
+      "content_digest"
+    } else {
+      "partial_domain"
+    }
   }
   assets <- manifest$assets
   if (

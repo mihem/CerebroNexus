@@ -49,7 +49,9 @@ viewerPackDomainEligible <- function(pack, domain) {
     return(TRUE)
   }
   dcache <- pack$domain_cache
-  if (is.environment(dcache) && exists(domain, envir = dcache, inherits = FALSE)) {
+  if (
+    is.environment(dcache) && exists(domain, envir = dcache, inherits = FALSE)
+  ) {
     return(get(domain, envir = dcache, inherits = FALSE))
   }
   manifest_digests <- pack$manifest$content_digests
@@ -64,7 +66,9 @@ viewerPackDomainEligible <- function(pack, domain) {
         as.character(manifest_digests[["trajectories"]]),
         as.character(.viewerPackRuntimeDomainDigest(obj, "trajectories"))
       )
-  } else if (domain %in% c("projections", "metadata", "spatial", "immune", "hla_tcr")) {
+  } else if (
+    domain %in% c("projections", "metadata", "spatial", "immune", "hla_tcr")
+  ) {
     identical(
       as.character(manifest_digests[[domain]]),
       as.character(.viewerPackRuntimeDomainDigest(obj, domain))
@@ -93,10 +97,14 @@ viewerPackDomainEligible <- function(pack, domain) {
 .viewerPackRuntimeDomainDigest <- function(object, domain) {
   hash_section <- function(value) paste0("xxh128-v1:", rlang::hash(value))
   if (identical(domain, "projections")) {
-    projections <- tryCatch(object$availableProjections(), error = function(e) character())
+    projections <- tryCatch(object$availableProjections(), error = function(e) {
+      character()
+    })
     proj_digests <- stats::setNames(
       lapply(projections, function(nm) {
-        hash_section(tryCatch(object$getProjection(nm), error = function(e) NULL))
+        hash_section(tryCatch(object$getProjection(nm), error = function(e) {
+          NULL
+        }))
       }),
       projections
     )
@@ -115,7 +123,9 @@ viewerPackDomainEligible <- function(pack, domain) {
     )
     return(hash_section(list(
       groups = tryCatch(object$getGroups(), error = function(e) character()),
-      cell_cycle = tryCatch(object$getCellCycle(), error = function(e) character()),
+      cell_cycle = tryCatch(object$getCellCycle(), error = function(e) {
+        character()
+      }),
       columns = meta_col_digests
     )))
   }
@@ -123,7 +133,9 @@ viewerPackDomainEligible <- function(pack, domain) {
     return(hash_section(object$trajectories))
   }
   if (identical(domain, "spatial")) {
-    spatial_names <- tryCatch(object$availableSpatial(), error = function(e) character())
+    spatial_names <- tryCatch(object$availableSpatial(), error = function(e) {
+      character()
+    })
     spatial_digests <- stats::setNames(
       lapply(spatial_names, function(nm) {
         hash_section(tryCatch(
@@ -136,7 +148,9 @@ viewerPackDomainEligible <- function(pack, domain) {
     return(hash_section(spatial_digests))
   }
   if (identical(domain, "immune")) {
-    repertoire <- tryCatch(object$getImmuneRepertoire(), error = function(e) list())
+    repertoire <- tryCatch(object$getImmuneRepertoire(), error = function(e) {
+      list()
+    })
     ir_version <- if (length(repertoire)) {
       if (exists("IR_ENCODING_VERSION", inherits = TRUE)) {
         get("IR_ENCODING_VERSION", inherits = TRUE)
@@ -145,7 +159,12 @@ viewerPackDomainEligible <- function(pack, domain) {
           {
             enc_env <- new.env(parent = baseenv())
             sys.source(
-              system.file("viewer", "immune_repertoire", "encode.R", package = "CerebroNexus"),
+              system.file(
+                "viewer",
+                "immune_repertoire",
+                "encode.R",
+                package = "CerebroNexus"
+              ),
               envir = enc_env
             )
             enc_env$IR_ENCODING_VERSION
@@ -159,7 +178,9 @@ viewerPackDomainEligible <- function(pack, domain) {
     return(hash_section(list(version = ir_version, repertoire = repertoire)))
   }
   if (identical(domain, "hla_tcr")) {
-    repertoire <- tryCatch(object$getImmuneRepertoire(), error = function(e) list())
+    repertoire <- tryCatch(object$getImmuneRepertoire(), error = function(e) {
+      list()
+    })
     has_hla_pkgs <- requireNamespace("igraph", quietly = TRUE) &&
       requireNamespace("stringdist", quietly = TRUE)
     meta_col_digests <- if (length(repertoire)) {
@@ -179,7 +200,10 @@ viewerPackDomainEligible <- function(pack, domain) {
     return(hash_section(list(
       enabled = has_hla_pkgs,
       groups = tryCatch(object$getGroups(), error = function(e) character()),
-      lineage = tryCatch(object$getTechnicalInfo()$lineage_column, error = function(e) NULL),
+      lineage = tryCatch(
+        object$getTechnicalInfo()$lineage_column,
+        error = function(e) NULL
+      ),
       repertoire = repertoire,
       metadata = meta_col_digests
     )))
@@ -246,7 +270,9 @@ viewerPackOpen <- function(file, object = NULL) {
       return(NULL)
     }
     metadata <- tryCatch(object$getMetaData(), error = function(e) NULL)
-    cells <- if (is.data.frame(metadata) && "cell_barcode" %in% colnames(metadata)) {
+    cells <- if (
+      is.data.frame(metadata) && "cell_barcode" %in% colnames(metadata)
+    ) {
       as.character(metadata$cell_barcode)
     } else {
       NULL
@@ -332,7 +358,11 @@ viewerPackSourceSignature <- function(file) {
     parallel::detectCores(logical = FALSE),
     error = function(e) 1L
   ))
-  if (length(cores) != 1L || is.na(cores) || cores < 1L) 1L else min(4L, as.integer(cores))
+  if (length(cores) != 1L || is.na(cores) || cores < 1L) {
+    1L
+  } else {
+    min(4L, as.integer(cores))
+  }
 }
 
 .viewerPackCacheSlots <- function() {
