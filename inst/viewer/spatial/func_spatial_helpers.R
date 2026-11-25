@@ -589,41 +589,127 @@ blend_genes_to_rgb <- function(r = NULL, g = NULL, b = NULL) {
 
 morans_i <- function(x, y, values, k = 6) {
   ok <- !is.na(x) & !is.na(y) & !is.na(values)
-  x <- x[ok]
-  y <- y[ok]
-  values <- values[ok]
+  x <- as.numeric(x[ok])
+  y <- as.numeric(y[ok])
+  values <- as.numeric(values[ok])
   n <- length(values)
-  if (n < k + 1) {
+  k <- as.integer(k)
+  if (n < k + 1L || k < 1L) {
     return(NA_real_)
   }
   if (stats::sd(values) == 0) {
     return(0)
   }
-  ## Euclidean distance matrix, then a binary weight for each cell's k nearest
-  ## neighbours (excluding itself). O(n^2); callers down-sample large inputs.
-  dmat <- as.matrix(stats::dist(cbind(x, y)))
-  weight <- matrix(0, n, n)
-  for (i in seq_len(n)) {
-    di <- dmat[i, ]
-    di[i] <- Inf # never neighbour itself
-    nn <- order(di)[seq_len(k)]
-    weight[i, nn] <- 1
+  ## Exact k-nearest-neighbour graph via 2D uniform spatial grid bucketing
+  ## (O(n) average time and O(k*n) memory instead of O(n^2) dense matrices).
+  from <- integer(n * k)
+  to <- integer(n * k)
+  rx <- range(x)
+  ry <- range(y)
+  dx <- rx[2L] - rx[1L]
+  dy <- ry[2L] - ry[1L]
+  if (n <= 128L || (dx == 0 && dy == 0)) {
+    dmat <- as.matrix(stats::dist(cbind(x, y)))
+    for (i in seq_len(n)) {
+      di <- dmat[i, ]
+      di[i] <- Inf
+      nn <- order(di)[seq_len(k)]
+      off <- (i - 1L) * k
+      from[off + seq_len(k)] <- i
+      to[off + seq_len(k)] <- nn
+    }
+  } else {
+    g <- max(2L, as.integer(floor(sqrt(n / max(k, 4L)))))
+    gx_n <- if (dx > 0) g else 1L
+    gy_n <- if (dy > 0) g else 1L
+    cell_w <- if (dx > 0) dx / gx_n else Inf
+    cell_h <- if (dy > 0) dy / gy_n else Inf
+    min_step <- min(cell_w, cell_h)
+    gx <- if (dx > 0) {
+      pmin(gx_n, pmax(1L, as.integer(floor((x - rx[1L]) / cell_w)) + 1L))
+    } else {
+      rep(1L, n)
+    }
+    gy <- if (dy > 0) {
+      pmin(gy_n, pmax(1L, as.integer(floor((y - ry[1L]) / cell_h)) + 1L))
+    } else {
+      rep(1L, n)
+    }
+    bucket_id <- gx + (gy - 1L) * gx_n
+    buckets <- split(seq_len(n), factor(bucket_id, levels = seq_len(gx_n * gy_n)))
+    max_ring <- max(gx_n, gy_n)
+    for (i in seq_len(n)) {
+      cx <- gx[[i]]
+      cy <- gy[[i]]
+      xi <- x[[i]]
+      yi <- y[[i]]
+      cand <- integer()
+      for (r in 0L:max_ring) {
+        x0 <- max(1L, cx - r)
+        x1 <- min(gx_n, cx + r)
+        y0 <- max(1L, cy - r)
+        y1 <- min(gy_n, cy + r)
+        if (r == 0L) {
+          ids <- cx + (cy - 1L) * gx_n
+        } else {
+          ids <- integer()
+          if (cy - r >= 1L) {
+            ids <- c(ids, (x0:x1) + (cy - r - 1L) * gx_n)
+          }
+          if (cy + r <= gy_n) {
+            ids <- c(ids, (x0:x1) + (cy + r - 1L) * gx_n)
+          }
+          ym0 <- max(1L, cy - r + 1L)
+          ym1 <- min(gy_n, cy + r - 1L)
+          if (ym0 <= ym1) {
+            if (cx - r >= 1L) {
+              ids <- c(ids, (cx - r) + (ym0:ym1 - 1L) * gx_n)
+            }
+            if (cx + r <= gx_n) {
+              ids <- c(ids, (cx + r) + (ym0:ym1 - 1L) * gx_n)
+            }
+          }
+        }
+        if (length(ids)) {
+          added <- unlist(buckets[ids], use.names = FALSE)
+          if (length(added)) {
+            if (r == 0L) {
+              added <- added[added != i]
+            }
+            if (length(added)) {
+              cand <- c(cand, added)
+            }
+          }
+        }
+        if (length(cand) >= k) {
+          d2 <- (x[cand] - xi)^2 + (y[cand] - yi)^2
+          ord <- order(d2)
+          dk2 <- d2[[ord[[k]]]]
+          min_next_d2 <- (r * min_step)^2
+          if (r == max_ring || dk2 < min_next_d2) {
+            nn <- cand[ord[seq_len(k)]]
+            off <- (i - 1L) * k
+            from[off + seq_len(k)] <- i
+            to[off + seq_len(k)] <- nn
+            break
+          }
+        }
+      }
+    }
   }
-  ## kNN adjacency is directional (i may be j's neighbour without the reverse),
-  ## which yields an asymmetric, un-normalised weight matrix and pushes
-  ## ape::Moran.I's statistic outside the documented [-1, 1] range. Symmetrise
-  ## (undirected edge if either cell lists the other) then row-normalise so the
-  ## weights sum to 1 per cell, giving a well-scaled statistic.
-  weight <- pmax(weight, t(weight))
-  row_sums <- rowSums(weight)
-  row_sums[row_sums == 0] <- 1 # avoid 0/0 for isolated cells
-  weight <- weight / row_sums
-  ## Moran's I observed statistic, computed natively (matches ape::Moran.I()
-  ## $observed to floating-point precision) so the viewer needs no ape dependency:
-  ##   I = (n / W) * sum_ij w_ij (x_i - xbar)(x_j - xbar) / sum_i (x_i - xbar)^2
+  ## Symmetrise into an undirected sparse edge list and row-normalise weights
+  ## (algebraically identical to pmax(W, t(W)) / rowSums(...) and ape::Moran.I()).
+  u <- pmin(from, to)
+  v <- pmax(from, to)
+  edge_key <- as.numeric(u) + (as.numeric(v) - 1) * as.numeric(n)
+  keep <- !duplicated(edge_key)
+  u <- u[keep]
+  v <- v[keep]
+  deg <- tabulate(c(u, v), nbins = n)
+  inv_deg <- ifelse(deg > 0L, 1 / deg, 0)
   z <- values - mean(values)
-  W <- sum(weight)
-  (n / W) * sum(weight * outer(z, z)) / sum(z^2)
+  W <- sum(deg > 0L)
+  (n / W) * sum((inv_deg[u] + inv_deg[v]) * z[u] * z[v]) / sum(z^2)
 }
 
 

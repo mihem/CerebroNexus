@@ -395,6 +395,7 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
     var layerSlot = { buffer: null, size: 0 };
     var orderSlot = { buffer: null, size: 0 };
     var pointsGroup = null;
+    var pointsGroupUsesLayer = false;
     var data = null;
     var lastFrame = null;
     var width = 1;
@@ -433,6 +434,7 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
       bindGroups = [];
       orderedBindGroups = [];
       pointsGroup = null;
+      pointsGroupUsesLayer = false;
       if (context && context.unconfigure) {
         try { context.unconfigure(); } catch (error) { /* already gone */ }
       }
@@ -606,27 +608,29 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
       }
       if (checked.uploadLayers) {
         if (uploadSlot(layerSlot, webGpuLayerBytes(checked.uploadLayers))) buffersChanged = true;
-      } else if (!record.hasLayers && layerSlot.buffer) {
-        destroySlot(layerSlot);
-        buffersChanged = true;
       }
       if (checked.uploadDrawOrder) {
         if (uploadSlot(orderSlot, checked.uploadDrawOrder, 0)) buffersChanged = true;
-      } else if (!record.hasDrawOrder && orderSlot.buffer) {
-        destroySlot(orderSlot);
       }
-      if (record.hasDrawOrder && (buffersChanged || !pointsGroup)) {
+      // Keep layerSlot/orderSlot GPUBuffers pooled across temporary filter or
+      // paint-order toggles so toggling back does not reallocate megabyte GPU
+      // buffers; cleanupGpuObjects() still destroys them on release/loss.
+      var wantLayerBinding = !!(record.hasLayers && layerSlot.buffer);
+      if (record.hasDrawOrder &&
+          (buffersChanged || !pointsGroup || pointsGroupUsesLayer !== wantLayerBinding)) {
+        pointsGroupUsesLayer = wantLayerBinding;
         pointsGroup = device.createBindGroup({
           layout: orderedPipeline.getBindGroupLayout(1),
           entries: [
             positionSlot.buffer, colorSlot.buffer,
-            layerSlot.buffer || dummyLayerBuffer, orderSlot.buffer
+            wantLayerBinding ? layerSlot.buffer : dummyLayerBuffer, orderSlot.buffer
           ].map(function (buffer, binding) {
             return { binding: binding, resource: { buffer: buffer } };
           })
         });
       } else if (!record.hasDrawOrder) {
         pointsGroup = null;
+        pointsGroupUsesLayer = false;
       }
       data = record;
       metrics.pointCount = record.count;
