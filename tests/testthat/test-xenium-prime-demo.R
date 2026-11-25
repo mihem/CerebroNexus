@@ -323,7 +323,8 @@ test_that("the optional Prime 5K menu entry adds the dataset with readable cell 
   appearance <- configured$viewer_content[[
     label
   ]]$spatial_point_appearance$coronal
-  expect_identical(appearance, list(point_size = 2, point_opacity = 0.9))
+  ## No fixed size for the section: "Auto" sizes it from its coordinates.
+  expect_identical(appearance, list(point_opacity = 0.9))
   ## 63,000 cells: dots that are neither the million-cell defaults nor opaque
   ## blobs, so the clusters read clearly and the tissue shows between them.
   expect_equal(unname(configured$point_size[label]), 2)
