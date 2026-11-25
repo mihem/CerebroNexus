@@ -1200,17 +1200,61 @@ test_that("Viewer Pack records spatial extents and reuses unchanged assets incre
     tolerance = 2
   )
 
-  ## 2) Partial CRB edit (new metadata column only): spatial & common reused, metadata rebuilt!
-  Sys.setFileTime(spatial_file, old_mtime)
-  obj$meta_data$new_score <- seq_len(nrow(obj$meta_data)) * 2
-  saveCerebro(obj, crb, codec = "rds")
-  rebuilt2 <- buildViewerPack(crb, viewer_binary = "always", overwrite = TRUE)
-  expect_true(validateViewerPack(crb, rebuilt2, full = TRUE)$valid)
-  opened3 <- runtime$viewerPackOpen(crb)
-  expect_true("new_score" %in% opened3$manifest$metadata_names)
-  expect_equal(
-    as.numeric(file.info(spatial_file)$mtime),
-    as.numeric(old_mtime),
-    tolerance = 2
+  ## 2) Partial CRB edit (new metadata column only): projections, trajectory,
+  ##    spatial, immune, and common are reused while metadata rebuilds!
+  full_crb <- viewer_pack_fixture(
+    file.path(root, "full.crb"),
+    n = 6L,
+    immune = TRUE,
+    trajectory = TRUE,
+    spatial = TRUE,
+    groups = TRUE
   )
+  full_pack <- buildViewerPack(full_crb, viewer_binary = "always")
+  expect_true(validateViewerPack(full_crb, full_pack, full = TRUE)$valid)
+  f_proj <- file.path(full_pack, "projections", "001.bin")
+  f_meta <- file.path(full_pack, "metadata", "001.codes.bin")
+  f_grp <- file.path(full_pack, "groups", "001.qs2")
+  f_traj <- file.path(full_pack, "trajectory", "cell_index.qs2")
+  f_spat <- file.path(full_pack, "spatial", "001.geometry.bin")
+  f_imm <- file.path(full_pack, "immune", "encoded.qs2")
+  f_hla <- file.path(full_pack, "hla_tcr", "TRB.qs2")
+  tracked <- c(f_proj, f_meta, f_grp, f_traj, f_spat, f_imm)
+  if (file.exists(f_hla)) tracked <- c(tracked, f_hla)
+  Sys.setFileTime(tracked, old_mtime)
+
+  ## 2a) Add a metadata column -> metadata rebuilds; projections, trajectory,
+  ##     spatial, immune keep their original mtime (reused).
+  fobj <- readCerebro(full_crb)
+  fobj$meta_data$new_score <- seq_len(nrow(fobj$meta_data)) * 2
+  saveCerebro(fobj, full_crb, codec = "rds")
+  buildViewerPack(full_crb, viewer_binary = "always", overwrite = TRUE)
+  expect_true(validateViewerPack(full_crb, full_pack, full = TRUE)$valid)
+  opened_m <- runtime$viewerPackOpen(full_crb)
+  expect_true("new_score" %in% opened_m$manifest$metadata_names)
+  for (p in c(f_proj, f_traj, f_spat, f_imm)) {
+    expect_equal(as.numeric(file.info(p)$mtime), as.numeric(old_mtime), tolerance = 2, info = basename(p))
+  }
+
+  ## 2b) Add a new projection -> projections rebuild; metadata, groups, spatial,
+  ##     immune, and hla_tcr keep their original mtime (reused).
+  Sys.setFileTime(tracked, old_mtime)
+  fobj$addProjection(
+    "tsne",
+    data.frame(
+      tSNE_1 = seq_len(nrow(fobj$meta_data)),
+      tSNE_2 = rev(seq_len(nrow(fobj$meta_data))),
+      row.names = fobj$meta_data$cell_barcode
+    )
+  )
+  saveCerebro(fobj, full_crb, codec = "rds")
+  buildViewerPack(full_crb, viewer_binary = "always", overwrite = TRUE)
+  expect_true(validateViewerPack(full_crb, full_pack, full = TRUE)$valid)
+  opened_p <- runtime$viewerPackOpen(full_crb)
+  expect_true("tsne" %in% opened_p$manifest$projection_names)
+  reused_after_proj <- c(f_meta, f_grp, f_spat, f_imm)
+  if (file.exists(f_hla)) reused_after_proj <- c(reused_after_proj, f_hla)
+  for (p in reused_after_proj) {
+    expect_equal(as.numeric(file.info(p)$mtime), as.numeric(old_mtime), tolerance = 2, info = basename(p))
+  }
 })
