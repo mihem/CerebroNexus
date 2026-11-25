@@ -1142,7 +1142,12 @@
   manifest
 }
 
-.viewerPackStageVerifiedAssets <- function(existing_pack, rows_df, stage) {
+.viewerPackStageVerifiedAssets <- function(
+  existing_pack,
+  rows_df,
+  stage,
+  verify_md5 = FALSE
+) {
   if (!is.data.frame(rows_df) || !nrow(rows_df)) {
     return(NULL)
   }
@@ -1156,7 +1161,8 @@
     return(NULL)
   }
   if (
-    !identical(unname(tools::md5sum(src_paths)), as.character(rows_df$checksum))
+    isTRUE(verify_md5) &&
+      !identical(unname(tools::md5sum(src_paths)), as.character(rows_df$checksum))
   ) {
     return(NULL)
   }
@@ -1176,7 +1182,8 @@
   existing_pack,
   rows_df,
   stage,
-  new_rel_paths
+  new_rel_paths,
+  verify_md5 = FALSE
 ) {
   if (
     !is.data.frame(rows_df) ||
@@ -1195,7 +1202,8 @@
     return(NULL)
   }
   if (
-    !identical(unname(tools::md5sum(src_paths)), as.character(rows_df$checksum))
+    isTRUE(verify_md5) &&
+      !identical(unname(tools::md5sum(src_paths)), as.character(rows_df$checksum))
   ) {
     return(NULL)
   }
@@ -2412,6 +2420,57 @@ buildViewerPack <- function(
     payload = payload,
     crb_md5 = crb_md5
   )
+  if (!isTRUE(check$valid) && !is.null(existing_manifest)) {
+    ## An existing pack file may have been corrupted with identical byte size:
+    ## fall back to a clean full build before failing.
+    unlink(stage, recursive = TRUE, force = TRUE)
+    dir.create(stage, showWarnings = FALSE)
+    built <- .viewerPackBuildAssets(
+      object,
+      stage,
+      existing_pack = NULL,
+      existing_manifest = NULL,
+      cell_order_fingerprint = cell_order_fingerprint,
+      content_digests = content_digests,
+      item_digests = item_digests
+    )
+    manifest <- list(
+      schema_version = .viewerPackSchemaVersion,
+      format_revision = .viewerPackFormatRevision,
+      dataset_fingerprint = paste0("md5-crb-v1:", crb_md5),
+      cell_order_fingerprint = cell_order_fingerprint,
+      n_cells = length(cells),
+      modules = built$modules,
+      capabilities = built$capabilities,
+      projection_names = built$projection_names,
+      projection_frames = built$projection_frames,
+      metadata_names = built$metadata_names,
+      group_metric_frames = built$group_metric_frames,
+      trajectory_frames = built$trajectory_frames,
+      spatial_frames = built$spatial_frames,
+      immune_receptors = built$immune_receptors,
+      immune_encoding = built$immune_encoding,
+      immune_clonal_frames = built$immune_clonal_frames,
+      hla_chains = built$hla_chains,
+      content_digests = built$content_digests,
+      item_digests = built$item_digests,
+      assets = built$assets
+    )
+    jsonlite::write_json(
+      manifest,
+      file.path(stage, "manifest.json"),
+      auto_unbox = TRUE,
+      pretty = TRUE,
+      dataframe = "rows"
+    )
+    check <- .validateViewerPack(
+      file,
+      stage,
+      full = TRUE,
+      payload = payload,
+      crb_md5 = crb_md5
+    )
+  }
   if (!isTRUE(check$valid)) {
     stop("Built Viewer Pack failed validation: ", check$reason, call. = FALSE)
   }

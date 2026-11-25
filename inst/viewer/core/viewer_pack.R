@@ -28,18 +28,54 @@ viewerPackCellOrderFingerprint <- function(cells) {
 }
 
 ## TRUE when `domain` is eligible to be served from `pack`.
-## Packs opened via exact CRB MD5 match have `eligible_domains = NULL` (all
-## domains eligible); packs opened via content-digest decoupling carry a named
-## logical list so changed domains seamlessly fall back to the CRB.
+## Packs opened via exact CRB MD5 match have `eligible_domains = NULL` and
+## `runtime_object = NULL` (all domains eligible); packs opened via lazy
+## content-digest decoupling evaluate ONLY the requested domain on first access
+## and cache the boolean result in `pack$domain_cache`.
 viewerPackDomainEligible <- function(pack, domain) {
   if (!is.list(pack)) {
     return(FALSE)
   }
+  domain <- as.character(domain)
   eligible <- pack$eligible_domains
-  if (is.null(eligible)) {
+  if (!is.null(eligible)) {
+    return(isTRUE(eligible[[domain]]))
+  }
+  obj <- pack$runtime_object
+  if (is.null(obj)) {
     return(TRUE)
   }
-  isTRUE(eligible[[as.character(domain)]])
+  if (identical(domain, "common")) {
+    return(TRUE)
+  }
+  dcache <- pack$domain_cache
+  if (is.environment(dcache) && exists(domain, envir = dcache, inherits = FALSE)) {
+    return(get(domain, envir = dcache, inherits = FALSE))
+  }
+  manifest_digests <- pack$manifest$content_digests
+  if (!is.list(manifest_digests)) {
+    return(FALSE)
+  }
+  ok <- if (identical(domain, "groups")) {
+    viewerPackDomainEligible(pack, "metadata")
+  } else if (identical(domain, "trajectory")) {
+    viewerPackDomainEligible(pack, "projections") &&
+      identical(
+        as.character(manifest_digests[["trajectories"]]),
+        as.character(.viewerPackRuntimeDomainDigest(obj, "trajectories"))
+      )
+  } else if (domain %in% c("projections", "metadata", "spatial", "immune", "hla_tcr")) {
+    identical(
+      as.character(manifest_digests[[domain]]),
+      as.character(.viewerPackRuntimeDomainDigest(obj, domain))
+    )
+  } else {
+    FALSE
+  }
+  if (is.environment(dcache)) {
+    assign(domain, isTRUE(ok), envir = dcache)
+  }
+  isTRUE(ok)
 }
 
 .viewerPackAssetDomain <- function(path) {
@@ -54,94 +90,101 @@ viewerPackDomainEligible <- function(pack, domain) {
   substr(path, 1L, slash - 1L)
 }
 
-.viewerPackRuntimeContentDigests <- function(object) {
+.viewerPackRuntimeDomainDigest <- function(object, domain) {
   hash_section <- function(value) paste0("xxh128-v1:", rlang::hash(value))
-  projections <- tryCatch(object$availableProjections(), error = function(e) {
-    character()
-  })
-  proj_digests <- stats::setNames(
-    lapply(projections, function(nm) {
-      hash_section(tryCatch(object$getProjection(nm), error = function(e) NULL))
-    }),
-    projections
-  )
-  metadata <- tryCatch(object$getMetaData(), error = function(e) NULL)
-  metadata_names <- if (is.data.frame(metadata)) {
-    setdiff(colnames(metadata), "cell_barcode")
-  } else {
-    character()
-  }
-  meta_col_digests <- stats::setNames(
-    lapply(metadata_names, function(col) hash_section(metadata[[col]])),
-    metadata_names
-  )
-  spatial_names <- tryCatch(object$availableSpatial(), error = function(e) {
-    character()
-  })
-  spatial_digests <- stats::setNames(
-    lapply(spatial_names, function(nm) {
-      hash_section(tryCatch(
-        object$getSpatialData(nm, hydrate_molecules = FALSE)[["coordinates"]],
-        error = function(e) NULL
-      ))
-    }),
-    spatial_names
-  )
-  repertoire <- tryCatch(object$getImmuneRepertoire(), error = function(e) {
-    list()
-  })
-  ir_version <- if (length(repertoire)) {
-    if (exists("IR_ENCODING_VERSION", inherits = TRUE)) {
-      get("IR_ENCODING_VERSION", inherits = TRUE)
-    } else {
-      tryCatch(
-        {
-          enc_env <- new.env(parent = baseenv())
-          sys.source(
-            system.file(
-              "viewer",
-              "immune_repertoire",
-              "encode.R",
-              package = "CerebroNexus"
-            ),
-            envir = enc_env
-          )
-          enc_env$IR_ENCODING_VERSION
-        },
-        error = function(e) NA_integer_
-      )
-    }
-  } else {
-    0L
-  }
-  has_hla_pkgs <- requireNamespace("igraph", quietly = TRUE) &&
-    requireNamespace("stringdist", quietly = TRUE)
-  list(
-    projections = hash_section(proj_digests),
-    metadata = hash_section(list(
-      groups = tryCatch(object$getGroups(), error = function(e) character()),
-      cell_cycle = tryCatch(object$getCellCycle(), error = function(e) {
-        character()
+  if (identical(domain, "projections")) {
+    projections <- tryCatch(object$availableProjections(), error = function(e) character())
+    proj_digests <- stats::setNames(
+      lapply(projections, function(nm) {
+        hash_section(tryCatch(object$getProjection(nm), error = function(e) NULL))
       }),
+      projections
+    )
+    return(hash_section(proj_digests))
+  }
+  if (identical(domain, "metadata")) {
+    metadata <- tryCatch(object$getMetaData(), error = function(e) NULL)
+    metadata_names <- if (is.data.frame(metadata)) {
+      setdiff(colnames(metadata), "cell_barcode")
+    } else {
+      character()
+    }
+    meta_col_digests <- stats::setNames(
+      lapply(metadata_names, function(col) hash_section(metadata[[col]])),
+      metadata_names
+    )
+    return(hash_section(list(
+      groups = tryCatch(object$getGroups(), error = function(e) character()),
+      cell_cycle = tryCatch(object$getCellCycle(), error = function(e) character()),
       columns = meta_col_digests
-    )),
-    trajectories = hash_section(object$trajectories),
-    spatial = hash_section(spatial_digests),
-    immune = hash_section(list(
-      version = ir_version,
-      repertoire = repertoire
-    )),
-    hla_tcr = hash_section(list(
+    )))
+  }
+  if (identical(domain, "trajectories")) {
+    return(hash_section(object$trajectories))
+  }
+  if (identical(domain, "spatial")) {
+    spatial_names <- tryCatch(object$availableSpatial(), error = function(e) character())
+    spatial_digests <- stats::setNames(
+      lapply(spatial_names, function(nm) {
+        hash_section(tryCatch(
+          object$getSpatialData(nm, hydrate_molecules = FALSE)[["coordinates"]],
+          error = function(e) NULL
+        ))
+      }),
+      spatial_names
+    )
+    return(hash_section(spatial_digests))
+  }
+  if (identical(domain, "immune")) {
+    repertoire <- tryCatch(object$getImmuneRepertoire(), error = function(e) list())
+    ir_version <- if (length(repertoire)) {
+      if (exists("IR_ENCODING_VERSION", inherits = TRUE)) {
+        get("IR_ENCODING_VERSION", inherits = TRUE)
+      } else {
+        tryCatch(
+          {
+            enc_env <- new.env(parent = baseenv())
+            sys.source(
+              system.file("viewer", "immune_repertoire", "encode.R", package = "CerebroNexus"),
+              envir = enc_env
+            )
+            enc_env$IR_ENCODING_VERSION
+          },
+          error = function(e) NA_integer_
+        )
+      }
+    } else {
+      0L
+    }
+    return(hash_section(list(version = ir_version, repertoire = repertoire)))
+  }
+  if (identical(domain, "hla_tcr")) {
+    repertoire <- tryCatch(object$getImmuneRepertoire(), error = function(e) list())
+    has_hla_pkgs <- requireNamespace("igraph", quietly = TRUE) &&
+      requireNamespace("stringdist", quietly = TRUE)
+    meta_col_digests <- if (length(repertoire)) {
+      metadata <- tryCatch(object$getMetaData(), error = function(e) NULL)
+      metadata_names <- if (is.data.frame(metadata)) {
+        setdiff(colnames(metadata), "cell_barcode")
+      } else {
+        character()
+      }
+      stats::setNames(
+        lapply(metadata_names, function(col) hash_section(metadata[[col]])),
+        metadata_names
+      )
+    } else {
+      NULL
+    }
+    return(hash_section(list(
       enabled = has_hla_pkgs,
       groups = tryCatch(object$getGroups(), error = function(e) character()),
-      lineage = tryCatch(
-        object$getTechnicalInfo()$lineage_column,
-        error = function(e) NULL
-      ),
+      lineage = tryCatch(object$getTechnicalInfo()$lineage_column, error = function(e) NULL),
       repertoire = repertoire,
-      metadata = if (length(repertoire)) meta_col_digests else NULL
-    ))
-  )
+      metadata = meta_col_digests
+    )))
+  }
+  NA_character_
 }
 
 viewerPackOpen <- function(file, object = NULL) {
@@ -196,6 +239,8 @@ viewerPackOpen <- function(file, object = NULL) {
   )
   match_mode <- "crb_md5"
   eligible_domains <- NULL
+  runtime_object <- NULL
+  domain_cache <- NULL
   if (!md5_matches) {
     if (is.null(object) || !is.list(manifest$content_digests)) {
       return(NULL)
@@ -228,32 +273,9 @@ viewerPackOpen <- function(file, object = NULL) {
     ) {
       return(NULL)
     }
-    current_digests <- .viewerPackRuntimeContentDigests(object)
-    domain_matches <- vapply(
-      names(current_digests),
-      function(nm) {
-        identical(
-          as.character(manifest$content_digests[[nm]]),
-          as.character(current_digests[[nm]])
-        )
-      },
-      logical(1)
-    )
-    if (!any(domain_matches)) {
-      return(NULL)
-    }
-    eligible_domains <- list(
-      common = TRUE,
-      projections = isTRUE(domain_matches[["projections"]]),
-      metadata = isTRUE(domain_matches[["metadata"]]),
-      groups = isTRUE(domain_matches[["metadata"]]),
-      trajectory = isTRUE(domain_matches[["trajectories"]]) &&
-        isTRUE(domain_matches[["projections"]]),
-      spatial = isTRUE(domain_matches[["spatial"]]),
-      immune = isTRUE(domain_matches[["immune"]]),
-      hla_tcr = isTRUE(domain_matches[["hla_tcr"]])
-    )
-    match_mode <- if (all(domain_matches)) "content_digest" else "partial_domain"
+    match_mode <- "lazy_domain"
+    runtime_object <- object
+    domain_cache <- new.env(parent = emptyenv())
   }
   list(
     path = pack,
@@ -262,6 +284,8 @@ viewerPackOpen <- function(file, object = NULL) {
     canonical_order = TRUE,
     match_mode = match_mode,
     eligible_domains = eligible_domains,
+    runtime_object = runtime_object,
+    domain_cache = domain_cache,
     cache = new.env(parent = emptyenv())
   )
 }
