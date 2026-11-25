@@ -4026,3 +4026,30 @@ body .selectize-dropdown.cerebro-ms-dropdown .selectize-dropdown-content {
   opacity: .55;
   cursor: default;
 }
+
+/* Point size with its "Auto" switch at the right of the label
+   (viewerPointSizeWithAuto()): one cell of the settings grid. */
+.cv-point-size { position: relative; }
+.cv-point-size .cv-point-size-auto {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 20px;
+  color: #6b7280;
+  cursor: pointer;
+  user-select: none;
+}
+.cv-point-size .cv-point-size-auto input {
+  margin: 0;
+  width: 13px;
+  height: 13px;
+  accent-color: #f26b1d;
+  cursor: pointer;
+}
+.cv-point-size .cv-point-size-auto.is-unavailable { opacity: 0.45; cursor: default; }

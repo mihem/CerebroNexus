@@ -2139,31 +2139,87 @@
   // exactly where it matters most.
   function pointSizeOf(p) {
     var sp = spaceById[p.spaceId];
-    var size = ps;
+    if (autoPointSizeOn(sp)) return hintedPointSize(p, sp);
     if (!pointSizeEdited && sp && sp.builder_point_size != null) {
-      size = Math.max(1, Math.min(20, Number(sp.builder_point_size)));
+      return Math.max(1, Math.min(20, Number(sp.builder_point_size)));
     }
-    // The size the Pack's builder recommended for the section, in a panel of
-    // HINT_PANEL pixels, when nothing set one (no hint) and no slider moved it:
-    // scaled with the plot area of the panel it is drawn in, so an enlarged
-    // panel grows it back and a small one shrinks it.
-    if (size === DEFAULT_POINT_SIZE && sp && sp._pointSizeHint != null &&
-        !(pointSizeUserContext &&
-          sameDatasetContext(pointSizeUserContext, currentDatasetContext()))) {
-      return hintedPointSize(p, sp);
-    }
-    return size;
+    return ps;
   }
+  // "Auto": a spatial section draws the size that suits it (the server sends
+  // a hint only for sections nobody set a size for) while the "Auto" switch of
+  // the page's point size slider is on. It starts on, so it counts as on until
+  // the switch is drawn.
+  var POINT_SIZE_AUTO = {
+    spatial: { box: 'spatial_projection_point_size_auto', slider: 'spatial_projection_point_size' },
+    linked: { box: 'cv-ps-auto', slider: 'cv-ps' }
+  };
+  function pointSizeAutoIds() {
+    return singleActive === 'spatial_projection' ? POINT_SIZE_AUTO.spatial
+      : !singleActive ? POINT_SIZE_AUTO.linked : null;
+  }
+  function autoPointSizeOn(sp) {
+    if (!sp || sp._pointSizeHint == null) return false;
+    var ids = pointSizeAutoIds(), box = ids && document.getElementById(ids.box);
+    return !box || box.checked;
+  }
+  // With "Auto" on the slider has no say, so it is shown disabled; where no
+  // section has a size of its own (an author set one) the switch is.
+  var autoSizeFrame = 0;
+  function scheduleAutoSizeSync() {
+    if (autoSizeFrame || typeof window.requestAnimationFrame !== 'function') return;
+    autoSizeFrame = window.requestAnimationFrame(function () {
+      autoSizeFrame = 0;
+      syncAutoSizeSlider();
+    });
+  }
+  function syncAutoSizeSlider() {
+    var ids = pointSizeAutoIds(), box = ids && document.getElementById(ids.box);
+    var slider = box && window.jQuery && window.jQuery('#' + ids.slider).data('ionRangeSlider');
+    if (!slider) return;
+    var possible = panels.some(function (p) {
+      var sp = p.spaceId && spaceById[p.spaceId];
+      return !!(sp && isSpatialSpace(sp) && sp._pointSizeHint != null);
+    });
+    box.disabled = !possible;
+    box.parentNode.classList.toggle('is-unavailable', !possible);
+    var off = possible && box.checked;
+    if (!!slider.options.disable !== off) slider.update({ disable: off });
+  }
+  document.addEventListener('change', function (event) {
+    var id = event.target && event.target.id;
+    if (id !== POINT_SIZE_AUTO.spatial.box && id !== POINT_SIZE_AUTO.linked.box) return;
+    syncAutoSizeSlider();
+    drawAllSoon();
+  });
   // The reference panel of the hint (.viewerPackSpatialPointSize() in R): 300 x
   // 250 pixels less 20 of padding, the section fitted into it by its aspect.
   var HINT_PANEL_W = 280, HINT_PANEL_H = 230;
+  // The hint sizes the points to cover the tissue (1.3 times their spacing).
+  // Over a picture they are 0.6 times that, so the picture shows between them
+  // (a Kukanja EAE section in a grid: about 3.2 without, 2 with).
+  var PICTURE_POINT_SCALE = 0.6;
   function hintedPointSize(p, sp) {
+    var picture = showsPicture(p);
+    var scale = picture ? PICTURE_POINT_SCALE : 1;
+    // An enlarged panel reaches the default's 4 with a picture too.
+    var most = DEFAULT_POINT_SIZE;
     var u = sp._unit, aspect = u && Number(u.aspect);
-    if (!(aspect > 0) || !(p._SX > 0) || !(p._SY > 0)) return Number(sp._pointSizeHint);
+    if (!(aspect > 0) || !(p._SX > 0) || !(p._SY > 0)) {
+      return Math.max(1, Math.min(most, Number(sp._pointSizeHint) * scale));
+    }
     var refW = HINT_PANEL_W / HINT_PANEL_H > aspect ? HINT_PANEL_H * aspect : HINT_PANEL_W;
     var refH = HINT_PANEL_W / HINT_PANEL_H > aspect ? HINT_PANEL_H : HINT_PANEL_W / aspect;
-    var size = Number(sp._pointSizeHint) * Math.sqrt((p._SX * p._SY) / (refW * refH));
-    return Math.max(1, Math.min(DEFAULT_POINT_SIZE, Math.round(size * 10) / 10));
+    var size = Number(sp._pointSizeHint) * scale * Math.sqrt((p._SX * p._SY) / (refW * refH));
+    return Math.max(1, Math.min(most, Math.round(size * 10) / 10));
+  }
+  // Whether the panel draws its section's picture under the points (the
+  // conditions of drawImage(), without waiting for the picture to load, so
+  // the size does not change when it arrives).
+  function showsPicture(p) {
+    if (!singleActive && !linkedBackgroundsOn) return false;
+    var sp = spaceById[p.spaceId];
+    var state = sp && sp._imgState;
+    return !!(sp && currentImage(sp) && state && state.show);
   }
   function pointOpacityOf(p) {
     var sp = spaceById[p.spaceId];
@@ -3340,6 +3396,7 @@
   }
   function draw(p, shownMask, shownCount) {
     p._resizedUndrawn = false;
+    scheduleAutoSizeSync();
     markGridPending(p);
     var c = p.ctx; clearPanelLayers(p);
     if (needsUnderlay(p)) attachUnderlay(p);
@@ -12386,6 +12443,8 @@
       if (meta.is_spatial) {
         space.background_scope = id;
         space._sampleName = meta.image_label || 'Spatial';
+        // The section's own size ("Auto"), when the server sent one.
+        if (Number(data.point_size_hint) > 0) space._pointSizeHint = Number(data.point_size_hint);
         var bounds = meta.image_bounds || null;
         if (meta.background_image && bounds) {
           var imageId = meta.background_identity

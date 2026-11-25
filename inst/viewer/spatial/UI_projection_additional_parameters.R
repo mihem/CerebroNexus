@@ -27,11 +27,14 @@ output[["spatial_projection_scatter_parameters_UI"]] <- renderUI({
   }
 
   tagList(
-    viewerLimitedSlider(
-      "spatial_projection_point_size",
-      label = "Point size",
-      limits = preferences[["cell_point_size"]],
-      value = appearance$point_size
+    viewerPointSizeWithAuto(
+      viewerLimitedSlider(
+        "spatial_projection_point_size",
+        label = "Point size",
+        limits = preferences[["cell_point_size"]],
+        value = appearance$point_size
+      ),
+      "spatial_projection_point_size_auto"
     ),
     viewerLimitedSlider(
       "spatial_projection_point_opacity",

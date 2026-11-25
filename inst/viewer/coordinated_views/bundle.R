@@ -1309,7 +1309,8 @@ cv_spatial_one <- function(
     ) {
       viewerPackSpatialPointSize(
         attr(crb, "cerebro_viewer_pack", exact = TRUE),
-        nm
+        nm,
+        coordinates = co
       )
     },
     builder_percentage_cells = spatial_defaults$percentage_cells_to_show,

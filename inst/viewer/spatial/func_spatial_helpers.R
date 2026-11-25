@@ -1932,6 +1932,27 @@ spatial_panel_background <- function(configured, coordinates, cerebro_root) {
   )
 }
 
+## The size the Pack's builder recommends for a section, or the same rule on its
+## cells when the Pack has none (viewerPackSpatialPointSize()); NULL when the
+## author set a point size for the section (an opacity alone does not count).
+## The browser scales it to the panel it draws the section in.
+spatial_section_point_size_hint <- function(options, dataset, section) {
+  appearance <- spatialPointAppearance(options, dataset, section)
+  if (!is.null(appearance$point_size)) {
+    return(NULL)
+  }
+  tryCatch(
+    viewerPackSpatialPointSize(
+      viewerPackCurrent(),
+      section,
+      coordinates = function() {
+        getSpatialData(section, name_cells = FALSE)$coordinates
+      }
+    ),
+    error = function(error) NULL
+  )
+}
+
 ## One panel per section, drawing its slice of the frame. `backgrounds` is
 ## named by section; a section without one has no image fields.
 ## `point_size_hints`: section -> the size the Pack's builder recommends for it

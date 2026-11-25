@@ -626,16 +626,34 @@ viewerPackSpatialFrame <- function(pack, name) {
 }
 
 ## The point size the Pack's builder recommended for a section in a panel of
-## 300 x 250 pixels (.viewerPackSpatialPointSize() in R/viewer_pack.R), or NULL:
-## an older Pack has none.
-viewerPackSpatialPointSize <- function(pack, name) {
+## 300 x 250 pixels (.viewerPackSpatialPointSize() in R/viewer_pack.R). A data
+## set without a Pack (under 100,000 cells by default), or with a Pack older
+## than the suggestion, gets the same rule from the section's `coordinates`
+## (or a function returning them), counted once per section. NULL when
+## neither gives a size.
+.viewer_spatial_point_size_cache <- new.env(parent = emptyenv())
+viewerPackSpatialPointSize <- function(pack, name, coordinates = NULL) {
   frame <- viewerPackSpatialFrame(pack, name)
   size <- suppressWarnings(as.numeric(frame$point_size))
   if (length(size) == 1L && is.finite(size) && size >= 1 && size <= 20) {
-    size
-  } else {
-    NULL
+    return(size)
   }
+  if (is.function(coordinates)) {
+    coordinates <- tryCatch(coordinates(), error = function(error) NULL)
+  }
+  if (NROW(coordinates) < 1L || NCOL(coordinates) < 2L) {
+    return(NULL)
+  }
+  key <- paste(name, NROW(coordinates))
+  cache <- .viewer_spatial_point_size_cache
+  if (!exists(key, envir = cache, inherits = FALSE)) {
+    size <- tryCatch(
+      CerebroNexus:::.viewerPackSpatialPointSize(coordinates),
+      error = function(error) NA_real_
+    )
+    assign(key, if (length(size) == 1L && is.finite(size)) size, envir = cache)
+  }
+  get(key, envir = cache, inherits = FALSE)
 }
 
 viewerPackGroupMetric <- function(pack, group, metric) {

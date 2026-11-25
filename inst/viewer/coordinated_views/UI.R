@@ -346,13 +346,16 @@ tab_coordinated_views <- tabItem(
           cerebroSettingsSection(
             "Appearance",
             tagList(
-              sliderInput(
-                "cv-ps",
-                label = "Point size",
-                min = 1,
-                max = 20,
-                step = 1,
-                value = 5
+              viewerPointSizeWithAuto(
+                sliderInput(
+                  "cv-ps",
+                  label = "Point size",
+                  min = 1,
+                  max = 20,
+                  step = 1,
+                  value = 5
+                ),
+                "cv-ps-auto"
               ),
               sliderInput(
                 "cv-opacity",

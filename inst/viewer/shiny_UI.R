@@ -16,6 +16,12 @@ source(
   local = TRUE
 )
 
+## The point size field with its "Auto" switch (Spatial and Linked views).
+source(
+  file.path(Cerebro.options[["cerebro_root"]], "viewer/ui_point_size.R"),
+  local = TRUE
+)
+
 cerebroIcon <- function(name) {
   result <- icon(name)
   result$attribs[["aria-label"]] <- NULL

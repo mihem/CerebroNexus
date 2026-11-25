@@ -299,6 +299,8 @@ spatial_projection_update_plot <- function(input) {
       point_size = plot_parameters[["point_size"]],
       point_opacity = plot_parameters[["point_opacity"]],
       point_line = point_line,
+      ## A single section's own size (a grid's panels carry theirs).
+      point_size_hint = plot_parameters[["point_size_hint"]],
       x_range = x_range_out,
       y_range = y_range_out,
       reset_axes = reset_axes
@@ -384,6 +386,8 @@ spatial_projection_update_plot <- function(input) {
   if (section_codes) {
     payload$data$categorical_resource <- categorical_resource
   }
+  ## A single section's own size for "Auto" (a grid's panels carry theirs).
+  payload$data$point_size_hint <- plot_parameters[["point_size_hint"]]
   if (
     identical(plot_parameters[["plot_type"]], "ImageFeaturePlot") &&
       !isTRUE(plot_parameters[["no_gene"]])

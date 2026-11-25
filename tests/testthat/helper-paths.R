@@ -32,6 +32,7 @@ viewer_runtime_env <- function(
     "crb_cache.R",
     "ui_rgb_fields.R",
     "ui_background_image_editor.R",
+    "ui_point_size.R",
     "utility_functions.R"
   )) {
     sys.source(file.path(root, file), envir = envir)

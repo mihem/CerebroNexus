@@ -2460,8 +2460,8 @@ test_that("embedded spatial images share identity and point appearance", {
   expect_identical(built$images[[1L]]$preset$offsetY, -10)
   expect_true(built$images[[1L]]$preset$flipY)
   expect_identical(built$images[[1L]]$preset$rotation, 0)
-  expect_null(built$point_size)
-  expect_null(built$point_opacity)
+  expect_null(built[["point_size"]])
+  expect_null(built[["point_opacity"]])
   expect_identical(
     cv_env$viewerScatterDefaults(cv_env$Cerebro.options, "ds"),
     list(

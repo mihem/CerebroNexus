@@ -586,17 +586,11 @@ spatial_projection_parameters_plot_current <- reactive({
     grid_backgrounds <- grid_backgrounds[
       !vapply(grid_backgrounds, is.null, logical(1))
     ]
-    ## The size the Pack's builder recommends, for the sections nothing sets a
-    ## size for (a Builder setting for the section wins).
+    ## The size that suits each section, for the sections nothing sets a size
+    ## for (a Builder setting for the section wins).
     grid_point_size_hints <- stats::setNames(
       lapply(grid_sections, function(section) {
-        if (!is.null(spatialPointAppearance(options, dataset, section))) {
-          return(NULL)
-        }
-        tryCatch(
-          viewerPackSpatialPointSize(viewerPackCurrent(), section),
-          error = function(error) NULL
-        )
+        spatial_section_point_size_hint(options, dataset, section)
       }),
       grid_sections
     )
@@ -627,6 +621,14 @@ spatial_projection_parameters_plot_current <- reactive({
     grid_projection = controls$grid_projection %||% "",
     grid_backgrounds = grid_backgrounds,
     grid_point_size_hints = grid_point_size_hints,
+    ## One section on its own: its size too, so "Auto" works without a grid.
+    point_size_hint = if (!grid) {
+      spatial_section_point_size_hint(
+        if (exists("Cerebro.options")) Cerebro.options else NULL,
+        dataset,
+        spatial_name
+      )
+    },
     n_dimensions = n_dimensions,
     color_variable = color_variable,
     plot_type = plot_type,

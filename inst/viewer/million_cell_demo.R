@@ -268,8 +268,9 @@ viewerAddXeniumPrimeDemo <- function(
     point_size = 2,
     point_opacity = 0.8
   )
+  ## No fixed point size for the section: "Auto" sizes it.
   options[["viewer_content"]][[label]][["spatial_point_appearance"]] <- list(
-    coronal = list(point_size = 2, point_opacity = 0.9)
+    coronal = list(point_opacity = 0.9)
   )
   options
 }
