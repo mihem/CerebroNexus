@@ -1,3 +1,11 @@
+# CerebroNexus 8.5.3
+
+- **The Builder no longer stops with "nthreads > 1 requires TBB".** A CRB is
+  read on up to eight threads, but a qs2 built without TBB only reads on one,
+  so the Builder could not reopen the CRB it had just staged. The read now
+  repeats on one thread after that error (and remembers it for the session);
+  other read errors are reported as before.
+
 # CerebroNexus 8.5.2
 
 - **Faster Viewer Pack builds and opens (#294).** A Viewer Pack now stores a
