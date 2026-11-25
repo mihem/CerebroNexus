@@ -3268,7 +3268,11 @@ server <- function(input, output, session) {
   viewer_idle_delay <- function(initial = FALSE) {
     default <- if (isTRUE(initial)) 1.2 else 2.0
     val <- suppressWarnings(as.numeric(getOption(
-      if (isTRUE(initial)) "cerebro.idle_initial_delay" else "cerebro.idle_delay",
+      if (isTRUE(initial)) {
+        "cerebro.idle_initial_delay"
+      } else {
+        "cerebro.idle_delay"
+      },
       default
     )))
     if (length(val) != 1L || !is.finite(val) || val < 0.05) default else val
@@ -3276,10 +3280,16 @@ server <- function(input, output, session) {
   viewer_idle_activity <- function(initial = FALSE) {
     viewer_idle_quiet <<- FALSE
     viewer_idle_cancel()
-    viewer_idle_cancel <<- later::later(viewer_idle_run, viewer_idle_delay(initial))
+    viewer_idle_cancel <<- later::later(
+      viewer_idle_run,
+      viewer_idle_delay(initial)
+    )
     invisible(NULL)
   }
-  session$onFlushed(function() viewer_idle_activity(initial = TRUE), once = TRUE)
+  session$onFlushed(
+    function() viewer_idle_activity(initial = TRUE),
+    once = TRUE
+  )
   session$onInputReceived(function(...) viewer_idle_activity(initial = FALSE))
   session$onSessionEnded(function() viewer_idle_cancel())
 

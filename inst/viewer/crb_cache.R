@@ -110,7 +110,10 @@ crb_prefetch_abandon <- function(key) {
 }
 
 .viewerCrbCacheSlots <- function() {
-  slots <- suppressWarnings(as.integer(getOption("cerebro.crb_cache_slots", 2L)))
+  slots <- suppressWarnings(as.integer(getOption(
+    "cerebro.crb_cache_slots",
+    2L
+  )))
   if (length(slots) != 1L || is.na(slots) || slots < 1L) 2L else slots
 }
 

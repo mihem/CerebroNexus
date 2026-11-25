@@ -490,7 +490,11 @@ expression_projection_read_levels <- function(
     expression_levels <- numeric()
   } else {
     if (
-      exists("expression_projection_parameters_plot", mode = "function", inherits = TRUE)
+      exists(
+        "expression_projection_parameters_plot",
+        mode = "function",
+        inherits = TRUE
+      )
     ) {
       req(expression_projection_parameters_plot())
     } else {
@@ -620,7 +624,11 @@ expression_projection_expression_levels <- reactive(expressionProjectionCheckSid
       getGeneNames()
     )
     n_dimensions <- if (
-      exists("expression_projection_parameters_plot", mode = "function", inherits = TRUE)
+      exists(
+        "expression_projection_parameters_plot",
+        mode = "function",
+        inherits = TRUE
+      )
     ) {
       as.integer(expression_projection_parameters_plot()[["n_dimensions"]])
     } else {
@@ -662,7 +670,11 @@ expression_summary_data <- reactive({
   req(length(genes) > 0)
 
   n_dimensions <- if (
-    exists("expression_projection_parameters_plot", mode = "function", inherits = TRUE)
+    exists(
+      "expression_projection_parameters_plot",
+      mode = "function",
+      inherits = TRUE
+    )
   ) {
     as.integer(expression_projection_parameters_plot()[["n_dimensions"]])
   } else {

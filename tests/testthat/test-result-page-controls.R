@@ -399,7 +399,10 @@ test_that("result page outputs map to their owning tabs and ramp JS is vectorize
       "color_management"
     )
   )
-  js <- scope$.prettifyStyleInterval(c(0, 0.5, 1), c('"#ffffff"', '"#ffd0b0"', '"#ffa060"', '"#f97316"'))
+  js <- scope$.prettifyStyleInterval(
+    c(0, 0.5, 1),
+    c('"#ffffff"', '"#ffd0b0"', '"#ffa060"', '"#f97316"')
+  )
   expect_s3_class(js, "JS_EVAL")
   expect_identical(
     as.character(js),

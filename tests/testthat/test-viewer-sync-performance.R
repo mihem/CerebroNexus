@@ -543,7 +543,10 @@ test_that("registerCellViewPointBorder routes through session outputOptions", {
   scope$registerCellViewPointBorder(out, "overview_projection")
   expect_identical(
     seen,
-    c("overview_projection_point_border_UI", "overview_projection_keep_square_UI")
+    c(
+      "overview_projection_point_border_UI",
+      "overview_projection_keep_square_UI"
+    )
   )
 })
 
@@ -592,6 +595,14 @@ test_that("fill_height.js batches all DOM reads before any style write", {
   )
   tmp_js <- withr::local_tempfile(fileext = ".js")
   writeLines(check, tmp_js)
-  out <- system2(node, c(shQuote(tmp_js), shQuote(script)), stdout = TRUE, stderr = TRUE)
-  expect_true(any(grepl("PASS fill_height batch", out, fixed = TRUE)), info = paste(out, collapse = "\n"))
+  out <- system2(
+    node,
+    c(shQuote(tmp_js), shQuote(script)),
+    stdout = TRUE,
+    stderr = TRUE
+  )
+  expect_true(
+    any(grepl("PASS fill_height batch", out, fixed = TRUE)),
+    info = paste(out, collapse = "\n")
+  )
 })
