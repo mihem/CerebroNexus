@@ -1356,8 +1356,11 @@ viewerH5ExpressionMean <- function(data_set, cells, genes) {
   ) {
     return(NULL)
   }
-  ## Every cell: add each gene's non-zero cells into one vector, not a dense
-  ## row per gene (twelve genes on a million cells: 12 vectors of 8 MB).
+  ## Every cell: accumulate directly in a local vector (no closure `<<-`
+  ## copy-on-modify) and without holding a dense row per gene.
+  if (is.null(cells) && is.function(rows$mean_sparse)) {
+    return(rows$mean_sparse(genes))
+  }
   if (is.null(cells) && is.function(rows$each_sparse)) {
     total <- numeric(rows$n_cells())
     found <- rows$each_sparse(genes, function(i, entries) {
@@ -4222,33 +4225,39 @@ get_or_load_crb <- function(
     datasets <- lapply(c("indptr", "indices", "data"), function(name) {
       rhdf5::H5Dopen(file, paste0("expression/", name))
     })
+    spaces <- lapply(datasets, rhdf5::H5Dget_space)
     on.exit({
+      for (space in spaces) {
+        rhdf5::H5Sclose(space)
+      }
       for (dataset in datasets) {
         rhdf5::H5Dclose(dataset)
       }
       rhdf5::H5Fclose(file)
     })
-    slice <- function(dataset, start, count) {
-      space <- rhdf5::H5Dget_space(dataset)
-      on.exit(rhdf5::H5Sclose(space), add = TRUE)
+    use_int_index <- is.finite(state$n_cells) &&
+      state$n_cells < .Machine$integer.max
+    slice <- function(slot, start, count, as_int = FALSE) {
+      space <- spaces[[slot]]
       rhdf5::H5Sselect_hyperslab(space, start = start, count = count)
       memory <- rhdf5::H5Screate_simple(count)
       on.exit(rhdf5::H5Sclose(memory), add = TRUE)
       as.vector(rhdf5::H5Dread(
-        dataset,
+        datasets[[slot]],
         h5spaceFile = space,
         h5spaceMem = memory,
-        bit64conversion = "double"
+        bit64conversion = if (as_int) "int" else "double"
       ))
     }
     for (i in seq_along(columns)) {
-      bounds <- slice(datasets[[1L]], columns[[i]], 2L)
+      bounds <- slice(1L, columns[[i]], 2L)
       count <- bounds[[2L]] - bounds[[1L]]
       entries <- if (count > 0) {
         start <- bounds[[1L]] + 1
+        idx <- slice(2L, start, count, as_int = use_int_index)
         list(
-          index = slice(datasets[[2L]], start, count) + 1,
-          value = slice(datasets[[3L]], start, count)
+          index = if (is.integer(idx)) idx + 1L else idx + 1,
+          value = slice(3L, start, count)
         )
       } else {
         list(index = integer(), value = numeric())
@@ -4257,18 +4266,68 @@ get_or_load_crb <- function(
     }
     TRUE
   }
+  mean_sparse <- function(genes) {
+    prepare()
+    columns <- match(genes, state$genes)
+    if (anyNA(columns) || !length(columns)) {
+      return(NULL)
+    }
+    file <- rhdf5::H5Fopen(sidecar, flags = "H5F_ACC_RDONLY")
+    datasets <- lapply(c("indptr", "indices", "data"), function(name) {
+      rhdf5::H5Dopen(file, paste0("expression/", name))
+    })
+    spaces <- lapply(datasets, rhdf5::H5Dget_space)
+    on.exit({
+      for (space in spaces) {
+        rhdf5::H5Sclose(space)
+      }
+      for (dataset in datasets) {
+        rhdf5::H5Dclose(dataset)
+      }
+      rhdf5::H5Fclose(file)
+    })
+    use_int_index <- is.finite(state$n_cells) &&
+      state$n_cells < .Machine$integer.max
+    slice <- function(slot, start, count, as_int = FALSE) {
+      space <- spaces[[slot]]
+      rhdf5::H5Sselect_hyperslab(space, start = start, count = count)
+      memory <- rhdf5::H5Screate_simple(count)
+      on.exit(rhdf5::H5Sclose(memory), add = TRUE)
+      as.vector(rhdf5::H5Dread(
+        datasets[[slot]],
+        h5spaceFile = space,
+        h5spaceMem = memory,
+        bit64conversion = if (as_int) "int" else "double"
+      ))
+    }
+    total <- numeric(state$n_cells)
+    for (col in columns) {
+      bounds <- slice(1L, col, 2L)
+      count <- bounds[[2L]] - bounds[[1L]]
+      if (count > 0) {
+        start <- bounds[[1L]] + 1
+        idx <- slice(2L, start, count, as_int = use_int_index)
+        idx <- if (is.integer(idx)) idx + 1L else idx + 1
+        val <- slice(3L, start, count)
+        total[idx] <- total[idx] + val
+      }
+    }
+    total / length(columns)
+  }
   list(
     n_cells = function() {
       prepare()
       state$n_cells
     },
     each_sparse = each_sparse,
+    mean_sparse = mean_sparse,
     ## NULL for a gene the file does not have.
     row = function(gene) {
       values <- NULL
       each_sparse(gene, function(i, entries) {
-        values <<- numeric(state$n_cells)
-        values[entries$index] <<- entries$value
+        dense <- numeric(state$n_cells)
+        dense[entries$index] <- entries$value
+        values <<- dense
       })
       values
     }
@@ -5372,16 +5431,50 @@ canonicalGeneSelection <- function(selected, genes) {
   selected
 }
 
+## Process-backed small LRU memo for transcriptome-sized gene lists: shared
+## across browser sessions in the same R process (falls back to a local env when
+## utility_functions.R is sourced standalone in unit tests).
+viewerProcessMemo <- function(slot, limit = 4L) {
+  store <- get0(".viewer_gene_list_process_cache", inherits = TRUE)
+  if (!is.environment(store)) {
+    store <- new.env(parent = emptyenv())
+  }
+  state <- store[[slot]]
+  if (!is.environment(state)) {
+    state <- new.env(parent = emptyenv())
+    state$entries <- list()
+    store[[slot]] <- state
+  }
+  function(key, compute) {
+    for (i in seq_along(state$entries)) {
+      if (identical(state$entries[[i]]$key, key)) {
+        entry <- state$entries[[i]]
+        if (i > 1L) {
+          state$entries <- c(list(entry), state$entries[-i])
+        }
+        return(entry$value)
+      }
+    }
+    value <- compute()
+    state$entries <- c(
+      list(list(key = key, value = value)),
+      utils::head(state$entries, max(0L, as.integer(limit) - 1L))
+    )
+    value
+  }
+}
+
 ## Gene expression registers four selectors on the same gene list; a locale
-## sort of a whole transcriptome takes about half a second. Share one.
-.viewer_sorted_gene_choices <- viewerMemoOne()
+## sort of a whole transcriptome takes about half a second. Share one across
+## sessions in the process.
+.viewer_sorted_gene_choices <- viewerProcessMemo("sorted_genes", limit = 4L)
 
 ## Gene selectors search the whole gene list in the browser (www/gene-selector.js).
 ## A server-side search answered from the first 1000 genes until the typed
 ## text's request returned, so typing "CD4" highlighted ABCD4 and Enter chose
 ## it; text typed before the search existed was never searched at all. The
 ## list is about 270 KB of JSON for 28,000 genes; encode it once per process.
-.viewer_gene_choices_json <- viewerMemoOne()
+.viewer_gene_choices_json <- viewerProcessMemo("gene_choices_json", limit = 4L)
 
 viewerGeneChoicesJSON <- function(data, req) {
   shiny::httpResponse(

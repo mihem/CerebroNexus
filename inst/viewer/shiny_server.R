@@ -42,6 +42,9 @@ viewerFirstViewPublishKept(Cerebro.options)
 ## per process: decompressing one takes 0.1 s, and the page read it again at
 ## every render.
 .gene_id_tables <- new.env(parent = emptyenv())
+## Process-level cache for sorted transcriptome gene lists and their JSON
+## payloads (used by .viewer_sorted_gene_choices / .viewer_gene_choices_json).
+.viewer_gene_list_process_cache <- new.env(parent = emptyenv())
 viewerGeneIdTable <- function(organism) {
   file <- c(
     mouse = "mm10_gene_ID_name.tsv.xz",
@@ -3137,7 +3140,12 @@ server <- function(input, output, session) {
       tasks[[paste("sort genes", session$token)]] <- function() {
         genes <- isolate(getGeneNames())
         if (length(genes)) {
-          .viewer_sorted_gene_choices(list(genes), function() sort(genes))
+          sorted <- .viewer_sorted_gene_choices(list(genes), function() {
+            sort(genes)
+          })
+          .viewer_gene_choices_json(list(sorted), function() {
+            enc2utf8(as.character(jsonlite::toJSON(as.character(sorted))))
+          })
         }
       }
       ## A repertoire without the Pack's encoding is encoded by another R

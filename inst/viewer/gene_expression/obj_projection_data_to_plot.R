@@ -65,8 +65,13 @@ expression_projection_data_to_plot_raw <- reactive({
 })
 
 ## This prepared value already contains the million-cell expression vector.
-## Use Shiny's debounce directly instead of relaying it through another observer.
-expression_projection_data_to_plot <- shiny::debounce(
+## Apply the first change after a quiet spell immediately (like Projection and
+## Spatial), while still coalescing rapid bursts (slider drags / multi-clicks).
+expression_projection_active <- function() {
+  identical(input[["sidebar"]], "geneExpression")
+}
+expression_projection_data_to_plot <- debounceAfterFirst(
   expression_projection_data_to_plot_raw,
-  50
+  50,
+  active = expression_projection_active
 )

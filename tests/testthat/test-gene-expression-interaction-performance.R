@@ -186,3 +186,75 @@ test_that("empty Gene selection keeps the same summary without hydrating IDs", {
   )
   expect_gt(hydrated, 0L)
 })
+
+test_that("viewerProcessMemo shares gene choice caches across sessions", {
+  shared <- new.env(parent = emptyenv())
+  make_scope <- function() {
+    env <- new.env(parent = globalenv())
+    env$.viewer_gene_list_process_cache <- shared
+    viewer_runtime_env(env)
+    env
+  }
+  s1 <- make_scope()
+  s2 <- make_scope()
+  calls <- 0L
+  memo1 <- s1$viewerProcessMemo("sorted")
+  memo2 <- s2$viewerProcessMemo("sorted")
+  genes <- c("Z", "A", "M")
+  compute <- function() {
+    calls <<- calls + 1L
+    sort(genes)
+  }
+  expect_identical(memo1(genes, compute), c("A", "M", "Z"))
+  expect_identical(memo2(genes, compute), c("A", "M", "Z"))
+  expect_identical(calls, 1L)
+})
+
+test_that("expression_projection_data_to_plot emits first value without debounce stall", {
+  shiny::testServer(
+    function(input, output, session) {
+      scope <- environment()
+      viewer_runtime_env(scope)
+      viewer_loaded_dataset_context <- function() list(key = "tiny")
+      data_set <- function() list()
+      expression_projection_coordinates <- shiny::reactive({
+        data.frame(UMAP_1 = c(0, 1), UMAP_2 = c(1, 0))
+      })
+      expression_projection_parameters_plot <- shiny::reactive({
+        list(
+          projection = input$proj %||% "UMAP",
+          is_trajectory = FALSE
+        )
+      })
+      expression_projection_expression_levels <- shiny::reactive({
+        if (nzchar(input$genes %||% "")) c(1, 2) else numeric()
+      })
+      expression_selected_genes <- shiny::reactive({
+        list(genes_to_display_present = input$genes %||% character())
+      })
+      expression_projection_parameters_color <- shiny::reactive(list())
+      expression_projection_trajectory <- shiny::reactive(list())
+      expression_projection_display_mode <- shiny::reactive("combined")
+      expression_projection_parameters_other <- list(reset_axes = FALSE)
+      expression_projection_render_key <- shiny::reactive("k1")
+      expression_projection_cells_to_show <- shiny::reactive(c(1L, 2L))
+      expression_projection_trajectory_rows <- shiny::reactive(NULL)
+      expression_projection_client_percentage <- shiny::reactive(FALSE)
+      sys.source(
+        viewer_test_path("gene_expression", "obj_projection_data_to_plot.R"),
+        scope
+      )
+    },
+    {
+      session$setInputs(sidebar = "geneExpression", proj = "UMAP", genes = "G1")
+      ## First value arrives immediately without waiting for a 50 ms timer.
+      first <- expression_projection_data_to_plot()
+      expect_identical(first$plot_parameters$projection, "UMAP")
+      ## A lone change after the delay also arrives immediately.
+      session$elapse(100)
+      session$setInputs(proj = "TSNE")
+      second <- expression_projection_data_to_plot()
+      expect_identical(second$plot_parameters$projection, "TSNE")
+    }
+  )
+})

@@ -9,6 +9,11 @@ expressionInputGenes <- function(value) {
   genes[!is.na(genes) & nzchar(genes)]
 }
 
+expression_lower_genes_memo <- viewerMemoOne()
+expression_lower_genes <- function(available) {
+  expression_lower_genes_memo(list(available), function() tolower(available))
+}
+
 ## Mean/separate retain their full list. Seed RGB only when that list changes;
 ## returning to RGB must preserve manual channel assignments, including blanks.
 expression_rgb_seed <- NULL
@@ -27,7 +32,10 @@ observeEvent(
     req(!is.null(source))
     source <- expressionInputGenes(source)
     available <- list_of_genes()
-    genes <- unique(available[match(tolower(source), tolower(available))])
+    genes <- unique(available[match(
+      tolower(source),
+      expression_lower_genes(available)
+    )])
     genes <- genes[!is.na(genes)]
     if (identical(expression_rgb_seed, genes)) {
       return()
@@ -70,7 +78,10 @@ observeEvent(
     req(length(missing) > 0L)
     genes <- c(current, missing)
     available <- list_of_genes()
-    seeded <- unique(available[match(tolower(genes), tolower(available))])
+    seeded <- unique(available[match(
+      tolower(genes),
+      expression_lower_genes(available)
+    )])
     expression_rgb_seed <<- seeded[!is.na(seeded)]
     session$sendCustomMessage(
       "cerebro_expression_gene_list",
@@ -124,9 +135,11 @@ expression_selected_genes_input <- reactive({
     ]])
   }
   ## check which are available in the data set
-  genes_to_display_here <- list_of_genes()[match(
+  available <- list_of_genes()
+  available_lower <- expression_lower_genes(available)
+  genes_to_display_here <- available[match(
     tolower(gene_sets[["genes_to_display"]]),
-    tolower(list_of_genes())
+    available_lower
   )]
   ## get which genes are available in the data set
   gene_sets[["genes_to_display_present"]] <- na.omit(genes_to_display_here)
@@ -140,8 +153,8 @@ expression_selected_genes_input <- reactive({
     if (length(gene) != 1L || is.na(gene) || !nzchar(gene)) {
       return(NULL)
     }
-    index <- match(tolower(gene), tolower(list_of_genes()))
-    if (is.na(index)) NULL else unname(list_of_genes()[index])
+    index <- match(tolower(gene), available_lower)
+    if (is.na(index)) NULL else unname(available[index])
   })
   return(gene_sets)
 })
