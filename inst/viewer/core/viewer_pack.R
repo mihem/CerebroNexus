@@ -320,6 +320,29 @@ viewerPackSourceSignature <- function(file) {
   )
 }
 
+.viewerPackQsThreads <- function() {
+  configured <- suppressWarnings(as.integer(getOption(
+    "cerebro.viewer_pack_threads",
+    NA_integer_
+  )))
+  if (length(configured) == 1L && !is.na(configured) && configured >= 1L) {
+    return(configured)
+  }
+  cores <- suppressWarnings(tryCatch(
+    parallel::detectCores(logical = FALSE),
+    error = function(e) 1L
+  ))
+  if (length(cores) != 1L || is.na(cores) || cores < 1L) 1L else min(4L, as.integer(cores))
+}
+
+.viewerPackCacheSlots <- function() {
+  slots <- suppressWarnings(as.integer(getOption(
+    "cerebro.viewer_pack_cache_slots",
+    8L
+  )))
+  if (length(slots) != 1L || is.na(slots) || slots < 1L) 8L else slots
+}
+
 viewerPackOpenCached <- function(file, cache, object = NULL) {
   if (!is.environment(cache)) {
     stop("Viewer Pack descriptor cache must be an environment.", call. = FALSE)
@@ -330,6 +353,8 @@ viewerPackOpenCached <- function(file, cache, object = NULL) {
   }
   cached <- cache[[signature$key]]
   if (!is.null(cached) && identical(cached$signature, signature)) {
+    cached$last_used <- as.numeric(Sys.time())
+    cache[[signature$key]] <- cached
     pack <- cached$descriptor
     pack$cache <- new.env(parent = emptyenv())
     return(pack)
@@ -345,8 +370,26 @@ viewerPackOpenCached <- function(file, cache, object = NULL) {
   descriptor$cache <- NULL
   cache[[signature$key]] <- list(
     signature = signature,
-    descriptor = descriptor
+    descriptor = descriptor,
+    last_used = as.numeric(Sys.time())
   )
+  max_slots <- .viewerPackCacheSlots()
+  keys <- ls(cache, all.names = TRUE)
+  if (length(keys) > max_slots) {
+    older <- setdiff(keys, signature$key)
+    ages <- vapply(
+      older,
+      function(k) {
+        val <- cache[[k]]$last_used
+        if (is.numeric(val) && length(val) == 1L) val else 0
+      },
+      numeric(1)
+    )
+    rm(
+      list = older[order(ages)][seq_len(length(keys) - max_slots)],
+      envir = cache
+    )
+  }
   pack
 }
 
@@ -544,7 +587,10 @@ viewerPackReadAsset <- function(pack, path) {
   if (is.null(asset)) {
     return(NULL)
   }
-  value <- tryCatch(qs2::qs_read(asset$file), error = function(error) NULL)
+  value <- tryCatch(
+    qs2::qs_read(asset$file, nthreads = .viewerPackQsThreads()),
+    error = function(error) NULL
+  )
   if (!is.null(value)) {
     assign(path, value, envir = pack$cache)
   }

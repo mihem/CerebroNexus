@@ -76,10 +76,128 @@
   )
 }
 
-.viewerPackMd5 <- function(path) {
+.viewerPackQsThreads <- function() {
+  configured <- suppressWarnings(as.integer(getOption(
+    "cerebro.viewer_pack_threads",
+    NA_integer_
+  )))
+  if (length(configured) == 1L && !is.na(configured) && configured >= 1L) {
+    return(configured)
+  }
+  cores <- suppressWarnings(tryCatch(
+    parallel::detectCores(logical = FALSE),
+    error = function(e) 1L
+  ))
+  if (length(cores) != 1L || is.na(cores) || cores < 1L) 1L else min(4L, as.integer(cores))
+}
+
+.viewerPackCrbSample <- function(file, size, bytes = 2^20) {
+  connection <- file(file, open = "rb")
+  on.exit(close(connection), add = TRUE)
+  head <- readBin(connection, "raw", n = min(size, bytes))
+  tail <- if (size > bytes) {
+    seek(connection, max(bytes, size - bytes))
+    readBin(connection, "raw", n = bytes)
+  }
+  rlang::hash(c(head, tail))
+}
+
+.viewerPackCrbMd5CachePath <- function(file, info) {
+  norm <- normalizePath(file, winslash = "/", mustWork = FALSE)
+  key <- paste(
+    norm,
+    info$size,
+    format(as.numeric(info$mtime), digits = 17),
+    sep = "\r"
+  )
+  raw_bytes <- charToRaw(enc2utf8(key))
+  key_hash <- if ("bytes" %in% names(formals(tools::md5sum))) {
+    unname(tools::md5sum(bytes = raw_bytes))
+  } else {
+    tmp <- tempfile("vp-md5-key-")
+    on.exit(unlink(tmp), add = TRUE)
+    writeBin(raw_bytes, tmp)
+    unname(tools::md5sum(tmp))
+  }
+  tryCatch(
+    file.path(
+      tools::R_user_dir("CerebroNexus", "cache"),
+      "crb-md5",
+      paste0(key_hash, ".txt")
+    ),
+    error = function(error) NULL
+  )
+}
+
+.viewerPackCrbVersionLine <- function(file, info) {
+  paste(
+    normalizePath(file, winslash = "/", mustWork = FALSE),
+    info$size,
+    format(as.numeric(info$mtime), digits = 17),
+    format(as.numeric(info$ctime), digits = 17),
+    sep = "\t"
+  )
+}
+
+.viewerPackWriteCrbMd5Cache <- function(file, md5_value) {
+  info <- suppressWarnings(file.info(file, extra_cols = FALSE))
+  if (
+    is.na(info$size) ||
+      isTRUE(info$isdir) ||
+      info$size < 1048576 ||
+      is.na(md5_value) ||
+      !nzchar(md5_value)
+  ) {
+    return(invisible(FALSE))
+  }
+  store <- .viewerPackCrbMd5CachePath(file, info)
+  if (is.null(store)) {
+    return(invisible(FALSE))
+  }
+  tryCatch(
+    {
+      dir.create(dirname(store), recursive = TRUE, showWarnings = FALSE)
+      temporary <- paste0(store, ".", Sys.getpid(), ".tmp")
+      writeLines(
+        c(
+          .viewerPackCrbVersionLine(file, info),
+          .viewerPackCrbSample(file, info$size),
+          as.character(md5_value)
+        ),
+        temporary,
+        useBytes = TRUE
+      )
+      file.rename(temporary, store)
+      invisible(TRUE)
+    },
+    error = function(error) invisible(FALSE)
+  )
+}
+
+.viewerPackMd5 <- function(path, use_crb_cache = FALSE) {
+  if (isTRUE(use_crb_cache)) {
+    info <- suppressWarnings(file.info(path, extra_cols = FALSE))
+    if (!is.na(info$size) && !isTRUE(info$isdir) && info$size >= 1048576) {
+      store <- .viewerPackCrbMd5CachePath(path, info)
+      if (!is.null(store) && file.exists(store)) {
+        stored <- tryCatch(readLines(store, n = 3L, warn = FALSE), error = function(e) character())
+        if (
+          length(stored) == 3L &&
+            identical(stored[[1L]], .viewerPackCrbVersionLine(path, info)) &&
+            grepl("^[0-9a-f]{32}$", stored[[3L]]) &&
+            identical(stored[[2L]], .viewerPackCrbSample(path, info$size))
+        ) {
+          return(stored[[3L]])
+        }
+      }
+    }
+  }
   value <- unname(tools::md5sum(path))
   if (length(value) != 1L || is.na(value) || !nzchar(value)) {
     stop("Could not checksum Viewer Pack input.", call. = FALSE)
+  }
+  if (isTRUE(use_crb_cache)) {
+    .viewerPackWriteCrbMd5Cache(path, value)
   }
   value
 }
@@ -141,7 +259,7 @@
       writeBin(as.numeric(value), target, size = 4L, endian = "little")
     }
   } else {
-    qs2::qs_save(value, target)
+    qs2::qs_save(value, target, nthreads = .viewerPackQsThreads())
   }
   data.frame(
     path = path,
@@ -2381,9 +2499,10 @@ buildViewerPack <- function(
       item_digests = item_digests
     )
   }
-  ## The CRB is hashed once (0.7 s for 380 MB): the check of the staged pack
-  ## below compares the manifest with the same file, unchanged since.
-  crb_md5 <- .viewerPackMd5(file)
+  ## The CRB is hashed once (0.7 s for 380 MB): consult & seed the Viewer's
+  ## sample-verified crb-md5 disk cache so the first Viewer open avoids a
+  ## redundant cold MD5 pass.
+  crb_md5 <- .viewerPackMd5(file, use_crb_cache = TRUE)
   manifest <- list(
     schema_version = .viewerPackSchemaVersion,
     format_revision = .viewerPackFormatRevision,
