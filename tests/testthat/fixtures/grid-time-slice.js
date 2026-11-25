@@ -79,12 +79,30 @@ assert.deepEqual(
 );
 assert.equal(resets, 1, 'updateResetButtons called once when queue drains');
 
-// Small grids (< 8 panels) still draw synchronously in one turn.
+// Small lightweight grids (< 8 panels and < 500k total points) draw synchronously.
 stagePanels = 3;
 panels = panels.slice(0, 3);
 drawn = [];
 drawAll();
-assert.equal(drawn.length, 3, 'small view draws synchronously');
-assert.equal(rafQueue.length, 0, 'no rAF slice needed for < 8 panels');
+assert.equal(drawn.length, 3, 'small lightweight view draws synchronously');
+assert.equal(rafQueue.length, 0, 'no rAF slice needed for < 8 lightweight panels');
+
+// Heavy multi-panel views (e.g. Linked views or Gene expression separate panels
+// on 500k-1.3M cells) time-slice across animation frames even with < 8 panels.
+D = {
+  n: 300000,
+  spaces: {
+    s_bufAbove: {n: 300000},
+    s_bufBelow: {n: 300000},
+    s_visMid: {n: 300000}
+  }
+};
+stagePanels = 3;
+drawn = [];
+drawAll();
+assert.equal(drawn.length, 2, 'heavy 3-panel view yields after 10 ms budget in slice 1');
+assert.equal(rafQueue.length, 1, 'remaining heavy panel deferred to next rAF');
+while (rafQueue.length) rafQueue.shift().fn();
+assert.equal(drawn.length, 3, 'all 3 heavy panels finish across frames');
 
 console.log('PASS grid time-sliced draw queue');
