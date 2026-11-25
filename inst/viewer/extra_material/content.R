@@ -149,6 +149,7 @@ if (exists("viewer_hidden_output_options", inherits = TRUE)) {
 ## switch status
 ##----------------------------------------------------------------------------##
 output[["extra_material_plot_UI"]] <- renderUI({
+  req(identical(extra_material_category(), "plots"))
   req(!is.null(extra_material_plot_interactive()))
   if (extra_material_plot_interactive() == TRUE) {
     plotly::plotlyOutput(
@@ -164,9 +165,6 @@ output[["extra_material_plot_UI"]] <- renderUI({
     )
   }
 })
-if (exists("viewer_hidden_output_options", inherits = TRUE)) {
-  outputOptions(output, "extra_material_plot_UI", suspendWhenHidden = FALSE)
-}
 
 ##----------------------------------------------------------------------------##
 ## UI element that contains interactive version of plot
