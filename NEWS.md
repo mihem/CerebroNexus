@@ -1,3 +1,12 @@
+# CerebroNexus 8.5.4
+
+- **Standard colour palettes in the Builder.** Group colors has a Palette
+  select for the dataset: Cerebro default, Seurat / ggplot2 default,
+  ColorBrewer Set1, Set2, Dark2 and Paired, Tableau 10, Okabe-Ito, Paul Tol
+  Bright and greyscale, so group colors can match the figures of a
+  manuscript. A color picked by hand keeps its value when the palette changes;
+  "Reset colors" drops it.
+
 # CerebroNexus 8.5.3
 
 - **The Builder no longer stops with "nthreads > 1 requires TBB".** A CRB is
