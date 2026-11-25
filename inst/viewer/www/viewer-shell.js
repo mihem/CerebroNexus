@@ -765,6 +765,10 @@
         var img = element.querySelector('img');
         return !!img && img.complete && img.naturalWidth > 0;
       }
+      if (element.classList.contains('shiny-html-output') &&
+          element.classList.contains('cerebro-result-slot')) {
+        return element.children.length > 0 || element.textContent.trim().length > 0;
+      }
       return true;
     }
     function ownsOutput(pane, element) {
@@ -802,7 +806,7 @@
       if (!outputSettled(slot)) return false;
       // A renderUI value is only the start: all mounted, visible child outputs
       // must also finish. In particular a DT value is not a completed draw.
-      return Array.from(pane.querySelectorAll('.shiny-bound-output')).every(function (element) {
+      return Array.from(pane.querySelectorAll('.shiny-bound-output, .datatables.html-widget-output')).every(function (element) {
         return !element.getClientRects().length || outputSettled(element);
       });
     }
