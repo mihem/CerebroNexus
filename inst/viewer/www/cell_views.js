@@ -2077,11 +2077,19 @@
     return off;
   }
   function drawMinimap(p) {
-    if (!p.mini || !p.mctx) return;
+    if (!p.mini) return;
     var sp = spaceById[p.spaceId], u = sp && sp._unit;
     var on = !!(p.view && D && p.ok && u);
     p.mini.classList.toggle('is-on', on);
     if (!on) return;
+    if (!p.mctx) {
+      var dpr = window.devicePixelRatio || 1;
+      p.mini.width = MINI * dpr;
+      p.mini.height = MINI * dpr;
+      p.mctx = p.mini.getContext('2d');
+      if (!p.mctx) return;
+      p.mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
     if (!p.miniBg || p.miniUnit !== u) p.miniBg = buildMiniBg(p, u);
     var c = p.mctx, S = MINI - MINI_PAD * 2, v = p.view;
     c.clearRect(0, 0, MINI, MINI);
@@ -2424,6 +2432,7 @@
       if (D && p.spaceId) drawPanel(p);
     }
     renderer.failed.then(failed);
+    if (typeof renderer.isReady === 'function' && renderer.isReady()) return;
     renderer.ready.then(function () {
       if (p.gpu === renderer && D && p.spaceId) draw(p);
     }).catch(failed);
@@ -2436,10 +2445,16 @@
     var canvas = createLayerCanvas(p, 'cv-gpu-layer');
     try {
       p.gpuCanvas = canvas;
-      // Without WebGPU every panel draws through the page's one shared WebGL2
-      // context (its own canvas stays 2-D and keeps the picture).
+      // Multi-panel grids (>= OFFSTAGE_MIN_PANELS cards, not enlarged) draw
+      // through the page's single shared WebGL2 context rather than opening a
+      // dedicated WebGPU swap chain per card (and avoiding async ready double
+      // draws). Single views, small linked views, and enlarged Focus panels
+      // keep api.create(canvas) (WebGPU when available).
       var api = window.CerebroPointRenderer;
-      p.gpu = !navigator.gpu && api.createSharedWebGl
+      var useSharedGrid = !focusPanel &&
+        stagePanels >= OFFSTAGE_MIN_PANELS &&
+        typeof api.createSharedWebGl === 'function';
+      p.gpu = (useSharedGrid || (!navigator.gpu && api.createSharedWebGl))
         ? api.createSharedWebGl(canvas) : api.create(canvas);
       canvas._cerebroPointRenderer = p.gpu;
       if (p.W && p.H) p.gpu.resize(p.W, p.H, window.devicePixelRatio || 1);
@@ -3472,13 +3487,23 @@
 
   // The interaction layer: the hover ring, and a lasso or box while it is being
   // dragged, so a drag frame redraws neither the points nor the decorations.
+  // Attached lazily on first hover/drag so multi-panel grids do not allocate
+  // dozens of unused overlay canvases up front.
   function drawHoverOverlay(p) {
+    var dragging = !!(p.drag && p.moved);
+    var hovering = hoverCell != null && hoverCell !== pick &&
+      !!(p.ok && p.ok[hoverCell]) &&
+      (singleActive || linkedHoverOn || p === hoverPanel);
+    if (!dragging && !hovering) {
+      if (p.interactionCtx) p.interactionCtx.clearRect(0, 0, p.W, p.H);
+      return;
+    }
+    if (!p.interactionCtx) attachInteractionLayer(p);
     var c = p.interactionCtx;
     if (!c) return;
     c.clearRect(0, 0, p.W, p.H);
-    if (p.drag && p.moved) strokeOutline(c, p.lasso);
-    if (hoverCell == null || hoverCell === pick || !p.ok || !p.ok[hoverCell]) return;
-    if (!singleActive && !linkedHoverOn && p !== hoverPanel) return;
+    if (dragging) strokeOutline(c, p.lasso);
+    if (!hovering) return;
     // Thinner and cooler than the pick ring so hover and selection never read
     // as the same state.
     c.globalAlpha = 1; c.strokeStyle = '#0f172a'; c.lineWidth = 1.6;
@@ -6990,7 +7015,6 @@
   // per-dataset arrays.
   function buildPanels() {
     var paneEls = document.querySelectorAll('.coordviews-page .cv-panes > .cv-pane');
-    var dpr = window.devicePixelRatio || 1;
     for (var index = panels.length; index < paneEls.length; index++) {
       var key = panelKey(index), low = key.toLowerCase();
       var cv = $('cv-cv-' + low); if (!cv) continue;
@@ -7004,15 +7028,10 @@
         interactionCanvas: null, interactionCtx: null,
         gpu: null, gpuCanvas: null, gpuData: null, gpuDataState: null,
         gpuTransformOnly: false, _gpuDisabled: false };
-      attachInteractionLayer(p);
       prepareCanvasSemantics(p);
-      // The minimap is a FIXED size, so its backing store is set once here
-      // rather than on every re-fit.
-      if (mini) {
-        mini.width = MINI * dpr; mini.height = MINI * dpr;
-        p.mctx = mini.getContext('2d');
-        p.mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      }
+      // Interaction and minimap canvases allocate lazily on first hover/drag or
+      // zoom (drawHoverOverlay() / drawMinimap()), keeping multi-section grids
+      // down to a single 2D canvas per card until interacted with.
       panels.push(p);
       wireHover(p); wireBrush(p);
       if (p.pane) wirePane(p);
