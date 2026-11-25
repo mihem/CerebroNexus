@@ -1,3 +1,15 @@
+# CerebroNexus 8.4.14
+
+- **Faster Viewer Pack builds and opens (#294).** A Viewer Pack now stores the
+  extents of every projection, trajectory and spatial section and a content
+  digest per item, so rebuilding a pack reuses the assets of the items that
+  did not change instead of writing them again. The checksum of a large CRB
+  file is cached on disk (keyed by path, size, modification time and a sample
+  of its bytes), cell names and items are hashed in one pass, and `qs2`
+  files are written with several threads (`options(cerebro.viewer_pack_threads)`).
+  The Viewer checks each domain of a pack when it first needs it, not all
+  at start-up.
+
 # CerebroNexus 8.4.12
 
 - **Restructured guides (#267).** The documentation starts with a new
