@@ -164,6 +164,14 @@ test_that("multi-panel grid draws time-slice across animation frames viewport-fi
   )
 })
 
+test_that("multi-panel grids keep cards lightweight and share one GPU context", {
+  expect_node_fixture(
+    "grid-lightweight-cards.js",
+    viewer_test_path("www", "cell_views.js"),
+    pass = "PASS lightweight grid cards and shared GPU"
+  )
+})
+
 test_that("in Chrome shared WebGL2 draws indexed paint order, uniform alpha, and compact Uint8 layers", {
   skip_if_no_chrome()
   browser <- chromote::ChromoteSession$new()
