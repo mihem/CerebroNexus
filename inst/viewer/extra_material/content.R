@@ -138,7 +138,6 @@ output[["extra_material_table"]] <- viewerLazyRender(function() {
 if (exists("viewer_hidden_output_options", inherits = TRUE)) {
   outputOptions(output, "extra_material_content_UI", priority = 10)
   outputOptions(output, "extra_material_table", suspendWhenHidden = FALSE)
-  outputOptions(output, "extra_material_plot_UI", suspendWhenHidden = FALSE)
 }
 
 ##----------------------------------------------------------------------------##
@@ -165,6 +164,9 @@ output[["extra_material_plot_UI"]] <- renderUI({
     )
   }
 })
+if (exists("viewer_hidden_output_options", inherits = TRUE)) {
+  outputOptions(output, "extra_material_plot_UI", suspendWhenHidden = FALSE)
+}
 
 ##----------------------------------------------------------------------------##
 ## UI element that contains interactive version of plot
