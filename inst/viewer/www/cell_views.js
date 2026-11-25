@@ -2466,17 +2466,14 @@
     var canvas = createLayerCanvas(p, 'cv-gpu-layer');
     try {
       p.gpuCanvas = canvas;
-      // Multi-panel grids (>= OFFSTAGE_MIN_PANELS cards, not enlarged) draw
-      // through the page's single shared WebGL2 context rather than opening a
-      // dedicated WebGPU swap chain per card (and avoiding async ready double
-      // draws). Single views, small linked views, and enlarged Focus panels
-      // keep api.create(canvas) (WebGPU when available).
+      // Without WebGPU (or when it gave no adapter) the panels share one hidden
+      // WebGL2 context. With it, every panel is drawn through WebGPU, in a grid
+      // too: on the large Spatial demos a grid on the shared WebGL2 context
+      // opened and scrolled as fast as one on WebGPU, so it is not worth a
+      // second path.
       var api = window.CerebroPointRenderer;
       var noWebGpu = !navigator.gpu || (api.webGpuFailed && api.webGpuFailed());
-      var useSharedGrid = !focusPanel &&
-        stagePanels >= OFFSTAGE_MIN_PANELS &&
-        typeof api.createSharedWebGl === 'function';
-      p.gpu = ((noWebGpu && api.createSharedWebGl) || useSharedGrid)
+      p.gpu = noWebGpu && api.createSharedWebGl
         ? api.createSharedWebGl(canvas) : api.create(canvas);
       canvas._cerebroPointRenderer = p.gpu;
       if (p.W && p.H) p.gpu.resize(p.W, p.H, window.devicePixelRatio || 1);

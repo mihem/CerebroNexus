@@ -164,7 +164,7 @@ test_that("multi-panel grid draws time-slice across animation frames viewport-fi
   )
 })
 
-test_that("multi-panel grids keep cards lightweight and share one GPU context", {
+test_that("multi-panel grids keep cards lightweight and pick their renderer by WebGPU", {
   expect_node_fixture(
     "grid-lightweight-cards.js",
     viewer_test_path("www", "cell_views.js"),
