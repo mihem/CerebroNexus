@@ -621,10 +621,11 @@ spatial_projection_update_plot <- function(input) {
   ## took 40 s. A new render request (a remounted canvas, a data set switch)
   ## always gets the whole frame.
   grid_geometry <- if (is.list(grid)) {
+    all_from_file <- isTRUE(grid$all_from_geometry)
     rlang::hash(list(
       context = input[["dataset_context"]],
-      x = payload$data$x,
-      y = payload$data$y,
+      x = if (all_from_file) length(payload$data$x) else payload$data$x,
+      y = if (all_from_file) length(payload$data$y) else payload$data$y,
       keys = payload$data$selection_key,
       panels = payload$data$panels,
       x_range = payload$data$x_range,

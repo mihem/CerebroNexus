@@ -176,8 +176,10 @@ spatial_projection_coexpression_columns <- function(
 spatial_grid_geometry_files <- function(plot_parameters, cells, rotation_of) {
   none <- function(section, rows) NULL
   failed <- input[["spatial_projection_projection_resource_failed"]]
+  grid <- spatial_grid_of(cells)
+  n_sections <- if (is.list(grid)) length(grid$sections) else 0L
   if (
-    length(cells) < spatial_grid_stream_min ||
+    !spatial_grid_should_stream(length(cells), n_sections) ||
       identical(plot_parameters[["plot_type"]], "Co-expression (RGB)") ||
       (length(failed) == 1L && !is.na(failed) && nzchar(failed)) ||
       !exists("viewerSpatialGeometryAsset", mode = "function")

@@ -1655,16 +1655,30 @@ spatial_grid_coordinates <- function(
   x_ranges <- y_ranges <- geometry <- vector("list", length(grid$sections))
   for (i in seq_along(grid$sections)) {
     section <- grid$sections[[i]]
-    full <- spatial_grid_xy(coordinates_of(section))
-    full <- rotateSpatialCoordinates(full, rotation_of(section))
-    x_ranges[i] <- list(spatial_grid_range(full$x))
-    y_ranges[i] <- list(spatial_grid_range(full$y))
     rows <- if (grid$counts[[i]]) {
       as.integer(cells[(starts[[i]] + 1L):ends[[i]]])
     } else {
       integer()
     }
     file <- if (length(rows)) geometry_of(section, rows)
+    has_extents <- is.list(file) &&
+      is.numeric(file$x_range) &&
+      length(file$x_range) == 2L &&
+      all(is.finite(file$x_range)) &&
+      is.numeric(file$y_range) &&
+      length(file$y_range) == 2L &&
+      all(is.finite(file$y_range))
+    if (!is.null(file) && has_extents) {
+      x_ranges[i] <- list(as.numeric(file$x_range))
+      y_ranges[i] <- list(as.numeric(file$y_range))
+      geometry[i] <- list(file)
+      xs[[i]] <- ys[[i]] <- rep(NA_real_, length(rows))
+      next
+    }
+    full <- spatial_grid_xy(coordinates_of(section))
+    full <- rotateSpatialCoordinates(full, rotation_of(section))
+    x_ranges[i] <- list(spatial_grid_range(full$x))
+    y_ranges[i] <- list(spatial_grid_range(full$y))
     if (!is.null(file)) {
       geometry[i] <- list(file)
       xs[[i]] <- ys[[i]] <- rep(NA_real_, length(rows))
@@ -1696,7 +1710,9 @@ spatial_grid_coordinates <- function(
     counts = grid$counts,
     x_ranges = x_ranges,
     y_ranges = y_ranges,
-    geometry = geometry
+    geometry = geometry,
+    all_from_geometry = length(grid$sections) > 0L &&
+      all(!vapply(geometry, is.null, logical(1)))
   )
 }
 
@@ -1934,10 +1950,30 @@ spatial_grid_metadata <- function(full_metadata, cells, columns) {
 ## way. All 59 sections of the Allen atlas (3.9 million cells) drew only after
 ## their 51 MB frame had arrived and been read, about 5 s.
 spatial_grid_stream_min <- 4e5
+## Multi-section grids (e.g. Kukanja EAE: 52 sections, 270k cells) benefit from
+## Viewer Pack static geometry and head-first streaming well below 400k cells.
+spatial_grid_stream_min_sections <- 6L
+spatial_grid_stream_min_multi <- 5e4
 ## The cells of the first batch (a few sections, drawn about 1.5 s sooner than
 ## the whole grid) and of every other.
 spatial_grid_stream_first <- 1.5e5
+spatial_grid_stream_first_multi <- 6e4
 spatial_grid_stream_step <- 1e6
+
+spatial_grid_should_stream <- function(
+  n_cells,
+  n_sections = 0L,
+  min_cells = spatial_grid_stream_min,
+  min_sections = spatial_grid_stream_min_sections,
+  min_multi = spatial_grid_stream_min_multi
+) {
+  if (n_cells >= min_cells) {
+    return(TRUE)
+  }
+  identical(min_cells, spatial_grid_stream_min) &&
+    n_sections >= min_sections &&
+    n_cells >= min_multi
+}
 
 ## The batches of a streaming grid: lists of indices into `counts` (the cells
 ## of each section panel, in frame order). `order` names the panels in the
@@ -1996,8 +2032,7 @@ spatial_grid_stream_split <- function(
   n <- length(data$x)
   panels <- data$panels
   if (
-    n < min_cells ||
-      !is.list(panels) ||
+    !is.list(panels) ||
       length(data$y) != n ||
       !is.null(data$rgb) ||
       !is.null(data$sparse_color) ||
@@ -2010,7 +2045,10 @@ spatial_grid_stream_split <- function(
     function(panel) !is.null(panel$section) && !is.null(panel$start),
     logical(1)
   ))
-  if (length(section_at) < 2L) {
+  if (
+    length(section_at) < 2L ||
+      !spatial_grid_should_stream(n, length(section_at), min_cells = min_cells)
+  ) {
     return(NULL)
   }
   sections <- vapply(
@@ -2028,7 +2066,18 @@ spatial_grid_stream_split <- function(
     function(panel) as.integer(panel$count),
     0L
   )
-  batches <- spatial_grid_stream_batches(counts, match(shown, sections), ...)
+  dots <- list(...)
+  if (
+    is.null(dots$first) &&
+      n < spatial_grid_stream_min &&
+      length(section_at) >= spatial_grid_stream_min_sections
+  ) {
+    dots$first <- min(spatial_grid_stream_first, spatial_grid_stream_first_multi)
+  }
+  batches <- do.call(
+    spatial_grid_stream_batches,
+    c(list(counts = counts, order = match(shown, sections)), dots)
+  )
   ## Sections whose positions come from a Viewer Pack file carry none here,
   ## and a frame with such sections always streams: its first message names
   ## the files.

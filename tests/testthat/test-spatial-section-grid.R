@@ -892,3 +892,62 @@ test_that("the Builder offers the Spatial layout with the author's choice", {
     fixed = TRUE
   )
 })
+
+test_that("multi-section grids below 400k cells stream and skip coordinate reads when pack extents exist", {
+  ## Kukanja-scale: 52 sections, 270k cells (< 400k) streams and opens with a
+  ## first-screen head batch (~60k cells).
+  expect_true(spatial_grid_should_stream(270878L, 52L))
+  expect_false(spatial_grid_should_stream(270878L, 3L))
+  expect_false(spatial_grid_should_stream(20000L, 10L))
+
+  n_sec <- 15L
+  per <- 6000L
+  n <- n_sec * per
+  panels <- lapply(seq_len(n_sec), function(i) {
+    list(
+      section = paste0("S", i),
+      start = (i - 1L) * per,
+      count = per
+    )
+  })
+  frame <- list(
+    x = numeric(n),
+    y = numeric(n),
+    group_code = integer(n),
+    panels = panels
+  )
+  stream <- spatial_grid_stream_split(frame, shown = paste0("S", seq_len(n_sec)))
+  expect_false(is.null(stream))
+  expect_identical(stream$batches, 2L)
+  expect_length(unclass(stream$head$grid_stream$section), 10L)
+
+  ## When geometry_of supplies x_range and y_range, coordinates_of is not called.
+  data <- section_grid_data()
+  cells <- spatial_grid_cells(
+    names(data$index),
+    function(section) data$index[[section]]
+  )
+  coord_calls <- character()
+  layout <- spatial_grid_coordinates(
+    cells,
+    function(section) {
+      coord_calls <<- c(coord_calls, section)
+      data$coordinates[[section]]
+    },
+    function(section) data$index[[section]],
+    geometry_of = function(section, rows) {
+      list(
+        protocol = "spatial-geometry-v1",
+        url = paste0("pack/", section, ".bin"),
+        cells = length(rows),
+        x_range = c(0, 100),
+        y_range = c(0, 50)
+      )
+    }
+  )
+  expect_identical(coord_calls, character())
+  expect_true(layout$all_from_geometry)
+  expect_true(all(is.na(layout$coordinates$x)))
+  expect_identical(layout$x_ranges[[1L]], c(0, 100))
+  expect_identical(layout$y_ranges[[1L]], c(0, 50))
+})
