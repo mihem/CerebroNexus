@@ -1300,11 +1300,18 @@ viewerProjectionSubsetRows <- function(
   indices,
   columns = colnames(table)
 ) {
-  if (is.null(columns)) {
-    columns <- colnames(table)
+  if (!is.null(columns) && !identical(columns, colnames(table))) {
+    table <- table[, columns, drop = FALSE]
   }
-  table <- table[, columns, drop = FALSE]
-  if (identical(indices, seq_len(nrow(table)))) {
+  n <- nrow(table)
+  if (
+    is.integer(indices) &&
+      length(indices) == n &&
+      (n == 0L ||
+        (indices[[1L]] == 1L &&
+          indices[[n]] == n &&
+          !is.unsorted(indices, strictly = TRUE)))
+  ) {
     return(table)
   }
   table[indices, , drop = FALSE]
@@ -3632,14 +3639,13 @@ randomlySubsetCells <- function(table, percentage) {
   ## check if subsetting is necessary
   ## ... percentage is less than 100
   if (percentage < 100) {
-    ## calculate how many cells should be left after subsetting
-    size_of_subset <- ceiling(percentage / 100 * nrow(table))
-    ## get IDs of all cells
-    cell_ids <- rownames(table)
-    ## subset cell IDs
-    subset_of_cell_ids <- cell_ids[sample(seq_along(cell_ids), size_of_subset)]
-    ## subset table and return
-    return(table[subset_of_cell_ids, ])
+    n <- nrow(table)
+    if (n == 0L) {
+      return(table)
+    }
+    size_of_subset <- min(n, as.integer(ceiling(percentage / 100 * n)))
+    ## Integer index subsetting avoids materializing and hashing 1.3M rownames.
+    return(table[sample.int(n, size_of_subset), , drop = FALSE])
     ## ... percentage is 100 -> no subsetting needed
   } else {
     ## return original table

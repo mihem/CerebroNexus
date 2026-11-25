@@ -63,7 +63,14 @@
   "viewerSelectionRows",
   "viewerRowMask",
   "selectedCellMask",
-  "trajectorySelectionValid"
+  "trajectorySelectionValid",
+  "compactViolinData",
+  "cerebroViolinData",
+  "cerebroBarChartData",
+  "cerebroSankeyData",
+  "morans_i",
+  "rotateSpatialCoordinatesByRoi",
+  "compute_group_hulls"
 )
 
 .viewerSourceAssignment <- function(expression) {
@@ -117,14 +124,25 @@
 }
 
 ## The cache is keyed by the path as given: normalizePath() costs 1-3 ms per
-## call on Windows.
+## call on Windows. For immutable installed package files (under .../CerebroNexus/viewer/
+## when cerebro.dev_reload is not enabled), a cached entry is reused without
+## repeating file.info(). Editable/temp files still stat on every call.
 viewerSource <- function(path, envir = parent.frame()) {
-  info <- file.info(path, extra_cols = FALSE)
-  fingerprint <- c(size = info$size, mtime = as.numeric(info$mtime))
   cached <- .viewer_source_cache[[path]]
-  if (is.null(cached) || !identical(cached$fingerprint, fingerprint)) {
+  check_stat <- is.null(cached) ||
+    !isTRUE(cached$immutable) ||
+    isTRUE(getOption("cerebro.dev_reload", FALSE))
+  fingerprint <- NULL
+  if (check_stat) {
+    info <- file.info(path, extra_cols = FALSE)
+    fingerprint <- c(size = info$size, mtime = as.numeric(info$mtime))
+  }
+  if (is.null(cached) || (check_stat && !identical(cached$fingerprint, fingerprint))) {
     expressions <- parse(file = path, keep.source = FALSE)
-    shared_names <- if (identical(basename(path), "utility_functions.R")) {
+    shared_names <- if (
+      basename(path) %in%
+        c("utility_functions.R", "plotting_functions.R", "func_spatial_helpers.R")
+    ) {
       vapply(expressions, .viewerSourceAssignment, character(1))
     } else {
       rep(NA_character_, length(expressions))
@@ -140,8 +158,10 @@ viewerSource <- function(path, envir = parent.frame()) {
     if (any(shared)) {
       invisible(eval(expressions[shared], envir = shared_environment))
     }
+    norm_path <- gsub("\\", "/", path, fixed = TRUE)
     cached <- list(
       fingerprint = fingerprint,
+      immutable = grepl("/CerebroNexus/viewer/", norm_path, fixed = TRUE),
       expressions = expressions[!shared],
       shared_names = shared_names[shared],
       shared_environment = shared_environment
