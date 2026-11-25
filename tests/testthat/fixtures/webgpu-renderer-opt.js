@@ -448,8 +448,189 @@ async function testSharedDeviceLifecycleAndRelease() {
   console.log('PASS webgpu shared-device listeners, release cleanup and failover release');
 }
 
+// 4. Shader alpha uniform, lean layers (null & Uint8Array), and *Id scratch tokens.
+async function testAlphaLeanLayersAndScratchTokens() {
+  const h = makeHarness();
+  const canvas = h.makeCanvas(200, 200);
+  const renderer = h.api.create(canvas);
+  await renderer.ready;
+  const stats = h.devices[0]._stats;
+  assert.equal(renderer.supportsUniformAlpha(), true);
+  assert.equal(renderer.supportsBufferIds(), true);
+
+  // Upload with layers: null and monotonic *Id tokens -> skips layer buffer allocation!
+  const bufsBefore = stats.buffersCreated;
+  const writesBefore = stats.attributeWrites.length;
+  renderer.setData({
+    positions: new Float32Array([0, 0, 1, 1]), positionsId: 1,
+    colors: new Uint8Array([255, 0, 0, 255, 0, 0, 255, 255]), colorsId: 2,
+    layers: null, layersId: 0,
+    count: 2, foreground: false
+  });
+  assert.equal(stats.buffersCreated, bufsBefore + 2, 'null layers allocates only positions + colors');
+  assert.equal(stats.attributeWrites.length, writesBefore + 2);
+
+  // Draw with alpha uniform override: writes style.w = 0.4; changing alpha invalidates cache.
+  const uBefore = stats.uniformWrites.length;
+  assert.equal(renderer.draw({pointSize: 4, alpha: {background: 0.4, foreground: 0.95}}), true);
+  assert.equal(stats.uniformWrites.length, uBefore + 1);
+  assert.ok(Math.abs(stats.uniformWrites[uBefore].values[19] - 0.4) < 1e-6);
+
+  // Re-submitting with nulled scratch arrays + same *Id tokens uploads nothing and skips redraw!
+  const submitsBefore = stats.submits;
+  renderer.setData({
+    positions: null, positionsId: 1,
+    colors: null, colorsId: 2,
+    layers: null, layersId: 0,
+    count: 2, foreground: false
+  });
+  assert.equal(stats.attributeWrites.length, writesBefore + 2);
+  assert.equal(renderer.draw({pointSize: 4, alpha: {background: 0.4, foreground: 0.95}}), true);
+  assert.equal(stats.submits, submitsBefore, 'unchanged alpha uniform skips submit');
+  // Changing alpha.background triggers redraw without any buffer upload!
+  assert.equal(renderer.draw({pointSize: 4, alpha: {background: 0.7, foreground: 0.95}}), true);
+  assert.equal(stats.submits, submitsBefore + 1);
+  assert.ok(Math.abs(stats.uniformWrites.at(-1).values[19] - 0.7) < 1e-6);
+
+  // Compact Uint8Array layers widen cleanly for WebGPU without re-uploading positions or colors!
+  const writesBeforeLayers = stats.attributeWrites.length;
+  renderer.setData({
+    positions: null, positionsId: 1,
+    colors: null, colorsId: 2,
+    layers: new Uint8Array([0, 1]), layersId: 3,
+    count: 2, foreground: true
+  });
+  assert.equal(stats.attributeWrites.length, writesBeforeLayers + 1, 'only layers uploaded');
+  assert.equal(stats.attributeWrites.at(-1).bytes.length, 8, 'Uint8Array widened to 2 u32 entries');
+  const uFgBefore = stats.uniformWrites.length;
+  assert.equal(renderer.draw({pointSize: 4, alpha: {background: 0.05, foreground: 0.95}}), true);
+  assert.equal(stats.uniformWrites.length, uFgBefore + 2);
+  assert.ok(Math.abs(stats.uniformWrites[uFgBefore].values[19] - 0.05) < 1e-5);
+  assert.ok(Math.abs(stats.uniformWrites[uFgBefore + 1].values[19] - 0.95) < 1e-5);
+
+  console.log('PASS webgpu alpha uniforms, lean layers and token-based scratch uploads');
+}
+
+// 5. cell_views.js lazy attachGpu, opacity-only uniform fast path & post-upload scratch release.
+async function testViewerLazyAttachAndZeroCopySelection() {
+  // Confirm buildPanels() no longer eagerly attaches GPU contexts to off-stage panels.
+  const bpStart = viewSource.indexOf('  function buildPanels()');
+  const bpEnd = viewSource.indexOf('  function canFocusPanel()');
+  assert.ok(bpStart > 0 && bpEnd > bpStart);
+  assert.equal(viewSource.slice(bpStart, bpEnd).includes('attachGpu('), false,
+    'buildPanels must not eagerly attach GPU contexts');
+
+  // Exercise gpuAvailable / gpuCandidate / updateGpuSelection / drawGpuPoints with a real-contract renderer.
+  const fnStart = viewSource.indexOf('  function gpuAvailable(p)');
+  const fnEnd = viewSource.indexOf('  function hideGpu(p)');
+  const selStart = viewSource.indexOf('  function gpuUsesUniformAlpha(p)');
+  const selEnd = viewSource.indexOf('  var GPU_LITTLE_ENDIAN');
+  const scrStart = viewSource.indexOf('  var GPU_LITTLE_ENDIAN');
+  const scrEnd = viewSource.indexOf('  var GPU_COLOUR_KEYS');
+  const drawStart = viewSource.indexOf('  function drawGpuPoints(');
+  const drawEnd = viewSource.indexOf('  function requestSingleAux(');
+  assert.ok(fnStart > 0 && selStart > 0 && scrStart > 0 && drawStart > 0);
+
+  let attached = 0, setDataCalls = [], drawCalls = [];
+  const makeRealContractRenderer = () => ({
+    isReady: () => true,
+    supportsUniformAlpha: () => true,
+    supportsBufferIds: () => true,
+    setData(d) {
+      setDataCalls.push({
+        positions: d.positions, positionsId: d.positionsId,
+        colors: d.colors, colorsId: d.colorsId,
+        layers: d.layers, layersId: d.layersId,
+        foreground: d.foreground
+      });
+    },
+    draw(opts) { drawCalls.push(opts); return true; },
+    clear() {}
+  });
+
+  const ctx = {
+    D: {n: 25000},
+    GPU_MIN_CELLS: 20000,
+    RGB_MODE: '__rgb__',
+    gpuAcceleration: true,
+    sel: null,
+    nicheSet: null,
+    spaceById: {s: {_unit: {nz: null}}},
+    window: {CerebroPointRenderer: {create() {}}},
+    panelColorMode: () => 'group',
+    pointOpacityOf: p => p._op,
+    panelRect: () => ({x: 0, y: 0, width: 100, height: 100}),
+    gpuColor: () => [0, 0, 0, 255],
+    forEachHeldCell(hi, _cells, fn) { hi.forEach(fn); },
+    hideGpu() {},
+    disableGpu() {},
+    failOver: () => false,
+    setGpuLayerVisible() {},
+    attachGpu(p) { attached++; p.gpu = makeRealContractRenderer(); p.gpuCanvas = {dataset: {}}; },
+    buildGpuData(p) {
+      if (!p.gpuData) {
+        p.gpuDataState = {opacity: p._op, selection: ctx.sel, niche: null, unit: ctx.spaceById.s._unit};
+        p.gpuData = {
+          positions: ctx.gpuScratchPositions(6), positionsId: ++ctx.gpuBufferSeq,
+          colors: ctx.gpuScratchColors(12), colorsId: ++ctx.gpuBufferSeq,
+          layers: null, layersId: 0,
+          count: 3, opaque: true, foreground: false,
+          vertexIndex: new Int32Array([1, 2, 3]), vertexCells: null, ordered: false,
+          drawOrder: null, drawOrderId: 0, drawOrderOf: null
+        };
+      } else {
+        const nextState = {opacity: p._op, selection: ctx.sel, niche: null, unit: ctx.spaceById.s._unit};
+        const updated = ctx.updateGpuSelection(p, nextState, ctx.sel);
+        if (updated) return updated;
+      }
+      return p.gpuData;
+    }
+  };
+  vm.createContext(ctx);
+  vm.runInContext(
+    viewSource.slice(fnStart, fnEnd) + '\n' +
+    viewSource.slice(scrStart, scrEnd) + '\n' +
+    viewSource.slice(selStart, selEnd) + '\n' +
+    viewSource.slice(drawStart, drawEnd),
+    ctx
+  );
+
+  // Before first draw: gpuCandidate is true even with p.gpu === null.
+  const p = {spaceId: 's', gpu: null, gpuCanvas: null, _gpuDisabled: false, _op: 0.8, _renderPointSize: 3};
+  assert.equal(ctx.gpuCandidate(p), true, 'unattached panel is still a GPU candidate');
+  assert.equal(attached, 0);
+
+  // First draw lazily attaches GPU, releases scratch refs after setData, and passes alpha uniform.
+  assert.equal(ctx.drawGpuPoints(p, null, 3, null), true);
+  assert.equal(attached, 1);
+  assert.equal(p.gpuData.positions, null, 'scratch positions released after upload');
+  assert.equal(p.gpuData.colors, null, 'scratch colors released after upload');
+  assert.equal(p.gpuData.layers, null);
+  assert.deepEqual({...drawCalls[0].alpha}, {background: 0.8, foreground: 0.95});
+
+  // Opacity slider change: returns previous gpuData without copying/uploading colors!
+  p._op = 0.35;
+  assert.equal(ctx.drawGpuPoints(p, null, 3, null), true);
+  assert.equal(setDataCalls[1].colors, null);
+  assert.equal(setDataCalls[1].colorsId, setDataCalls[0].colorsId, 'opacity change keeps colorsId');
+  assert.deepEqual({...drawCalls[1].alpha}, {background: 0.35, foreground: 0.95});
+
+  // Selection highlight: keeps colorsId untouched and uploads only compact Uint8Array layers!
+  ctx.sel = new Set([1]);
+  assert.equal(ctx.drawGpuPoints(p, null, 3, null), true);
+  assert.equal(setDataCalls[2].colorsId, setDataCalls[0].colorsId, 'selection keeps colorsId');
+  assert.equal(setDataCalls[2].layers.BYTES_PER_ELEMENT, 1, 'selection uses 1-byte Uint8Array layers');
+  assert.equal(setDataCalls[2].layers[1], 1);
+  assert.equal(p.gpuData.layers, null, 'selection scratch layers released after upload');
+  assert.deepEqual({...drawCalls[2].alpha}, {background: 0.05, foreground: 0.95});
+
+  console.log('PASS viewer lazy attachGpu, uniform alpha opacity/selection, and post-upload scratch release');
+}
+
 (async () => {
   await testFrameCacheAndUniforms();
   await testBufferAndBindGroupReuse();
   await testSharedDeviceLifecycleAndRelease();
+  await testAlphaLeanLayersAndScratchTokens();
+  await testViewerLazyAttachAndZeroCopySelection();
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -150,23 +150,69 @@ async function checkOrder() {
   console.log('PASS webgpu draws through an order: order-only uploads, ordered pipeline, plain without it');
 }
 async function checkWebGlOrder() {
+  const uploads = [], orderUploads = [], drawCalls = [];
+  let deleted = 0;
   const gl = {
+    POINTS: 1, UNSIGNED_INT: 2, UNSIGNED_BYTE: 3, FLOAT: 4,
+    ARRAY_BUFFER: 5, ELEMENT_ARRAY_BUFFER: 6, STATIC_DRAW: 7,
+    COLOR_BUFFER_BIT: 8, BLEND: 9, SRC_ALPHA: 10, ONE_MINUS_SRC_ALPHA: 11,
+    ONE: 12, NO_ERROR: 0, RENDERER: 13,
     createShader: () => ({}), shaderSource() {}, compileShader() {},
     getShaderParameter: () => true, deleteShader() {},
     createProgram: () => ({}), attachShader() {}, linkProgram() {},
-    getProgramParameter: () => true, getUniformLocation: () => ({}),
-    createBuffer: () => ({}), useProgram() {}, bindBuffer() {}, bufferData() {},
-    bufferSubData() {}, enableVertexAttribArray() {}, vertexAttribIPointer() {},
-    vertexAttribPointer() {}, viewport() {}, getParameter: () => 'test adapter'
+    getProgramParameter: () => true, getUniformLocation: (_p, name) => name,
+    createBuffer: () => ({}), deleteBuffer() { deleted++; },
+    useProgram() {}, bindBuffer() {},
+    bufferData(target, array) {
+      (target === gl.ELEMENT_ARRAY_BUFFER ? orderUploads : uploads).push(
+        ['data', Buffer.from(array.buffer, array.byteOffset, array.byteLength)]
+      );
+    },
+    bufferSubData(target, _offset, array) {
+      (target === gl.ELEMENT_ARRAY_BUFFER ? orderUploads : uploads).push(
+        ['sub', Buffer.from(array.buffer, array.byteOffset, array.byteLength)]
+      );
+    },
+    enableVertexAttribArray() {}, disableVertexAttribArray() {},
+    vertexAttribI4ui() {}, vertexAttribIPointer() {}, vertexAttribPointer() {},
+    viewport() {}, clearColor() {}, clear() {}, enable() {}, blendFuncSeparate() {},
+    uniform1f() {}, uniform2f() {}, uniform3f() {}, uniform4f() {}, flush() {},
+    drawArrays: (_m, _f, count) => drawCalls.push(['arrays', count]),
+    drawElements: (_m, count, type) => drawCalls.push(['elements', count, type]),
+    getError: () => 0, getParameter: () => 'test adapter'
   };
   const scope = {window: {}, navigator: {}, performance};
   vm.runInNewContext(source, scope);
   const renderer = scope.window.CerebroPointRenderer.create({
     style: {}, clientWidth: 10, clientHeight: 10, addEventListener() {}, getContext: () => gl});
-  assert.equal(renderer.drawsInOrder(1), false);
-  assert.throws(() => renderer.setData({positions: new Float32Array(2), colors: new Uint8Array(4),
+  assert.equal(renderer.drawsInOrder(3), true);
+  const positions = new Float32Array([0, 0, 1, 1, 2, 2]);
+  const colors = new Uint8Array(12), drawOrder = new Uint32Array([2, 0, 1]);
+  renderer.setData({positions, colors, layers: null, count: 3, foreground: false, drawOrder});
+  assert.equal(uploads.length, 2, 'layers: null skips layer buffer upload');
+  assert.equal(orderUploads.length, 1);
+  assert.equal(orderUploads[0][0], 'data');
+  assert.equal(renderer.draw({pointSize: 2}), true);
+  assert.deepEqual(drawCalls, [['elements', 3, gl.UNSIGNED_INT]]);
+  // A new order of the same size reuses ELEMENT_ARRAY_BUFFER via bufferSubData.
+  renderer.setData({positions, colors, layers: null, count: 3, foreground: false,
+    drawOrder: new Uint32Array([1, 2, 0])});
+  assert.equal(uploads.length, 2, 'order-only update keeps positions and colors');
+  assert.equal(orderUploads.length, 2);
+  assert.equal(orderUploads[1][0], 'sub');
+  // Dropping drawOrder deletes orderBuffer and returns to drawArrays.
+  renderer.setData({positions, colors, layers: null, count: 3, foreground: false});
+  assert.equal(deleted, 1);
+  assert.equal(renderer.draw({pointSize: 2}), true);
+  assert.deepEqual(drawCalls[1], ['arrays', 3]);
+  // A minimal gl without drawElements still reports drawsInOrder() === false.
+  const bareGl = Object.assign({}, gl, {drawElements: undefined});
+  const bare = scope.window.CerebroPointRenderer.create({
+    style: {}, clientWidth: 10, clientHeight: 10, addEventListener() {}, getContext: () => bareGl});
+  assert.equal(bare.drawsInOrder(1), false);
+  assert.throws(() => bare.setData({positions: new Float32Array(2), colors: new Uint8Array(4),
     layers: new Uint32Array(1), count: 1, drawOrder: new Uint32Array(1)}), /buffer order only/);
-  console.log('PASS webgl2 refuses a draw order');
+  console.log('PASS webgl2 draws through an order via drawElements and skips null layers');
 }
 (async () => {
   await check('webgpu');

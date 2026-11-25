@@ -155,3 +155,84 @@ test_that("the stage observer tells the panels near the window from the far ones
     pass = "PASS the stage observer"
   )
 })
+
+test_that("in Chrome shared WebGL2 draws indexed paint order, uniform alpha, and compact Uint8 layers", {
+  skip_if_no_chrome()
+  browser <- chromote::ChromoteSession$new()
+  on.exit(browser$close(), add = TRUE)
+  evaluate <- function(code) {
+    result <- browser$Runtime$evaluate(
+      expression = code,
+      awaitPromise = TRUE,
+      returnByValue = TRUE
+    )
+    if (!is.null(result$exceptionDetails)) {
+      stop(
+        result$exceptionDetails$exception$description %||%
+          result$exceptionDetails$text,
+        call. = FALSE
+      )
+    }
+    result$result$value
+  }
+  evaluate(paste(
+    readLines(viewer_test_path("www", "cell_points_gpu.js"), warn = FALSE),
+    collapse = "\n"
+  ))
+  res <- evaluate(
+    "(async () => {
+      const probe = document.createElement('canvas');
+      if (!probe.getContext('webgl2')) return null;
+      const canvas = document.createElement('canvas');
+      canvas.style.width = canvas.style.height = '40px';
+      document.body.append(canvas);
+      const renderer = window.CerebroPointRenderer.createSharedWebGl(canvas);
+      renderer.resize(40, 40, 1);
+      // Two overlapping points at the centre: index 0 is red, index 1 is blue.
+      const positions = new Float32Array([0.5, 0.5, 0.5, 0.5]);
+      const colors = new Uint8Array([255, 0, 0, 255, 0, 0, 255, 255]);
+      const readCenter = () => Array.from(canvas.getContext('2d').getImageData(20, 20, 1, 1).data);
+      // 1) drawOrder [0, 1] puts blue on top; null layers skips layer upload.
+      renderer.setData({positions, positionsId: 1, colors, colorsId: 2,
+        layers: null, layersId: 0, drawOrder: new Uint32Array([0, 1]), drawOrderId: 3,
+        count: 2, foreground: false});
+      renderer.draw({pointSize: 16});
+      const blueTop = readCenter();
+      // 2) Reorder to [1, 0] puts red on top without re-uploading positions!
+      renderer.setData({positions: null, positionsId: 1, colors: null, colorsId: 2,
+        layers: null, layersId: 0, drawOrder: new Uint32Array([1, 0]), drawOrderId: 4,
+        count: 2, foreground: false});
+      renderer.draw({pointSize: 16});
+      const redTop = readCenter();
+      // 3) Uniform alpha overrides opacity without re-uploading colors!
+      renderer.setData({positions: new Float32Array([0.5, 0.5]), positionsId: 5,
+        colors: new Uint8Array([0, 255, 0, 255]), colorsId: 6,
+        layers: null, layersId: 0, count: 1, foreground: false});
+      renderer.draw({pointSize: 16, alpha: {background: 0.4, foreground: 0.95}});
+      const halfGreen = readCenter();
+      // 4) Compact Uint8Array layers put foreground index 0 (red) above index 1 (blue).
+      renderer.setData({positions, positionsId: 7, colors, colorsId: 8,
+        layers: new Uint8Array([1, 0]), layersId: 9, count: 2, foreground: true});
+      renderer.draw({pointSize: 16, alpha: {background: 0.05, foreground: 0.95}});
+      const fgRed = readCenter();
+      const stats = renderer.stats();
+      renderer.release();
+      return {
+        drawsInOrder: stats.orderedDraw === false,
+        positionUploads: stats.positionUploads,
+        blueTop, redTop, halfGreen, fgRed
+      };
+    })()"
+  )
+  skip_if(is.null(res), "This Chrome has no WebGL2.")
+  expect_identical(res$positionUploads, 3L)
+  expect_gt(res$blueTop[[3]], 200L)
+  expect_lt(res$blueTop[[1]], 50L)
+  expect_gt(res$redTop[[1]], 200L)
+  expect_lt(res$redTop[[3]], 50L)
+  expect_gt(res$halfGreen[[2]], 200L)
+  expect_gt(res$halfGreen[[4]], 70L)
+  expect_lt(res$halfGreen[[4]], 140L)
+  expect_gt(res$fgRed[[1]], 200L)
+  expect_gt(res$fgRed[[4]], 220L)
+})

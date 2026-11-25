@@ -12,6 +12,12 @@ struct Uniforms {
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 
+struct FlatVertexInput {
+  @location(0) position: vec2f,
+  @location(1) color: vec4f,
+  @builtin(vertex_index) vertexIndex: u32,
+}
+
 struct VertexInput {
   @location(0) position: vec2f,
   @location(1) color: vec4f,
@@ -25,8 +31,8 @@ struct VertexOutput {
   @location(1) color: vec4f,
 }
 
-// Places one point's quad corner. Both entry points end here: one reads a
-// point from the vertex buffers, the other through the draw order.
+// Places one point's quad corner. All vertex entry points end here: flat
+// (no layer buffer), layered (vertex buffers), and ordered (storage buffers).
 fn place(position: vec2f, color: vec4f, layer: u32, vertexIndex: u32) -> VertexOutput {
   var corners = array<vec2f, 4>(
     vec2f(-1.0, -1.0), vec2f(1.0, -1.0),
@@ -53,6 +59,11 @@ fn place(position: vec2f, color: vec4f, layer: u32, vertexIndex: u32) -> VertexO
 }
 
 @vertex
+fn vertex_flat(input: FlatVertexInput) -> VertexOutput {
+  return place(input.position, input.color, 0u, input.vertexIndex);
+}
+
+@vertex
 fn vertex_main(input: VertexInput) -> VertexOutput {
   return place(input.position, input.color, input.layer, input.vertexIndex);
 }
@@ -68,7 +79,11 @@ fn vertex_main(input: VertexInput) -> VertexOutput {
 fn vertex_ordered(@builtin(vertex_index) vertexIndex: u32,
                   @builtin(instance_index) drawn: u32) -> VertexOutput {
   let i = order[drawn];
-  return place(points[i], unpack4x8unorm(colours[i]), pointLayers[i], vertexIndex);
+  var layer: u32 = 0u;
+  if (uniforms.style.z >= 0.0) {
+    layer = pointLayers[i];
+  }
+  return place(points[i], unpack4x8unorm(colours[i]), layer, vertexIndex);
 }
 
 @fragment
@@ -90,55 +105,124 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
       distanceFromCenter
     );
   }
-  var color = mix(input.color, uniforms.border, borderMix);
+  var baseColor = input.color;
+  if (uniforms.style.w >= 0.0) {
+    baseColor.a = uniforms.style.w;
+  }
+  var color = mix(baseColor, uniforms.border, borderMix);
   color.a *= coverage;
   return color;
 }`;
 
-  // Validates point data for setData and returns the record a renderer keeps.
-  function checkData(next, label) {
-    if (!next || !next.positions || !next.colors || !next.layers) {
+  function sameAttr(prev, next, key, idKey) {
+    if (!prev) return false;
+    if (next[idKey] != null) return prev[idKey] === next[idKey];
+    return prev[key] === next[key];
+  }
+
+  // Validates point data for setData and returns upload instructions plus the
+  // lightweight record kept by the renderer. Callers that pass monotonic
+  // `*Id` tokens can reuse scratch TypedArrays without pinning them here;
+  // callers without tokens keep reference-equality semantics.
+  function checkData(next, label, previous) {
+    if (!next) throw new Error(label + ' point data is incomplete.');
+    var count = Number(next.count) || 0;
+    var foreground = !!next.foreground;
+    var samePositions = sameAttr(previous, next, 'positions', 'positionsId');
+    var sameColors = sameAttr(previous, next, 'colors', 'colorsId');
+    var hasLayers = !!(next.layers ||
+      (next.layersId != null && next.layersId > 0));
+    var hasDrawOrder = !!(next.drawOrder ||
+      (next.drawOrderId != null && next.drawOrderId > 0));
+    if (!samePositions && !next.positions) {
       throw new Error(label + ' point data is incomplete.');
     }
-    var count = Number(next.count) || 0;
-    if (next.positions.length < count * 2 || next.colors.length < count * 4 ||
-        next.layers.length < count ||
-        (next.drawOrder && next.drawOrder.length < count)) {
+    if (!sameColors && !next.colors) {
+      throw new Error(label + ' point data is incomplete.');
+    }
+    if (foreground && !hasLayers) {
+      throw new Error(label + ' point data is incomplete.');
+    }
+    var sameLayers = !hasLayers
+      ? (!!previous && !previous.hasLayers)
+      : (!!previous && previous.hasLayers &&
+          sameAttr(previous, next, 'layers', 'layersId'));
+    var sameDrawOrder = !hasDrawOrder
+      ? (!!previous && !previous.hasDrawOrder)
+      : (!!previous && previous.hasDrawOrder &&
+          sameAttr(previous, next, 'drawOrder', 'drawOrderId'));
+    if (hasLayers && !sameLayers && !next.layers) {
+      throw new Error(label + ' point data is incomplete.');
+    }
+    if (hasDrawOrder && !sameDrawOrder && !next.drawOrder) {
+      throw new Error(label + ' point data is incomplete.');
+    }
+    if ((!samePositions && next.positions.length < count * 2) ||
+        (!sameColors && next.colors.length < count * 4) ||
+        (hasLayers && !sameLayers && next.layers.length < count) ||
+        (hasDrawOrder && !sameDrawOrder && next.drawOrder.length < count)) {
       throw new Error(label + ' point buffers are shorter than count.');
     }
     return {
-      positions: next.positions,
-      colors: next.colors,
-      layers: next.layers,
-      count: count,
-      foreground: !!next.foreground,
-      drawOrder: next.drawOrder || null
+      uploadPositions: !samePositions ? next.positions : null,
+      uploadColors: !sameColors ? next.colors : null,
+      uploadLayers: hasLayers && !sameLayers ? next.layers : null,
+      uploadDrawOrder: hasDrawOrder && !sameDrawOrder ? next.drawOrder : null,
+      unchanged: !!previous && samePositions && sameColors && sameLayers &&
+        sameDrawOrder && previous.count === count &&
+        previous.foreground === foreground,
+      record: {
+        positions: next.positionsId != null ? null : next.positions,
+        positionsId: next.positionsId != null ? next.positionsId : null,
+        colors: next.colorsId != null ? null : next.colors,
+        colorsId: next.colorsId != null ? next.colorsId : null,
+        layers: !hasLayers || next.layersId != null ? null : next.layers,
+        layersId: hasLayers && next.layersId != null ? next.layersId : null,
+        drawOrder: !hasDrawOrder || next.drawOrderId != null ? null : next.drawOrder,
+        drawOrderId: hasDrawOrder && next.drawOrderId != null ? next.drawOrderId : null,
+        count: count,
+        foreground: foreground,
+        hasLayers: hasLayers,
+        hasDrawOrder: hasDrawOrder
+      }
     };
-  }
-  function sameData(a, b) {
-    return !!a && a.positions === b.positions && a.colors === b.colors &&
-      a.layers === b.layers && a.count === b.count && a.foreground === b.foreground &&
-      a.drawOrder === b.drawOrder;
   }
 
   // A draw's inputs as plain numbers: an unchanged frame is not drawn again.
-  // Callers may mutate their view/rect objects in place, hence the copy.
+  // Callers may mutate their view/rect/alpha objects in place, hence the copy.
   function drawFrame(options, width, height, pixelRatio, canvas) {
     var view = options.view || { cx: 0.5, cy: 0.5, span: 1 };
     var rect = options.rect || { x: 0, y: 0, width: width, height: height };
     var border = options.border || null;
     var borderValue = border && border.color ? border.color : [0, 0, 0, 0];
+    var alpha = options.alpha || null;
+    var bgAlpha = alpha && alpha.background != null ? Number(alpha.background) : -1;
+    var fgAlpha = alpha && alpha.foreground != null ? Number(alpha.foreground) : -1;
     return [
       Number(view.cx), Number(view.cy), Math.max(1e-9, Number(view.span)),
       Number(rect.x), Number(rect.y), Number(rect.width), Number(rect.height),
       Math.max(0, Number(options.pointSize) || 0),
       border ? Math.max(0, Number(border.width) || 0) : 0,
       borderValue[0], borderValue[1], borderValue[2], borderValue[3],
-      width, height, pixelRatio, canvas.width, canvas.height
+      width, height, pixelRatio, canvas.width, canvas.height,
+      bgAlpha, fgAlpha
     ];
   }
   function sameFrame(a, b) {
     return !!a && a.every(function (value, i) { return value === b[i]; });
+  }
+
+  // Reusable scratch buffer for widening compact Uint8Array layers to u32 on
+  // WebGPU (written synchronously by queue.writeBuffer, never retained).
+  var webGpuLayerScratch = null;
+  function webGpuLayerBytes(array) {
+    if (!array || array.BYTES_PER_ELEMENT !== 1) return array;
+    var n = array.length;
+    if (!webGpuLayerScratch || webGpuLayerScratch.length < n) {
+      webGpuLayerScratch = new Uint32Array(n);
+    }
+    for (var i = 0; i < n; i++) webGpuLayerScratch[i] = array[i];
+    return webGpuLayerScratch.subarray(0, n);
   }
 
   var sharedResources = null;
@@ -172,6 +256,27 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
           }
         }]
       };
+      var flatPipeline = await device.createRenderPipelineAsync({
+        layout: 'auto',
+        vertex: {
+          module: module,
+          entryPoint: 'vertex_flat',
+          buffers: [
+            {
+              arrayStride: 8,
+              stepMode: 'instance',
+              attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }]
+            },
+            {
+              arrayStride: 4,
+              stepMode: 'instance',
+              attributes: [{ shaderLocation: 1, offset: 0, format: 'unorm8x4' }]
+            }
+          ]
+        },
+        fragment: fragment,
+        primitive: { topology: 'triangle-strip' }
+      });
       var pipeline = await device.createRenderPipelineAsync({
         layout: 'auto',
         vertex: {
@@ -201,6 +306,7 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
       // Drawing through an order needs storage buffers in the vertex stage;
       // without them every order stays on the CPU, as before.
       var orderedPipeline = null;
+      var dummyLayerBuffer = null;
       var limits = device.limits || {};
       var maxStorageBindingBytes = limits.maxStorageBufferBindingSize || 0;
       if ((limits.maxStorageBuffersPerShaderStage || 0) >= 4 &&
@@ -213,13 +319,20 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
             fragment: fragment,
             primitive: { topology: 'triangle-strip' }
           });
+          dummyLayerBuffer = device.createBuffer({
+            size: 8,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+          });
         } catch (error) {
           orderedPipeline = null;
+          dummyLayerBuffer = null;
         }
       }
       var resources = {
-        adapter: adapter, device: device, format: format, pipeline: pipeline,
+        adapter: adapter, device: device, format: format,
+        flatPipeline: flatPipeline, pipeline: pipeline,
         orderedPipeline: orderedPipeline,
+        dummyLayerBuffer: dummyLayerBuffer,
         maxStorageBindingBytes: maxStorageBindingBytes,
         // Cells one storage binding holds: positions take 8 bytes a cell.
         orderLimit: orderedPipeline
@@ -261,11 +374,14 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
     var adapter = null;
     var device = null;
     var context = null;
+    var flatPipeline = null;
     var pipeline = null;
     var orderedPipeline = null;
+    var dummyLayerBuffer = null;
     var orderLimit = 0;
     var maxStorageBindingBytes = 0;
     var uniformBuffers = [];
+    var flatBindGroups = [];
     var bindGroups = [];
     var orderedBindGroups = [];
     var uniformData = new Float32Array(20);
@@ -308,6 +424,7 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
         }
       });
       uniformBuffers = [];
+      flatBindGroups = [];
       bindGroups = [];
       orderedBindGroups = [];
       pointsGroup = null;
@@ -385,8 +502,10 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
       shared = resources;
       adapter = resources.adapter;
       device = resources.device;
+      flatPipeline = resources.flatPipeline;
       pipeline = resources.pipeline;
       orderedPipeline = resources.orderedPipeline;
+      dummyLayerBuffer = resources.dummyLayerBuffer;
       orderLimit = resources.orderLimit;
       maxStorageBindingBytes = resources.maxStorageBindingBytes;
       metrics.adapter = adapter.info
@@ -403,6 +522,12 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
         usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC
       });
       uniformBuffers = [makeUniformBuffer(), makeUniformBuffer()];
+      flatBindGroups = uniformBuffers.map(function (buffer) {
+        return device.createBindGroup({
+          layout: flatPipeline.getBindGroupLayout(0),
+          entries: [{ binding: 0, resource: { buffer: buffer } }]
+        });
+      });
       bindGroups = uniformBuffers.map(function (buffer) {
         return device.createBindGroup({
           layout: pipeline.getBindGroupLayout(0),
@@ -458,49 +583,53 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
 
     function setData(next) {
       if (!ready) throw new Error('WebGPU renderer is not ready.');
-      next = checkData(next, 'WebGPU');
-      if (next.drawOrder && (!orderedPipeline || next.count > orderLimit)) {
+      var checked = checkData(next, 'WebGPU', data);
+      var record = checked.record;
+      if (record.hasDrawOrder && (!orderedPipeline || record.count > orderLimit)) {
         throw new Error('WebGPU cannot draw these points in order.');
       }
-      if (sameData(data, next)) return;
+      if (checked.unchanged) return;
       lastFrame = null;
       var started = performance.now();
       var buffersChanged = false;
-      if (!data || data.positions !== next.positions) {
-        if (uploadSlot(positionSlot, next.positions)) buffersChanged = true;
+      if (checked.uploadPositions) {
+        if (uploadSlot(positionSlot, checked.uploadPositions)) buffersChanged = true;
         metrics.positionUploads++;
       }
-      if (!data || data.colors !== next.colors) {
-        if (uploadSlot(colorSlot, next.colors)) buffersChanged = true;
+      if (checked.uploadColors) {
+        if (uploadSlot(colorSlot, checked.uploadColors)) buffersChanged = true;
       }
-      if (!data || data.layers !== next.layers) {
-        if (uploadSlot(layerSlot, next.layers)) buffersChanged = true;
+      if (checked.uploadLayers) {
+        if (uploadSlot(layerSlot, webGpuLayerBytes(checked.uploadLayers))) buffersChanged = true;
+      } else if (!record.hasLayers && layerSlot.buffer) {
+        destroySlot(layerSlot);
+        buffersChanged = true;
       }
-      if (next.drawOrder && (!data || data.drawOrder !== next.drawOrder)) {
-        if (uploadSlot(orderSlot, next.drawOrder, 0)) buffersChanged = true;
-      } else if (!next.drawOrder && orderSlot.buffer) {
+      if (checked.uploadDrawOrder) {
+        if (uploadSlot(orderSlot, checked.uploadDrawOrder, 0)) buffersChanged = true;
+      } else if (!record.hasDrawOrder && orderSlot.buffer) {
         destroySlot(orderSlot);
       }
-      if (next.drawOrder && (buffersChanged || !pointsGroup)) {
+      if (record.hasDrawOrder && (buffersChanged || !pointsGroup)) {
         pointsGroup = device.createBindGroup({
           layout: orderedPipeline.getBindGroupLayout(1),
           entries: [
             positionSlot.buffer, colorSlot.buffer,
-            layerSlot.buffer, orderSlot.buffer
+            layerSlot.buffer || dummyLayerBuffer, orderSlot.buffer
           ].map(function (buffer, binding) {
             return { binding: binding, resource: { buffer: buffer } };
           })
         });
-      } else if (!next.drawOrder) {
+      } else if (!record.hasDrawOrder) {
         pointsGroup = null;
       }
-      data = next;
-      metrics.pointCount = next.count;
-      metrics.orderedDraw = !!next.drawOrder;
+      data = record;
+      metrics.pointCount = record.count;
+      metrics.orderedDraw = record.hasDrawOrder;
       metrics.uploadSubmitMs = performance.now() - started;
     }
 
-    function fillUniforms(frame, passValue) {
+    function fillUniforms(frame, passValue, passAlpha) {
       var radius = frame[7] * 0.5;
       uniformData[0] = frame[0];
       uniformData[1] = frame[1];
@@ -521,7 +650,7 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
       uniformData[16] = radius;
       uniformData[17] = frame[8];
       uniformData[18] = passValue;
-      uniformData[19] = 0;
+      uniformData[19] = passAlpha;
       return uniformData;
     }
 
@@ -555,26 +684,32 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
       var hasPoints = !!(data.count && frame[7]);
       if (hasPoints) {
         if (data.foreground) {
-          fillUniforms(frame, 0);
+          fillUniforms(frame, 0, frame[18]);
           device.queue.writeBuffer(uniformBuffers[0], 0, uniformData);
           uniformData[18] = 1;
+          uniformData[19] = frame[19];
           device.queue.writeBuffer(uniformBuffers[1], 0, uniformData);
         } else {
-          fillUniforms(frame, -1);
+          fillUniforms(frame, -1, frame[18]);
           device.queue.writeBuffer(uniformBuffers[0], 0, uniformData);
         }
       }
       submitPass(hasPoints ? function (pass) {
         var groups = bindGroups;
-        if (data.drawOrder) {
+        if (data.hasDrawOrder) {
           pass.setPipeline(orderedPipeline);
           pass.setBindGroup(1, pointsGroup);
           groups = orderedBindGroups;
-        } else {
+        } else if (data.hasLayers) {
           pass.setPipeline(pipeline);
           pass.setVertexBuffer(0, positionSlot.buffer);
           pass.setVertexBuffer(1, colorSlot.buffer);
           pass.setVertexBuffer(2, layerSlot.buffer);
+        } else {
+          pass.setPipeline(flatPipeline);
+          pass.setVertexBuffer(0, positionSlot.buffer);
+          pass.setVertexBuffer(1, colorSlot.buffer);
+          groups = flatBindGroups;
         }
         if (data.foreground) {
           pass.setBindGroup(0, groups[0]);
@@ -607,6 +742,8 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
       drawsInOrder: function (count) {
         return ready && !!orderedPipeline && count <= orderLimit;
       },
+      supportsUniformAlpha: function () { return true; },
+      supportsBufferIds: function () { return true; },
       release: release,
       resize: resize,
       setData: setData,
@@ -668,6 +805,7 @@ uniform float pointSize;
 uniform float borderWidth;
 uniform float pixelRatio;
 uniform vec4 borderColor;
+uniform float passAlpha;
 out vec4 outputColor;
 
 void main() {
@@ -688,7 +826,9 @@ void main() {
         distanceFromCenter
       )
     : 0.0;
-  outputColor = mix(pointColor, borderColor, borderMix);
+  vec4 baseColor = pointColor;
+  if (passAlpha >= 0.0) baseColor.a = passAlpha;
+  outputColor = mix(baseColor, borderColor, borderMix);
   outputColor.a *= coverage;
 }`;
 
@@ -729,13 +869,14 @@ void main() {
         borderWidth: gl.getUniformLocation(program, 'borderWidth'),
         borderColor: gl.getUniformLocation(program, 'borderColor'),
         pixelRatio: gl.getUniformLocation(program, 'pixelRatio'),
-        passValue: gl.getUniformLocation(program, 'passValue')
+        passValue: gl.getUniformLocation(program, 'passValue'),
+        passAlpha: gl.getUniformLocation(program, 'passAlpha')
       }
     };
   }
 
   // Sets the blending and uniforms of `frame` and draws the bound points.
-  function drawWebGlPoints(gl, locations, frame, count, foreground, width, height, pixelRatio) {
+  function drawWebGlPoints(gl, locations, frame, count, foreground, width, height, pixelRatio, indexed) {
     gl.enable(gl.BLEND);
     gl.blendFuncSeparate(
       gl.SRC_ALPHA,
@@ -752,10 +893,17 @@ void main() {
       frame[9] / 255, frame[10] / 255, frame[11] / 255, frame[12] / 255);
     gl.uniform1f(locations.pixelRatio, pixelRatio);
     if (!count || !frame[7]) return;
-    var passes = foreground ? [0, 1] : [-1];
-    passes.forEach(function (passValue) {
-      gl.uniform1f(locations.passValue, passValue);
-      gl.drawArrays(gl.POINTS, 0, count);
+    var passes = foreground
+      ? [[0, frame[18]], [1, frame[19]]]
+      : [[-1, frame[18]]];
+    passes.forEach(function (pass) {
+      gl.uniform1f(locations.passValue, pass[0]);
+      gl.uniform1f(locations.passAlpha, pass[1]);
+      if (indexed) {
+        gl.drawElements(gl.POINTS, count, gl.UNSIGNED_INT, 0);
+      } else {
+        gl.drawArrays(gl.POINTS, 0, count);
+      }
     });
   }
 
@@ -772,7 +920,9 @@ void main() {
     }
     gl.enableVertexAttribArray(location);
     if (integer) {
-      gl.vertexAttribIPointer(location, 1, gl.UNSIGNED_INT, 0, 0);
+      var intType = array.BYTES_PER_ELEMENT === 1
+        ? gl.UNSIGNED_BYTE : gl.UNSIGNED_INT;
+      gl.vertexAttribIPointer(location, 1, intType, 0, 0);
     } else {
       gl.vertexAttribPointer(
         location,
@@ -782,6 +932,16 @@ void main() {
         0,
         0
       );
+    }
+  }
+
+  function uploadWebGlOrder(gl, uploaded, buffer, array) {
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffer);
+    if (uploaded[3] === array.byteLength) {
+      gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, array);
+    } else {
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, array, gl.STATIC_DRAW);
+      uploaded[3] = array.byteLength;
     }
   }
 
@@ -801,9 +961,11 @@ void main() {
     var built = webGlProgram(gl);
     var program = built.program;
     var locations = built.locations;
+    var canIndex = !!(gl.ELEMENT_ARRAY_BUFFER && gl.drawElements && gl.UNSIGNED_INT);
     var positionBuffer = gl.createBuffer();
     var colorBuffer = gl.createBuffer();
-    var layerBuffer = gl.createBuffer();
+    var layerBuffer = null;
+    var orderBuffer = null;
     var data = null;
     var width = 1;
     var height = 1;
@@ -861,31 +1023,53 @@ void main() {
       gl.viewport(0, 0, canvas.width, canvas.height);
     }
 
-    var uploadedBytes = [-1, -1, -1];
+    var uploadedBytes = [-1, -1, -1, -1];
     function upload(buffer, location, array, integer) {
       uploadWebGlAttribute(gl, uploadedBytes, buffer, location, array, integer);
     }
 
     function setData(next) {
       if (!ready) throw new Error('WebGL2 renderer is not ready.');
-      next = checkData(next, 'WebGL2');
-      if (next.drawOrder) throw new Error('WebGL2 draws points in buffer order only.');
-      if (sameData(data, next)) return;
+      var checked = checkData(next, 'WebGL2', data);
+      var record = checked.record;
+      if (record.hasDrawOrder && !canIndex) {
+        throw new Error('WebGL2 draws points in buffer order only.');
+      }
+      if (checked.unchanged) return;
       lastFrame = null;
       var started = performance.now();
       gl.useProgram(program);
-      if (!data || data.positions !== next.positions) {
-        upload(positionBuffer, 0, next.positions, false);
+      if (checked.uploadPositions) {
+        upload(positionBuffer, 0, checked.uploadPositions, false);
         metrics.positionUploads++;
       }
-      if (!data || data.colors !== next.colors) {
-        upload(colorBuffer, 1, next.colors, false);
+      if (checked.uploadColors) {
+        upload(colorBuffer, 1, checked.uploadColors, false);
       }
-      if (!data || data.layers !== next.layers) {
-        upload(layerBuffer, 2, next.layers, true);
+      if (checked.uploadLayers) {
+        if (!layerBuffer) layerBuffer = gl.createBuffer();
+        upload(layerBuffer, 2, checked.uploadLayers, true);
+      } else if (!record.hasLayers) {
+        if (gl.disableVertexAttribArray) gl.disableVertexAttribArray(2);
+        if (gl.vertexAttribI4ui) gl.vertexAttribI4ui(2, 0, 0, 0, 0);
+        if (layerBuffer) {
+          if (gl.deleteBuffer) gl.deleteBuffer(layerBuffer);
+          layerBuffer = null;
+          uploadedBytes[2] = -1;
+        }
       }
-      data = next;
-      metrics.pointCount = next.count;
+      if (checked.uploadDrawOrder) {
+        if (!orderBuffer) orderBuffer = gl.createBuffer();
+        uploadWebGlOrder(gl, uploadedBytes, orderBuffer, checked.uploadDrawOrder);
+      } else if (!record.hasDrawOrder && orderBuffer) {
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+        if (gl.deleteBuffer) gl.deleteBuffer(orderBuffer);
+        orderBuffer = null;
+        uploadedBytes[3] = -1;
+      }
+      data = record;
+      metrics.pointCount = record.count;
+      metrics.orderedDraw = record.hasDrawOrder;
       metrics.uploadSubmitMs = performance.now() - started;
     }
 
@@ -906,7 +1090,7 @@ void main() {
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
       drawWebGlPoints(gl, locations, frame, data.count, data.foreground,
-        width, height, pixelRatio);
+        width, height, pixelRatio, data.hasDrawOrder);
       gl.flush();
       metrics.drawSubmitMs = performance.now() - started;
       var succeeded = gl.getError() === gl.NO_ERROR;
@@ -927,7 +1111,11 @@ void main() {
       ready: Promise.resolve(),
       failed: failed,
       isReady: function () { return ready; },
-      drawsInOrder: function () { return false; },
+      drawsInOrder: function (count) {
+        return ready && canIndex && !(count < 0);
+      },
+      supportsUniformAlpha: function () { return true; },
+      supportsBufferIds: function () { return true; },
       release: release,
       resize: resize,
       setData: setData,
@@ -995,11 +1183,13 @@ void main() {
     var gl = shared.gl;
     var target = canvas.getContext('2d');
     if (!target) throw new Error('A 2-D canvas is unavailable.');
+    var canIndex = !!(gl.ELEMENT_ARRAY_BUFFER && gl.drawElements && gl.UNSIGNED_INT);
     var vertexArray = gl.createVertexArray();
     var positionBuffer = gl.createBuffer();
     var colorBuffer = gl.createBuffer();
-    var layerBuffer = gl.createBuffer();
-    var uploadedBytes = [-1, -1, -1];
+    var layerBuffer = null;
+    var orderBuffer = null;
+    var uploadedBytes = [-1, -1, -1, -1];
     var data = null;
     var width = 1;
     var height = 1;
@@ -1043,7 +1233,10 @@ void main() {
       if (contextLost || gl.isContextLost()) return;
       gl.deleteBuffer(positionBuffer);
       gl.deleteBuffer(colorBuffer);
-      gl.deleteBuffer(layerBuffer);
+      if (layerBuffer) gl.deleteBuffer(layerBuffer);
+      if (orderBuffer) gl.deleteBuffer(orderBuffer);
+      layerBuffer = null;
+      orderBuffer = null;
       gl.deleteVertexArray(vertexArray);
     }
 
@@ -1060,25 +1253,47 @@ void main() {
 
     function setData(next) {
       if (!ready) throw new Error('WebGL2 renderer is not ready.');
-      next = checkData(next, 'WebGL2');
-      if (next.drawOrder) throw new Error('WebGL2 draws points in buffer order only.');
-      if (sameData(data, next)) return;
+      var checked = checkData(next, 'WebGL2', data);
+      var record = checked.record;
+      if (record.hasDrawOrder && !canIndex) {
+        throw new Error('WebGL2 draws points in buffer order only.');
+      }
+      if (checked.unchanged) return;
       lastFrame = null;
       var started = performance.now();
       gl.bindVertexArray(vertexArray);
-      if (!data || data.positions !== next.positions) {
-        uploadWebGlAttribute(gl, uploadedBytes, positionBuffer, 0, next.positions, false);
+      if (checked.uploadPositions) {
+        uploadWebGlAttribute(gl, uploadedBytes, positionBuffer, 0, checked.uploadPositions, false);
         metrics.positionUploads++;
       }
-      if (!data || data.colors !== next.colors) {
-        uploadWebGlAttribute(gl, uploadedBytes, colorBuffer, 1, next.colors, false);
+      if (checked.uploadColors) {
+        uploadWebGlAttribute(gl, uploadedBytes, colorBuffer, 1, checked.uploadColors, false);
       }
-      if (!data || data.layers !== next.layers) {
-        uploadWebGlAttribute(gl, uploadedBytes, layerBuffer, 2, next.layers, true);
+      if (checked.uploadLayers) {
+        if (!layerBuffer) layerBuffer = gl.createBuffer();
+        uploadWebGlAttribute(gl, uploadedBytes, layerBuffer, 2, checked.uploadLayers, true);
+      } else if (!record.hasLayers) {
+        if (gl.disableVertexAttribArray) gl.disableVertexAttribArray(2);
+        if (gl.vertexAttribI4ui) gl.vertexAttribI4ui(2, 0, 0, 0, 0);
+        if (layerBuffer) {
+          if (gl.deleteBuffer) gl.deleteBuffer(layerBuffer);
+          layerBuffer = null;
+          uploadedBytes[2] = -1;
+        }
+      }
+      if (checked.uploadDrawOrder) {
+        if (!orderBuffer) orderBuffer = gl.createBuffer();
+        uploadWebGlOrder(gl, uploadedBytes, orderBuffer, checked.uploadDrawOrder);
+      } else if (!record.hasDrawOrder && orderBuffer) {
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+        if (gl.deleteBuffer) gl.deleteBuffer(orderBuffer);
+        orderBuffer = null;
+        uploadedBytes[3] = -1;
       }
       gl.bindVertexArray(null);
-      data = next;
-      metrics.pointCount = next.count;
+      data = record;
+      metrics.pointCount = record.count;
+      metrics.orderedDraw = record.hasDrawOrder;
       metrics.uploadSubmitMs = performance.now() - started;
     }
 
@@ -1108,7 +1323,7 @@ void main() {
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
       drawWebGlPoints(gl, shared.locations, frame, data.count, data.foreground,
-        width, height, pixelRatio);
+        width, height, pixelRatio, data.hasDrawOrder);
       gl.disable(gl.SCISSOR_TEST);
       gl.bindVertexArray(null);
       if (gl.isContextLost()) return false;
@@ -1137,7 +1352,11 @@ void main() {
       ready: Promise.resolve(),
       failed: failed,
       isReady: function () { return ready; },
-      drawsInOrder: function () { return false; },
+      drawsInOrder: function (count) {
+        return ready && canIndex && !(count < 0);
+      },
+      supportsUniformAlpha: function () { return true; },
+      supportsBufferIds: function () { return true; },
       release: release,
       resize: resize,
       setData: setData,

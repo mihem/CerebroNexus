@@ -111,6 +111,6 @@ test_that("WebGPU caches unchanged frames, reuses buffers in place and releases 
     "webgpu-renderer-opt.js",
     viewer_test_path("www", "cell_points_gpu.js"),
     viewer_test_path("www", "cell_views.js"),
-    pass = "PASS webgpu shared-device listeners, release cleanup and failover release"
+    pass = "PASS viewer lazy attachGpu, uniform alpha opacity/selection, and post-upload scratch release"
   )
 })
