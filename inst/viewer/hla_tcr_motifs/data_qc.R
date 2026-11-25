@@ -156,6 +156,9 @@ output$hla_data_qc_ui <- renderUI({
     uiOutput("hla_qc_ui")
   )
 })
+if (exists("viewer_hidden_output_options", inherits = TRUE)) {
+  outputOptions(output, "hla_data_qc_ui", priority = 10)
+}
 
 output$hla_ir_sample_count <- renderText({
   sprintf("Immune-repertoire samples: %d", length(hla_ir_samples()))
@@ -194,7 +197,13 @@ output$hla_coverage_table <- viewerLazyRender(function() {
       rownames = FALSE,
       colnames = c("Sample", "# alleles", "Loci"),
       class = "display nowrap",
-      options = list(pageLength = 10, dom = "t", scrollX = TRUE)
+      options = list(
+        pageLength = 10,
+        dom = "t",
+        scrollX = TRUE,
+        deferRender = TRUE,
+        autoWidth = FALSE
+      )
     )
   })
 })
@@ -210,7 +219,13 @@ output$hla_normalized_preview <- viewerLazyRender(function() {
       t,
       rownames = FALSE,
       class = "display nowrap",
-      options = list(pageLength = 8, scrollX = TRUE, dom = "tip")
+      options = list(
+        pageLength = 8,
+        scrollX = TRUE,
+        deferRender = TRUE,
+        autoWidth = FALSE,
+        dom = "tip"
+      )
     )
   })
 })
@@ -228,7 +243,13 @@ output$hla_donor_mapping_preview <- viewerLazyRender(function() {
       rownames = FALSE,
       colnames = c("IR sample", "Analysis unit", "Unit type"),
       class = "display nowrap",
-      options = list(pageLength = 10, dom = "t", scrollX = TRUE)
+      options = list(
+        pageLength = 10,
+        dom = "t",
+        scrollX = TRUE,
+        deferRender = TRUE,
+        autoWidth = FALSE
+      )
     )
   })
 })

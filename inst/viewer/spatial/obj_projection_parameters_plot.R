@@ -391,20 +391,37 @@ spatial_projection_parameters_plot_current <- reactive({
   ## The section's ROIs for the sample, from its cells' metadata rows (the
   ## Viewer Pack's section index), kept per section and data set. They depend
   ## only on the section and sample, so colour or feature changes reuse them.
-  roi_facet <- spatial_projection_facet_memo(
-    list(data_set(), spatial_name, selected_sample),
-    function() {
-      scope <- spatial_section_scope(
-        spatial_name,
-        selected_sample,
-        viewerProjectionFirstFrameMetadata(),
-        function() {
-          rownames(getSpatialData(spatial_name)$coordinates) %||% character()
-        }
-      )
-      list(field = scope$roi_field, values = scope$roi_values)
-    }
-  )
+  roi_facet_compute <- function() {
+    scope <- spatial_section_scope(
+      spatial_name,
+      selected_sample,
+      viewerProjectionFirstFrameMetadata(),
+      function() {
+        rownames(getSpatialData(spatial_name)$coordinates) %||% character()
+      }
+    )
+    list(field = scope$roi_field, values = scope$roi_values)
+  }
+  ds <- data_set()
+  roi_facet_p_key <- if (
+    exists("viewerProcessMemo", mode = "function", inherits = TRUE) &&
+      exists("viewerProcessDatasetKey", mode = "function", inherits = TRUE)
+  ) {
+    viewerProcessDatasetKey(ds)
+  } else {
+    NULL
+  }
+  roi_facet <- if (!is.null(roi_facet_p_key)) {
+    viewerProcessMemo("spatial_facet", limit = 16L)(
+      list(roi_facet_p_key, spatial_name, selected_sample),
+      roi_facet_compute
+    )
+  } else {
+    spatial_projection_facet_memo(
+      list(ds, spatial_name, selected_sample),
+      roi_facet_compute
+    )
+  }
   roi_values <- roi_facet$values
   selected_roi <- input[["spatial_projection_roi"]] %||%
     spatial_default_roi_selection(roi_values)

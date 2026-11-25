@@ -77,6 +77,9 @@ output[["trajectory_expression_metrics_UI"]] <- renderUI({
     )
   )
 })
+if (exists("viewer_hidden_output_options", inherits = TRUE)) {
+  outputOptions(output, "trajectory_expression_metrics_UI", priority = 10)
+}
 
 ##----------------------------------------------------------------------------##
 ## One UI/text/plot output triple per metric. The spec name is both the output

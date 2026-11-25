@@ -82,6 +82,13 @@ output[["trajectory_distribution_along_pseudotime_UI"]] <- renderUI({
     )
   )
 })
+if (exists("viewer_hidden_output_options", inherits = TRUE)) {
+  outputOptions(
+    output,
+    "trajectory_distribution_along_pseudotime_UI",
+    priority = 10
+  )
+}
 
 ##----------------------------------------------------------------------------##
 ## Plot.

@@ -331,6 +331,9 @@ output$hla_associations_ui <- renderUI({
     )
   )
 })
+if (exists("viewer_hidden_output_options", inherits = TRUE)) {
+  outputOptions(output, "hla_associations_ui", priority = 10)
+}
 
 ## The two overlap tables update on every Feature-type/feature switch. Rendering
 ## them the normal (reactive) way tore the whole DataTable down and rebuilt it
@@ -359,7 +362,10 @@ hla_overlap_live_table <- function(
         rownames = FALSE,
         colnames = if (is.null(headers)) colnames(skeleton) else headers(),
         class = "display nowrap",
-        options = options
+        options = utils::modifyList(
+          list(deferRender = TRUE, autoWidth = FALSE),
+          options
+        )
       )
     )
   })
@@ -492,7 +498,13 @@ output$hla_allele_matrix <- viewerLazyRender(function() {
       mat,
       rownames = FALSE,
       class = "display nowrap",
-      options = list(pageLength = 10, scrollX = TRUE, dom = "tip")
+      options = list(
+        pageLength = 10,
+        scrollX = TRUE,
+        deferRender = TRUE,
+        autoWidth = FALSE,
+        dom = "tip"
+      )
     )
   })
 })

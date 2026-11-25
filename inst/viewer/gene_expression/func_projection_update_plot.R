@@ -141,8 +141,8 @@ expression_projection_update_plot <- function(input) {
   )
   ## define output_data
   output_data <- list(
-    x = coordinates[[1]],
-    y = coordinates[[2]],
+    x = if (length(coordinates) >= 1L) coordinates[[1]] else NULL,
+    y = if (length(coordinates) >= 2L) coordinates[[2]] else NULL,
     color = expression_levels,
     selection_key = seq_len(n_cells),
     point_size = plot_parameters[["point_size"]],

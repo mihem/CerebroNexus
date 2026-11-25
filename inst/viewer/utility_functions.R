@@ -748,6 +748,8 @@ debounceAfterFirst <- function(reactive, millis, active = NULL) {
       ## settle, and its last value is taken then.
       last_change <- now_ms()
       first_run <- TRUE
+      pending <- shiny::reactiveVal(FALSE)
+      pending_value <- NULL
       shiny::observeEvent(reactive(), {
         next_value <- reactive()
         ## Its first run sees the value taken above, unless it changed since.
@@ -760,10 +762,27 @@ debounceAfterFirst <- function(reactive, millis, active = NULL) {
         quiet <- now - last_change >= millis
         ## A return to the value on show is a change too: it extends the burst.
         last_change <<- now
-        if (quiet) publish(next_value)
+        if (quiet) {
+          pending_value <<- NULL
+          pending(FALSE)
+          publish(next_value)
+        } else {
+          pending_value <<- next_value
+          pending(TRUE)
+        }
       })
-      delayed <- shiny::debounce(reactive, millis)
-      shiny::observeEvent(delayed(), publish(delayed()), ignoreInit = TRUE)
+      shiny::observe({
+        shiny::req(isTRUE(pending()))
+        elapsed <- now_ms() - last_change
+        if (elapsed >= millis) {
+          val <- pending_value
+          pending_value <<- NULL
+          pending(FALSE)
+          publish(val)
+        } else {
+          shiny::invalidateLater(max(1, ceiling(millis - elapsed)))
+        }
+      })
     }
     current
   })
@@ -5515,6 +5534,30 @@ viewerProcessMemo <- function(slot, limit = 4L) {
     )
     value
   }
+}
+
+viewerProcessDatasetKey <- function(ds = NULL) {
+  if (is.null(ds) && exists("data_set", mode = "function", inherits = TRUE)) {
+    ds <- tryCatch(data_set(), error = function(e) NULL)
+  }
+  path <- attr(ds, "cerebro_dataset_path", exact = TRUE)
+  if (
+    !is.character(path) ||
+      length(path) != 1L ||
+      is.na(path) ||
+      !nzchar(path)
+  ) {
+    return(NULL)
+  }
+  info <- suppressWarnings(file.info(path, extra_cols = FALSE))
+  if (is.na(info$size) || is.na(info$mtime)) {
+    return(NULL)
+  }
+  list(
+    path = normalizePath(path, winslash = "/", mustWork = FALSE),
+    size = as.numeric(info$size),
+    mtime = as.numeric(info$mtime)
+  )
 }
 
 ## Gene expression registers four selectors on the same gene list; a locale

@@ -348,6 +348,8 @@ output$hla_network_table <- viewerLazyRender(function() {
       options = list(
         pageLength = 25,
         scrollX = TRUE,
+        deferRender = TRUE,
+        autoWidth = FALSE,
         columnDefs = col_defs
       )
     )

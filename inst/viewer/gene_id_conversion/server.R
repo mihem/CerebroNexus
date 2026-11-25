@@ -20,6 +20,8 @@ output[["gene_info"]] <- viewerLazyRender(function() {
       extensions = "Buttons",
       options = list(
         scrollX = TRUE,
+        deferRender = TRUE,
+        autoWidth = FALSE,
         dom = "Bfrtip",
         buttons = c("copy", "excel", "csv", "print"),
         lengthMenu = c(15, 30, 50, 100),

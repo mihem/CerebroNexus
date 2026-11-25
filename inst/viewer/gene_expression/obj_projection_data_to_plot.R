@@ -6,8 +6,35 @@ expression_projection_data_to_plot_raw <- reactive({
   ## million-cell expression rows for a view nobody is looking at.
   req(identical(input[["sidebar"]], "geneExpression"))
   dataset_context <- viewer_loaded_dataset_context()
-  coordinates <- expression_projection_coordinates()
   parameters <- expression_projection_parameters_plot()
+  cell_indices <- expression_projection_cells_to_show()
+  failed_asset <- input[["expression_projection_projection_resource_failed"]]
+  projection_resource <- if (
+    !isTRUE(parameters[["is_trajectory"]]) &&
+      exists("viewerProjectionAsset", mode = "function", inherits = TRUE)
+  ) {
+    asset <- viewerProjectionAsset(parameters[["projection"]], cell_indices)
+    if (
+      is.list(asset) &&
+        !identical(as.character(failed_asset), asset$url)
+    ) {
+      asset
+    } else {
+      NULL
+    }
+  } else {
+    NULL
+  }
+  coordinates <- if (is.list(projection_resource)) {
+    list()
+  } else {
+    expression_projection_coordinates()
+  }
+  n_coord_cells <- if (is.list(projection_resource)) {
+    length(cell_indices)
+  } else {
+    nrow(coordinates)
+  }
   expression_levels <- expression_projection_expression_levels()
   no_gene_selected <- length(
     expression_selected_genes()[["genes_to_display_present"]]
@@ -18,13 +45,13 @@ expression_projection_data_to_plot_raw <- reactive({
   ## gene is selected, so never materialize it on the colour-update path.
   metadata <- NULL
   req(
-    coordinates,
+    is.list(projection_resource) || !is.null(coordinates),
     parameters,
     expression_projection_parameters_color(),
     expression_projection_trajectory(),
     no_gene_selected ||
-      nrow(coordinates) == length(expression_levels) ||
-      nrow(coordinates) == length(expression_levels[[1]]),
+      n_coord_cells == length(expression_levels) ||
+      n_coord_cells == length(expression_levels[[1]]),
     !is.null(expression_projection_display_mode())
   )
   if (parameters[['is_trajectory']]) {
@@ -50,12 +77,10 @@ expression_projection_data_to_plot_raw <- reactive({
     display_mode = expression_projection_display_mode(),
     rgb_layout = input[["expression_rgb_layout"]],
     render_key = expression_projection_render_key(),
-    cell_indices = expression_projection_cells_to_show(),
+    cell_indices = cell_indices,
     trajectory_rows = expression_projection_trajectory_rows(),
     client_percentage = isTRUE(expression_projection_client_percentage()),
-    projection_resource_failed = input[[
-      "expression_projection_projection_resource_failed"
-    ]],
+    projection_resource_failed = failed_asset,
     separate_panels = identical(
       expression_projection_display_mode(),
       "separate"

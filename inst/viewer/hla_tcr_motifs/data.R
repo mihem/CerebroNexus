@@ -1148,7 +1148,19 @@ hla_build_graph_raw_from <- function(seg) {
 ## values; without this each one would trigger a finalize. Only the value the
 ## slider settles on recomputes. show_isolated is a checkbox (one event), so it
 ## needs no debounce.
-hla_min_nodes_debounced <- shiny::debounce(
+hla_min_nodes_debounced <- (if (
+  exists("debounceAfterFirst", mode = "function", inherits = TRUE)
+) {
+  function(expr, millis) {
+    debounceAfterFirst(
+      expr,
+      millis,
+      active = function() identical(input[["sidebar"]], "hla_tcr_motifs")
+    )
+  }
+} else {
+  shiny::debounce
+})(
   reactive({
     req(identical(input[["sidebar"]], "hla_tcr_motifs"))
     as.integer(hla_param("hla_min_nodes", hla_default_min_nodes()))
