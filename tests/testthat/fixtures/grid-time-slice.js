@@ -105,4 +105,15 @@ assert.equal(rafQueue.length, 1, 'remaining heavy panel deferred to next rAF');
 while (rafQueue.length) rafQueue.shift().fn();
 assert.equal(drawn.length, 3, 'all 3 heavy panels finish across frames');
 
+// Panels that scroll near draw at once: slicing them turned one stall into many slow frames.
+D = null;
+panels = specs.map(([key, top]) => ({
+  key, spaceId: 's_' + key, pane: pane(top), _pendingSize: [300, 200], _resizedUndrawn: true
+}));
+stagePanels = panels.length;
+drawn = [];
+drawNearPanels();
+assert.equal(rafQueue.length, 0, 'panels that scroll near are not deferred to a later frame');
+assert.equal(drawn.length, 7, 'all 7 near panels draw in one go, skipping farOff');
+
 console.log('PASS grid time-sliced draw queue');

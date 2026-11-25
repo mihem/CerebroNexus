@@ -1555,7 +1555,10 @@
     var idx = 0;
     var drewAny = false;
     var firstShown = null;
-    var timed = shouldTimeSlicePanels(queue);
+    // Opening or recolouring a grid draws in slices; panels that scroll near are
+    // drawn at once, since slicing them stretched one stall into many slow frames.
+    var timed = !(options && options.slice === false) &&
+      shouldTimeSlicePanels(queue);
     function step() {
       drawQueueFrame = 0;
       if (job !== drawQueueJob || drawAllDeferred ||
@@ -1610,6 +1613,7 @@
     });
     if (!near.length) return;
     runDrawQueue(near, {
+      slice: false,
       prepare: function (p) {
         if (p._pendingSize) {
           var size = p._pendingSize;
