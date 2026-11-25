@@ -1,4 +1,4 @@
-# CerebroNexus 8.4.14
+# CerebroNexus 8.5.2
 
 - **Faster Viewer Pack builds and opens (#294).** A Viewer Pack now stores the
   extents of every projection, trajectory and spatial section and a content
