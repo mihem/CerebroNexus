@@ -866,7 +866,13 @@ viewerOutputTab <- function(ids) {
     ir_ = "immune_repertoire",
     trajectory_ = "trajectory",
     trekker_ = "trekker",
-    hla_ = "hla_tcr_motifs"
+    hla_ = "hla_tcr_motifs",
+    marker_genes_ = "markerGenes",
+    enriched_pathways_ = "enrichedPathways",
+    most_expressed_genes_ = "mostExpressedGenes",
+    extra_material_ = "extra_material",
+    gene_info = "geneIdConversion",
+    color_assignments_ = "color_management"
   )
   vapply(
     ids,
@@ -2831,33 +2837,64 @@ cerebroSelectionSummary <- function(
 ## Functions to find columns of specific type (for automatic formatting).
 ##----------------------------------------------------------------------------##
 findColumnsInteger <- function(df, columns_to_test) {
-  columns_indices <- c()
+  columns_indices <- integer()
   for (i in columns_to_test) {
+    values <- df[[i]]
+    if (anyNA(values) || !is.numeric(values)) {
+      next
+    }
     if (
-      any(is.na(df[[i]])) == FALSE &&
-        is.numeric(df[[i]]) &&
-        all.equal(df[[i]], as.integer(df[[i]]), check.attributes = FALSE) ==
-          TRUE
+      is.integer(values) ||
+        isTRUE(all.equal(values, as.integer(values), check.attributes = FALSE))
     ) {
       columns_indices <- c(columns_indices, i)
     }
   }
-  return(columns_indices)
+  columns_indices
 }
 
 ## Numeric columns without NA whose name matches `pattern` and whose values lie
 ## within [lower, upper].
 findColumnsMatching <- function(df, pattern, lower = -Inf, upper = Inf) {
-  which(vapply(
-    seq_along(df),
+  candidates <- which(grepl(pattern, colnames(df), ignore.case = TRUE))
+  if (!length(candidates)) {
+    return(integer())
+  }
+  candidates[vapply(
+    candidates,
     function(i) {
       values <- df[[i]]
-      grepl(colnames(df)[i], pattern = pattern, ignore.case = TRUE) &&
-        !anyNA(values) &&
+      !anyNA(values) &&
         is.numeric(values) &&
         all(values >= lower & values <= upper)
     },
     logical(1)
+  )]
+}
+
+## Vectorized equivalent of DT::styleInterval() for finite numeric cuts and
+## pre-quoted CSS colour strings. Avoids DT:::jsValues()'s 200+ per-element
+## jsonlite::toJSON() calls and O(n^2) string concatenation per numeric column.
+.prettifyStyleInterval <- function(cuts, quoted_values) {
+  n <- length(cuts)
+  if (n != length(quoted_values) - 1L) {
+    stop("length(cuts) must be equal to length(values) - 1")
+  }
+  if (n == 0L) {
+    return(quoted_values)
+  }
+  cut_tokens <- sprintf("%.6g", cuts)
+  DT::JS(paste0(
+    "isNaN(parseFloat(value)) ? '' : ",
+    paste0(
+      "value <= ",
+      cut_tokens,
+      " ? ",
+      quoted_values[seq_len(n)],
+      " : ",
+      collapse = ""
+    ),
+    quoted_values[[n + 1L]]
   ))
 }
 
@@ -3111,22 +3148,33 @@ prettifyTable <- function(
         "}"
       )
     )
-  ) %>%
-    DT::formatStyle(
-      columns = c(columns_character),
-      textAlign = 'left',
-      "white-space" = "nowrap"
-    ) %>%
-    DT::formatStyle(
-      columns = c(columns_factor, columns_logical),
-      textAlign = 'center',
-      "white-space" = "nowrap"
-    ) %>%
-    DT::formatStyle(
-      columns = c(columns_numeric, columns_p_value),
-      textAlign = 'right',
-      "white-space" = "nowrap"
-    )
+  )
+  if (length(columns_character)) {
+    table <- table %>%
+      DT::formatStyle(
+        columns = columns_character,
+        textAlign = 'left',
+        "white-space" = "nowrap"
+      )
+  }
+  center_columns <- c(columns_factor, columns_logical)
+  if (length(center_columns)) {
+    table <- table %>%
+      DT::formatStyle(
+        columns = center_columns,
+        textAlign = 'center',
+        "white-space" = "nowrap"
+      )
+  }
+  right_columns <- c(columns_numeric, columns_p_value)
+  if (length(right_columns)) {
+    table <- table %>%
+      DT::formatStyle(
+        columns = right_columns,
+        textAlign = 'right',
+        "white-space" = "nowrap"
+      )
+  }
 
   # show cellular barcodes in monospace font
   if ('cell_barcode' %in% colnames(table_original)) {
@@ -3195,8 +3243,13 @@ prettifyTable <- function(
     down_col <- if (is.null(chart_theme)) "#c05b5b" else chart_theme$down
 
     ## 101-step white-to-accent background over each column's own range.
+    ramp_colors_js <- paste0(
+      '"',
+      grDevices::colorRampPalette(colors = c('white', ramp_hi))(102L),
+      '"'
+    )
     ramp <- function(table, columns) {
-      if (nrow(table_original) <= 1) {
+      if (nrow(table_original) <= 1 || !length(columns)) {
         return(table)
       }
       for (i in columns) {
@@ -3212,9 +3265,9 @@ prettifyTable <- function(
           table <- table %>%
             DT::formatStyle(
               columns = i,
-              backgroundColor = DT::styleInterval(
+              backgroundColor = .prettifyStyleInterval(
                 seq(range[1], range[2], (range[2] - range[1]) / 100),
-                colorRampPalette(colors = c('white', ramp_hi))(102)
+                ramp_colors_js
               )
             )
         }
@@ -7017,6 +7070,13 @@ cerebroResultPageServer <- function(
       }
     })
   })
+  ## Flush the table shell and table data together in the first round trip when
+  ## the page is active (shiny_server.R re-suspends it on every other tab via
+  ## viewerOutputTab()). Guarded so standalone testServer() tests stay lazy.
+  if (exists("viewer_hidden_output_options", inherits = TRUE)) {
+    outputOptions(output, id("table_or_text_UI"), priority = 10)
+    outputOptions(output, id("table"), suspendWhenHidden = FALSE)
+  }
   invisible(NULL)
 }
 

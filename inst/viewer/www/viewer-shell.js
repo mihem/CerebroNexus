@@ -975,7 +975,11 @@
         scheduleFinish(pane);
       })
       .on("shiny:value.cerebroPageLoader", function (event) {
-        markDelivered(event.target);
+        if (typeof event.name === "string" && event.name) {
+          delivered.add(event.name);
+        } else {
+          markDelivered(event.target);
+        }
         drawnTables.delete(event.target);
         drawnPlots.delete(event.target);
         var pane = paneFor(event.target);
@@ -988,7 +992,11 @@
         }
       })
       .on('shiny:outputinvalidated.cerebroPageLoader', function (event) {
-        clearDelivered(event.target);
+        if (typeof event.name === "string" && event.name) {
+          delivered.delete(event.name);
+        } else {
+          clearDelivered(event.target);
+        }
         drawnTables.delete(event.target);
         drawnPlots.delete(event.target);
         if (paneFor(event.target) === activePane && localCompletion(activePane) && ownsOutput(activePane, event.target)) cancelScheduledFinish();
