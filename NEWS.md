@@ -1,3 +1,15 @@
+# CerebroNexus 8.5.1
+
+- **Faster page loads and tables (#293).** The Viewer defers its remaining
+  scripts and mounts result tables lazily, flushes tables in the first
+  round trip and builds the colour ramps of `prettifyTable()` in one
+  vectorised step. Gene expression no longer debounces twice, reads H5
+  expression faster and shares the sorted gene list between sessions. Hidden
+  pages stop leaking outputs across tabs, `fill_height` batches its DOM
+  reads, and subsetting and copying of projection tables avoid needless
+  copies. Several helpers (violin, bar chart and Sankey data, Moran's I,
+  ROI rotation, group hulls) are evaluated once per process.
+
 # CerebroNexus 8.5.0
 
 - **Spatial shows all sections side by side.** A data set with several spatial

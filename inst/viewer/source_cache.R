@@ -69,6 +69,7 @@
   "cerebroBarChartData",
   "cerebroSankeyData",
   "morans_i",
+  "spatialRoiPivots",
   "rotateSpatialCoordinatesByRoi",
   "compute_group_hulls"
 )
@@ -137,11 +138,18 @@ viewerSource <- function(path, envir = parent.frame()) {
     info <- file.info(path, extra_cols = FALSE)
     fingerprint <- c(size = info$size, mtime = as.numeric(info$mtime))
   }
-  if (is.null(cached) || (check_stat && !identical(cached$fingerprint, fingerprint))) {
+  if (
+    is.null(cached) ||
+      (check_stat && !identical(cached$fingerprint, fingerprint))
+  ) {
     expressions <- parse(file = path, keep.source = FALSE)
     shared_names <- if (
       basename(path) %in%
-        c("utility_functions.R", "plotting_functions.R", "func_spatial_helpers.R")
+        c(
+          "utility_functions.R",
+          "plotting_functions.R",
+          "func_spatial_helpers.R"
+        )
     ) {
       vapply(expressions, .viewerSourceAssignment, character(1))
     } else {

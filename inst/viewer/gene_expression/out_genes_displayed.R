@@ -3,19 +3,16 @@ output[["expression_genes_displayed"]] <- renderUI({
   req(expression_selected_genes())
   missing <- expression_selected_genes()[["genes_to_display_missing"]]
   count <- length(expression_selected_genes()[["genes_to_display_present"]])
-  n_dimensions <- if (
-    exists("expression_projection_parameters_plot", mode = "function", inherits = TRUE)
-  ) {
+  ## The plot's dimensions are only read when a separate layout could fall back.
+  n_dimensions <- function() {
     as.integer(expression_projection_parameters_plot()[["n_dimensions"]])
-  } else {
-    ncol(expression_projection_coordinates())
   }
   fallback <- identical(
     input[["expression_projection_genes_in_separate_panels"]],
     "separate"
   ) &&
     count >= 2L &&
-    (count > 9L || !identical(n_dimensions, 2L))
+    (count > 9L || !identical(n_dimensions(), 2L))
   tagList(
     if (fallback) {
       div(
