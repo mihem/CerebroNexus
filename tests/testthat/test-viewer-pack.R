@@ -1258,3 +1258,115 @@ test_that("Viewer Pack records spatial extents and reuses unchanged assets incre
     expect_equal(as.numeric(file.info(p)$mtime), as.numeric(old_mtime), tolerance = 2, info = basename(p))
   }
 })
+
+test_that("Viewer Pack persists projection/trajectory extents, reuses unchanged sub-items, and supports runtime domain decoupling", {
+  root <- tempfile("viewer-pack-granular-")
+  dir.create(root)
+  on.exit(unlink(root, recursive = TRUE), add = TRUE)
+  crb <- viewer_pack_fixture(
+    file.path(root, "granular.crb"),
+    n = 6L,
+    immune = TRUE,
+    trajectory = TRUE,
+    spatial = TRUE,
+    groups = TRUE
+  )
+  ## Add a second spatial section so per-section reuse can be verified
+  obj <- readCerebro(crb)
+  slice2 <- obj$getSpatialData("slice")
+  slice2$coordinates[, 1] <- slice2$coordinates[, 1] + 100
+  obj$addSpatialData("slice2", slice2)
+  saveCerebro(obj, crb, codec = "rds")
+
+  pack <- buildViewerPack(crb, viewer_binary = "always")
+  runtime <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("core", "viewer_pack.R"), envir = runtime)
+  opened <- runtime$viewerPackOpen(crb)
+  expect_identical(opened$match_mode, "crb_md5")
+
+  ## 1) Persisted projection & trajectory extents
+  pframe <- runtime$viewerPackProjectionFrame(opened, "umap")
+  expect_equal(pframe$x_range, range(obj$getProjection("umap")[, 1]))
+  expect_equal(pframe$y_range, range(obj$getProjection("umap")[, 2]))
+  tframe <- runtime$viewerPackTrajectoryFrame(opened, "monocle2", "subset")
+  tmeta <- obj$getTrajectory("monocle2", "subset")$meta
+  tmeta <- tmeta[!is.na(tmeta$pseudotime), , drop = FALSE]
+  expect_equal(tframe$x_range, range(tmeta$DR_1))
+  expect_equal(tframe$y_range, range(tmeta$DR_2))
+
+  ## 2) Sub-domain granular reuse: adding 1 metadata col reuses existing
+  ##    metadata columns AND existing group metric violins!
+  old_mtime <- Sys.time() - 3600
+  f_proj1 <- file.path(pack, "projections", "001.bin")
+  f_meta1 <- file.path(pack, "metadata", "001.codes.bin")
+  f_grp1 <- file.path(pack, "groups", "001.qs2")
+  f_spat1 <- file.path(pack, "spatial", "001.geometry.bin")
+  f_spat2 <- file.path(pack, "spatial", "002.geometry.bin")
+  Sys.setFileTime(c(f_proj1, f_meta1, f_grp1, f_spat1, f_spat2), old_mtime)
+
+  obj$meta_data$extra_numeric <- seq_len(nrow(obj$meta_data)) * 3.5
+  saveCerebro(obj, crb, codec = "rds")
+  buildViewerPack(crb, viewer_binary = "always", overwrite = TRUE)
+  expect_true(validateViewerPack(crb, pack, full = TRUE)$valid)
+  expect_equal(as.numeric(file.info(f_meta1)$mtime), as.numeric(old_mtime), tolerance = 2)
+  expect_equal(as.numeric(file.info(f_grp1)$mtime), as.numeric(old_mtime), tolerance = 2)
+
+  ## 2b) Adding a second projection reuses unchanged projection 001.bin
+  Sys.setFileTime(c(f_proj1, f_meta1, f_grp1, f_spat1, f_spat2), old_mtime)
+  obj$addProjection(
+    "pca",
+    data.frame(
+      PC_1 = seq_len(nrow(obj$meta_data)) * 0.5,
+      PC_2 = seq_len(nrow(obj$meta_data)) * -0.5,
+      row.names = obj$meta_data$cell_barcode
+    )
+  )
+  saveCerebro(obj, crb, codec = "rds")
+  buildViewerPack(crb, viewer_binary = "always", overwrite = TRUE)
+  expect_true(validateViewerPack(crb, pack, full = TRUE)$valid)
+  expect_equal(as.numeric(file.info(f_proj1)$mtime), as.numeric(old_mtime), tolerance = 2)
+
+  ## 2c) Editing slice2 reuses unchanged slice (001.geometry.bin)
+  Sys.setFileTime(c(f_spat1, f_spat2), old_mtime)
+  slice2$coordinates[, 2] <- slice2$coordinates[, 2] + 50
+  obj$addSpatialData("slice2", slice2)
+  saveCerebro(obj, crb, codec = "rds")
+  buildViewerPack(crb, viewer_binary = "always", overwrite = TRUE)
+  expect_true(validateViewerPack(crb, pack, full = TRUE)$valid)
+  expect_equal(as.numeric(file.info(f_spat1)$mtime), as.numeric(old_mtime), tolerance = 2)
+  expect_gt(as.numeric(file.info(f_spat2)$mtime), as.numeric(old_mtime) + 10)
+
+  ## 3) Runtime domain-level decoupling without rebuilding Pack:
+  ## 3a) Non-pack edit (extra_material) -> strict MD5 fails, decoupled succeeds for ALL domains
+  obj$addExtraMaterial("tables", "notes", data.frame(a = 1L))
+  saveCerebro(obj, crb, codec = "rds")
+  expect_false(validateViewerPack(crb, pack, full = TRUE)$valid)
+  decoupled_val <- validateViewerPack(crb, pack, full = TRUE, allow_content_match = TRUE)
+  expect_true(decoupled_val$valid)
+  expect_identical(decoupled_val$match_mode, "content_digest")
+  expect_null(runtime$viewerPackOpen(crb))
+  opened_full <- runtime$viewerPackOpen(crb, object = readCerebro(crb))
+  expect_identical(opened_full$match_mode, "content_digest")
+  expect_true(runtime$viewerPackDomainEligible(opened_full, "projections"))
+  expect_true(runtime$viewerPackDomainEligible(opened_full, "metadata"))
+  expect_false(is.null(runtime$viewerPackProjectionFrame(opened_full, "umap")))
+
+  ## 3b) Partial-domain edit (add metadata col) -> unchanged domains hit Pack, metadata/groups fall back
+  obj$meta_data$unbuilt_col <- seq_len(nrow(obj$meta_data))
+  saveCerebro(obj, crb, codec = "rds")
+  opened_partial <- runtime$viewerPackOpen(crb, object = readCerebro(crb))
+  expect_identical(opened_partial$match_mode, "partial_domain")
+  expect_true(runtime$viewerPackDomainEligible(opened_partial, "projections"))
+  expect_true(runtime$viewerPackDomainEligible(opened_partial, "spatial"))
+  expect_false(runtime$viewerPackDomainEligible(opened_partial, "metadata"))
+  expect_false(runtime$viewerPackDomainEligible(opened_partial, "groups"))
+  expect_false(is.null(runtime$viewerPackSpatialFrame(opened_partial, "slice")))
+  expect_false(is.null(runtime$viewerPackReadAsset(opened_partial, "spatial/cell_index.qs2")))
+  expect_null(runtime$viewerPackVerifiedAsset(opened_partial, "metadata/001.codes.bin"))
+
+  ## 3c) Cell-order mutation -> Pack rejected even with object provided
+  obj_reordered <- readCerebro(crb)
+  obj_reordered$meta_data <- obj_reordered$meta_data[rev(seq_len(nrow(obj_reordered$meta_data))), , drop = FALSE]
+  saveCerebro(obj_reordered, crb, codec = "rds")
+  expect_null(runtime$viewerPackOpen(crb, object = readCerebro(crb)))
+})

@@ -27,7 +27,115 @@ viewerPackCellOrderFingerprint <- function(cells) {
   paste0("md5-cell-order-v1:", digest)
 }
 
-viewerPackOpen <- function(file) {
+## TRUE when `domain` is eligible to be served from `pack`.
+## Packs opened via exact CRB MD5 match have `eligible_domains = NULL` (all
+## domains eligible); packs opened via content-digest decoupling carry a named
+## logical list so changed domains seamlessly fall back to the CRB.
+viewerPackDomainEligible <- function(pack, domain) {
+  if (!is.list(pack)) {
+    return(FALSE)
+  }
+  eligible <- pack$eligible_domains
+  if (is.null(eligible)) {
+    return(TRUE)
+  }
+  isTRUE(eligible[[as.character(domain)]])
+}
+
+.viewerPackAssetDomain <- function(path) {
+  path <- as.character(path)
+  if (length(path) != 1L || is.na(path)) {
+    return(NA_character_)
+  }
+  slash <- regexpr("/", path, fixed = TRUE)
+  if (slash <= 1L) {
+    return(NA_character_)
+  }
+  substr(path, 1L, slash - 1L)
+}
+
+.viewerPackRuntimeContentDigests <- function(object) {
+  hash_section <- function(value) paste0("xxh128-v1:", rlang::hash(value))
+  projections <- tryCatch(object$availableProjections(), error = function(e) {
+    character()
+  })
+  proj_data <- stats::setNames(
+    lapply(projections, function(nm) {
+      tryCatch(object$getProjection(nm), error = function(e) NULL)
+    }),
+    projections
+  )
+  metadata <- tryCatch(object$getMetaData(), error = function(e) NULL)
+  spatial_names <- tryCatch(object$availableSpatial(), error = function(e) {
+    character()
+  })
+  spatial_coords <- stats::setNames(
+    lapply(spatial_names, function(nm) {
+      tryCatch(
+        object$getSpatialData(nm, hydrate_molecules = FALSE)[["coordinates"]],
+        error = function(e) NULL
+      )
+    }),
+    spatial_names
+  )
+  repertoire <- tryCatch(object$getImmuneRepertoire(), error = function(e) {
+    list()
+  })
+  ir_version <- if (length(repertoire)) {
+    if (exists("IR_ENCODING_VERSION", inherits = TRUE)) {
+      get("IR_ENCODING_VERSION", inherits = TRUE)
+    } else {
+      tryCatch(
+        {
+          enc_env <- new.env(parent = baseenv())
+          sys.source(
+            system.file(
+              "viewer",
+              "immune_repertoire",
+              "encode.R",
+              package = "CerebroNexus"
+            ),
+            envir = enc_env
+          )
+          enc_env$IR_ENCODING_VERSION
+        },
+        error = function(e) NA_integer_
+      )
+    }
+  } else {
+    0L
+  }
+  has_hla_pkgs <- requireNamespace("igraph", quietly = TRUE) &&
+    requireNamespace("stringdist", quietly = TRUE)
+  list(
+    projections = hash_section(proj_data),
+    metadata = hash_section(list(
+      groups = tryCatch(object$getGroups(), error = function(e) character()),
+      cell_cycle = tryCatch(object$getCellCycle(), error = function(e) {
+        character()
+      }),
+      metadata = metadata
+    )),
+    trajectories = hash_section(object$trajectories),
+    spatial = hash_section(spatial_coords),
+    immune = hash_section(list(
+      version = ir_version,
+      repertoire = repertoire
+    )),
+    hla_tcr = hash_section(list(
+      enabled = has_hla_pkgs,
+      groups = tryCatch(object$getGroups(), error = function(e) character()),
+      lineage = tryCatch(
+        object$getTechnicalInfo()$lineage_column,
+        error = function(e) NULL
+      ),
+      repertoire = repertoire,
+      metadata = if (length(repertoire)) metadata else NULL
+    ))
+  )
+}
+
+viewerPackOpen <- function(file, object = NULL) {
   if (
     !is.character(file) ||
       length(file) != 1L ||
@@ -52,11 +160,7 @@ viewerPackOpen <- function(file) {
   )
   if (
     !is.list(manifest) ||
-      !identical(manifest$schema_version, VIEWER_PACK_SCHEMA_VERSION) ||
-      !identical(
-        manifest$dataset_fingerprint,
-        paste0("md5-crb-v1:", .viewerCrbMd5(file))
-      )
+      !identical(manifest$schema_version, VIEWER_PACK_SCHEMA_VERSION)
   ) {
     return(NULL)
   }
@@ -77,11 +181,78 @@ viewerPackOpen <- function(file) {
   ) {
     return(NULL)
   }
+  md5_matches <- identical(
+    manifest$dataset_fingerprint,
+    paste0("md5-crb-v1:", .viewerCrbMd5(file))
+  )
+  match_mode <- "crb_md5"
+  eligible_domains <- NULL
+  if (!md5_matches) {
+    if (is.null(object) || !is.list(manifest$content_digests)) {
+      return(NULL)
+    }
+    metadata <- tryCatch(object$getMetaData(), error = function(e) NULL)
+    cells <- if (is.data.frame(metadata) && "cell_barcode" %in% colnames(metadata)) {
+      as.character(metadata$cell_barcode)
+    } else {
+      NULL
+    }
+    if (is.null(cells) || !identical(length(cells), cell_count)) {
+      return(NULL)
+    }
+    ## Check cell order against verified Pack cell_order.qs2 first (fast), else hash.
+    probe_pack <- list(
+      path = pack,
+      manifest = manifest,
+      cell_count = cell_count,
+      canonical_order = TRUE,
+      cache = new.env(parent = emptyenv())
+    )
+    stored_cells <- viewerPackReadAsset(probe_pack, "common/cell_order.qs2")
+    order_ok <- is.character(stored_cells) && identical(stored_cells, cells)
+    if (
+      !order_ok &&
+        !identical(
+          as.character(manifest$cell_order_fingerprint),
+          as.character(viewerPackCellOrderFingerprint(cells))
+        )
+    ) {
+      return(NULL)
+    }
+    current_digests <- .viewerPackRuntimeContentDigests(object)
+    domain_matches <- vapply(
+      names(current_digests),
+      function(nm) {
+        identical(
+          as.character(manifest$content_digests[[nm]]),
+          as.character(current_digests[[nm]])
+        )
+      },
+      logical(1)
+    )
+    if (!any(domain_matches)) {
+      return(NULL)
+    }
+    eligible_domains <- list(
+      common = TRUE,
+      projections = isTRUE(domain_matches[["projections"]]),
+      metadata = isTRUE(domain_matches[["metadata"]]),
+      groups = isTRUE(domain_matches[["metadata"]]),
+      trajectory = isTRUE(domain_matches[["trajectories"]]) &&
+        isTRUE(domain_matches[["projections"]]),
+      spatial = isTRUE(domain_matches[["spatial"]]),
+      immune = isTRUE(domain_matches[["immune"]]),
+      hla_tcr = isTRUE(domain_matches[["hla_tcr"]])
+    )
+    match_mode <- if (all(domain_matches)) "content_digest" else "partial_domain"
+  }
   list(
     path = pack,
     manifest = manifest,
     cell_count = cell_count,
     canonical_order = TRUE,
+    match_mode = match_mode,
+    eligible_domains = eligible_domains,
     cache = new.env(parent = emptyenv())
   )
 }
@@ -116,7 +287,7 @@ viewerPackSourceSignature <- function(file) {
   )
 }
 
-viewerPackOpenCached <- function(file, cache) {
+viewerPackOpenCached <- function(file, cache, object = NULL) {
   if (!is.environment(cache)) {
     stop("Viewer Pack descriptor cache must be an environment.", call. = FALSE)
   }
@@ -130,7 +301,7 @@ viewerPackOpenCached <- function(file, cache) {
     pack$cache <- new.env(parent = emptyenv())
     return(pack)
   }
-  pack <- viewerPackOpen(file)
+  pack <- viewerPackOpen(file, object = object)
   if (is.null(pack)) {
     if (!is.null(cached)) {
       rm(list = signature$key, envir = cache)
@@ -293,6 +464,10 @@ viewerPackVerifiedAsset <- function(
   md5 = .viewerFileMd5,
   accept = NULL
 ) {
+  domain <- .viewerPackAssetDomain(path)
+  if (!is.na(domain) && !viewerPackDomainEligible(pack, domain)) {
+    return(NULL)
+  }
   assets <- pack$manifest$assets
   row <- which(as.character(assets$path) == as.character(path))
   if (length(row) != 1L) {
@@ -434,7 +609,43 @@ viewerPackDropTrajectoryNames <- function(pack, object) {
   invisible(object)
 }
 
+viewerPackProjectionFrame <- function(pack, name) {
+  if (!viewerPackDomainEligible(pack, "projections")) {
+    return(NULL)
+  }
+  frames <- pack$manifest$projection_frames
+  if (!is.data.frame(frames) || !nrow(frames)) {
+    return(NULL)
+  }
+  row <- which(as.character(frames$name) == as.character(name))
+  if (length(row) != 1L) {
+    return(NULL)
+  }
+  frame <- as.list(frames[row, , drop = FALSE])
+  frame <- lapply(frame, function(value) value[[1L]])
+  frame$cells <- suppressWarnings(as.integer(frame$cells))
+  frame$dimensions <- suppressWarnings(as.integer(frame$dimensions))
+  x_min <- suppressWarnings(as.numeric(frame$x_min))
+  x_max <- suppressWarnings(as.numeric(frame$x_max))
+  y_min <- suppressWarnings(as.numeric(frame$y_min))
+  y_max <- suppressWarnings(as.numeric(frame$y_max))
+  if (
+    length(x_min) == 1L &&
+      length(x_max) == 1L &&
+      length(y_min) == 1L &&
+      length(y_max) == 1L &&
+      all(is.finite(c(x_min, x_max, y_min, y_max)))
+  ) {
+    frame$x_range <- c(x_min, x_max)
+    frame$y_range <- c(y_min, y_max)
+  }
+  frame
+}
+
 viewerPackTrajectoryFrame <- function(pack, method, name) {
+  if (!viewerPackDomainEligible(pack, "trajectory")) {
+    return(NULL)
+  }
   frames <- pack$manifest$trajectory_frames
   if (!is.data.frame(frames) || !nrow(frames)) {
     return(NULL)
@@ -502,6 +713,20 @@ viewerPackTrajectoryFrame <- function(pack, method, name) {
       logical(1)
     )) &&
     frame$state_dtype %in% c("uint8", "uint16", "uint32")
+  x_min <- suppressWarnings(as.numeric(frame$x_min))
+  x_max <- suppressWarnings(as.numeric(frame$x_max))
+  y_min <- suppressWarnings(as.numeric(frame$y_min))
+  y_max <- suppressWarnings(as.numeric(frame$y_max))
+  if (
+    length(x_min) == 1L &&
+      length(x_max) == 1L &&
+      length(y_min) == 1L &&
+      length(y_max) == 1L &&
+      all(is.finite(c(x_min, x_max, y_min, y_max)))
+  ) {
+    frame$x_range <- c(x_min, x_max)
+    frame$y_range <- c(y_min, y_max)
+  }
   if (!isTRUE(valid)) NULL else frame
 }
 
@@ -614,6 +839,9 @@ viewerPackSpatialIndex <- function(pack, name) {
 }
 
 viewerPackSpatialFrame <- function(pack, name) {
+  if (!viewerPackDomainEligible(pack, "spatial")) {
+    return(NULL)
+  }
   frames <- pack$manifest$spatial_frames
   if (!is.data.frame(frames) || !nrow(frames)) {
     return(NULL)

@@ -1326,7 +1326,11 @@ server <- function(input, output, session) {
             length(dataset_to_load) == 1L &&
             file.exists(dataset_to_load)
         ) {
-          viewerPackOpenCached(dataset_to_load, .viewer_pack_process_cache)
+          viewerPackOpenCached(
+            dataset_to_load,
+            .viewer_pack_process_cache,
+            object = data
+          )
         } else {
           NULL
         }
@@ -1710,6 +1714,13 @@ server <- function(input, output, session) {
       return(NULL)
     }
     prefix <- viewerStaticResourcePrefix("projection", dirname(asset$file))
+    frame <- if (
+      exists("viewerPackProjectionFrame", mode = "function", inherits = TRUE)
+    ) {
+      viewerPackProjectionFrame(pack, name)
+    } else {
+      NULL
+    }
     descriptor <- c(
       list(
         protocol = "canonical-projection-v1",
@@ -1719,7 +1730,9 @@ server <- function(input, output, session) {
         dimensions = asset$dimensions[[2L]],
         dtype = "float32",
         bytes = asset$bytes,
-        checksum = asset$checksum
+        checksum = asset$checksum,
+        x_range = frame$x_range,
+        y_range = frame$y_range
       ),
       viewerCanonicalResourceIdentity(pack)
     )
