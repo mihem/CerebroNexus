@@ -1506,11 +1506,24 @@
     }
     drawQueueFrame = 0;
   }
-  function shouldTimeSlicePanels(count) {
+  var TIME_SLICE_POINTS_THRESHOLD = 500000;
+  function totalQueuePoints(list) {
+    var total = 0, fallback = (D && D.n) || 0;
+    for (var i = 0; i < list.length; i++) {
+      var p = list[i];
+      var space = p && D && D.spaces && D.spaces[p.spaceId];
+      var n = (space && space.n) || fallback;
+      if (n > 0) total += n;
+    }
+    return total;
+  }
+  function shouldTimeSlicePanels(list) {
+    var count = list.length;
     return !focusPanel &&
-      stagePanels >= OFFSTAGE_MIN_PANELS &&
       count > 1 &&
-      typeof window.requestAnimationFrame === 'function';
+      typeof window.requestAnimationFrame === 'function' &&
+      (stagePanels >= OFFSTAGE_MIN_PANELS ||
+        totalQueuePoints(list) >= TIME_SLICE_POINTS_THRESHOLD);
   }
   function orderPanelsByViewport(list) {
     if (list.length <= 1) return list.slice();
@@ -1542,7 +1555,7 @@
     var idx = 0;
     var drewAny = false;
     var firstShown = null;
-    var timed = shouldTimeSlicePanels(queue.length);
+    var timed = shouldTimeSlicePanels(queue);
     function step() {
       drawQueueFrame = 0;
       if (job !== drawQueueJob || drawAllDeferred ||
