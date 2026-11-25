@@ -162,7 +162,7 @@ viewerAddEaeDemo <- function(
     options,
     path,
     "CEREBRO_EAE_DEMO_CRB",
-    "Kukanja et al. mouse EAE ISS (52 sections)",
+    "Kukanja et al. mouse EAE ISS (44 sections)",
     point_size = 1,
     point_opacity = 0.6
   )

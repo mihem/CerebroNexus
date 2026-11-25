@@ -150,7 +150,7 @@ test_that("the large spatial and T-cell demos join the menu", {
     ),
     eae = list(
       add = env$viewerAddEaeDemo,
-      label = "Kukanja et al. mouse EAE ISS (52 sections)",
+      label = "Kukanja et al. mouse EAE ISS (44 sections)",
       variable = "CEREBRO_EAE_DEMO_CRB"
     ),
     ms = list(
@@ -1026,4 +1026,33 @@ test_that("a Kukanja h5ad gives counts, groups with colours and both layouts", {
   expect_error(env$.viewerKukanjaRead(h5ad, spec), "is not categorical")
   spec$groups <- c(section = "missing")
   expect_error(env$.viewerKukanjaRead(h5ad, spec), "no obs column missing")
+})
+
+test_that("a Kukanja h5ad leaves out the cells its recipe drops", {
+  skip_if_not_installed("rhdf5")
+  env <- large_demo_env("prepare_viewer_kukanja_data.R")
+  h5ad <- kukanja_h5ad(file.path(withr::local_tempdir(), "eae.h5ad"))
+  spec <- list(
+    cells = "cell_id",
+    drop = c(sex = "male"),
+    groups = c(section = "sample_id", cell_type = "Level2", sex = "sex"),
+    numbers = c(cell_area = "cell_area")
+  )
+  expect_identical(
+    env$.viewerKukanjaKeep(h5ad, spec),
+    c(TRUE, TRUE, FALSE, FALSE)
+  )
+  data <- env$.viewerKukanjaRead(h5ad, spec)
+  expect_identical(colnames(data$counts), c("a1", "a2"))
+  expect_identical(rownames(data$metadata), c("a1", "a2"))
+  ## The sections and groups of the dropped cells go with them.
+  expect_identical(levels(data$metadata$section), "S2")
+  expect_identical(levels(data$metadata$sex), "female")
+  expect_equal(data$metadata$cell_area, c(10, 20))
+  expect_equal(data$coordinates$x, c(1, 2))
+  expect_equal(data$projection$Dim_1, c(-1, -2))
+  expect_identical(data$metadata$nUMI, c(3L, 3L))
+  ## No `drop`: every cell stays.
+  spec$drop <- NULL
+  expect_true(all(env$.viewerKukanjaKeep(h5ad, spec)))
 })

@@ -102,7 +102,7 @@
   of the time); CRBs written before read as before.
 - **Demo data sets with many sections.** `Rscript run-demo.R
   --data=allen,eae,ms` prepares the Allen MERFISH atlas (59 sections, 3.9
-  million cells) and the Kukanja et al. 2024 spinal cord data (EAE, 52
+  million cells) and the Kukanja et al. 2024 spinal cord data (EAE, 44
   sections; MS, 6), the last two with the authors' DAPI picture of every
   section, aligned to the cells. `--data=dlpfc,mouse_brain,breast,prostate`
   prepares four public Visium data sets with their H&E pictures for the
@@ -111,6 +111,12 @@
   atlas's 1,201 supertypes) no longer ends the session when it opens; a
   colouring by more than 24 groups shows three rows of its legend and a *Show
   all* button.
+- **Dense sections on a dark picture.** The light outline of the points no
+  longer whitens a section of a hundred thousand cells (the Xenium MS demo):
+  it fades in with the point size, and in the WebGPU and WebGL2 renderers it
+  fades with the point opacity, as the Canvas one does. The EAE demo leaves
+  out the 8 brain sections of the authors' file and keeps the 44 spinal cord
+  sections.
 
 # CerebroNexus 8.4.10
 

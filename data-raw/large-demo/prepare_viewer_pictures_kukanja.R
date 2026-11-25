@@ -50,11 +50,13 @@
 ## The cells' slide, section and positions: picture pixels and the Viewer's.
 .viewerPicturesKukanjaCells <- function(h5ad, set) {
   spec <- .viewerPicturesKukanjaSets()[[set]]
-  xy <- .viewerKukanjaObsm(h5ad, "xy_loc")
+  ## The cells the data set leaves out have no section in it.
+  keep <- .viewerKukanjaKeep(h5ad, .viewerKukanjaSets()[[set]])
+  xy <- .viewerKukanjaObsm(h5ad, "xy_loc")[keep, , drop = FALSE]
   list(
-    slide = as.character(.viewerKukanjaObs(h5ad, spec$image_by)),
-    section = as.character(.viewerKukanjaObs(h5ad, "sample_id")),
-    pixels = .viewerKukanjaObsm(h5ad, spec$pixels),
+    slide = as.character(.viewerKukanjaObs(h5ad, spec$image_by))[keep],
+    section = as.character(.viewerKukanjaObs(h5ad, "sample_id"))[keep],
+    pixels = .viewerKukanjaObsm(h5ad, spec$pixels)[keep, , drop = FALSE],
     viewer = cbind(xy[, 1L], -xy[, 2L])
   )
 }

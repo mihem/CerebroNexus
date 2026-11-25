@@ -109,7 +109,12 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
   if (uniforms.style.w >= 0.0) {
     baseColor.a = uniforms.style.w;
   }
-  var color = mix(baseColor, uniforms.border, borderMix);
+  // The outline fades with the point (the Canvas fallback's globalAlpha does
+  // too): at a low point opacity or for a point the lasso left out it would
+  // otherwise stay a ring of white while its fill is gone.
+  var edge = uniforms.border;
+  edge.a = edge.a * baseColor.a;
+  var color = mix(baseColor, edge, borderMix);
   color.a *= coverage;
   return color;
 }`;
@@ -828,7 +833,10 @@ void main() {
     : 0.0;
   vec4 baseColor = pointColor;
   if (passAlpha >= 0.0) baseColor.a = passAlpha;
-  outputColor = mix(baseColor, borderColor, borderMix);
+  // The outline fades with the point, as the Canvas fallback's globalAlpha does.
+  vec4 edge = borderColor;
+  edge.a *= baseColor.a;
+  outputColor = mix(baseColor, edge, borderMix);
   outputColor.a *= coverage;
 }`;
 

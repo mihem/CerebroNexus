@@ -1,14 +1,18 @@
 ## Kukanja et al. 2024 (Cell 187:1990): the in situ sequencing (ISS) data of
 ## mouse spinal cord sections in experimental autoimmune encephalomyelitis
-## (`eae`, 52 sections, 239 genes) and the Xenium data of human multiple
+## (`eae`, 44 sections, 239 genes) and the Xenium data of human multiple
 ## sclerosis spinal cord (`ms`, 6 sections, 266 genes), each one AnnData file
 ## of the authors with their cell types and UMAP. See kukanja.ATTRIBUTION.md.
+##
+## The EAE file also holds 8 coronal sections of the brain (region B). They are
+## left out (`drop`), as in the authors' KaroSpace viewer of the spinal cord.
 
 .viewerKukanjaBaseUrl <- "https://zenodo.org/records/8037425/files/"
 
 ## What each data set takes from its h5ad. `groups` and `numbers` map the
-## Viewer's column names to the authors' obs columns; size and MD5 are the ones
-## Zenodo publishes for the archive.
+## Viewer's column names to the authors' obs columns; `drop` names the cells to
+## leave out (a group and its values); size and MD5 are the ones Zenodo
+## publishes for the archive.
 .viewerKukanjaSets <- function() {
   list(
     eae = list(
@@ -20,6 +24,7 @@
       organism = "Mus musculus",
       technology = "in situ sequencing (ISS)",
       cells = "_index",
+      drop = c(region = "B"),
       groups = c(
         section = "sample_id",
         condition = "condition",
@@ -195,6 +200,16 @@
   t(values[1:2, , drop = FALSE])
 }
 
+## Which cells of the h5ad are kept: all of them, but those `spec$drop` names.
+.viewerKukanjaKeep <- function(h5ad, spec) {
+  keep <- rep(TRUE, length(.viewerKukanjaObs(h5ad, spec$cells)))
+  for (group in names(spec$drop)) {
+    values <- as.character(.viewerKukanjaObs(h5ad, spec$groups[[group]]))
+    keep <- keep & !(values %in% spec$drop[[group]])
+  }
+  keep
+}
+
 ## Reads one h5ad: the counts, the cell table with the groups and their
 ## colours, the section coordinates and the authors' UMAP.
 .viewerKukanjaRead <- function(h5ad, spec) {
@@ -204,6 +219,9 @@
     stop("The h5ad needs a unique name for every cell.", call. = FALSE)
   }
   colnames(counts) <- cells
+  keep <- .viewerKukanjaKeep(h5ad, spec)
+  counts <- counts[, keep, drop = FALSE]
+  cells <- cells[keep]
   metadata <- data.frame(cell_barcode = cells, row.names = cells)
   colors <- list()
   for (group in names(spec$groups)) {
@@ -212,6 +230,7 @@
     if (!is.factor(values)) {
       stop("The obs column ", column, " is not categorical.", call. = FALSE)
     }
+    values <- droplevels(values[keep])
     if (anyNA(values)) {
       levels(values) <- c(levels(values), "N/A")
       values[is.na(values)] <- "N/A"
@@ -228,13 +247,13 @@
     metadata[[name]] <- as.numeric(.viewerKukanjaObs(
       h5ad,
       spec$numbers[[name]]
-    ))
+    )[keep])
   }
   ## The authors' aligned coordinates: every section turned the same way. The
   ## image's y axis grows downwards, the Viewer's upwards, so y is mirrored.
-  xy <- .viewerKukanjaObsm(h5ad, "xy_loc")
+  xy <- .viewerKukanjaObsm(h5ad, "xy_loc")[keep, , drop = FALSE]
   coordinates <- data.frame(x = xy[, 1L], y = -xy[, 2L], row.names = cells)
-  umap <- .viewerKukanjaObsm(h5ad, "X_umap")
+  umap <- .viewerKukanjaObsm(h5ad, "X_umap")[keep, , drop = FALSE]
   projection <- data.frame(
     Dim_1 = umap[, 1L],
     Dim_2 = umap[, 2L],

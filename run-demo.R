@@ -13,7 +13,7 @@
 ## 1m, ren, cosmx, tcell, allen, eae and ms are written as CRBs directly. The
 ## spatial ones have many sections each:
 ##   allen  Allen whole mouse brain MERFISH atlas, 59 sections of one brain
-##   eae    mouse spinal cord in EAE by in situ sequencing, 52 sections
+##   eae    mouse spinal cord in EAE by in situ sequencing, 44 sections
 ##   ms     human multiple sclerosis spinal cord by Xenium, 6 sections
 ## (eae and ms: Kukanja et al. 2024).
 ##

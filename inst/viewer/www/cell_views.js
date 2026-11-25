@@ -1604,13 +1604,21 @@
   }
   // The outline of a panel's points: light, when the picture drawn under them
   // is dark and the outline is on; else none. Faint (alpha .35), so the
-  // outlines of overlapping points do not add up to white.
+  // outlines of overlapping points do not add up to white. It also grows with
+  // the point: on a point of 4 pixels a ring 0.8 wide is more than half of its
+  // area, and the 130,000 cells of a Xenium section overlap so much that their
+  // rings whitened the whole tissue; from 2 pixels it fades in, and a point of
+  // 8 pixels has all of it.
   function pictureOutline(p) {
     if (!pictureOutlineOn || (!singleActive && !linkedBackgroundsOn)) return null;
     var sp = spaceById[p.spaceId];
     var state = sp && sp._imgState;
     if (!sp || !currentImage(sp) || !sp._imgEl || !sp._imgReady || !state || !state.show) return null;
-    return pictureIsDark(sp._imgEl) ? { color: 'rgba(255,255,255,.35)', width: 0.8 } : null;
+    if (!pictureIsDark(sp._imgEl)) return null;
+    var size = p._renderPointSize == null ? pointSizeOf(p) : p._renderPointSize;
+    var grow = Math.round(Math.max(0, Math.min(1, (size - 2) / 6)) * 20) / 20;
+    if (!grow) return null;
+    return { color: 'rgba(255,255,255,' + (0.35 * grow).toFixed(3) + ')', width: 0.8 * grow };
   }
 
   function drawImage(p, context) {

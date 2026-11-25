@@ -1,6 +1,6 @@
 # Large demo data sets
 
-These scripts download and prepare the large demo data sets that `run-demo.R` opens in the Viewer: the mouse brain E18 data set (all 1,306,127 cells of the 10x 1M neurons matrix), the Ren et al. COVID-19 atlas (1.46M cells with paired TCR/BCR data), and, on request, the NanoString CosMx NSCLC spatial data set (eight tissue sections), the Zheng et al. pan-cancer T-cell atlas (397,810 cells with TCR sequences and the CD8 exhaustion pseudotime), and three spatial data sets with many sections: the Allen whole mouse brain MERFISH atlas (3,938,808 cells, 59 sections) and the Kukanja et al. mouse EAE (in situ sequencing, 52 sections) and human MS (Xenium, 6 sections) spinal cord data. They are not shipped in `inst/extdata/examples/`, `data-raw/` is excluded from package builds, and they are not part of the test suite. `tests/testthat/test-run-demo.R`, `test-ren-demo.R`, `test-large-demos.R`, `test-million-cell-viewer.R` and `test-demo-h5-transpose.R` test them with small synthetic data.
+These scripts download and prepare the large demo data sets that `run-demo.R` opens in the Viewer: the mouse brain E18 data set (all 1,306,127 cells of the 10x 1M neurons matrix), the Ren et al. COVID-19 atlas (1.46M cells with paired TCR/BCR data), and, on request, the NanoString CosMx NSCLC spatial data set (eight tissue sections), the Zheng et al. pan-cancer T-cell atlas (397,810 cells with TCR sequences and the CD8 exhaustion pseudotime), and three spatial data sets with many sections: the Allen whole mouse brain MERFISH atlas (3,938,808 cells, 59 sections) and the Kukanja et al. mouse EAE (in situ sequencing, 44 spinal cord sections) and human MS (Xenium, 6 sections) spinal cord data. They are not shipped in `inst/extdata/examples/`, `data-raw/` is excluded from package builds, and they are not part of the test suite. `tests/testthat/test-run-demo.R`, `test-ren-demo.R`, `test-large-demos.R`, `test-million-cell-viewer.R` and `test-demo-h5-transpose.R` test them with small synthetic data.
 
 ## How to run
 
@@ -95,8 +95,8 @@ They are built like the CosMx data set, one spatial entry per section, so that S
 |---|---|---|---|
 | Environment variable read by the Viewer | `CEREBRO_ALLEN_DEMO_CRB` | `CEREBRO_EAE_DEMO_CRB` | `CEREBRO_MS_DEMO_CRB` |
 | Cache folder | `large-examples/allen/` | `large-examples/eae/` | `large-examples/ms/` |
-| Data set menu entry | Allen whole mouse brain MERFISH (59 sections, 3.9M) | Kukanja et al. mouse EAE ISS (52 sections) | Kukanja et al. human MS Xenium (6 sections) |
-| Cells, genes, sections | 3,938,808, 550, 59 | 592,421, 239, 52 | 660,801, 266, 6 |
+| Data set menu entry | Allen whole mouse brain MERFISH (59 sections, 3.9M) | Kukanja et al. mouse EAE ISS (44 sections) | Kukanja et al. human MS Xenium (6 sections) |
+| Cells, genes, sections | 3,938,808, 550, 59 | 270,878, 239, 44 | 660,801, 266, 6 |
 | Download | 3 files, 8.6 GB | 1 file, 0.57 GB | 1 file, 0.51 GB |
 | Licence | CC BY-NC 4.0 | CC BY 4.0 | CC BY 4.0 |
 
