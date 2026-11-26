@@ -924,7 +924,9 @@ test_that("multi-section grids below 400k cells stream and skip coordinate reads
   expect_identical(stream$batches, 2L)
   expect_length(unclass(stream$head$grid_stream$section), 10L)
 
-  ## When geometry_of supplies x_range and y_range, coordinates_of is not called.
+  ## A section with a Pack file has no positions in the frame (the browser reads
+  ## the file), but its extent still comes from its coordinates, with the grid's
+  ## margin like any other section's.
   data <- section_grid_data()
   cells <- spatial_grid_cells(
     names(data$index),
@@ -942,15 +944,20 @@ test_that("multi-section grids below 400k cells stream and skip coordinate reads
       list(
         protocol = "spatial-geometry-v1",
         url = paste0("pack/", section, ".bin"),
-        cells = length(rows),
-        x_range = c(0, 100),
-        y_range = c(0, 50)
+        cells = length(rows)
       )
     }
   )
-  expect_identical(coord_calls, character())
+  expect_identical(coord_calls, names(data$index))
   expect_true(layout$all_from_geometry)
   expect_true(all(is.na(layout$coordinates$x)))
-  expect_identical(layout$x_ranges[[1L]], c(0, 100))
-  expect_identical(layout$y_ranges[[1L]], c(0, 50))
+  first <- data$coordinates[[1L]]
+  expect_identical(
+    layout$x_ranges[[1L]],
+    spatial_grid_range(spatial_grid_xy(first)$x)
+  )
+  expect_identical(
+    layout$y_ranges[[1L]],
+    spatial_grid_range(spatial_grid_xy(first)$y)
+  )
 })

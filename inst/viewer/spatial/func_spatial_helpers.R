@@ -1750,20 +1750,6 @@ spatial_grid_coordinates <- function(
       integer()
     }
     file <- if (length(rows)) geometry_of(section, rows)
-    has_extents <- is.list(file) &&
-      is.numeric(file$x_range) &&
-      length(file$x_range) == 2L &&
-      all(is.finite(file$x_range)) &&
-      is.numeric(file$y_range) &&
-      length(file$y_range) == 2L &&
-      all(is.finite(file$y_range))
-    if (!is.null(file) && has_extents) {
-      x_ranges[i] <- list(as.numeric(file$x_range))
-      y_ranges[i] <- list(as.numeric(file$y_range))
-      geometry[i] <- list(file)
-      xs[[i]] <- ys[[i]] <- rep(NA_real_, length(rows))
-      next
-    }
     full <- spatial_grid_xy(coordinates_of(section))
     full <- rotateSpatialCoordinates(full, rotation_of(section))
     x_ranges[i] <- list(spatial_grid_range(full$x))

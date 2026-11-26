@@ -65,7 +65,7 @@ Suggests:
   chromote,
   codetools,
   DelayedArray,
-  digest,
+  digest (>= 0.6.39),
   future.apply (>= 1.1.0),
   ggdendro,
   ggplot2 (>= 3.4.0),
