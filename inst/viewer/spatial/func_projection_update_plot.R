@@ -17,6 +17,13 @@ spatial_projection_output_hulls <- function(
   )
 }
 spatial_projection_drawn_hulls <- list()
+## The hash of the cells, positions and panels of the grid frame drawn last
+## (NULL for any other frame): a new colouring of the same grid sends only its
+## colours.
+spatial_grid_drawn_geometry <- NULL
+## Counts the frames sent; the batches of a streaming grid stop once it moves
+## on (spatial_grid_stream_send()).
+spatial_grid_stream_serial <- 0L
 
 ##----------------------------------------------------------------------------##
 ## Function that updates projections.
@@ -91,6 +98,8 @@ spatial_background_render_payload <- function(
 }
 
 spatial_projection_update_plot <- function(input) {
+  ## A new frame ends the batches of a grid still streaming.
+  spatial_grid_stream_serial <<- spatial_grid_stream_serial + 1L
   ## assign input data to new variables
   dataset_context <- input[["dataset_context"]]
   metadata <- input[['cells_df']]
@@ -153,17 +162,16 @@ spatial_projection_update_plot <- function(input) {
       hover_info = hover,
       groups = getGroups()
     )
-    hover_metadata <- viewerProjectionSubsetRows(
-      first_frame,
-      cell_index,
-      columns
-    )
+    ## Read only for hover text: the rows of a frame of 3.9 million cells
+    ## took 0.3 s even without a column.
+    hover_metadata <- if (hover) {
+      viewerProjectionSubsetRows(first_frame, cell_index, columns)
+    }
     ## The browser takes the names from the cell-name resource when there is
     ## one, so only the canonical rows of the points are sent.
     names_resource <- viewerCellNamesResourceFor(cell_index)
     cell_barcodes <- if (is.null(names_resource)) {
-      viewerPackCellBarcodes(viewerPackCurrent(), cell_index) %||%
-        getMetaData()[["cell_barcode"]][cell_index]
+      viewerCellBarcodesAt(cell_index)
     }
     aux <- cerebroCellViewDeferredAux(
       selection_rows = selection_rows,
@@ -227,71 +235,92 @@ spatial_projection_update_plot <- function(input) {
   ## Co-expression: colour each cell by blending up to three genes' expression
   ## onto RGB channels. The channel columns were populated in
   ## obj_projection_data_to_plot.R.
-  is_coexpr <- identical(plot_parameters[["plot_type"]], "Co-expression (RGB)")
+  ## Co-expression: one gene per channel, blended in the browser as on the
+  ## Gene expression page (color_type "rgb"): a cell expressing none of them
+  ## is grey, and the legend names each channel's gene. Without any gene the
+  ## frame is the grey "No gene selected" one below.
+  is_coexpr <- identical(
+    plot_parameters[["plot_type"]],
+    "Co-expression (RGB)"
+  ) &&
+    !isTRUE(plot_parameters[["no_gene"]])
   if (is_coexpr) {
-    render_color <- blend_genes_to_rgb(
-      r = if ("coexpr_r" %in% colnames(metadata)) {
-        metadata[["coexpr_r"]]
+    channel_values <- function(column) {
+      values <- if (column %in% colnames(metadata)) {
+        as.numeric(metadata[[column]])
       } else {
-        NULL
-      },
-      g = if ("coexpr_g" %in% colnames(metadata)) {
-        metadata[["coexpr_g"]]
-      } else {
-        NULL
-      },
-      b = if ("coexpr_b" %in% colnames(metadata)) {
-        metadata[["coexpr_b"]]
-      } else {
-        NULL
+        numeric(nrow(metadata))
       }
-    )
-    ## One legend entry per populated channel, kept as parallel label/colour
-    ## vectors so the JS renders a coloured swatch per channel (red/green/blue)
-    ## instead of a single grey blob. An unused channel is dropped from both.
-    coexpr_labels <- c(
-      if (nzchar(plot_parameters[["coexpr_r"]] %||% "")) {
-        paste0("R: ", plot_parameters[["coexpr_r"]])
-      },
-      if (nzchar(plot_parameters[["coexpr_g"]] %||% "")) {
-        paste0("G: ", plot_parameters[["coexpr_g"]])
-      },
-      if (nzchar(plot_parameters[["coexpr_b"]] %||% "")) {
-        paste0("B: ", plot_parameters[["coexpr_b"]])
-      }
-    )
-    coexpr_colors <- c(
-      if (nzchar(plot_parameters[["coexpr_r"]] %||% "")) "rgb(255,0,0)",
-      if (nzchar(plot_parameters[["coexpr_g"]] %||% "")) "rgb(0,255,0)",
-      if (nzchar(plot_parameters[["coexpr_b"]] %||% "")) "rgb(0,0,255)"
-    )
+      values[!is.finite(values)] <- 0
+      values
+    }
+    grid <- plot_parameters[["grid"]]
     output_meta <- c(
       background_meta,
       list(
-        color_type = "coexpression",
-        space_label = plot_parameters[["projection"]],
-        traces = as.list(coexpr_labels),
-        coexpr_colors = as.list(coexpr_colors),
-        color_variable = paste(coexpr_labels, collapse = "  "),
+        color_type = "rgb",
+        ## Separate channels: one panel per channel (and section, in the grid).
+        rgb_layout = if (
+          identical(plot_parameters[["rgb_layout"]], "separate")
+        ) {
+          "separate"
+        } else {
+          "composite"
+        },
+        color_variable = "RGB co-expression",
+        show_color_scale = TRUE,
+        space_label = if (is.list(grid)) {
+          "Section grid"
+        } else {
+          plot_parameters[["projection"]]
+        },
         appearance = list(
           group_labels = FALSE,
           draw_border = isTRUE(plot_parameters[["draw_border"]]),
-          keep_square = isTRUE(plot_parameters[["keep_square"]])
+          keep_square = isTRUE(plot_parameters[["keep_square"]]),
+          picture_outline = !isFALSE(plot_parameters[["picture_outline"]])
         )
       )
     )
     output_data <- list(
-      x = coordinates[[1]],
-      y = coordinates[[2]],
+      x = as.numeric(coordinates[[1]]),
+      y = as.numeric(coordinates[[2]]),
       selection_key = selection_keys,
-      color = render_color,
+      rgb = list(
+        r = channel_values("coexpr_r"),
+        g = channel_values("coexpr_g"),
+        b = channel_values("coexpr_b")
+      ),
+      rgb_genes = list(
+        r = plot_parameters[["coexpr_r"]] %||% "",
+        g = plot_parameters[["coexpr_g"]] %||% "",
+        b = plot_parameters[["coexpr_b"]] %||% ""
+      ),
       point_size = plot_parameters[["point_size"]],
       point_opacity = plot_parameters[["point_opacity"]],
       point_line = point_line,
+      ## A single section's own size (a grid's panels carry theirs).
+      point_size_hint = plot_parameters[["point_size_hint"]],
       x_range = x_range_out,
       y_range = y_range_out,
       reset_axes = reset_axes
     )
+    if (is.list(grid)) {
+      grid$coordinates <- coordinates
+      output_data$panels <- c(
+        spatial_grid_projection_panel(grid$projection),
+        spatial_grid_panels(
+          grid,
+          plot_parameters[["grid_backgrounds"]] %||% list(),
+          if (exists("Cerebro.options")) {
+            Cerebro.options[["cerebro_root"]]
+          } else {
+            NULL
+          },
+          plot_parameters[["grid_point_size_hints"]] %||% list()
+        )
+      )
+    }
     output_hover <- list(
       hoverinfo = "skip",
       text = list(),
@@ -336,6 +365,7 @@ spatial_projection_update_plot <- function(input) {
     point_opacity = plot_parameters[["point_opacity"]],
     group_labels = plot_parameters[["group_labels"]],
     keep_square = plot_parameters[["keep_square"]],
+    picture_outline = plot_parameters[["picture_outline"]],
     point_line = point_line,
     x_range = x_range_out,
     y_range = y_range_out,
@@ -356,7 +386,12 @@ spatial_projection_update_plot <- function(input) {
   if (section_codes) {
     payload$data$categorical_resource <- categorical_resource
   }
-  if (identical(plot_parameters[["plot_type"]], "ImageFeaturePlot")) {
+  ## A single section's own size for "Auto" (a grid's panels carry theirs).
+  payload$data$point_size_hint <- plot_parameters[["point_size_hint"]]
+  if (
+    identical(plot_parameters[["plot_type"]], "ImageFeaturePlot") &&
+      !isTRUE(plot_parameters[["no_gene"]])
+  ) {
     settings <- viewerExpressionColorSettings(
       if (exists("Cerebro.options")) Cerebro.options else list(),
       dataset_context$dataset_key
@@ -369,8 +404,59 @@ spatial_projection_update_plot <- function(input) {
     payload[["data"]] <- attach_geometry_resource(payload[["data"]])
   }
 
+  ## A grid: one panel per section over its slice of this frame. The frame's
+  ## single colour vector and range serve every panel.
+  grid <- plot_parameters[["grid"]]
+  if (is.list(grid)) {
+    grid$coordinates <- coordinates
+    payload$data$panels <- c(
+      spatial_grid_projection_panel(grid$projection),
+      spatial_grid_panels(
+        grid,
+        plot_parameters[["grid_backgrounds"]] %||% list(),
+        if (exists("Cerebro.options")) {
+          Cerebro.options[["cerebro_root"]]
+        } else {
+          NULL
+        },
+        plot_parameters[["grid_point_size_hints"]] %||% list()
+      )
+    )
+    ## Slices index the frame's rows, so x, y and keys are flat in frame order
+    ## (a small categorical payload nests them by group).
+    payload$data$x <- as.numeric(coordinates[[1L]])
+    payload$data$y <- as.numeric(coordinates[[2L]])
+    payload$data$selection_key <- selection_keys
+    if (is.numeric(color_input)) {
+      payload$data$color_range <- spatial_grid_color_range(color_input)
+    } else {
+      trace_names <- unlist(payload$meta$traces, use.names = FALSE)
+      ## The payload's codes of the traces, when it has them: matching 3.9
+      ## million names again took 0.2 s.
+      canonical <- payload$data$canonical_group
+      payload$data$group_code <- if (length(canonical) == length(color_input)) {
+        as.integer(unclass(canonical))
+      } else {
+        grid_groups <- as.character(color_input)
+        grid_groups[is.na(grid_groups)] <- "(missing)"
+        as.integer(match(grid_groups, trace_names) - 1L)
+      }
+      payload$data$canonical_group <- NULL
+      payload$data$color <- NULL
+      ## The payload adds "(missing)" with this colour when a cell has none.
+      grid_colors <- unname(color_assignments[trace_names])
+      grid_colors[is.na(grid_colors)] <- "#7b8794"
+      payload$meta$group_colors <- grid_colors
+    }
+    payload$meta$space_label <- "Section grid"
+  }
+
   split_by <- plot_parameters[["split_by"]] %||% ""
-  if (nzchar(split_by) && split_by %in% colnames(metadata)) {
+  if (
+    !is.list(grid) &&
+      nzchar(split_by) &&
+      split_by %in% colnames(metadata)
+  ) {
     cell_index <- if ("cell_index" %in% colnames(metadata)) {
       metadata[["cell_index"]]
     } else {
@@ -379,12 +465,7 @@ spatial_projection_update_plot <- function(input) {
     panel_selection_keys <- if ("cell_barcode" %in% colnames(metadata)) {
       metadata[["cell_barcode"]]
     } else {
-      barcodes <- viewerPackCellBarcodes(viewerPackCurrent(), cell_index)
-      if (is.null(barcodes)) {
-        getMetaData()[["cell_barcode"]][cell_index]
-      } else {
-        barcodes
-      }
+      viewerCellBarcodesAt(cell_index)
     }
     req(
       length(panel_selection_keys) == length(selection_keys),
@@ -538,17 +619,168 @@ spatial_projection_update_plot <- function(input) {
   ) {
     payload$data$selection_rows <- cerebroRowRange(aux_cells - 1L)
   }
-  cerebroCellViewRender(
+  ## A grid coloured anew over the same cells, positions and panels: only the
+  ## colours travel, and the browser keeps what it has (recolorSingle() in
+  ## cell_views.js). Sending the 3.9 million positions of the Allen atlas again
+  ## took 40 s. A new render request (a remounted canvas, a data set switch)
+  ## always gets the whole frame.
+  grid_geometry <- if (is.list(grid)) {
+    all_from_file <- isTRUE(grid$all_from_geometry)
+    rlang::hash(list(
+      context = input[["dataset_context"]],
+      x = if (all_from_file) length(payload$data$x) else payload$data$x,
+      y = if (all_from_file) length(payload$data$y) else payload$data$y,
+      keys = payload$data$selection_key,
+      panels = payload$data$panels,
+      x_range = payload$data$x_range,
+      y_range = payload$data$y_range
+    ))
+  }
+  if (
+    !is.null(grid_geometry) &&
+      identical(grid_geometry, spatial_grid_drawn_geometry) &&
+      !isTRUE(input[["fresh_render"]]) &&
+      !isTRUE(reset_axes)
+  ) {
+    ## A gene expressed in under half the cells travels as those cells and
+    ## their values (cerebroSparseColorPacket()): Vip over the 3.9 million
+    ## cells of the Allen atlas is 7.4 MB instead of 31.5 MB.
+    sparse <- cerebroSparseColorPacket(payload$data$color)
+    if (!is.null(sparse)) {
+      payload$data$color <- NULL
+      payload$data$sparse_color <- sparse
+    }
+    cerebroCellViewRecolor(
+      "spatial_projection",
+      payload[["meta"]],
+      payload[["data"]],
+      dataset_context = input[["dataset_context"]],
+      feedback = input[["feedback"]]
+    )
+    return(invisible(NULL))
+  }
+  spatial_grid_drawn_geometry <<- grid_geometry
+  ## A grid of many cells streams: the sections shown first draw at once, the
+  ## others as their batches arrive. Until the last is sent a new colouring
+  ## gets a whole frame, since a recolour holds the colours of every cell.
+  stream <- if (is.list(grid)) {
+    spatial_grid_stream_split(payload$data, spatial_grid_shown_sections())
+  }
+  deferred_aux <- function() build_deferred_aux(aux_rows)
+  if (!is.null(stream)) {
+    payload$data <- stream$head
+    spatial_grid_drawn_geometry <<- NULL
+    stream <- spatial_grid_stream_keys(stream, deferred_aux())
+    deferred_aux <- function() stream$head_aux
+  }
+  render_token <- cerebroCellViewRender(
     "spatial_projection",
     payload[["meta"]],
     payload[["data"]],
     payload[["hover"]],
     extra = list(group_hulls = output_hulls),
-    deferred_aux = function() {
-      build_deferred_aux(aux_rows)
-    },
+    deferred_aux = deferred_aux,
     dataset_context = input[["dataset_context"]],
     feedback = input[["feedback"]],
     aux_key = aux_key(aux_rows)
   )
+  if (!is.null(stream)) {
+    spatial_grid_stream_send(
+      stream,
+      render_token,
+      input[["dataset_context"]],
+      grid_geometry
+    )
+  }
+  invisible(render_token)
+}
+
+## The sections the Sections field shows, in its order (the browser lays the
+## grid out by it).
+spatial_grid_shown_sections <- function() {
+  tryCatch(
+    as.character(
+      shiny::isolate(
+        session$input[["spatial_projection_sections"]]
+      ) %||%
+        character()
+    ),
+    error = function(error) character()
+  )
+}
+
+## Sends batches 2, 3, ... of a streaming grid (spatial_grid_stream_split()),
+## each in its own turn of the event loop so that the session answers its
+## inputs in between. A newer frame of the page stops them; the browser drops
+## the rows of a frame it no longer shows. After the last, a new colouring of
+## the grid sends only its colours.
+spatial_grid_stream_send <- function(
+  stream,
+  render_token,
+  dataset_context,
+  geometry
+) {
+  serial <- spatial_grid_stream_serial
+  context <- viewerDatasetContext(
+    dataset_context$epoch,
+    dataset_context$dataset_key,
+    dataset_context$generation
+  )
+  send <- function(k) {
+    if (
+      !identical(serial, spatial_grid_stream_serial) ||
+        isTRUE(tryCatch(session$isClosed(), error = function(error) TRUE))
+    ) {
+      return(invisible(NULL))
+    }
+    part <- stream$part(k)
+    last <- k >= stream$batches
+    message <- list(
+      id = "spatial_projection",
+      dataset_context = context,
+      render_token = render_token,
+      batch = k,
+      done = last,
+      section = I(part$section),
+      start = I(part$start),
+      count = I(part$count)
+    )
+    for (field in intersect(
+      c(
+        "x",
+        "y",
+        "group_code",
+        "color",
+        "projection",
+        "selection_index",
+        "selection_key"
+      ),
+      names(part)
+    )) {
+      value <- part[[field]]
+      message[[field]] <- if (identical(field, "projection")) {
+        lapply(value, function(values) I(unname(values)))
+      } else if (is.list(value)) {
+        value
+      } else {
+        I(unname(value))
+      }
+    }
+    session$sendBinaryMessage(
+      "cell_view_grid_rows",
+      cv_wire_pack_message(message)
+    )
+    if (last) {
+      spatial_grid_drawn_geometry <<- geometry
+    } else {
+      later::later(function() send(k + 1L), 0)
+    }
+    invisible(NULL)
+  }
+  ## A frame of one batch (its sections' positions all in files) is sent.
+  if (stream$batches < 2L) {
+    spatial_grid_drawn_geometry <<- geometry
+    return(invisible(NULL))
+  }
+  later::later(function() send(2L), 0)
 }

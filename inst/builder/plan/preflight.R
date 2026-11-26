@@ -98,7 +98,12 @@ builder_plan_requires_app <- function(entries) {
       entry$settings$images %||% list()
     )
     images <- .builder_plan_flatten_spatial_images(alignments$spatial)
-    if (length(images) || !is.null(alignments$trekker)) {
+    ## Embedded images travel inside the CRB; a Trekker image is always a file.
+    external <- identical(
+      builder_spatial_image_storage(entry$settings),
+      "external"
+    )
+    if ((external && length(images)) || !is.null(alignments$trekker)) {
       requires_app <- TRUE
     }
   }
@@ -268,12 +273,20 @@ builder_plan_requires_app <- function(entries) {
         ))
       }
     }
+    embedded <- identical(
+      builder_spatial_image_storage(entry$settings),
+      "embedded"
+    )
     if (
       length(images) &&
-        !isTRUE(make_app)
+        !isTRUE(make_app) &&
+        (!embedded || !is.null(alignments$trekker))
     ) {
       return(builder_plan_error(
-        "External spatial images require CRB files + Viewer App output.",
+        paste(
+          "External spatial images require CRB files + Viewer App output;",
+          "store them inside the CRB to build CRB files only."
+        ),
         "external_images_require_app"
       ))
     }

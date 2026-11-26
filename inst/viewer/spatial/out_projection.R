@@ -7,8 +7,9 @@ output[["spatial_details_selected_cells_plot"]] <- renderCerebroChart({
     return(NULL)
   }
   req(
-    input[["spatial_projection_to_display"]],
-    input[["spatial_projection_to_display"]] %in% availableSpatial(),
+    spatial_projection_single_section(input, availableSpatial()),
+    spatial_projection_single_section(input, availableSpatial()) %in%
+      availableSpatial(),
     input[["spatial_selected_cells_plot_select_variable"]],
     spatial_projection_data_to_plot()
   )
@@ -28,8 +29,9 @@ output[["spatial_details_selected_cells_table"]] <- viewerLazyRender(
       ## The browser lists a selection it reported by row.
       req(!viewerClientSelection("spatial_projection", "table"))
       req(
-        input[["spatial_projection_to_display"]],
-        input[["spatial_projection_to_display"]] %in% availableSpatial(),
+        spatial_projection_single_section(input, availableSpatial()),
+        spatial_projection_single_section(input, availableSpatial()) %in%
+          availableSpatial(),
         spatial_projection_data_to_plot()
       )
       meta_data <- viewerProjectionFirstFrameMetadata()

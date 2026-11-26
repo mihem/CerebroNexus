@@ -112,7 +112,7 @@ test_that("the Pack's Clonal frame is the frame the page builds", {
     file.path(pack, "manifest.json"),
     simplifyVector = TRUE
   )
-  expect_identical(manifest$format_revision, 2L)
+  expect_identical(manifest$format_revision, 3L)
   expect_setequal(manifest$immune_clonal_frames$receptor, c("TCR", "BCR"))
 
   object <- readCerebro(fixture$path)

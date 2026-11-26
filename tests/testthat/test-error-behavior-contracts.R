@@ -9,7 +9,10 @@ test_that("launchers do not replace the process-wide Shiny error handler", {
     CEREBRO_1M_DEMO_CRB = NA,
     CEREBRO_REN_DEMO_CRB = NA,
     CEREBRO_COSMX_DEMO_CRB = NA,
-    CEREBRO_TCELL_DEMO_CRB = NA
+    CEREBRO_TCELL_DEMO_CRB = NA,
+    CEREBRO_ALLEN_DEMO_CRB = NA,
+    CEREBRO_EAE_DEMO_CRB = NA,
+    CEREBRO_MS_DEMO_CRB = NA
   ))
   for (launcher in c("package", "demo")) {
     scope <- new.env(parent = environment(launchCerebro))

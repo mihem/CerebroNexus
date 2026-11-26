@@ -1241,9 +1241,10 @@ Cerebro <- R6::R6Class(
     #' @param name Name of the spatial data entry (for example a Seurat image or
     #'   Cerebro spatial entry).
     #' @param data \code{list} containing 'coordinates' (data.frame) and
-    #'   'expression' (sparse matrix). Embedded backgrounds are stored in
-    #'   'histology_images', a uniquely named list of image payloads. Each
-    #'   payload contains 'histology_image' (a base64 \code{data:} URI),
+    #'   'expression' (sparse matrix, or the reference to the object's matrix
+    #'   that \code{getSpatialData(hydrate_expression = FALSE)} returns).
+    #'   Embedded backgrounds are stored in 'histology_images', a uniquely
+    #'   named list of image payloads. Each payload contains 'histology_image' (a base64 \code{data:} URI),
     #'   'histology_image_bounds' (xmin/xmax/ymin/ymax in coordinate space), and
     #'   may contain a declarative 'histology_alignment'.
     #'   Bounds omitted from a payload are derived from the coordinates. The
@@ -1267,17 +1268,24 @@ Cerebro <- R6::R6Class(
     #' @param hydrate_molecules Whether to read an external molecule table. Set
     #'   to \code{FALSE} for Viewer paths that only consume coordinates,
     #'   expression, or images.
+    #' @param hydrate_expression Whether to return the section's expression
+    #'   matrix. A saved CRB keeps it as a reference to the columns of the
+    #'   object's expression matrix; set to \code{FALSE} to leave that
+    #'   reference in place when only coordinates or images are needed.
     #'
     #' @return
     #' A canonical spatial-data \code{list} containing 'coordinates',
     #' 'expression', and 'histology_images'.
-    getSpatialData = function(name, hydrate_molecules = TRUE) {
-      if (
-        !is.logical(hydrate_molecules) ||
-          length(hydrate_molecules) != 1L ||
-          is.na(hydrate_molecules)
-      ) {
-        stop("`hydrate_molecules` must be TRUE or FALSE.", call. = FALSE)
+    getSpatialData = function(
+      name,
+      hydrate_molecules = TRUE,
+      hydrate_expression = TRUE
+    ) {
+      for (flag in c("hydrate_molecules", "hydrate_expression")) {
+        value <- get(flag)
+        if (!is.logical(value) || length(value) != 1L || is.na(value)) {
+          stop("`", flag, "` must be TRUE or FALSE.", call. = FALSE)
+        }
       }
       if (name %in% names(self$spatial) == FALSE) {
         stop(
@@ -1340,7 +1348,35 @@ Cerebro <- R6::R6Class(
         data[["coordinates"]],
         context
       )
-      private$loadMatrixFor(data[["expression"]])
+      expression <- data[["expression"]]
+      if (!inherits(expression, "CerebroSpatialExpressionRef")) {
+        private$loadMatrixFor(expression)
+      } else if (isTRUE(hydrate_expression)) {
+        ## The section's columns of the object's matrix (see
+        ## .referenceSpatialExpression()); base R only, see the top of the file.
+        full <- self$expression
+        private$loadMatrixFor(full)
+        cells <- expression$cells
+        if (is.null(cells)) {
+          cells <- rownames(data[["coordinates"]])
+        }
+        genes <- expression$genes
+        if (
+          !all(cells %in% colnames(full)) ||
+            (!is.null(genes) && !all(genes %in% rownames(full)))
+        ) {
+          stop(
+            context,
+            " refers to cells or genes the expression matrix does not have.",
+            call. = FALSE
+          )
+        }
+        data[["expression"]] <- if (is.null(genes)) {
+          full[, cells, drop = FALSE]
+        } else {
+          full[genes, cells, drop = FALSE]
+        }
+      }
       data
     },
 

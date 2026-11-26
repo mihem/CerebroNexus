@@ -2217,7 +2217,7 @@ test_that("legacy image records drop saved flags and gain canonical defaults", {
   expect_false("saved" %in% names(normalized))
   expect_identical(normalized$base_bounds, legacy$bounds)
   expect_identical(normalized$section_id, "fov")
-  expect_identical(normalized$point_size, 5)
+  expect_identical(normalized$point_size, 4)
 })
 
 test_that("ROI image scope is complete and non-empty", {

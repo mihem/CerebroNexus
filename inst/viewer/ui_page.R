@@ -228,6 +228,11 @@ ui <- dashboardPage(
       cerebro_js("cv-geom.js", defer = TRUE),
       cerebro_js("cell_views_state.js", defer = TRUE),
       cerebro_js("dataset-context.js"),
+      ## CEREBRO_PANEL_CAP=off: no limit of 2 panels in a browser without a GPU
+      ## (cell_points_gpu.js); the tests' headless Chrome draws in software.
+      if (identical(tolower(Sys.getenv("CEREBRO_PANEL_CAP")), "off")) {
+        tags$script("window.CerebroPanelCapOff = true;")
+      },
       cerebro_js("cell_points_gpu.js"),
       cerebro_js("cell_views_wire.js"),
       cerebro_js("hla_motifs.js", defer = TRUE),

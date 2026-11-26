@@ -319,7 +319,7 @@
         c("mode", "image_count", "section_count")
       ) &&
       .builder_report_text(spatial_storage$mode) &&
-      identical(spatial_storage$mode, "external") &&
+      spatial_storage$mode %in% c("external", "embedded") &&
       .builder_report_count(spatial_storage$image_count) &&
       .builder_report_count(spatial_storage$section_count)
     is.list(dataset) &&
@@ -646,7 +646,7 @@ builder_build_report <- function(plan, result) {
       expression_backend = item$expression_backend,
       expression_storage = list(mode = item$expression_backend),
       spatial_image_storage = list(
-        mode = "external",
+        mode = item$spatial_image_storage %||% "external",
         image_count = as.integer(item$spatial_alignment$image_count %||% 0L),
         section_count = as.integer(
           item$spatial_alignment$section_count %||% 0L

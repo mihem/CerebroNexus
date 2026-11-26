@@ -566,15 +566,16 @@ test_that("grouped Clonal UMAP panels brush their own cells and share them", {
   ## A brush in the second panel selects only cells of the second group, and the
   ## cells below the plot are those.
   app$run_js(paste0(visible_boxes, "[1].click()"))
-  canvases <- app$get_js(paste0(
-    "Array.from(document.querySelectorAll('",
+  ## The canvas of the second panel, whichever layers its pane has attached.
+  box <- app$get_js(paste0(
+    "(function(){const panes=Array.from(document.querySelectorAll('",
     host,
-    " canvas:not(.cv-mini)')).filter(c=>c.getClientRects().length>0)",
-    ".map(c=>{const r=c.getBoundingClientRect();",
-    "return {x:r.x,y:r.y,w:r.width,h:r.height};})"
+    " .cv-pane')).filter(p=>p.getClientRects().length>0);",
+    "const c=Array.from(panes[1].querySelectorAll('canvas:not(.cv-mini)'))",
+    ".filter(c=>c.getClientRects().length>0)[0];",
+    "const r=c.getBoundingClientRect();",
+    "return {x:r.x,y:r.y,w:r.width,h:r.height};})()"
   ))
-  ## Each panel owns two stacked canvases; the second panel starts at index 3.
-  box <- canvases[[3]]
   viewer_drag_mouse(
     app,
     box$x + box$w * .02,

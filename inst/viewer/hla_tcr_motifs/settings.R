@@ -69,7 +69,7 @@ output$hla_parameters_ui <- renderUI({
     if (length(chains) > 1) {
       selectInput(
         "hla_chain",
-        "Chain:",
+        "Chain",
         choices = chains,
         selected = isolate(hla_active_chain())
       )
@@ -145,7 +145,7 @@ output$hla_more_parameters_ui <- renderUI({
   tagList(
     sliderInput(
       "hla_min_nodes",
-      "Minimum motif size (nodes):",
+      "Minimum motif size (nodes)",
       min = 2,
       max = 10,
       value = hla_default_min_nodes(),
@@ -336,7 +336,7 @@ output$hla_additional_params_ui <- renderUI({
   tagList(
     radioButtons(
       "hla_legend_mode",
-      "Legend:",
+      "Legend",
       choices = c(
         "Auto" = "auto",
         "Always show" = "always",
@@ -360,7 +360,7 @@ output$hla_additional_params_ui <- renderUI({
     ),
     sliderInput(
       "hla_node_scale",
-      "Node size:",
+      "Node size",
       min = HLA_NODE_SCALE_MIN,
       max = HLA_NODE_SCALE_MAX,
       value = current_page_display_defaults("hla")$node_scale,

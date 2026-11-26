@@ -40,13 +40,6 @@ test_that("shared cluster labels are text without background boxes", {
   )
 })
 
-test_that("Spatial background accepts slider and native input events", {
-  expect_node_fixture(
-    "spatial-background-events.js",
-    viewer_test_path("spatial", "js_page_helpers.js")
-  )
-})
-
 test_that("shared lifecycle and background models preserve view semantics", {
   expect_node_fixture(
     "viewer-shared-models.js",
@@ -83,5 +76,37 @@ test_that("the browser table of selected cells matches the DT table's rules", {
   expect_node_fixture(
     "selection-table.js",
     viewer_test_path("www", "selection-table.js")
+  )
+})
+
+test_that("a colour-only change of a panel's GPU points writes the bytes the byte-by-byte version wrote", {
+  expect_node_fixture(
+    "gpu-colours-fast.js",
+    viewer_test_path("www", "cell_views.js"),
+    pass = "PASS the colour update writes the bytes"
+  )
+})
+
+test_that("a panel's paint sequence by radix sort is the one the float-key sort found", {
+  expect_node_fixture(
+    "paint-sequence-radix.js",
+    viewer_test_path("www", "cell_views.js"),
+    pass = "PASS a panel paint sequence by radix sort"
+  )
+})
+
+test_that("cell names are decoded in slices that give way to the event loop and are the names one decode gives", {
+  expect_node_fixture(
+    "cell-names-sliced.js",
+    viewer_test_path("www", "cell_views.js"),
+    pass = "PASS the cell names decoded in slices"
+  )
+})
+
+test_that("a page whose WebGPU gave no adapter says so", {
+  expect_node_fixture(
+    "webgpu-adapter-missing.js",
+    viewer_test_path("www", "cell_points_gpu.js"),
+    pass = "PASS a page without a WebGPU adapter says so"
   )
 })

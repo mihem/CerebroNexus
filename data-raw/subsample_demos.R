@@ -88,7 +88,13 @@ demo_subsample_cells <- function(object, n_keep, seed) {
       ,
       drop = FALSE
     ]
-    if (!is.null(entry$expression)) {
+    if (inherits(entry$expression, "CerebroSpatialExpressionRef")) {
+      ## A reference without cells follows the coordinates.
+      if (!is.null(entry$expression$cells)) {
+        cells <- entry$expression$cells
+        entry$expression$cells <- cells[cells %in% kept]
+      }
+    } else if (!is.null(entry$expression)) {
       entry$expression <- entry$expression[,
         colnames(entry$expression) %in% kept,
         drop = FALSE

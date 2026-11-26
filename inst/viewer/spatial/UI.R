@@ -41,7 +41,16 @@ tab_spatial <- tabItem(
           uiOutput("spatial_projection_main_parameters_UI"),
           div(
             class = "cerebro-spatial-background-row",
-            uiOutput("spatial_projection_background_selector_UI"),
+            ## A grid panel shows its own section's image (func_spatial_helpers.R).
+            conditionalPanel(
+              condition = "!(input.spatial_projection_sections && input.spatial_projection_sections.length > 1)",
+              uiOutput("spatial_projection_background_selector_UI")
+            ),
+            ## The grid chooses one picture per section, grouped by section.
+            conditionalPanel(
+              condition = "input.spatial_projection_sections && input.spatial_projection_sections.length > 1",
+              uiOutput("spatial_projection_grid_background_UI")
+            ),
             cerebroToolbarActions(
               cerebroSettingsButton(
                 "spatial_projection_more_button",
@@ -58,9 +67,10 @@ tab_spatial <- tabItem(
             tagList(
               uiOutput("spatial_projection_scatter_parameters_UI"),
               uiOutput("spatial_projection_show_group_label_UI"),
-              uiOutput("spatial_projection_keep_square_UI"),
+              uiOutput("spatial_projection_show_region_outline_UI"),
               uiOutput("spatial_projection_point_border_UI"),
-              uiOutput("spatial_projection_show_region_outline_UI")
+              uiOutput("spatial_projection_picture_outline_UI"),
+              uiOutput("spatial_projection_keep_square_UI")
             ),
             cerebroInfoButton(
               "spatial_projection_additional_parameters_info"
@@ -70,12 +80,27 @@ tab_spatial <- tabItem(
             "Data",
             uiOutput("spatial_projection_data_parameters_UI")
           ),
-          cerebroSettingsSection(
-            "Background image",
-            div(
-              class = "spatial-image-controls",
-              uiOutput("spatial_projection_background_parameters_UI")
-            )
+          ## The image is chosen in the toolbar; this adjusts the one on screen,
+          ## in the browser, like the same section of Linked views.
+          shiny::tagAppendAttributes(
+            cerebroSettingsSection(
+              "Background image",
+              viewerBackgroundImageEditor(
+                "sp",
+                div(
+                  id = "spatial_projection_image_ui",
+                  viewerBackgroundImageBar(
+                    "sp",
+                    list(),
+                    NULL,
+                    copy_preset = TRUE
+                  )
+                ),
+                image_select = FALSE,
+                page_scope = TRUE
+              )
+            ),
+            style = "display:none"
           ),
           cerebroSettingsSection(
             "Group filters",
@@ -97,7 +122,11 @@ tab_spatial <- tabItem(
       div(
         class = "spatial-viz-surface",
         conditionalPanel(
-          condition = "input.spatial_projection_plot_type == 'ImageFeaturePlot'",
+          condition = paste(
+            "input.spatial_projection_plot_type == 'ImageFeaturePlot' &&",
+            "!!input.spatial_projection_feature_to_display &&",
+            "!(input.spatial_projection_sections && input.spatial_projection_sections.length > 1)"
+          ),
           tags$div(
             class = "spatial-moran-overlay",
             tags$strong("Moran's I:"),

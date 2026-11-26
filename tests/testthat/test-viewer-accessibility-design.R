@@ -10,7 +10,11 @@ test_that("preferences expose labelled checkbox controls", {
     },
     {
       doc <- xml2::read_html(output$preferences_options$html)
-      for (id in c("webgl_checkbox", "hover_info_in_projections_checkbox")) {
+      for (id in c(
+        "webgl_checkbox",
+        "hover_info_in_projections_checkbox",
+        "expression_on_top_checkbox"
+      )) {
         control <- xml2::xml_find_first(doc, paste0(".//*[@id='", id, "']"))
         expect_identical(xml2::xml_attr(control, "type"), "checkbox")
         expect_true(nzchar(trimws(xml2::xml_text(xml2::xml_find_first(

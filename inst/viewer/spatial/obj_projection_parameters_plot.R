@@ -8,7 +8,8 @@
 spatial_projection_appearance <- reactiveValues(
   group_labels = FALSE,
   draw_border = FALSE,
-  keep_square = FALSE
+  keep_square = FALSE,
+  picture_outline = TRUE
 )
 spatial_projection_region_outlines <- reactiveVal(FALSE)
 spatial_author_overridden <- new.env(parent = emptyenv())
@@ -19,6 +20,7 @@ observeEvent(
     controls <- c(
       group_labels = "spatial_projection_group_labels",
       draw_border = "spatial_projection_point_border",
+      picture_outline = "spatial_projection_picture_outline",
       keep_square = "spatial_projection_keep_square",
       region_outlines = "spatial_projection_show_region_outlines"
     )
@@ -71,14 +73,16 @@ observe(
     req(length(spatial_names) > 0L)
 
     defaults <- current_spatial_scatter_defaults()
-    ## A new sample shows its own sections: take the one its FOV control will
-    ## select instead of waiting for that control to come back.
-    shown <- spatial_sample_sections(
-      spatial_projection_selected_sample()
-    )$sections
-    projection <- input[["spatial_projection_to_display"]]
-    if (is.null(projection) || !(projection %in% shown)) {
-      projection <- shown[1L]
+    ## The Sections field: one section is the single view, several the grid.
+    chosen <- spatial_projection_chosen_sections(input, availableSpatial())
+    ## A field emptied on its way to another section keeps what is drawn.
+    req(length(chosen) || !spatial_input_bound("spatial_projection_sections"))
+    projection <- if (length(chosen)) chosen[[1L]] else NULL
+    if (is.null(projection)) {
+      ## Nothing chosen yet: the first section of the shown sample.
+      projection <- spatial_sample_sections(
+        spatial_projection_selected_sample()
+      )$sections[1L]
     }
     if (is.null(projection) || !(projection %in% spatial_names)) {
       projection <- spatial_names[[1L]]
@@ -115,8 +119,41 @@ observe(
         value[[1L]]
       }
     }
+    ## Several chosen sections draw the grid. Its frame holds every section
+    ## of the data set, whatever their samples, or as many as its cell budget
+    ## takes (spatial_grid_frame_sections()); which of them show and in what
+    ## order is the browser's (cell_views.js), so a change among sections the
+    ## frame holds asks for no frame, and the frame's own section stays put.
+    layout <- if (length(chosen) > 1L) "grid" else "single"
+    grid_sections <- if (
+      spatial_grid_active(layout, spatial_names, plot_type[[1L]])
+    ) {
+      spatial_grid_frame_sections(
+        spatial_names,
+        chosen,
+        spatial_section_cell_count,
+        previous = isolate(spatial_projection_controls())$grid_sections %||%
+          character()
+      )
+    } else {
+      character()
+    }
+    if (length(grid_sections)) {
+      projection <- grid_sections[[1L]]
+    }
+    ## An embedding beside the sections, drawn from the same frame.
+    grid_projection <- input[["spatial_projection_grid_projection"]] %||% ""
+    if (
+      !length(grid_sections) ||
+        !isTRUE(grid_projection %in% availableProjections())
+    ) {
+      grid_projection <- ""
+    }
     controls <- list(
       projection = as.character(projection[[1L]]),
+      layout = if (length(grid_sections)) "grid" else "single",
+      grid_sections = grid_sections,
+      grid_projection = as.character(grid_projection[[1L]]),
       plot_type = as.character(plot_type[[1L]]),
       color_variable = as.character(color_variable[[1L]]),
       split_by = as.character(
@@ -128,6 +165,7 @@ observe(
       coexpr_r = input[["spatial_projection_coexpr_r"]] %||% "",
       coexpr_g = input[["spatial_projection_coexpr_g"]] %||% "",
       coexpr_b = input[["spatial_projection_coexpr_b"]] %||% "",
+      rgb_layout = input[["spatial_projection_rgb_layout"]] %||% "composite",
       point_size = as.numeric(value_or_default(
         isolate(input[["spatial_projection_point_size"]]),
         defaults$point_size
@@ -187,7 +225,7 @@ observeEvent(
     key <- as.character(jsonlite::toJSON(
       list(
         viewer_loaded_dataset_context(),
-        input[["spatial_projection_to_display"]],
+        spatial_projection_single_section(input, availableSpatial()),
         input[["spatial_projection_roi"]]
       ),
       auto_unbox = TRUE
@@ -238,6 +276,18 @@ observeEvent(
 )
 
 observeEvent(
+  input[["spatial_projection_picture_outline"]],
+  {
+    value <- isTRUE(input[["spatial_projection_picture_outline"]])
+    if (spatial_update_appearance("picture_outline", value)) {
+      spatial_author_overridden$picture_outline <- TRUE
+      spatial_send_appearance(list(picture_outline = value))
+    }
+  },
+  ignoreNULL = TRUE
+)
+
+observeEvent(
   input[["spatial_projection_keep_square"]],
   {
     value <- isTRUE(input[["spatial_projection_keep_square"]])
@@ -276,6 +326,8 @@ spatial_projection_parameters_plot_current <- reactive({
   color_variable <- NULL
   feature_to_display <- NULL
   split_by <- ""
+  grid_sections <- controls$grid_sections %||% character()
+  grid <- length(grid_sections) > 0L
 
   if (plot_type == "ImageDimPlot") {
     color_variable <- controls$color_variable
@@ -283,19 +335,28 @@ spatial_projection_parameters_plot_current <- reactive({
       color_variable,
       color_variable %in% colnames(viewerProjectionFirstFrameMetadata())
     )
-    ## "__none__" (or a column this data set lacks) is no split.
+    ## "__none__" (or a column this data set lacks) is no split. The grid
+    ## already gives each section its own panel.
     if (
-      length(controls$split_by) == 1L &&
+      !grid &&
+        length(controls$split_by) == 1L &&
         controls$split_by %in% colnames(viewerProjectionFirstFrameMetadata())
     ) {
       split_by <- controls$split_by
     }
   } else if (plot_type == "ImageFeaturePlot") {
     feature_to_display <- controls$feature_to_display
-    ## Right after a dataset switch the picker can still hold the previous
-    ## dataset's gene; wait for one this dataset has.
-    req(feature_to_display, feature_to_display %in% getGeneNames())
-    color_variable <- feature_to_display
+    if (!length(feature_to_display) || !any(nzchar(feature_to_display))) {
+      ## No gene chosen yet: the cells turn one light grey instead of keeping
+      ## the colours of the previous plot type.
+      feature_to_display <- NULL
+      color_variable <- spatial_no_gene_variable
+    } else {
+      ## Right after a dataset switch the picker can still hold the previous
+      ## dataset's gene; wait for one this dataset has.
+      req(feature_to_display %in% getGeneNames())
+      color_variable <- feature_to_display
+    }
   } else if (plot_type == "Co-expression (RGB)") {
     ## One gene per channel; any channel may be empty. Require at least one so
     ## the render has something to colour by.
@@ -305,16 +366,23 @@ spatial_projection_parameters_plot_current <- reactive({
       b = controls$coexpr_b
     )
     blank <- function(x) is.null(x) || !nzchar(x)
-    req(
-      !(blank(coexpr_genes$r) && blank(coexpr_genes$g) && blank(coexpr_genes$b))
-    )
     ## The cell colour comes from the RGB blend, not a metadata column, but the
     ## downstream code still indexes metadata[[color_variable]] — give it a valid
-    ## placeholder column so that lookup can't fail on a NULL name.
-    color_variable <- "cell_index"
+    ## placeholder column so that lookup can't fail on a NULL name. Before any
+    ## channel has a gene, the cells are the grey "No gene selected" ones, so a
+    ## section or layout change still draws.
+    color_variable <- if (
+      blank(coexpr_genes$r) && blank(coexpr_genes$g) && blank(coexpr_genes$b)
+    ) {
+      spatial_no_gene_variable
+    } else {
+      "cell_index"
+    }
   }
 
-  spatial_data <- getSpatialData(controls$projection)
+  ## Its images and shape only: no cell name is read for it (the ROI scope
+  ## below names the cells itself when it needs them).
+  spatial_data <- getSpatialData(controls$projection, name_cells = FALSE)
   req(spatial_data, spatial_data$coordinates)
   n_dimensions <- ncol(spatial_data$coordinates)
   spatial_name <- controls$projection
@@ -330,7 +398,9 @@ spatial_projection_parameters_plot_current <- reactive({
         spatial_name,
         selected_sample,
         viewerProjectionFirstFrameMetadata(),
-        function() rownames(spatial_data$coordinates) %||% character()
+        function() {
+          rownames(getSpatialData(spatial_name)$coordinates) %||% character()
+        }
       )
       list(field = scope$roi_field, values = scope$roi_values)
     }
@@ -341,6 +411,10 @@ spatial_projection_parameters_plot_current <- reactive({
   roi_modes <- c("__all__", if (length(roi_values) > 1L) "__separate__")
   if (!selected_roi %in% c(roi_modes, roi_values)) {
     selected_roi <- spatial_default_roi_selection(roi_values)
+  }
+  ## A grid panel is a whole section; the ROI control belongs to one section.
+  if (grid) {
+    selected_roi <- "__all__"
   }
   roi_value <- spatial_roi_value(selected_roi)
   separate_roi_values <- character()
@@ -481,6 +555,49 @@ spatial_projection_parameters_plot_current <- reactive({
       configured_background_images
     )
   }
+  ## Each grid panel shows the picture chosen for its section in the grid's
+  ## picker: its first until the picker has bound, then what the picker holds.
+  ## The frame itself carries no image.
+  grid_backgrounds <- list()
+  grid_point_size_hints <- list()
+  if (grid) {
+    options <- if (exists("Cerebro.options")) Cerebro.options else NULL
+    picks <- spatial_grid_background_picks(
+      input[["spatial_projection_grid_background_images"]],
+      availableSpatial()
+    )
+    unpicked <- if (
+      spatial_input_bound("spatial_projection_grid_background_images")
+    ) {
+      0L
+    }
+    grid_backgrounds <- stats::setNames(
+      lapply(grid_sections, function(section) {
+        spatial_grid_section_background(
+          options,
+          dataset,
+          section,
+          spatial_grid_section_record(section),
+          pick = picks[[section]] %||% unpicked
+        )
+      }),
+      grid_sections
+    )
+    grid_backgrounds <- grid_backgrounds[
+      !vapply(grid_backgrounds, is.null, logical(1))
+    ]
+    ## The size that suits each section, for the sections nothing sets a size
+    ## for (a Builder setting for the section wins).
+    grid_point_size_hints <- stats::setNames(
+      lapply(grid_sections, function(section) {
+        spatial_section_point_size_hint(options, dataset, section)
+      }),
+      grid_sections
+    )
+    background_image <- "none"
+    background_descriptor <- NULL
+    configured_background_images <- list()
+  }
   background_identity <- spatial_background_identity(
     dataset,
     spatial_name,
@@ -499,6 +616,19 @@ spatial_projection_parameters_plot_current <- reactive({
 
   parameters <- list(
     projection = controls$projection,
+    layout = if (grid) "grid" else "single",
+    grid_sections = grid_sections,
+    grid_projection = controls$grid_projection %||% "",
+    grid_backgrounds = grid_backgrounds,
+    grid_point_size_hints = grid_point_size_hints,
+    ## One section on its own: its size too, so "Auto" works without a grid.
+    point_size_hint = if (!grid) {
+      spatial_section_point_size_hint(
+        if (exists("Cerebro.options")) Cerebro.options else NULL,
+        dataset,
+        spatial_name
+      )
+    },
     n_dimensions = n_dimensions,
     color_variable = color_variable,
     plot_type = plot_type,
@@ -514,12 +644,15 @@ spatial_projection_parameters_plot_current <- reactive({
     roi_order = separate_roi_values,
     roi_point_appearance = roi_point_appearance,
     feature_to_display = feature_to_display,
+    no_gene = identical(color_variable, spatial_no_gene_variable),
     coexpr_r = controls$coexpr_r,
     coexpr_g = controls$coexpr_g,
     coexpr_b = controls$coexpr_b,
+    rgb_layout = controls$rgb_layout,
     point_size = controls$point_size,
     point_opacity = controls$point_opacity,
     draw_border = isolate(spatial_projection_appearance$draw_border),
+    picture_outline = isolate(spatial_projection_appearance$picture_outline),
     group_labels = isolate(spatial_projection_appearance$group_labels),
     keep_square = isolate(spatial_projection_appearance$keep_square),
     show_region_outlines = isolate(spatial_projection_region_outlines()),
@@ -574,6 +707,6 @@ spatial_projection_parameters_other <- reactiveValues(
 )
 
 ##
-observeEvent(input[['spatial_projection_to_display']], {
+observeEvent(spatial_projection_single_section(input, availableSpatial()), {
   spatial_projection_parameters_other[['reset_axes']] <- TRUE
 })

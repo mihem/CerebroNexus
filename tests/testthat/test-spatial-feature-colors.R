@@ -67,3 +67,15 @@ test_that("ImageFeaturePlot preserves values and uses the saved expression palet
     runtime$expressionColorScale("blues")
   )
 })
+
+test_that("ImageFeaturePlot without a gene colours every cell light grey", {
+  metadata <- data.frame(cell_index = 1:3)
+  greyed <- spatial_with_no_gene_column(metadata, spatial_no_gene_variable)
+  expect_identical(
+    as.character(greyed[[spatial_no_gene_variable]]),
+    rep(spatial_no_gene_label, 3L)
+  )
+  ## A real colour column is left as it is.
+  expect_identical(spatial_with_no_gene_column(metadata, "GENE"), metadata)
+  expect_null(spatial_with_no_gene_column(NULL, spatial_no_gene_variable))
+})

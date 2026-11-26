@@ -35,8 +35,10 @@ trekker_gene_names <- reactive({
 ## score (this demo ships a myelination score), velocity magnitude, a signaling
 ## score -- can colour the physical map with no page change.
 trekker_meta_cols <- reactive({
+  ## The first-frame metadata has these columns without hydrating a thin CRB
+  ## (its cell names).
   md <- tryCatch(
-    data_set()$getMetaData(),
+    viewerProjectionFirstFrameMetadata(),
     error = function(error) {
       if (inherits(error, "shiny.silent.error")) {
         stop(error)

@@ -442,6 +442,37 @@ test_that("embedded image presets retain already-applied calibration", {
   expect_identical(spatialEmbeddedImagePreset(preset, NULL), preset)
 })
 
+test_that("a Builder-embedded image keeps its alignment live", {
+  preset <- spatialImagePreset(NULL, "data", "fov", "image")
+  setting <- list(
+    flip_x = FALSE,
+    flip_y = TRUE,
+    scale_x = 1.5,
+    scale_y = 1.5,
+    offset_x = 7,
+    offset_y = -3,
+    rotation = 30,
+    image_opacity = 0.4
+  )
+  live <- spatialEmbeddedImagePreset(
+    preset,
+    list(builder_managed = TRUE, geometry = "live", viewer_setting = setting)
+  )
+  ## Drawn like the same image kept as a file, not as pre-transformed pixels.
+  expect_null(live$geometryBaked)
+  expect_identical(
+    live,
+    spatialImagePreset(
+      list(
+        spatial_image_settings = list(data = list(fov = list(image = setting)))
+      ),
+      "data",
+      "fov",
+      "image"
+    )
+  )
+})
+
 
 test_that("configured image opacity sets the initial opacity of every image", {
   for (saved_opacity in c(0, 0.2, 0.8, 1)) {

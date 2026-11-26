@@ -236,7 +236,7 @@ test_that("legacy settings upgrade to one canonical Viewer content shape", {
   expect_identical(settings$included_projections, "umap")
   expect_identical(settings$default_projection, "umap")
   expect_identical(settings$initial_projections, "umap")
-  expect_identical(settings$overview_point_size, 5)
+  expect_identical(settings$overview_point_size, 4)
   expect_identical(settings$overview_percentage_cells_to_show, 20)
   expect_identical(settings$cell_cycle_columns, "Phase")
   expect_identical(

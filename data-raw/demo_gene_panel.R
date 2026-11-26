@@ -140,6 +140,20 @@ demo_gene_panel <- function(object, max_genes = 100L) {
   spatial <- object$spatial
   for (name in names(spatial)) {
     sm <- spatial[[name]]$expression
+    ## A section stored as a reference to the object's matrix follows the cut
+    ## of that matrix below; only a gene list of its own needs cutting.
+    if (inherits(sm, "CerebroSpatialExpressionRef")) {
+      if (!is.null(sm$genes)) {
+        if (!all(keep %in% sm$genes)) {
+          stop(
+            "Spatial expression does not cover the selected demo genes: ",
+            name
+          )
+        }
+        spatial[[name]]$expression$genes <- keep
+      }
+      next
+    }
     if (
       !inherits(sm, "sparseMatrix") ||
         !all(keep %in% rownames(sm))

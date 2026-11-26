@@ -2393,14 +2393,21 @@ test_that("per-image settings also apply to embedded backgrounds", {
     collapse = "\n"
   )
   expect_match(js, "xRange: sample.x_range || null", fixed = TRUE)
+  ## A section's own size and opacity hold until the reader sets them, on
+  ## Linked views as on a single page; then every panel takes the reader's.
   expect_match(
     js,
-    "(!pointSizeEdited || !singleActive) && sp && sp.builder_point_size",
+    "!pointSizeEdited && sp && sp.builder_point_size",
     fixed = TRUE
   )
   expect_match(
     js,
-    "(!pointOpacityEdited || !singleActive) && sp && sp.builder_point_opacity",
+    "!pointOpacityEdited && sp && sp.builder_point_opacity",
+    fixed = TRUE
+  )
+  expect_match(
+    js,
+    "if (singleActive || pctEdited || !isSpatialSpace(space)) return pctMask;",
     fixed = TRUE
   )
 })
@@ -2453,8 +2460,8 @@ test_that("embedded spatial images share identity and point appearance", {
   expect_identical(built$images[[1L]]$preset$offsetY, -10)
   expect_true(built$images[[1L]]$preset$flipY)
   expect_identical(built$images[[1L]]$preset$rotation, 0)
-  expect_null(built$point_size)
-  expect_null(built$point_opacity)
+  expect_null(built[["point_size"]])
+  expect_null(built[["point_opacity"]])
   expect_identical(
     cv_env$viewerScatterDefaults(cv_env$Cerebro.options, "ds"),
     list(
@@ -2924,4 +2931,140 @@ test_that("supplement projections served by the Viewer Pack are sent as descript
   expect_identical(projections$tsne$projection_resource, descriptor)
   expect_null(projections$tsne$x)
   expect_identical(projections$pca$x, I(c(1, 2)))
+})
+
+test_that("a compact scene of a thin CRB's section is made without a cell name", {
+  cells <- paste0("c", 1:6)
+  rows <- c(5L, 2L, 6L, 1L)
+  x <- c(1, 2, 3, 4)
+  y <- c(8, 7, 6, 5)
+  stored <- data.frame(x = x, y = y)
+  attr(stored, "row.names") <- rows
+  attr(stored, "cerebro_cell_index_rownames") <- TRUE
+  named <- data.frame(x = x, y = y, row.names = cells[rows])
+  metadata <- data.frame(cell_barcode = cells, sample = "S")
+  getter_named <- 0L
+  make_crb <- function(coordinates) {
+    crb <- new.env()
+    crb$spatial <- list(fov = list(coordinates = coordinates))
+    crb$availableSpatial <- function() "fov"
+    crb$getSpatialData <- function(name, hydrate_molecules = TRUE) {
+      co <- crb$spatial[[name]]$coordinates
+      if (isTRUE(attr(co, "cerebro_cell_index_rownames"))) {
+        getter_named <<- getter_named + 1L
+        attr(co, "cerebro_cell_index_rownames") <- NULL
+        attr(co, "row.names") <- cells[attr(co, "row.names")]
+      }
+      list(coordinates = co)
+    }
+    attr(crb, "cerebro_viewer_pack") <- list(
+      canonical_order = TRUE,
+      manifest = list(n_cells = 6L)
+    )
+    crb
+  }
+  old_index <- get0("viewerPackSpatialIndex", envir = cv_env, inherits = FALSE)
+  on.exit(
+    if (is.null(old_index)) {
+      rm("viewerPackSpatialIndex", envir = cv_env)
+    } else {
+      assign("viewerPackSpatialIndex", old_index, envir = cv_env)
+    },
+    add = TRUE
+  )
+  assign("viewerPackSpatialIndex", function(pack, name) rows, envir = cv_env)
+
+  thin <- make_crb(stored)
+  fast <- cv_env$cv_build_spatial(
+    thin,
+    cells = stop("the cell names were read"),
+    metadata = metadata,
+    compact = TRUE
+  )
+  # The getter named no cell, and the stored section is back as it was.
+  expect_identical(getter_named, 0L)
+  expect_identical(thin$spatial$fov$coordinates, stored)
+
+  reference <- cv_env$cv_build_spatial(
+    make_crb(named),
+    cells = cells,
+    metadata = metadata,
+    compact = TRUE
+  )
+  expect_identical(as.integer(fast$rows), as.integer(reference$rows))
+  expect_identical(as.integer(fast$rows), rows - 1L)
+  expect_equal(fast$x, reference$x)
+  expect_equal(fast$y, reference$y)
+  expect_equal(fast$label, reference$label)
+  expect_equal(fast$builder_point_size, reference$builder_point_size)
+
+  # ROIs are read from the metadata at the rows: the same scenes as with the
+  # cells named, none named.
+  with_roi <- cbind(
+    metadata,
+    sample_roi = c("A", "B", NA, "B", "A", "")
+  )
+  scenes <- cv_env$cv_build_spatial(
+    make_crb(stored),
+    cells = stop("the cell names were read"),
+    metadata = with_roi,
+    compact = TRUE
+  )
+  expect_identical(getter_named, 0L)
+  expect_identical(
+    vapply(scenes$samples, `[[`, character(1), "name"),
+    c("fov", "fov::roi::A", "fov::roi::B")
+  )
+  by_name <- cv_env$cv_build_spatial(
+    make_crb(named),
+    cells = cells,
+    metadata = with_roi,
+    compact = TRUE
+  )
+  expect_equal(scenes, by_name)
+  expect_identical(as.integer(scenes$samples[[2]]$rows), c(4L, 0L))
+  expect_identical(as.integer(scenes$samples[[3]]$rows), 1L)
+})
+
+test_that("the supplement's Spatial space is built once per session cache", {
+  calls <- 0L
+  old <- get("cv_build_spatial", envir = cv_env)
+  on.exit(assign("cv_build_spatial", old, envir = cv_env), add = TRUE)
+  assign(
+    "cv_build_spatial",
+    function(crb, cells, metadata = NULL, compact = FALSE) {
+      calls <<- calls + 1L
+      list(id = "spatial", compact = compact, rows = nrow(metadata))
+    },
+    envir = cv_env
+  )
+  crb <- list(getMetaData = function() stop("cell names were read"))
+  frame <- list(meta_data = data.frame(a = 1:3))
+
+  # Without a cache every call builds.
+  cv_env$cv_compact_spatial(crb, frame)
+  cv_env$cv_compact_spatial(crb, frame)
+  expect_identical(calls, 2L)
+
+  # With one, the first call builds and the next hand the same space over.
+  cache <- new.env(parent = emptyenv())
+  first <- cv_env$cv_compact_spatial(crb, frame, cache)
+  again <- cv_env$cv_compact_spatial(crb, frame, cache)
+  expect_identical(calls, 3L)
+  expect_identical(again, first)
+  expect_true(first$compact)
+
+  # A data set without Spatial (NULL) is kept too, not built again.
+  assign(
+    "cv_build_spatial",
+    function(...) {
+      calls <<- calls + 1L
+      NULL
+    },
+    envir = cv_env
+  )
+  empty <- new.env(parent = emptyenv())
+  expect_null(cv_env$cv_compact_spatial(crb, frame, empty))
+  expect_null(cv_env$cv_compact_spatial(crb, frame, empty))
+  expect_identical(calls, 4L)
 })

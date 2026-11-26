@@ -6,13 +6,18 @@
 ##      immune/clonal/), and the HLA first frames without their segments
 ##      (version 3, hla_tcr/<chain>.first.v3.qs2), which are in
 ##      hla_tcr/<chain>.first.segments.qs2.
+##   3: each spatial section's point size (`spatial_frames$point_size`), the
+##      extents of projections, trajectories and spatial sections, and the
+##      content digests a rebuild reuses unchanged assets by. A rebuild reuses
+##      only a Pack of the same revision, so a Pack written before these
+##      fields existed is built anew instead of keeping frames without them.
 ## A Viewer uses each asset only when its manifest entry is present and valid,
 ## so an older Pack opens as before and a newer one is never rejected. An asset
 ## whose content changes gets a new path: a Viewer of revision 1 reads
 ## hla_tcr/<chain>.first.qs2 without checking its version and takes its
 ## segments from it, so a first frame without them must not be found there
 ## (that Viewer builds the first view from the repertoire instead).
-.viewerPackFormatRevision <- 2L
+.viewerPackFormatRevision <- 3L
 
 .viewerDatasetCapabilities <- function(object) {
   ## Each capability is one stored field. An object without the accessor
@@ -745,6 +750,46 @@
   list(indexes = indexes, frames = frame_table, assets = assets)
 }
 
+## The point size (in CSS pixels) that suits a section's cells in a panel of
+## `panel` pixels, written to the Pack when it is built: about the spacing of
+## the points on screen (the tissue's area in the panel, its plot area times
+## the share of the section's bounding box its cells occupy, over the number of
+## cells, as a side), times 1.3, from 1 to 4. The Viewer scales it to the
+## panels it draws and lets any size an author or a reader sets win. NA for a
+## section without usable coordinates.
+.viewerPackSpatialPointSize <- function(
+  coordinates,
+  panel = c(300, 250),
+  padding = 20,
+  lattice = 64L
+) {
+  x <- suppressWarnings(as.numeric(coordinates[, 1L]))
+  y <- suppressWarnings(as.numeric(coordinates[, 2L]))
+  keep <- is.finite(x) & is.finite(y)
+  x <- x[keep]
+  y <- y[keep]
+  if (!length(x)) {
+    return(NA_real_)
+  }
+  width <- diff(range(x))
+  height <- diff(range(y))
+  if (!(width > 0) || !(height > 0)) {
+    return(NA_real_)
+  }
+  available <- panel - padding
+  scale <- min(available[[1L]] / width, available[[2L]] / height)
+  area <- (width * scale) * (height * scale)
+  cell <- function(v, low, span) {
+    pmin(lattice - 1L, floor((v - low) / span * lattice))
+  }
+  share <- length(unique(
+    cell(x, min(x), width) * lattice + cell(y, min(y), height)
+  )) /
+    lattice^2
+  size <- 1.3 * sqrt(area * share / length(x))
+  max(1, min(4, round(size, 1L)))
+}
+
 .viewerPackSpatialAssets <- function(
   object,
   cells,
@@ -861,6 +906,11 @@
       x_max <- suppressWarnings(as.numeric(old_frame_row$x_max[[1L]]))
       y_min <- suppressWarnings(as.numeric(old_frame_row$y_min[[1L]]))
       y_max <- suppressWarnings(as.numeric(old_frame_row$y_max[[1L]]))
+      ## A section without usable coordinates has an NA point size, which the
+      ## manifest omits.
+      point_size <- suppressWarnings(as.numeric(
+        old_frame_row$point_size[[1L]]
+      ))
       frames[[length(frames) + 1L]] <- data.frame(
         name = name,
         cells = as.integer(old_frame_row$cells[[1L]]),
@@ -870,6 +920,7 @@
         x_max = if (length(x_max) == 1L) x_max else NA_real_,
         y_min = if (length(y_min) == 1L) y_min else NA_real_,
         y_max = if (length(y_max) == 1L) y_max else NA_real_,
+        point_size = if (length(point_size) == 1L) point_size else NA_real_,
         stringsAsFactors = FALSE
       )
       next
@@ -944,6 +995,7 @@
       x_max = x_max,
       y_min = y_min,
       y_max = y_max,
+      point_size = .viewerPackSpatialPointSize(coordinate_matrix),
       stringsAsFactors = FALSE
     )
   }
@@ -959,6 +1011,7 @@
       x_max = numeric(),
       y_min = numeric(),
       y_max = numeric(),
+      point_size = numeric(),
       stringsAsFactors = FALSE
     )
   }

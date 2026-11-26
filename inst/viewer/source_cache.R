@@ -14,6 +14,7 @@
   "viewerScatterDefaults",
   "viewerPublishChanged",
   "spatialImagePreset",
+  "spatialImageSettingPreset",
   "spatialPlotRotation",
   "rotateSpatialCoordinates",
   "viewerOutputTab",

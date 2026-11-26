@@ -103,6 +103,20 @@
   animation: spatial-coordinate-settings-expand var(--duration-normal) var(--ease) both;
 }
 .spatial-coordinate-settings-body > .form-group { margin-bottom: 0; }
+.spatial-image-storage { margin: 0; padding: 0; border: 0; min-width: 0; }
+.spatial-image-storage .form-group { margin-bottom: 0; }
+.spatial-image-storage .control-label { margin-bottom: var(--space-1); }
+.spatial-image-storage .radio { margin: 0 0 var(--space-1); }
+.spatial-image-storage-choice { display: grid; gap: 1px; }
+.spatial-image-storage-choice strong {
+  font-size: var(--builder-type-small);
+  font-weight: 600;
+}
+.spatial-image-storage-choice .hint {
+  font-size: var(--builder-type-small);
+  line-height: 1.3;
+  margin: 0;
+}
 .spatial-image-file-summary:empty { display: none; }
 .spatial-image-file-summary .enhance-tissue-file-item {
   padding: 0 0 var(--space-2);

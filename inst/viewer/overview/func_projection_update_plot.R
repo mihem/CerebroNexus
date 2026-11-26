@@ -117,7 +117,7 @@ overview_projection_update_plot <- function(input) {
     }
     cerebroCellViewDeferredAux(
       selection_rows = selection_rows,
-      cell_barcodes = if (keys) getMetaData()[["cell_barcode"]][cell_indices],
+      cell_barcodes = if (keys) viewerCellBarcodesAt(cell_indices),
       hover_columns = hover_columns,
       hover = plot_parameters[["hover_info"]],
       keys = keys

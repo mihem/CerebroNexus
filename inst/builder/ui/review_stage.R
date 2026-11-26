@@ -3,7 +3,7 @@
 builder_review_options <- function(
   welcome_message = "Welcome to CerebroNexus!",
   initial_page = "data_info",
-  point_size = 5,
+  point_size = 4,
   variable_to_compare = FALSE,
   host = "127.0.0.1",
   port = 8080L,
@@ -426,7 +426,7 @@ builder_review_model <- function(plan, verification = NULL) {
     } else {
       color_custom_count
     }
-    point_size <- item$overview_point_size %||% 5
+    point_size <- item$overview_point_size %||% 4
     point_opacity <- item$overview_point_opacity %||% 1
     trajectory_model <- builder_review_trajectory_model(
       item$included_trajectories %||% list(),

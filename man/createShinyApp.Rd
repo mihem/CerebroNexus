@@ -20,7 +20,7 @@ createShinyApp(
   crb_pick_smallest_file = TRUE,
   show_upload_ui = FALSE,
   welcome_message = "Welcome to CerebroNexus!",
-  point_size = 5,
+  point_size = 4,
   point_opacity = 1,
   percentage_cells_to_show = 100,
   variable_to_compare = NULL,

@@ -385,6 +385,11 @@ test_that("Viewer Pack stores canonical spatial row indexes", {
     runtime$viewerPackSpatialIndex(descriptor, "slice"),
     c(3L, 1L)
   )
+  ## The Pack's builder recorded the size that suits the section; the Viewer
+  ## reads it back when the section has coordinates to size from.
+  frames <- descriptor$manifest$spatial_frames
+  expect_true("point_size" %in% names(frames))
+  expect_true(is.numeric(frames$point_size))
 
   ## A thin CRB that stores the cells of the section as metadata rows: the
   ## Pack names them, and the object's getter has nothing left to restore.
@@ -1414,4 +1419,60 @@ test_that("Viewer Pack persists projection/trajectory extents, reuses unchanged 
   ]
   saveCerebro(obj_reordered, crb, codec = "rds")
   expect_null(runtime$viewerPackOpen(crb, object = readCerebro(crb)))
+})
+
+test_that("the Pack records the point size that suits each section", {
+  grid <- function(n_side, step = 1) {
+    cells <- expand.grid(x = seq_len(n_side) * step, y = seq_len(n_side) * step)
+    as.matrix(cells)
+  }
+  size <- function(m, ...) .viewerPackSpatialPointSize(m, ...)
+
+  # Dense cells in a small panel get a small size, sparse ones the full 4.
+  dense <- grid(300)
+  sparse <- grid(10)
+  expect_lte(size(dense), 1.5)
+  expect_gte(size(dense), 1)
+  expect_identical(size(sparse), 4)
+
+  # A bigger panel, or fewer cells in the same panel, grow it.
+  expect_gt(
+    size(dense, panel = c(1200, 1000)),
+    size(dense, panel = c(300, 250))
+  )
+  expect_gt(size(grid(100)), size(grid(300)))
+
+  # The number is the same however the coordinates are scaled.
+  expect_identical(size(dense * 1000), size(dense))
+
+  # Always from 1 to 4; NA without usable coordinates.
+  expect_true(size(grid(2)) <= 4 && size(grid(2)) >= 1)
+  expect_true(is.na(size(matrix(numeric(), ncol = 2L))))
+  expect_true(is.na(size(cbind(c(1, 1, 1), c(2, 3, 4)))))
+  expect_true(is.na(size(cbind(c(NA, NaN), c(1, 2)))))
+})
+
+test_that("the Viewer reads a section's recommended point size from the Pack", {
+  scope <- viewer_runtime_env()
+  sys.source(viewer_test_path("core", "viewer_pack.R"), scope)
+  pack <- function(frames) list(manifest = list(spatial_frames = frames))
+  frames <- data.frame(
+    name = c("a", "b", "c"),
+    cells = c(3L, 3L, 3L),
+    dimensions = 2L,
+    geometry_path = "spatial/001.geometry.bin",
+    point_size = c(1.6, NA, 40),
+    stringsAsFactors = FALSE
+  )
+  expect_identical(scope$viewerPackSpatialPointSize(pack(frames), "a"), 1.6)
+  # Not a number, or out of range, or an unknown section: none.
+  expect_null(scope$viewerPackSpatialPointSize(pack(frames), "b"))
+  expect_null(scope$viewerPackSpatialPointSize(pack(frames), "c"))
+  expect_null(scope$viewerPackSpatialPointSize(pack(frames), "z"))
+  # A Pack written before the column existed has none.
+  expect_null(scope$viewerPackSpatialPointSize(
+    pack(frames[setdiff(names(frames), "point_size")]),
+    "a"
+  ))
+  expect_null(scope$viewerPackSpatialPointSize(NULL, "a"))
 })

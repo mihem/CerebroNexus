@@ -301,7 +301,7 @@ test_that("new dataset settings start with canonical Viewer content fields", {
     expect_identical(settings$default_group, "cluster")
     expect_identical(settings$included_projections, "umap")
     expect_identical(settings$default_projection, "umap")
-    expect_identical(settings$overview_point_size, 5)
+    expect_identical(settings$overview_point_size, 4)
     expect_identical(
       settings$included_trajectories,
       list(monocle2 = "lineage")

@@ -178,7 +178,8 @@ test_that("shared selection actions and layouts survive navigation and resize", 
       ".find(el => el.textContent.includes('B cell maturation'))",
       ".closest('.cv-pane').querySelector('.cv-zsel-btn').offsetParent !== null && ",
       "document.getElementById('cv-config-open').offsetParent !== null && ",
-      "document.getElementById('cv-readout').offsetParent !== null"
+      "document.querySelector('.cerebro-selection-composition-slot[data-linked] ",
+      ".cerebro-selection-composition-card') !== null"
     ),
     timeout = 10000
   )
@@ -619,21 +620,22 @@ test_that("shared selection actions and layouts survive navigation and resize", 
   expect_true(linked_collapsed$collapsed)
   expect_gt(linked_collapsed$canvasWidth, linked_open$canvasWidth + 20)
 
+  ## Square draws the plot in a square inside a canvas that keeps its size.
+  canvas_width <- paste0(
+    "document.querySelector('.cv-pane:not(.cv-hidden) canvas:not(.cv-mini)')",
+    ".getBoundingClientRect().width"
+  )
+  wide_width <- app$get_js(canvas_width)
   app$run_js(paste0(
     "const square = document.getElementById('cv-square-plots');",
     "square.checked = true;",
     "square.dispatchEvent(new Event('input', {bubbles:true}));"
   ))
   app$wait_for_js(
-    paste0(
-      "(() => {",
-      "const r = document.querySelector(",
-      "'.cv-pane:not(.cv-hidden) canvas:not(.cv-mini)').getBoundingClientRect();",
-      "return Math.abs(r.width - r.height) < 2;",
-      "})()"
-    ),
+    "!!document.querySelector('.cv-pane:not(.cv-hidden).cv-square-plot')",
     timeout = 10000
   )
+  expect_equal(app$get_js(canvas_width), wide_width, tolerance = 2 / wide_width)
 
   ## Restore the default shell state before checking the existing responsive
   ## visualization pages below.
