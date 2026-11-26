@@ -2028,3 +2028,47 @@ test_that("a qs2 without TBB falls back to one thread", {
     "corrupt"
   )
 })
+
+test_that("a qs2 that only warns about TBB is read once and stays quiet", {
+  state <- .cerebroQs2State
+  old <- state$no_tbb
+  on.exit(state$no_tbb <- old, add = TRUE)
+  state$no_tbb <- NULL
+  seen <- integer()
+  ## qs2 0.1.6 and later: warns, then reads on one thread itself
+  read <- function(file, nthreads) {
+    seen <<- c(seen, nthreads)
+    if (nthreads > 1L) {
+      warning(
+        "nthreads > 1 requested but TBB not available; using nthreads = 1",
+        call. = FALSE
+      )
+    }
+    "payload"
+  }
+  expect_no_warning(
+    expect_identical(.cerebroQs2Read("x", read, threads = 8L), "payload")
+  )
+  expect_identical(seen, 8L)
+  expect_true(state$no_tbb)
+  ## remembered: the next read goes straight to one thread
+  expect_no_warning(.cerebroQs2Read("x", read, threads = 8L))
+  expect_identical(seen, c(8L, 1L))
+  ## other warnings are not swallowed
+  state$no_tbb <- NULL
+  expect_warning(
+    expect_identical(
+      .cerebroQs2Read(
+        "x",
+        function(file, nthreads) {
+          warning("something else", call. = FALSE)
+          "payload"
+        },
+        8L
+      ),
+      "payload"
+    ),
+    "something else"
+  )
+  expect_false(isTRUE(state$no_tbb))
+})

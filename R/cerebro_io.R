@@ -1047,9 +1047,12 @@
   readRDS(file)
 }
 
-## A qs2 built without TBB refuses `nthreads > 1` ("nthreads > 1 requires
-## TBB"). The first such error is remembered for the session and the read is
-## repeated on one thread, which every build supports.
+## A qs2 built without TBB cannot read on several threads. qs2 0.1.1 to 0.1.5
+## stop with "nthreads > 1 requires TBB"; from 0.1.6 on it only warns and reads
+## on one thread itself. The first such condition is remembered for the session
+## and, after the error, the read is repeated on one thread, which every build
+## supports. The condition is recognised by its message, because qs2's own
+## check_TBB() is not exported and using it would add an R CMD check NOTE.
 .cerebroQs2State <- new.env(parent = emptyenv())
 
 .cerebroQs2Read <- function(
@@ -1058,14 +1061,20 @@
   threads = .cerebroReadThreads()
 ) {
   if (threads > 1L && !isTRUE(.cerebroQs2State$no_tbb)) {
+    no_tbb <- function(condition) {
+      grepl("TBB", conditionMessage(condition), fixed = TRUE)
+    }
     result <- tryCatch(
-      list(value = read(file, nthreads = threads)),
-      error = function(error) {
-        if (!grepl("TBB", conditionMessage(error), fixed = TRUE)) {
-          stop(error)
+      withCallingHandlers(
+        list(value = read(file, nthreads = threads)),
+        warning = function(warning) {
+          if (no_tbb(warning)) {
+            .cerebroQs2State$no_tbb <- TRUE
+            invokeRestart("muffleWarning")
+          }
         }
-        NULL
-      }
+      ),
+      error = function(error) if (no_tbb(error)) NULL else stop(error)
     )
     if (!is.null(result)) {
       return(result$value)
