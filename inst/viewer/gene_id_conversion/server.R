@@ -30,10 +30,8 @@ output[["gene_info"]] <- viewerLazyRender(function() {
     )
   })
 })
-if (exists("viewer_hidden_output_options", inherits = TRUE)) {
-  outputOptions(output, "gene_info_UI", priority = 10)
-  outputOptions(output, "gene_info", suspendWhenHidden = FALSE)
-}
+outputOptions(output, "gene_info_UI", priority = 10)
+outputOptions(output, "gene_info", suspendWhenHidden = FALSE)
 
 ##----------------------------------------------------------------------------##
 ## Info box that gets shown when pressing the "info" button.

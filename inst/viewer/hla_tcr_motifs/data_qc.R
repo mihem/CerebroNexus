@@ -156,9 +156,7 @@ output$hla_data_qc_ui <- renderUI({
     uiOutput("hla_qc_ui")
   )
 })
-if (exists("viewer_hidden_output_options", inherits = TRUE)) {
-  outputOptions(output, "hla_data_qc_ui", priority = 10)
-}
+outputOptions(output, "hla_data_qc_ui", priority = 10)
 
 output$hla_ir_sample_count <- renderText({
   sprintf("Immune-repertoire samples: %d", length(hla_ir_samples()))

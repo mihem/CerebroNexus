@@ -191,7 +191,7 @@ test_that("viewerProcessMemo shares gene choice caches across sessions", {
   shared <- new.env(parent = emptyenv())
   make_scope <- function() {
     env <- new.env(parent = globalenv())
-    env$.viewer_gene_list_process_cache <- shared
+    env$.viewer_process_memo_store <- shared
     viewer_runtime_env(env)
     env
   }
@@ -208,6 +208,58 @@ test_that("viewerProcessMemo shares gene choice caches across sessions", {
   expect_identical(memo1(genes, compute), c("A", "M", "Z"))
   expect_identical(memo2(genes, compute), c("A", "M", "Z"))
   expect_identical(calls, 1L)
+})
+
+test_that("sessions on one file share an entry; another file, a changed file or no file do not", {
+  shared <- new.env(parent = emptyenv())
+  make_scope <- function() {
+    env <- new.env(parent = globalenv())
+    env$.viewer_process_memo_store <- shared
+    viewer_runtime_env(env)
+    env
+  }
+  s1 <- make_scope()
+  s2 <- make_scope()
+  file_a <- tempfile(fileext = ".crb")
+  file_b <- tempfile(fileext = ".crb")
+  writeLines("a", file_a)
+  writeLines("b", file_b)
+  on.exit(unlink(c(file_a, file_b)), add = TRUE)
+  data_set_of <- function(path) structure(list(), cerebro_dataset_path = path)
+  computed <- 0L
+  compute <- function() {
+    computed <<- computed + 1L
+    computed
+  }
+  session_answers <- 0L
+  fallback <- function() {
+    session_answers <<- session_answers + 1L
+    "own memo"
+  }
+  value <- function(scope, path) {
+    scope$viewerSharedMemo(
+      "test_slot",
+      4L,
+      scope$viewerProcessDatasetKey(data_set_of(path)),
+      list("section 1"),
+      compute,
+      fallback
+    )
+  }
+  ## The second session on the same file gets the first one's entry.
+  expect_identical(value(s1, file_a), 1L)
+  expect_identical(value(s2, file_a), 1L)
+  ## Another file, or the same file changed, is computed anew.
+  expect_identical(value(s2, file_b), 2L)
+  Sys.setFileTime(file_a, Sys.time() + 120)
+  expect_identical(value(s1, file_a), 3L)
+  ## A data set without a file stays with the session's own memo.
+  expect_identical(value(s1, NULL), "own memo")
+  expect_identical(c(computed, session_answers), c(3L, 1L))
+  ## When the last session ends the entries go, and the memo still works.
+  s1$viewerProcessMemoClear()
+  expect_length(shared$test_slot$entries, 0L)
+  expect_identical(value(s2, file_b), 4L)
 })
 
 test_that("expression_projection_data_to_plot emits first value without debounce stall", {

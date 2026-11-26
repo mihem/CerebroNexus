@@ -3,12 +3,22 @@
 - **Faster page loads and tables (#293).** The Viewer defers its remaining
   scripts and mounts result tables lazily, flushes tables in the first
   round trip and builds the colour ramps of `prettifyTable()` in one
-  vectorised step. Gene expression no longer debounces twice, reads H5
-  expression faster and shares the sorted gene list between sessions. Hidden
-  pages stop leaking outputs across tabs, `fill_height` batches its DOM
-  reads, and subsetting and copying of projection tables avoid needless
-  copies. Several helpers (violin, bar chart and Sankey data, Moran's I,
-  ROI rotation, group hulls) are evaluated once per process.
+  vectorised step, with cut points to 15 significant digits as
+  `DT::styleInterval()` has them. Gene expression no longer debounces twice
+  and reads the mean of several H5 genes without a dense row per gene.
+  Hidden pages stop leaking outputs across tabs, `fill_height` batches its
+  DOM reads, and subsetting and copying of projection tables avoid needless
+  copies. Moran's I, ROI rotation and group hulls are defined once per
+  process.
+- **Sessions on one file share what they compute.** The sorted gene list,
+  a section's ROI scope, the trajectory's cells and the clonal UMAP points
+  are kept once per R process for each data set file (path, size and
+  modification time), so a second visitor on the same file gets them
+  without computing them again. Each kind holds a few entries, and all are
+  dropped when the last session ends.
+- **Options for large data.** `cerebro.crb_cache_slots`,
+  `cerebro.idle_initial_delay`, `cerebro.idle_delay` and
+  `cerebro.dev_reload` are described in the large-data article.
 
 # CerebroNexus 8.5.0
 

@@ -89,16 +89,10 @@ expression_projection_parameters_plot <- reactive({
   )
   if (selected_projection %in% availableProjections()) {
     is_trajectory <- FALSE
-    projection_resource <- if (
-      exists("viewerProjectionAsset", mode = "function", inherits = TRUE)
-    ) {
-      viewerProjectionAsset(
-        selected_projection,
-        expression_projection_cells_to_show()
-      )
-    } else {
-      NULL
-    }
+    projection_resource <- viewerProjectionAsset(
+      selected_projection,
+      expression_projection_cells_to_show()
+    )
     if (is.list(projection_resource)) {
       n_dimensions <- as.integer(projection_resource$dimensions)
       x_range <- if (length(projection_resource$x_range) == 2L) {

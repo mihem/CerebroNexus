@@ -331,9 +331,7 @@ output$hla_associations_ui <- renderUI({
     )
   )
 })
-if (exists("viewer_hidden_output_options", inherits = TRUE)) {
-  outputOptions(output, "hla_associations_ui", priority = 10)
-}
+outputOptions(output, "hla_associations_ui", priority = 10)
 
 ## The two overlap tables update on every Feature-type/feature switch. Rendering
 ## them the normal (reactive) way tore the whole DataTable down and rebuilt it

@@ -26,25 +26,19 @@ spatial_projection_roi_context <- function(spatial_name, rotation_angle) {
       rotation_angle
     )
   }
-  p_key <- if (
-    exists("viewerProcessMemo", mode = "function", inherits = TRUE) &&
-      exists("viewerProcessDatasetKey", mode = "function", inherits = TRUE)
-  ) {
-    viewerProcessDatasetKey(ds)
-  } else {
-    NULL
-  }
-  if (!is.null(p_key)) {
-    viewerProcessMemo("spatial_roi_context", limit = 16L)(
-      list(p_key, spatial_name, sample_value, rotation_angle),
-      compute
-    )
-  } else {
-    spatial_projection_roi_context_memo(
-      list(ds, spatial_name, sample_value, rotation_angle),
-      compute
-    )
-  }
+  viewerSharedMemo(
+    "spatial_roi_context",
+    16L,
+    viewerProcessDatasetKey(ds),
+    list(spatial_name, sample_value, rotation_angle),
+    compute,
+    function() {
+      spatial_projection_roi_context_memo(
+        list(ds, spatial_name, sample_value, rotation_angle),
+        compute
+      )
+    }
+  )
 }
 ## The ROI of each drawn cell (spatial_projection_coordinates()).
 spatial_projection_drawn_roi <- function(roi_context) {

@@ -489,17 +489,7 @@ expression_projection_read_levels <- function(
     ## zero-colour fast path.
     expression_levels <- numeric()
   } else {
-    if (
-      exists(
-        "expression_projection_parameters_plot",
-        mode = "function",
-        inherits = TRUE
-      )
-    ) {
-      req(expression_projection_parameters_plot())
-    } else {
-      req(expression_projection_coordinates())
-    }
+    req(expression_projection_n_dimensions())
     ## All branches keep the requested slice in canonical index order. The
     ## class accessors dispatch those indices across dgCMatrix and DelayedArray
     ## without a barcode lookup.
@@ -623,21 +613,10 @@ expression_projection_expression_levels <- reactive(expressionProjectionCheckSid
       genes_data$genes_to_display_present,
       getGeneNames()
     )
-    n_dimensions <- if (
-      exists(
-        "expression_projection_parameters_plot",
-        mode = "function",
-        inherits = TRUE
-      )
-    ) {
-      as.integer(expression_projection_parameters_plot()[["n_dimensions"]])
-    } else {
-      ncol(expression_projection_coordinates())
-    }
     display_mode <- expressionSummaryMode(
       expression_projection_display_mode(),
       length(genes_present),
-      n_dimensions
+      expression_projection_n_dimensions()
     )
     levels_key <- list(
       data_set(),
@@ -657,6 +636,13 @@ expression_projection_expression_levels <- reactive(expressionProjectionCheckSid
   }
 ))
 
+## The projection's number of dimensions, from the plot parameters: they know
+## it without the coordinates, which are not read when a Viewer Pack file
+## brings the positions to the browser.
+expression_projection_n_dimensions <- reactive({
+  as.integer(expression_projection_parameters_plot()[["n_dimensions"]])
+})
+
 expression_summary_data <- reactive({
   req(
     expression_projection_cells_to_show(),
@@ -669,22 +655,11 @@ expression_summary_data <- reactive({
   ))
   req(length(genes) > 0)
 
-  n_dimensions <- if (
-    exists(
-      "expression_projection_parameters_plot",
-      mode = "function",
-      inherits = TRUE
-    )
-  ) {
-    as.integer(expression_projection_parameters_plot()[["n_dimensions"]])
-  } else {
-    ncol(expression_projection_coordinates())
-  }
   spec <- expressionSummarySpec(
     expression_projection_display_mode(),
     genes,
     expression_selected_genes()[["rgb_genes"]],
-    n_dimensions
+    expression_projection_n_dimensions()
   )
   expression_levels <- expression_projection_expression_levels()
   spec$series <- lapply(spec$series, function(series) {

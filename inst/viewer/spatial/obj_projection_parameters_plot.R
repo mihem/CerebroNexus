@@ -403,25 +403,19 @@ spatial_projection_parameters_plot_current <- reactive({
     list(field = scope$roi_field, values = scope$roi_values)
   }
   ds <- data_set()
-  roi_facet_p_key <- if (
-    exists("viewerProcessMemo", mode = "function", inherits = TRUE) &&
-      exists("viewerProcessDatasetKey", mode = "function", inherits = TRUE)
-  ) {
-    viewerProcessDatasetKey(ds)
-  } else {
-    NULL
-  }
-  roi_facet <- if (!is.null(roi_facet_p_key)) {
-    viewerProcessMemo("spatial_facet", limit = 16L)(
-      list(roi_facet_p_key, spatial_name, selected_sample),
-      roi_facet_compute
-    )
-  } else {
-    spatial_projection_facet_memo(
-      list(ds, spatial_name, selected_sample),
-      roi_facet_compute
-    )
-  }
+  roi_facet <- viewerSharedMemo(
+    "spatial_facet",
+    16L,
+    viewerProcessDatasetKey(ds),
+    list(spatial_name, selected_sample),
+    roi_facet_compute,
+    function() {
+      spatial_projection_facet_memo(
+        list(ds, spatial_name, selected_sample),
+        roi_facet_compute
+      )
+    }
+  )
   roi_values <- roi_facet$values
   selected_roi <- input[["spatial_projection_roi"]] %||%
     spatial_default_roi_selection(roi_values)

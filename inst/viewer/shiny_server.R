@@ -42,9 +42,14 @@ viewerFirstViewPublishKept(Cerebro.options)
 ## per process: decompressing one takes 0.1 s, and the page read it again at
 ## every render.
 .gene_id_tables <- new.env(parent = emptyenv())
-## Process-level cache for sorted transcriptome gene lists and their JSON
-## payloads (used by .viewer_sorted_gene_choices / .viewer_gene_choices_json).
-.viewer_gene_list_process_cache <- new.env(parent = emptyenv())
+## What the sessions of this R process share (viewerProcessMemo() in
+## utility_functions.R): sorted gene lists and their JSON, section ROI scopes,
+## and the trajectory and clonal points of a file. Each slot holds a few
+## entries; all are dropped when the last session ends, so a Viewer nobody is
+## using keeps none of them.
+.viewer_process_memo_store <- new.env(parent = emptyenv())
+.viewer_open_sessions <- new.env(parent = emptyenv())
+.viewer_open_sessions$n <- 0L
 viewerGeneIdTable <- function(organism) {
   file <- c(
     mouse = "mm10_gene_ID_name.tsv.xz",
@@ -485,6 +490,13 @@ if (.viewer_launch_reads_datasets) {
 }
 
 server <- function(input, output, session) {
+  .viewer_open_sessions$n <- .viewer_open_sessions$n + 1L
+  session$onSessionEnded(function() {
+    .viewer_open_sessions$n <- max(0L, .viewer_open_sessions$n - 1L)
+    if (.viewer_open_sessions$n == 0L) {
+      viewerProcessMemoClear()
+    }
+  })
   source <- function(file, local = FALSE, ...) {
     dots <- list(...)
     if (identical(local, TRUE) && !length(dots)) {

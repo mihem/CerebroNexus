@@ -62,9 +62,7 @@ output[["trajectory_states_by_group_UI"]] <- renderUI({
     )
   )
 })
-if (exists("viewer_hidden_output_options", inherits = TRUE)) {
-  outputOptions(output, "trajectory_states_by_group_UI", priority = 10)
-}
+outputOptions(output, "trajectory_states_by_group_UI", priority = 10)
 
 ##----------------------------------------------------------------------------##
 ## UI element that either shows just the plot or also a table.
@@ -83,9 +81,7 @@ output[["states_by_group_table_UI"]] <- renderUI({
     }
   )
 })
-if (exists("viewer_hidden_output_options", inherits = TRUE)) {
-  outputOptions(output, "states_by_group_table_UI", priority = 10)
-}
+outputOptions(output, "states_by_group_table_UI", priority = 10)
 
 ##----------------------------------------------------------------------------##
 ## Plot.

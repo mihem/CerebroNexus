@@ -2909,7 +2909,9 @@ findColumnsMatching <- function(df, pattern, lower = -Inf, upper = Inf) {
   if (n == 0L) {
     return(quoted_values)
   }
-  cut_tokens <- sprintf("%.6g", cuts)
+  ## 15 significant digits: every double keeps its own cut point (6 would merge
+  ## the steps of large values in a narrow range, as DT::styleInterval() does not).
+  cut_tokens <- sprintf("%.15g", cuts)
   DT::JS(paste0(
     "isNaN(parseFloat(value)) ? '' : ",
     paste0(
@@ -4289,108 +4291,86 @@ get_or_load_crb <- function(
       state$genes <- .runtimeH5Names(sidecar, "barcodes")
     }
   }
-  ## The non-zero cells (1-based `index`) and `value`s of genes, one file
-  ## and dataset open for all of them (h5read opens the file for every
-  ## array: 3 x 12 times for twelve genes). `visit(i, entries)` gets the i-th
-  ## gene's entries. FALSE, with nothing read, when the file lacks a gene.
+  ## Opens the file and its TENx arrays once and calls `use(read)`, where
+  ## `read(column)` returns the non-zero cells (1-based `index`) and `value`s
+  ## of the gene in that column (h5read opens the file for every array: 3 x 12
+  ## times for twelve genes). Everything is closed when `use()` returns.
+  with_sparse_reader <- function(use) {
+    file <- rhdf5::H5Fopen(sidecar, flags = "H5F_ACC_RDONLY")
+    datasets <- lapply(c("indptr", "indices", "data"), function(name) {
+      rhdf5::H5Dopen(file, paste0("expression/", name))
+    })
+    spaces <- lapply(datasets, rhdf5::H5Dget_space)
+    on.exit({
+      for (space in spaces) {
+        rhdf5::H5Sclose(space)
+      }
+      for (dataset in datasets) {
+        rhdf5::H5Dclose(dataset)
+      }
+      rhdf5::H5Fclose(file)
+    })
+    use_int_index <- is.finite(state$n_cells) &&
+      state$n_cells < .Machine$integer.max
+    slice <- function(slot, start, count, as_int = FALSE) {
+      space <- spaces[[slot]]
+      rhdf5::H5Sselect_hyperslab(space, start = start, count = count)
+      memory <- rhdf5::H5Screate_simple(count)
+      on.exit(rhdf5::H5Sclose(memory), add = TRUE)
+      as.vector(rhdf5::H5Dread(
+        datasets[[slot]],
+        h5spaceFile = space,
+        h5spaceMem = memory,
+        bit64conversion = if (as_int) "int" else "double"
+      ))
+    }
+    read <- function(column) {
+      bounds <- slice(1L, column, 2L)
+      count <- bounds[[2L]] - bounds[[1L]]
+      if (count <= 0) {
+        return(list(index = integer(), value = numeric()))
+      }
+      start <- bounds[[1L]] + 1
+      idx <- slice(2L, start, count, as_int = use_int_index)
+      list(
+        index = if (is.integer(idx)) idx + 1L else idx + 1,
+        value = slice(3L, start, count)
+      )
+    }
+    use(read)
+  }
+  ## `visit(i, entries)` gets the i-th gene's entries. FALSE, with nothing
+  ## read, when the file lacks a gene.
   each_sparse <- function(genes, visit) {
     prepare()
     columns <- match(genes, state$genes)
     if (anyNA(columns)) {
       return(FALSE)
     }
-    file <- rhdf5::H5Fopen(sidecar, flags = "H5F_ACC_RDONLY")
-    datasets <- lapply(c("indptr", "indices", "data"), function(name) {
-      rhdf5::H5Dopen(file, paste0("expression/", name))
+    with_sparse_reader(function(read) {
+      for (i in seq_along(columns)) {
+        visit(i, read(columns[[i]]))
+      }
     })
-    spaces <- lapply(datasets, rhdf5::H5Dget_space)
-    on.exit({
-      for (space in spaces) {
-        rhdf5::H5Sclose(space)
-      }
-      for (dataset in datasets) {
-        rhdf5::H5Dclose(dataset)
-      }
-      rhdf5::H5Fclose(file)
-    })
-    use_int_index <- is.finite(state$n_cells) &&
-      state$n_cells < .Machine$integer.max
-    slice <- function(slot, start, count, as_int = FALSE) {
-      space <- spaces[[slot]]
-      rhdf5::H5Sselect_hyperslab(space, start = start, count = count)
-      memory <- rhdf5::H5Screate_simple(count)
-      on.exit(rhdf5::H5Sclose(memory), add = TRUE)
-      as.vector(rhdf5::H5Dread(
-        datasets[[slot]],
-        h5spaceFile = space,
-        h5spaceMem = memory,
-        bit64conversion = if (as_int) "int" else "double"
-      ))
-    }
-    for (i in seq_along(columns)) {
-      bounds <- slice(1L, columns[[i]], 2L)
-      count <- bounds[[2L]] - bounds[[1L]]
-      entries <- if (count > 0) {
-        start <- bounds[[1L]] + 1
-        idx <- slice(2L, start, count, as_int = use_int_index)
-        list(
-          index = if (is.integer(idx)) idx + 1L else idx + 1,
-          value = slice(3L, start, count)
-        )
-      } else {
-        list(index = integer(), value = numeric())
-      }
-      visit(i, entries)
-    }
     TRUE
   }
+  ## The mean of genes over every cell, summed without a dense row per gene.
+  ## NULL when there are no genes or the file lacks one.
   mean_sparse <- function(genes) {
     prepare()
     columns <- match(genes, state$genes)
     if (anyNA(columns) || !length(columns)) {
       return(NULL)
     }
-    file <- rhdf5::H5Fopen(sidecar, flags = "H5F_ACC_RDONLY")
-    datasets <- lapply(c("indptr", "indices", "data"), function(name) {
-      rhdf5::H5Dopen(file, paste0("expression/", name))
+    with_sparse_reader(function(read) {
+      total <- numeric(state$n_cells)
+      for (column in columns) {
+        entries <- read(column)
+        index <- entries$index
+        total[index] <- total[index] + entries$value
+      }
+      total / length(columns)
     })
-    spaces <- lapply(datasets, rhdf5::H5Dget_space)
-    on.exit({
-      for (space in spaces) {
-        rhdf5::H5Sclose(space)
-      }
-      for (dataset in datasets) {
-        rhdf5::H5Dclose(dataset)
-      }
-      rhdf5::H5Fclose(file)
-    })
-    use_int_index <- is.finite(state$n_cells) &&
-      state$n_cells < .Machine$integer.max
-    slice <- function(slot, start, count, as_int = FALSE) {
-      space <- spaces[[slot]]
-      rhdf5::H5Sselect_hyperslab(space, start = start, count = count)
-      memory <- rhdf5::H5Screate_simple(count)
-      on.exit(rhdf5::H5Sclose(memory), add = TRUE)
-      as.vector(rhdf5::H5Dread(
-        datasets[[slot]],
-        h5spaceFile = space,
-        h5spaceMem = memory,
-        bit64conversion = if (as_int) "int" else "double"
-      ))
-    }
-    total <- numeric(state$n_cells)
-    for (col in columns) {
-      bounds <- slice(1L, col, 2L)
-      count <- bounds[[2L]] - bounds[[1L]]
-      if (count > 0) {
-        start <- bounds[[1L]] + 1
-        idx <- slice(2L, start, count, as_int = use_int_index)
-        idx <- if (is.integer(idx)) idx + 1L else idx + 1
-        val <- slice(3L, start, count)
-        total[idx] <- total[idx] + val
-      }
-    }
-    total / length(columns)
   }
   list(
     n_cells = function() {
@@ -5509,11 +5489,12 @@ canonicalGeneSelection <- function(selected, genes) {
   selected
 }
 
-## Process-backed small LRU memo for transcriptome-sized gene lists: shared
-## across browser sessions in the same R process (falls back to a local env when
-## utility_functions.R is sourced standalone in unit tests).
+## A small LRU memo shared by every browser session of the R process, kept in
+## `.viewer_process_memo_store` (shiny_server.R), which is emptied when the
+## last session ends. Sourced on its own (unit tests), it keeps a store of
+## its own.
 viewerProcessMemo <- function(slot, limit = 4L) {
-  store <- get0(".viewer_gene_list_process_cache", inherits = TRUE)
+  store <- get0(".viewer_process_memo_store", inherits = TRUE)
   if (!is.environment(store)) {
     store <- new.env(parent = emptyenv())
   }
@@ -5542,10 +5523,27 @@ viewerProcessMemo <- function(slot, limit = 4L) {
   }
 }
 
-viewerProcessDatasetKey <- function(ds = NULL) {
-  if (is.null(ds) && exists("data_set", mode = "function", inherits = TRUE)) {
-    ds <- tryCatch(data_set(), error = function(e) NULL)
+## Drops every entry of the process memos (shiny_server.R, when the last
+## session ends). The slots stay, so a memo made earlier keeps working.
+viewerProcessMemoClear <- function(
+  store = get0(".viewer_process_memo_store", inherits = TRUE)
+) {
+  if (!is.environment(store)) {
+    return(invisible(NULL))
   }
+  for (slot in ls(store, all.names = TRUE)) {
+    state <- store[[slot]]
+    if (is.environment(state)) {
+      state$entries <- list()
+    }
+  }
+  invisible(NULL)
+}
+
+## The key of a data set read from a file: its path, size and modification
+## time, so a changed or replaced file gets new entries. NULL for a data set
+## that has no file (an uploaded or in-memory one).
+viewerProcessDatasetKey <- function(ds) {
   path <- attr(ds, "cerebro_dataset_path", exact = TRUE)
   if (
     !is.character(path) ||
@@ -5564,6 +5562,17 @@ viewerProcessDatasetKey <- function(ds = NULL) {
     size = as.numeric(info$size),
     mtime = as.numeric(info$mtime)
   )
+}
+
+## `compute()` through the process memo `slot` when the data set has a file
+## key (viewerProcessDatasetKey()), so every session on that file shares the
+## value; `key` holds what else the value depends on. Without a file key,
+## `fallback()` (the session's own memo) answers instead.
+viewerSharedMemo <- function(slot, limit, dataset_key, key, compute, fallback) {
+  if (is.null(dataset_key)) {
+    return(fallback())
+  }
+  viewerProcessMemo(slot, limit)(c(list(dataset_key), key), compute)
 }
 
 ## Gene expression registers four selectors on the same gene list; a locale
@@ -7127,10 +7136,8 @@ cerebroResultPageServer <- function(
   ## Flush the table shell and table data together in the first round trip when
   ## the page is active (shiny_server.R re-suspends it on every other tab via
   ## viewerOutputTab()). Guarded so standalone testServer() tests stay lazy.
-  if (exists("viewer_hidden_output_options", inherits = TRUE)) {
-    outputOptions(output, id("table_or_text_UI"), priority = 10)
-    outputOptions(output, id("table"), suspendWhenHidden = FALSE)
-  }
+  outputOptions(output, id("table_or_text_UI"), priority = 10)
+  outputOptions(output, id("table"), suspendWhenHidden = FALSE)
   invisible(NULL)
 }
 

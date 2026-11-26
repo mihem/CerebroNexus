@@ -213,47 +213,41 @@ trajectory_projection_prepared_raw <- reactive({
     }
     list(cells_df = cells_df, trajectory_lines = trajectory_lines)
   }
-  traj_p_key <- if (
-    exists("viewerProcessMemo", mode = "function", inherits = TRUE) &&
-      identical(as.numeric(request$percentage), 100) &&
-      exists("viewerProcessDatasetKey", mode = "function", inherits = TRUE)
-  ) {
-    color_meta <- tryCatch(
-      viewerProjectionFirstFrameMetadata()[[color_variable]],
-      error = function(e) NULL
-    )
-    if (!is.null(color_meta) && !is.numeric(color_meta)) {
-      viewerProcessDatasetKey()
-    } else {
-      NULL
+  ## Every session shows the same cells for a full, categorical colouring of
+  ## the same file; any other request stays with the session.
+  shared <- identical(as.numeric(request$percentage), 100) &&
+    {
+      color_meta <- tryCatch(
+        viewerProjectionFirstFrameMetadata()[[color_variable]],
+        error = function(e) NULL
+      )
+      !is.null(color_meta) && !is.numeric(color_meta)
     }
-  } else {
-    NULL
-  }
-  built <- if (!is.null(traj_p_key)) {
-    viewerProcessMemo("trajectory_cells", limit = 4L)(
-      list(
-        traj_p_key,
-        trajectory_selected_method(),
-        trajectory_selected_name(),
-        request,
-        color_variable
-      ),
-      traj_compute
-    )
-  } else {
-    trajectory_projection_cells_memo(
-      list(
-        dataset_context,
-        trajectory_data,
-        trajectory_selected_method(),
-        trajectory_selected_name(),
-        request,
-        color_variable
-      ),
-      traj_compute
-    )
-  }
+  built <- viewerSharedMemo(
+    "trajectory_cells",
+    4L,
+    if (shared) viewerProcessDatasetKey(data_set()),
+    list(
+      trajectory_selected_method(),
+      trajectory_selected_name(),
+      request,
+      color_variable
+    ),
+    traj_compute,
+    function() {
+      trajectory_projection_cells_memo(
+        list(
+          dataset_context,
+          trajectory_data,
+          trajectory_selected_method(),
+          trajectory_selected_name(),
+          request,
+          color_variable
+        ),
+        traj_compute
+      )
+    }
+  )
   cells_df <- built$cells_df
   trajectory_lines <- built$trajectory_lines
 

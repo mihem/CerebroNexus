@@ -9,10 +9,7 @@ expression_projection_data_to_plot_raw <- reactive({
   parameters <- expression_projection_parameters_plot()
   cell_indices <- expression_projection_cells_to_show()
   failed_asset <- input[["expression_projection_projection_resource_failed"]]
-  projection_resource <- if (
-    !isTRUE(parameters[["is_trajectory"]]) &&
-      exists("viewerProjectionAsset", mode = "function", inherits = TRUE)
-  ) {
+  projection_resource <- if (!isTRUE(parameters[["is_trajectory"]])) {
     asset <- viewerProjectionAsset(parameters[["projection"]], cell_indices)
     if (
       is.list(asset) &&

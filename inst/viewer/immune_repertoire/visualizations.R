@@ -996,34 +996,24 @@ observe(
       req(!is.null(out), length(out$x) > 0L)
       out
     }
-    ir_clonal_p_key <- if (
-      exists("viewerProcessMemo", mode = "function", inherits = TRUE) &&
-        isTRUE(full_percentage) &&
-        is.null(cells) &&
-        exists("viewerProcessDatasetKey", mode = "function", inherits = TRUE)
-    ) {
-      viewerProcessDatasetKey()
-    } else {
-      NULL
-    }
-    render_data <- if (!is.null(ir_clonal_p_key)) {
-      viewerProcessMemo("ir_clonal_umap_data", limit = 4L)(
-        c(
-          list(dataset = ir_clonal_p_key),
-          request_signature[c(
-            "dataset_fingerprint",
-            "cell_order_fingerprint",
-            "receptor",
-            "projection",
-            "show_all",
-            "percentage"
-          )]
-        ),
-        ir_clonal_compute
-      )
-    } else {
-      ir_clonal_umap_data_memo(data_key, ir_clonal_compute)
-    }
+    ## Every session gets the same points for every cell of the same file.
+    render_data <- viewerSharedMemo(
+      "ir_clonal_umap_data",
+      4L,
+      if (isTRUE(full_percentage) && is.null(cells)) {
+        viewerProcessDatasetKey(data_set())
+      },
+      request_signature[c(
+        "dataset_fingerprint",
+        "cell_order_fingerprint",
+        "receptor",
+        "projection",
+        "show_all",
+        "percentage"
+      )],
+      ir_clonal_compute,
+      function() ir_clonal_umap_data_memo(data_key, ir_clonal_compute)
+    )
     ## Grey background = cells without the selected receptor (expansion = NA);
     ## coloured foreground = receptor cells with an expansion level. One trace per
     ## expansion level, in canonical order, so each keeps its turbo colour.
