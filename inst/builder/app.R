@@ -785,8 +785,30 @@ ui <- function(req) {
   "server/build.R",
   "server/project.R"
 )
+.builder_load_cached_server_bytecode <- function(file, path) {
+  cache_path <- file.path("..", "builder-bytecode", paste0(file, ".rds"))
+  if (!file.exists(cache_path)) {
+    return(NULL)
+  }
+  cached <- tryCatch(readRDS(cache_path), error = function(e) NULL)
+  if (
+    !is.list(cached) ||
+      !identical(cached$r_version, R.version.string) ||
+      !identical(cached$md5, unname(tools::md5sum(path))) ||
+      is.null(cached$code)
+  ) {
+    return(NULL)
+  }
+  cached$code
+}
 .builder_server_programs <- lapply(.builder_server_sources, function(file) {
   path <- normalizePath(file, winslash = "/", mustWork = TRUE)
+  cached <- if (!isFALSE(getOption("cerebro.builder.precompile", TRUE))) {
+    .builder_load_cached_server_bytecode(file, path)
+  }
+  if (!is.null(cached)) {
+    return(structure(cached, builder_precompiled = TRUE))
+  }
   lines <- readLines(path, encoding = "UTF-8", warn = FALSE)
   if (length(lines)) {
     lines[[1L]] <- sub("^\ufeff", "", lines[[1L]])
@@ -843,6 +865,9 @@ for (.builder_compile_name in .builder_compile_names) {
   }
 }
 .builder_server_programs <- lapply(.builder_server_programs, function(program) {
+  if (isTRUE(attr(program, "builder_precompiled"))) {
+    return(program)
+  }
   program <- as.call(c(list(as.name("{")), as.list(program)))
   if (.builder_precompile) {
     program <- compiler::compile(program, env = .builder_compile_environment)

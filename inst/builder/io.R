@@ -1879,7 +1879,9 @@ builder_read_object <- function(path) {
       error = paste0("Could not read with ", fmt$label, ": ", reason)
     ))
   }
+  converted <- FALSE
   if (methods::is(obj, "SingleCellExperiment")) {
+    converted <- TRUE
     ## Everything downstream is Seurat-shaped; a SingleCellExperiment enters
     ## through this one conversion and keeps its results in @misc.
     .builder_io_require_package()
@@ -1921,7 +1923,7 @@ builder_read_object <- function(path) {
       )
     ))
   }
-  list(object = obj, format = fmt$label)
+  list(object = obj, format = fmt$label, converted = converted)
 }
 
 ## ---------------------------------------------------------------------------

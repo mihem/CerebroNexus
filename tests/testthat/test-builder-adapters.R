@@ -159,6 +159,38 @@ test_that("QS2 sources are read through the package's TBB-safe reader", {
   expect_identical(seen, 8L)
 })
 
+test_that("a SingleCellExperiment in an RDS file is not reused as a snapshot", {
+  skip_if_not_installed("SingleCellExperiment")
+  root <- withr::local_tempdir()
+  counts <- Matrix::rsparsematrix(20L, 30L, density = 0.3)
+  counts@x <- abs(round(counts@x * 10)) + 1
+  dimnames(counts) <- list(paste0("Gene", 1:20), paste0("cell-", 1:30))
+  sce <- SingleCellExperiment::SingleCellExperiment(
+    assays = list(counts = counts, logcounts = log1p(counts))
+  )
+  sce_path <- file.path(root, "sce.rds")
+  saveRDS(sce, sce_path)
+
+  read <- builder_read_object(sce_path)
+  expect_null(read$error)
+  expect_true(read$converted)
+  expect_s4_class(read$object, "Seurat")
+  inspected <- builder_adapter_inspect(builder_seurat_file_adapter(sce_path))
+  ## The converted Seurat object is not the file's own serialization, so the
+  ## file cannot stand in for the snapshot and its MD5 is taken instead.
+  expect_null(inspected$snapshot_source)
+  expect_identical(
+    inspected$source_md5,
+    unname(as.character(tools::md5sum(sce_path)))
+  )
+
+  seurat_path <- file.path(root, "seurat.rds")
+  saveRDS(SeuratObject::pbmc_small, seurat_path)
+  expect_false(builder_read_object(seurat_path)$converted)
+  inspected <- builder_adapter_inspect(builder_seurat_file_adapter(seurat_path))
+  expect_identical(inspected$snapshot_source$serialization, "rds")
+})
+
 test_that("a saved source MD5 is deferred to snapshot verification", {
   root <- withr::local_tempdir()
   writers <- list(
