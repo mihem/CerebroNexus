@@ -862,11 +862,14 @@ builder_build_progress_finish <- function(plan, path, current_note = NULL) {
     )
   }
   check <- tryCatch(
+    ## The export validated this pack in full moments ago in this process;
+    ## that check is reused while the pack's files and the CRB are unchanged.
     .builder_build_runtime_function(".validateViewerPack")(
       path,
       pack,
       full = TRUE,
-      payload = serialized
+      payload = serialized,
+      reuse = TRUE
     ),
     error = function(error) {
       list(valid = FALSE, reason = conditionMessage(error))

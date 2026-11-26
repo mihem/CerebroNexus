@@ -1443,3 +1443,47 @@ test_that("the Viewer reads a section's recommended point size from the Pack", {
   ))
   expect_null(scope$viewerPackSpatialPointSize(NULL, "a"))
 })
+
+test_that("a full validation right after building can reuse the build's check", {
+  root <- tempfile("viewer-pack-revalidate-")
+  dir.create(root)
+  on.exit(unlink(root, recursive = TRUE), add = TRUE)
+  crb <- viewer_pack_fixture(file.path(root, "dataset.crb"), n = 5L)
+  pack <- buildViewerPack(crb, viewer_binary = "always")
+  assets <- file.path(
+    pack,
+    .validateViewerPack(crb, pack, full = FALSE)$manifest$assets$path
+  )
+  hashed <- character()
+  md5sum <- tools::md5sum
+  testthat::local_mocked_bindings(
+    md5sum = function(files) {
+      hashed <<- c(hashed, files)
+      md5sum(files)
+    },
+    .package = "tools"
+  )
+  assets_hashed <- function() {
+    any(normalizePath(hashed) %in% normalizePath(assets))
+  }
+
+  ## Unchanged pack and CRB: no asset is hashed again.
+  reused <- .validateViewerPack(crb, pack, full = TRUE, reuse = TRUE)
+  expect_true(reused$valid)
+  expect_identical(reused$path, pack)
+  expect_false(assets_hashed())
+
+  ## Without asking, the check runs in full.
+  expect_true(.validateViewerPack(crb, pack, full = TRUE)$valid)
+  expect_true(assets_hashed())
+
+  ## A file whose time changed is checked in full again, and still passes.
+  hashed <- character()
+  Sys.setFileTime(assets[[1L]], Sys.time() + 60)
+  expect_true(.validateViewerPack(crb, pack, full = TRUE, reuse = TRUE)$valid)
+  expect_true(assets_hashed())
+
+  ## A changed asset is caught as before.
+  cat("x", file = assets[[1L]], append = TRUE)
+  expect_false(.validateViewerPack(crb, pack, full = TRUE, reuse = TRUE)$valid)
+})

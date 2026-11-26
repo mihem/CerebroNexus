@@ -2152,7 +2152,8 @@ validateViewerPack <- function(
   pack,
   full,
   payload = NULL,
-  crb_md5 = NULL
+  crb_md5 = NULL,
+  reuse = FALSE
 ) {
   if (!file.exists(file) || dir.exists(file)) {
     return(.viewerPackInvalid("CRB is missing"))
@@ -2171,13 +2172,20 @@ validateViewerPack <- function(
   ) {
     return(.viewerPackInvalid("Viewer Pack schema is incompatible"))
   }
+  crb_md5 <- crb_md5 %||% .viewerPackMd5(file)
   if (
     !identical(
       manifest$dataset_fingerprint,
-      paste0("md5-crb-v1:", crb_md5 %||% .viewerPackMd5(file))
+      paste0("md5-crb-v1:", crb_md5)
     )
   ) {
     return(.viewerPackInvalid("Viewer Pack dataset fingerprint mismatch"))
+  }
+  if (isTRUE(full) && isTRUE(reuse)) {
+    reused <- .viewerPackValidatedBefore(pack, crb_md5)
+    if (!is.null(reused)) {
+      return(reused)
+    }
   }
   thin_match <- isTRUE(full) &&
     !is.null(payload) &&
@@ -2244,7 +2252,68 @@ validateViewerPack <- function(
   ) {
     return(.viewerPackInvalid("Viewer Pack asset checksum mismatch"))
   }
-  list(valid = TRUE, reason = NULL, manifest = manifest, path = pack)
+  list(
+    valid = TRUE,
+    reason = NULL,
+    manifest = manifest,
+    path = pack,
+    crb_md5 = crb_md5
+  )
+}
+
+## A full validation reads and checksums every asset (25.7 s for the Allen
+## MERFISH pack). .buildViewerPack() runs one before it publishes a pack, and
+## the Builder runs one again on the published pack in the same process. The
+## passed check is remembered for that pack with the size and modification time
+## of each of its files and the CRB's MD5; a later full validation of the same
+## pack reuses it while all of them are unchanged, and runs in full otherwise.
+## Only a caller that asks (`reuse = TRUE`) gets it: one whose payload is the
+## object of that same CRB. validateViewerPack() and other callers always run
+## in full.
+.viewerPackValidated <- new.env(parent = emptyenv())
+
+.viewerPackTreeState <- function(pack) {
+  files <- sort(list.files(
+    pack,
+    recursive = TRUE,
+    all.files = TRUE,
+    no.. = TRUE
+  ))
+  info <- file.info(file.path(pack, files), extra_cols = FALSE)
+  list(
+    files = files,
+    size = unname(as.numeric(info$size)),
+    modified = unname(as.numeric(info$mtime))
+  )
+}
+
+.viewerPackRememberValidated <- function(pack, check) {
+  key <- normalizePath(pack, winslash = "/", mustWork = TRUE)
+  assign(
+    key,
+    list(
+      crb_md5 = check$crb_md5,
+      state = .viewerPackTreeState(pack),
+      check = check
+    ),
+    envir = .viewerPackValidated
+  )
+  invisible(check)
+}
+
+.viewerPackValidatedBefore <- function(pack, crb_md5) {
+  key <- normalizePath(pack, winslash = "/", mustWork = FALSE)
+  record <- get0(key, envir = .viewerPackValidated, inherits = FALSE)
+  if (
+    !is.list(record) ||
+      !identical(record$crb_md5, crb_md5) ||
+      !identical(record$state, .viewerPackTreeState(pack))
+  ) {
+    return(NULL)
+  }
+  check <- record$check
+  check$path <- pack
+  check
 }
 
 #' Read a valid Viewer Pack descriptor
@@ -2473,6 +2542,7 @@ buildViewerPack <- function(
     stop("Could not publish the Viewer Pack.", call. = FALSE)
   }
   published <- TRUE
+  .viewerPackRememberValidated(pack, check)
   if (!is.null(backup) && dir.exists(backup)) {
     unlink(backup, recursive = TRUE, force = TRUE)
   }
