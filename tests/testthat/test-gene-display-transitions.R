@@ -85,6 +85,9 @@ test_that("RGB layout changes reuse expression rows while producing a new paint 
       expression_projection_coordinates <- function() {
         data.frame(x = 1:3, y = 3:1)
       }
+      expression_projection_parameters_plot <- function() {
+        list(n_dimensions = 2L)
+      }
       expression_selected_genes <- function() {
         list(
           genes_to_display_present = c("A", "B"),

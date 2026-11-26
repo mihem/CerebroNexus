@@ -263,6 +263,8 @@ test_that("gene primary colours do not materialize metadata", {
       expression_projection_parameters_plot <- function() {
         list(is_trajectory = FALSE)
       }
+      ## No Viewer Pack file: the coordinates travel with the frame.
+      viewerProjectionAsset <- function(...) NULL
       expression_projection_expression_levels <- function() c(0, 2)
       expression_selected_genes <- function() {
         list(genes_to_display_present = input$genes)

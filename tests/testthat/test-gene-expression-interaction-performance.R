@@ -105,6 +105,8 @@ test_that("Gene projection host is present before dynamic controls bind", {
         list(point_size = 5, point_opacity = 1)
       }
       available_crb_files <- list(selected = "tiny")
+      ## No Viewer Pack file: the projection's coordinates are read.
+      viewerProjectionAsset <- function(...) NULL
       sys.source(
         viewer_test_path("gene_expression", "obj_projection_parameters_plot.R"),
         scope
@@ -269,6 +271,7 @@ test_that("expression_projection_data_to_plot emits first value without debounce
       viewer_runtime_env(scope)
       viewer_loaded_dataset_context <- function() list(key = "tiny")
       data_set <- function() list()
+      viewerProjectionAsset <- function(...) NULL
       expression_projection_coordinates <- shiny::reactive({
         data.frame(UMAP_1 = c(0, 1), UMAP_2 = c(1, 0))
       })

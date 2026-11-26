@@ -490,13 +490,6 @@ if (.viewer_launch_reads_datasets) {
 }
 
 server <- function(input, output, session) {
-  .viewer_open_sessions$n <- .viewer_open_sessions$n + 1L
-  session$onSessionEnded(function() {
-    .viewer_open_sessions$n <- max(0L, .viewer_open_sessions$n - 1L)
-    if (.viewer_open_sessions$n == 0L) {
-      viewerProcessMemoClear()
-    }
-  })
   source <- function(file, local = FALSE, ...) {
     dots <- list(...)
     if (identical(local, TRUE) && !length(dots)) {
@@ -3304,6 +3297,14 @@ server <- function(input, output, session) {
   )
   session$onInputReceived(function(...) viewer_idle_activity(initial = FALSE))
   session$onSessionEnded(function() viewer_idle_cancel())
+  ## Count the open sessions; the last one to end empties the process memos.
+  .viewer_open_sessions$n <- .viewer_open_sessions$n + 1L
+  session$onSessionEnded(function() {
+    .viewer_open_sessions$n <- max(0L, .viewer_open_sessions$n - 1L)
+    if (.viewer_open_sessions$n == 0L) {
+      viewerProcessMemoClear()
+    }
+  })
 
   ##--------------------------------------------------------------------------##
   ## Export reactive values for testing (shinytest2).
