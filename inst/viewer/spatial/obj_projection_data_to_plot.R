@@ -9,22 +9,33 @@
 spatial_projection_roi_context_memo <- viewerMemoOne()
 spatial_projection_roi_context <- function(spatial_name, rotation_angle) {
   sample_value <- spatial_projection_selected_sample()
-  spatial_projection_roi_context_memo(
-    list(data_set(), spatial_name, sample_value, rotation_angle),
-    function() {
-      coordinates <- viewerSpatialCoordinates(spatial_name)
-      metadata <- viewerProjectionFirstFrameMetadata()
-      spatial_roi_section_context(
-        coordinates,
-        spatial_section_scope(
-          spatial_name,
-          sample_value,
-          metadata,
-          function() rownames(coordinates) %||% character()
-        ),
-        metadata,
+  ds <- data_set()
+  compute <- function() {
+    coordinates <- viewerSpatialCoordinates(spatial_name)
+    metadata <- viewerProjectionFirstFrameMetadata()
+    spatial_roi_section_context(
+      coordinates,
+      spatial_section_scope(
+        spatial_name,
         sample_value,
-        rotation_angle
+        metadata,
+        function() rownames(coordinates) %||% character()
+      ),
+      metadata,
+      sample_value,
+      rotation_angle
+    )
+  }
+  viewerSharedMemo(
+    "spatial_roi_context",
+    16L,
+    viewerProcessDatasetKey(ds),
+    list(spatial_name, sample_value, rotation_angle),
+    compute,
+    function() {
+      spatial_projection_roi_context_memo(
+        list(ds, spatial_name, sample_value, rotation_angle),
+        compute
       )
     }
   )

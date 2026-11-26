@@ -181,46 +181,71 @@ trajectory_projection_prepared_raw <- reactive({
   ## function of the data set, the trajectory and the columns read, so those
   ## key them rather than the cells themselves, which would be read and
   ## compared in full on every evaluation.
-  built <- trajectory_projection_cells_memo(
+  traj_compute <- function() {
+    cells_df <- trajectory_cells_reactive(c(
+      color_variable,
+      names(group_filters)
+    ))
+    keep <- cerebroGroupFilterMask(cells_df, group_filters)
+    if (!all(keep)) {
+      cells_df <- cells_df[keep, , drop = FALSE]
+    }
+
+    ## randomly remove cells (if necessary)
+    cells_df <- randomlySubsetCells(cells_df, request$percentage)
+
+    ## An empty frame is still sent, without trajectory lines, so clearing
+    ## every filter cannot leave the previous Canvas frame visible.
+    trajectory_lines <- list()
+    if (nrow(cells_df) > 0L) {
+      ## Categorical payloads are split into one trace per group below, so
+      ## shuffling rows within a trace cannot change paint order. Continuous
+      ## colours stay shuffled so the original overlap behaviour is preserved.
+      if (is.numeric(cells_df[[color_variable]])) {
+        cells_df <- cells_df[sample.int(nrow(cells_df)), , drop = FALSE]
+      }
+
+      ## trajectory path as line-segment shapes (warm near-black, the theme
+      ## title colour), drawn under the points as the structural backbone
+      trajectory_lines <- trajectory_projection_lines(trajectory_data[[
+        "edges"
+      ]])
+    }
+    list(cells_df = cells_df, trajectory_lines = trajectory_lines)
+  }
+  ## Every session shows the same cells for a full, categorical colouring of
+  ## the same file; any other request stays with the session.
+  shared <- identical(as.numeric(request$percentage), 100) &&
+    {
+      color_meta <- tryCatch(
+        viewerProjectionFirstFrameMetadata()[[color_variable]],
+        error = function(e) NULL
+      )
+      !is.null(color_meta) && !is.numeric(color_meta)
+    }
+  built <- viewerSharedMemo(
+    "trajectory_cells",
+    4L,
+    if (shared) viewerProcessDatasetKey(data_set()),
     list(
-      dataset_context,
-      trajectory_data,
       trajectory_selected_method(),
       trajectory_selected_name(),
       request,
       color_variable
     ),
+    traj_compute,
     function() {
-      cells_df <- trajectory_cells_reactive(c(
-        color_variable,
-        names(group_filters)
-      ))
-      keep <- cerebroGroupFilterMask(cells_df, group_filters)
-      if (!all(keep)) {
-        cells_df <- cells_df[keep, , drop = FALSE]
-      }
-
-      ## randomly remove cells (if necessary)
-      cells_df <- randomlySubsetCells(cells_df, request$percentage)
-
-      ## An empty frame is still sent, without trajectory lines, so clearing
-      ## every filter cannot leave the previous Canvas frame visible.
-      trajectory_lines <- list()
-      if (nrow(cells_df) > 0L) {
-        ## Categorical payloads are split into one trace per group below, so
-        ## shuffling rows within a trace cannot change paint order. Continuous
-        ## colours stay shuffled so the original overlap behaviour is preserved.
-        if (is.numeric(cells_df[[color_variable]])) {
-          cells_df <- cells_df[sample.int(nrow(cells_df)), , drop = FALSE]
-        }
-
-        ## trajectory path as line-segment shapes (warm near-black, the theme
-        ## title colour), drawn under the points as the structural backbone
-        trajectory_lines <- trajectory_projection_lines(trajectory_data[[
-          "edges"
-        ]])
-      }
-      list(cells_df = cells_df, trajectory_lines = trajectory_lines)
+      trajectory_projection_cells_memo(
+        list(
+          dataset_context,
+          trajectory_data,
+          trajectory_selected_method(),
+          trajectory_selected_name(),
+          request,
+          color_variable
+        ),
+        traj_compute
+      )
     }
   )
   cells_df <- built$cells_df

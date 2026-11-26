@@ -103,7 +103,7 @@ tab_hla_tcr_motifs <- tabItem(
             # repertoire's rows are analysis units, so the label has to follow
             # the declared unit rather than being hard-coded here.
             uiOutput("hla_table_grain_ui"),
-            DT::dataTableOutput("hla_network_table"),
+            uiOutput("hla_network_table_UI"),
             br(),
             downloadButton(
               "hla_network_download",

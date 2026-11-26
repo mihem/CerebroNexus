@@ -530,3 +530,79 @@ test_that("viewer source reuses process-safe utility functions", {
   expect_identical(environment(second$extra_material_table_groups), second)
   expect_false(identical(first$cachePlot, second$cachePlot))
 })
+
+test_that("registerCellViewPointBorder routes through session outputOptions", {
+  scope <- new.env(parent = globalenv())
+  seen <- character()
+  scope$outputOptions <- function(output, name, ...) {
+    seen <<- c(seen, name)
+    invisible(NULL)
+  }
+  viewer_runtime_env(scope)
+  out <- new.env(parent = emptyenv())
+  scope$registerCellViewPointBorder(out, "overview_projection")
+  expect_identical(
+    seen,
+    c(
+      "overview_projection_point_border_UI",
+      "overview_projection_keep_square_UI"
+    )
+  )
+})
+
+test_that("fill_height.js batches all DOM reads before any style write", {
+  node <- Sys.which("node")
+  skip_if(!nzchar(node), "node is not installed")
+  script <- viewer_test_path("www", "fill_height.js")
+  check <- paste(
+    "const assert = require('assert/strict');",
+    "const fs = require('fs');",
+    "const vm = require('vm');",
+    "const ops = [];",
+    "const wrapper = { getBoundingClientRect: () => ({ top: 0 }), scrollTop: 0 };",
+    "const content = { closest: s => s === '.content-wrapper' ? wrapper : null, getBoundingClientRect: () => ({ top: 0 }), scrollTop: 0, scrollHeight: 700, classList: { contains: c => c === 'content' } };",
+    "function makeEl(id, top) {",
+    "  const classes = new Set();",
+    "  const el = {",
+    "    id, parentElement: content,",
+    "    classList: { contains: c => classes.has(c), add: c => { ops.push('class:' + id); classes.add(c); } },",
+    "    getClientRects: () => [{}],",
+    "    getBoundingClientRect: () => { ops.push('read:' + id); return { top, bottom: top + 300 }; },",
+    "    closest: s => s === '.content-wrapper' ? wrapper : (s === '.content' ? content : null),",
+    "    style: {}",
+    "  };",
+    "  Object.defineProperty(el.style, 'height', { set(v) { ops.push('write:' + id + ':' + v); } });",
+    "  return el;",
+    "}",
+    "const els = [makeEl('a', 100), makeEl('b', 120)];",
+    "let rafCb = null;",
+    "const window = {",
+    "  innerHeight: 900, WeakSet, Map,",
+    "  ResizeObserver: class { observe() {} },",
+    "  addEventListener() {},",
+    "  requestAnimationFrame(cb) { rafCb = cb; },",
+    "  getComputedStyle() { ops.push('style'); return { paddingBottom: '12px' }; }",
+    "};",
+    "const document = { body: {}, documentElement: {}, getElementsByClassName: () => els, addEventListener() {} };",
+    "vm.runInNewContext(fs.readFileSync(process.argv[2], 'utf8'), { window, document });",
+    "rafCb();",
+    "const firstWrite = ops.findIndex(op => op.startsWith('write:'));",
+    "const lastRead = ops.reduce((idx, op, i) => (op.startsWith('read:') || op === 'style') ? i : idx, -1);",
+    "assert.ok(firstWrite > 0 && lastRead >= 0 && lastRead < firstWrite, 'reads must precede writes: ' + ops.join(','));",
+    "assert.equal(ops.filter(op => op === 'style').length, 1, 'wrapper computedStyle cached per pass');",
+    "console.log('PASS fill_height batch');",
+    sep = "\n"
+  )
+  tmp_js <- withr::local_tempfile(fileext = ".js")
+  writeLines(check, tmp_js)
+  out <- system2(
+    node,
+    c(shQuote(tmp_js), shQuote(script)),
+    stdout = TRUE,
+    stderr = TRUE
+  )
+  expect_true(
+    any(grepl("PASS fill_height batch", out, fixed = TRUE)),
+    info = paste(out, collapse = "\n")
+  )
+})

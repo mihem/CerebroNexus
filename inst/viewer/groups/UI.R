@@ -26,7 +26,7 @@ tab_groups <- tabItem(
         div(id = "groups_by_other_group_plot", class = "cerebro-chart"),
         conditionalPanel(
           condition = "input.groups_by_other_group_show_table === true",
-          DT::dataTableOutput("groups_by_other_group_table")
+          uiOutput("groups_by_other_group_table_UI")
         )
       )
     )

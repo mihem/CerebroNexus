@@ -109,6 +109,14 @@ crb_prefetch_abandon <- function(key) {
   prototype
 }
 
+.viewerCrbCacheSlots <- function() {
+  slots <- suppressWarnings(as.integer(getOption(
+    "cerebro.crb_cache_slots",
+    2L
+  )))
+  if (length(slots) != 1L || is.na(slots) || slots < 1L) 2L else slots
+}
+
 .cacheCrbPrototype <- function(path, prototype, backend_identity) {
   cache_key <- normalizePath(path, winslash = "/", mustWork = FALSE)
   .checkCrbBackendIdentity(cache_key, backend_identity)
@@ -123,10 +131,11 @@ crb_prefetch_abandon <- function(key) {
     last_used = as.numeric(Sys.time())
   )
   .crb_process_cache[[cache_key]] <- cached
-  ## Bound retained prototypes by count: object.size(R6) cannot measure their
-  ## referenced payload reliably. Active session clones remain valid on eviction.
+  ## Bound retained prototypes by count (configurable via cerebro.crb_cache_slots;
+  ## default 2L): object.size(R6) cannot measure referenced payload reliably.
+  max_slots <- .viewerCrbCacheSlots()
   keys <- ls(.crb_process_cache, all.names = TRUE)
-  if (length(keys) > 2L) {
+  if (length(keys) > max_slots) {
     older <- setdiff(keys, cache_key)
     ages <- vapply(
       older,
@@ -134,7 +143,7 @@ crb_prefetch_abandon <- function(key) {
       numeric(1)
     )
     rm(
-      list = older[order(ages)][seq_len(length(keys) - 2L)],
+      list = older[order(ages)][seq_len(length(keys) - max_slots)],
       envir = .crb_process_cache
     )
   }

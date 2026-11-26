@@ -255,6 +255,13 @@ output[["most_expressed_genes_table"]] <- viewerLazyRender(function() {
     )
   })
 })
+outputOptions(output, "most_expressed_genes_table_or_text_UI", priority = 10)
+outputOptions(
+  output,
+  "most_expressed_genes_filter_subgroups_UI",
+  suspendWhenHidden = FALSE
+)
+outputOptions(output, "most_expressed_genes_table", suspendWhenHidden = FALSE)
 
 ##----------------------------------------------------------------------------##
 ## Info box that gets shown when pressing the "info" button.

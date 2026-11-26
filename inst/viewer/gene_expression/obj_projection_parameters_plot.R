@@ -89,16 +89,39 @@ expression_projection_parameters_plot <- reactive({
   )
   if (selected_projection %in% availableProjections()) {
     is_trajectory <- FALSE
-    range_data <- viewerProjectionFirstFrameCoordinates(selected_projection)
-    n_dimensions <- ncol(range_data)
+    projection_resource <- viewerProjectionAsset(
+      selected_projection,
+      expression_projection_cells_to_show()
+    )
+    if (is.list(projection_resource)) {
+      n_dimensions <- as.integer(projection_resource$dimensions)
+      x_range <- if (length(projection_resource$x_range) == 2L) {
+        projection_resource$x_range
+      } else {
+        list()
+      }
+      y_range <- if (length(projection_resource$y_range) == 2L) {
+        projection_resource$y_range
+      } else {
+        list()
+      }
+    } else {
+      range_data <- viewerProjectionFirstFrameCoordinates(selected_projection)
+      n_dimensions <- ncol(range_data)
+      XYranges <- getXYranges(range_data)
+      x_range <- c(XYranges$x$min, XYranges$x$max)
+      y_range <- c(XYranges$y$min, XYranges$y$max)
+    }
   } else {
     is_trajectory <- TRUE
     # currently, only trajectories with 2 dimensions are supported
     n_dimensions <- 2
     selection <- strsplit(selected_projection, split = " // ")[[1]]
     range_data <- getTrajectory(selection[[1]], selection[[2]])[["meta"]]
+    XYranges <- getXYranges(range_data)
+    x_range <- c(XYranges$x$min, XYranges$x$max)
+    y_range <- c(XYranges$y$min, XYranges$y$max)
   }
-  XYranges <- getXYranges(range_data)
   display <- current_page_display_defaults("gene")
   parameters <- list(
     projection = selected_projection,
@@ -118,8 +141,8 @@ expression_projection_parameters_plot <- reactive({
       isolate(input[["expression_projection_keep_square"]]) %||%
         display$keep_square
     ),
-    x_range = c(XYranges$x$min, XYranges$x$max),
-    y_range = c(XYranges$y$min, XYranges$y$max),
+    x_range = x_range,
+    y_range = y_range,
     hover_info = preferences[["show_hover_info_in_projections"]]
   )
   return(parameters)

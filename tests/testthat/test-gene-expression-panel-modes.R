@@ -183,6 +183,9 @@ test_that("RGB expression reads all channels in one backend call", {
     x = c(0, 1),
     y = c(1, 0)
   ))
+  scope$expression_projection_parameters_plot <- shiny::reactive(list(
+    n_dimensions = 2L
+  ))
   scope$expression_selected_genes <- shiny::reactive(list(
     genes_to_display_present = c("g1", "g2", "g3"),
     rgb_genes = list(r = "g1", g = "g2", b = "g3")
