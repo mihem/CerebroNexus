@@ -977,9 +977,17 @@ builder_alignment_legend_ui <- function(frame, colors = NULL) {
     shared <- intersect(levels, names(colors))
     palette[shared] <- colors[shared]
   }
-  esc_attr <- function(x) htmltools::htmlEscape(as.character(x), attribute = TRUE)
-  esc_text <- function(x) htmltools::htmlEscape(as.character(x), attribute = FALSE)
-  count_text <- esc_text(trimws(format(unname(as.numeric(counts)), big.mark = ",", scientific = FALSE)))
+  esc_attr <- function(x) {
+    htmltools::htmlEscape(as.character(x), attribute = TRUE)
+  }
+  esc_text <- function(x) {
+    htmltools::htmlEscape(as.character(x), attribute = FALSE)
+  }
+  count_text <- esc_text(trimws(format(
+    unname(as.numeric(counts)),
+    big.mark = ",",
+    scientific = FALSE
+  )))
   htmltools::tags$div(
     class = "spatial-alignment-legend",
     role = "list",
