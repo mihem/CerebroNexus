@@ -1776,6 +1776,84 @@ test_that("a reused CRB already read back in this session is not reopened", {
   expect_identical(result$verifications$ds1$source, "deep")
 })
 
+builder_deferred_h5ad_fixture <- function(scope = parent.frame()) {
+  h5ad_file <- withr::local_tempfile(fileext = ".h5ad", .local_envir = scope)
+  file.copy(anndata_test_fixture("small_csr.h5ad"), h5ad_file)
+  info <- file.info(h5ad_file)
+  object <- SeuratObject::pbmc_small
+  object@reductions <- object@reductions["pca"]
+  object@misc$.cerebro_deferred_h5ad <- list(
+    file = h5ad_file,
+    n_cells = 120,
+    n_genes = 60,
+    source = list(
+      size = as.double(info$size),
+      modified = as.double(info$mtime)
+    ),
+    layer_sources = list(counts = "layers/counts", data = NULL)
+  )
+  item <- list(
+    name = "Deferred",
+    layer = "counts",
+    expression_backend = "h5",
+    analyses = list()
+  )
+  list(object = object, item = item, file = h5ad_file)
+}
+
+test_that("only the expression file of a shell is streamed from the h5ad", {
+  fixture <- builder_deferred_h5ad_fixture()
+  object <- fixture$object
+  item <- fixture$item
+  stream <- .builder_build_deferred_h5ad_stream(object, item)
+  expect_identical(stream$path, "layers/counts")
+  expect_identical(stream$n_obs, 120)
+
+  with_spatial <- object
+  with_spatial@reductions$spatial <- with_spatial@reductions$pca
+  changed <- function(field, value) {
+    item[[field]] <- value
+    item
+  }
+  refused <- list(
+    embedded_backend = list(object, changed("expression_backend", "embedded")),
+    analyses = list(
+      object,
+      changed("analyses", list(list(id = "marker_genes")))
+    ),
+    layer_without_source = list(object, changed("layer", "data")),
+    spatial_reduction = list(with_spatial, item),
+    not_a_shell = list(SeuratObject::pbmc_small, item)
+  )
+  for (case in names(refused)) {
+    expect_null(
+      .builder_build_deferred_h5ad_stream(
+        refused[[case]][[1L]],
+        refused[[case]][[2L]]
+      ),
+      info = case
+    )
+  }
+  withr::with_options(list(cerebro.builder.h5ad_streaming = FALSE), {
+    expect_null(.builder_build_deferred_h5ad_stream(object, item))
+  })
+  Sys.setFileTime(fixture$file, Sys.time() + 3600)
+  expect_null(.builder_build_deferred_h5ad_stream(object, item))
+})
+
+test_that("a shell that cannot be streamed is never exported from its placeholders", {
+  fixture <- builder_deferred_h5ad_fixture()
+  item <- utils::modifyList(fixture$item, list(expression_backend = "embedded"))
+  expect_error(
+    .builder_build_export(fixture$object, item, tempfile(fileext = ".crb")),
+    "opened without its expression matrix"
+  )
+  ## Preparing reads such a shell in full; this one's file is not what the
+  ## shell recorded, so that stops before analyses run.
+  Sys.setFileTime(fixture$file, Sys.time() + 3600)
+  expect_error(.builder_build_prepare(fixture$object, item), "changed or moved")
+})
+
 test_that("the worker seeds copied App data from request identities", {
   app_dir <- withr::local_tempdir()
   private <- file.path(app_dir, "private-data")

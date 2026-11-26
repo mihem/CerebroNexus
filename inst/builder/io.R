@@ -1354,6 +1354,10 @@ builder_formats <- list(
     read = function(path) {
       .builder_io_require_package()
       readH5adAsSCE(path)
+    },
+    read_metadata = function(path) {
+      .builder_io_require_package()
+      readH5adAsSCE(path, .metadata_only = TRUE)
     }
   ),
   list(
@@ -1826,7 +1830,18 @@ builder_match_format <- function(path) {
 #'
 #' @return A list with `object` on success, or `error` with a sentence saying
 #'   what went wrong. Never throws: the caller is a page, not a script.
-builder_read_object <- function(path) {
+## An h5ad file at least this large is opened without its expression matrices
+## (`read_metadata`); the Build reads it in full when it needs them. 1 GiB by
+## default; Inf turns it off.
+.builder_metadata_only_bytes <- function() {
+  value <- suppressWarnings(as.numeric(getOption(
+    "cerebro.builder.h5ad_metadata_only_bytes",
+    2^30
+  )))
+  if (length(value) != 1L || is.na(value) || value < 0) 2^30 else value
+}
+
+builder_read_object <- function(path, metadata_only = NA) {
   if (!nzchar(path) || !file.exists(path)) {
     return(list(error = "File not found."))
   }
@@ -1861,7 +1876,23 @@ builder_read_object <- function(path) {
     ))
   }
 
-  obj <- try(fmt$read(path), silent = TRUE)
+  use_metadata <- is.function(fmt$read_metadata) &&
+    (isTRUE(metadata_only) ||
+      (is.na(metadata_only) &&
+        isTRUE(file.size(path) >= .builder_metadata_only_bytes())))
+  obj <- if (use_metadata) {
+    ## A layout the metadata-only read cannot stand in for is read in full.
+    tryCatch(
+      fmt$read_metadata(path),
+      cerebro_h5ad_metadata_ineligible = function(condition) NULL,
+      error = function(error) {
+        structure(list(error), class = "try-error", condition = error)
+      }
+    )
+  }
+  if (is.null(obj)) {
+    obj <- try(fmt$read(path), silent = TRUE)
+  }
   if (inherits(obj, "try-error")) {
     reason <- conditionMessage(attr(obj, "condition"))
     ## readRDS() says only "error reading from connection" when the file

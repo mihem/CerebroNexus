@@ -772,6 +772,11 @@
 #'   modalities inside a MuData file). Leave \code{NULL}.
 #' @param .stream_x Internal: do not read an X with more than 2^31 - 1
 #'   non-zero values, describe it for streaming (see \code{\link{convertH5adToCerebro}}).
+#' @param .metadata_only Internal: read cells, genes, metadata and embeddings
+#'   but no matrix values; empty matrices stand in for them and what
+#'   \code{convertSCEToSeurat} needs from them is recorded in
+#'   \code{metadata(sce)$.cerebro_deferred_h5ad} (used by the Builder for large
+#'   files). Leave \code{FALSE}.
 #'
 #' @return A \code{SingleCellExperiment} with genes in rows and cells in
 #'   columns. Duplicate gene names are made unique with a message; duplicate
@@ -807,7 +812,8 @@ readH5adAsSCE <- function(
   extra_modalities = NULL,
   verbose = FALSE,
   .root = NULL,
-  .stream_x = FALSE
+  .stream_x = FALSE,
+  .metadata_only = FALSE
 ) {
   .h5adRequire()
   if (!requireNamespace("SingleCellExperiment", quietly = TRUE)) {
@@ -936,17 +942,38 @@ readH5adAsSCE <- function(
   ## A matrix too large for a dgCMatrix is not read (`.stream_x`, set by the h5
   ## route of convertH5adToCerebro()): an empty one stands in for it and its
   ## description goes to the caller, who streams the file.
-  stream <- if (isTRUE(.stream_x) && x_path == "X") {
-    .h5adStreamPlan(ctx, x_path, length(cells), length(genes))
-  }
-  if (!is.null(stream)) {
-    stream$cells <- cells
-    stream$genes <- genes
-    assays[["X"]] <- with_dimnames(methods::new(
+  empty_matrix <- function() {
+    with_dimnames(methods::new(
       "dgCMatrix",
       p = integer(length(cells) + 1L),
       Dim = c(length(genes), length(cells))
     ))
+  }
+  stream <- if (!isTRUE(.metadata_only) && isTRUE(.stream_x) && x_path == "X") {
+    .h5adStreamPlan(ctx, x_path, length(cells), length(genes))
+  }
+  deferred_facts <- NULL
+  if (isTRUE(.metadata_only)) {
+    if (.h5adHas(ctx, x_path)) {
+      assays[["X"]] <- empty_matrix()
+    }
+    if (!isTRUE(use_raw) && .h5adHas(ctx, "layers")) {
+      for (layer in .h5adChildren(ctx, "layers")) {
+        assays[[layer]] <- empty_matrix()
+      }
+    }
+    deferred_facts <- .h5adDeferredFacts(
+      ctx,
+      x_path,
+      names(assays),
+      .h5adAsFrame(obs),
+      length(cells),
+      length(genes)
+    )
+  } else if (!is.null(stream)) {
+    stream$cells <- cells
+    stream$genes <- genes
+    assays[["X"]] <- empty_matrix()
   } else if (.h5adHas(ctx, x_path)) {
     assays[["X"]] <- with_dimnames(.h5adReadMatrix(
       ctx,
@@ -955,7 +982,9 @@ readH5adAsSCE <- function(
       length(genes)
     ))
   }
-  if (!is.null(stream) && !isTRUE(use_raw) && .h5adHas(ctx, "layers")) {
+  if (isTRUE(.metadata_only)) {
+    ## Already populated placeholder assays above without reading matrix data.
+  } else if (!is.null(stream) && !isTRUE(use_raw) && .h5adHas(ctx, "layers")) {
     message(
       "[INFO] The matrix of `X` has more than 2^31 - 1 non-zero values and is ",
       "streamed; the layers of the file are not read."
@@ -1044,7 +1073,193 @@ readH5adAsSCE <- function(
   if (length(images)) {
     sce@metadata$spatial_images <- images
   }
+  if (isTRUE(.metadata_only)) {
+    info <- file.info(file)
+    S4Vectors::metadata(sce)[[".cerebro_deferred_h5ad"]] <- c(
+      list(
+        file = normalizePath(file, winslash = "/", mustWork = FALSE),
+        assays = names(assays),
+        n_cells = length(cells),
+        n_genes = length(genes),
+        source = list(
+          size = as.double(info$size),
+          modified = as.double(info$mtime)
+        )
+      ),
+      deferred_facts
+    )
+  }
   sce
+}
+
+.readH5adMetadataOnly <- function(file, ...) {
+  readH5adAsSCE(file, ..., .metadata_only = TRUE)
+}
+
+#' What convertSCEToSeurat() would compute from the matrices of a metadata-only
+#' read, taken from the file without holding a matrix: whether `X` is a count
+#' matrix (the same first 100,000 stored values it samples) and, when obs has no
+#' per-cell totals, the total and the number of positive values per cell of the
+#' matrix it would sum. Only HDF5 CSR matrices qualify; anything else raises a
+#' `cerebro_h5ad_metadata_ineligible` condition so the caller reads in full.
+#' @keywords internal
+#' @noRd
+.h5adDeferredFacts <- function(
+  ctx,
+  x_path,
+  assay_names,
+  col_data,
+  n_cells,
+  n_genes
+) {
+  ineligible <- function(reason) {
+    stop(structure(
+      class = c("cerebro_h5ad_metadata_ineligible", "error", "condition"),
+      list(message = reason, call = NULL)
+    ))
+  }
+  if (identical(ctx$kind, "zarr")) {
+    ineligible("A zarr store is read in full.")
+  }
+  path_of <- function(assay) {
+    if (identical(assay, "X")) x_path else paste0("layers/", assay)
+  }
+  csr_source <- function(assay) {
+    path <- path_of(assay)
+    if (!identical(.h5adEncoding(ctx, path), "csr_matrix")) {
+      ineligible(paste0("`", path, "` is not a CSR matrix."))
+    }
+    .h5adStreamSource(ctx$file, path, n_cells, n_genes, prefix = ctx$prefix)
+  }
+  ## convertSCEToSeurat(): counts and logcounts by name, else the first assay
+  ## is counts when its first 100,000 stored values are whole numbers.
+  x_is_counts <- NULL
+  counts_assay <- if ("counts" %in% assay_names) "counts"
+  data_assay <- if ("logcounts" %in% assay_names) "logcounts"
+  if (is.null(counts_assay) && is.null(data_assay)) {
+    first <- assay_names[[1L]]
+    x_is_counts <- .h5adFirstValuesWhole(csr_source(first), n_genes)
+    if (x_is_counts) counts_assay <- first else data_assay <- first
+  }
+  reference <- if (is.null(counts_assay)) data_assay else counts_assay
+  candidates <- list(
+    count = c("total_counts", "n_counts", "nCount_RNA", "nUMI"),
+    features = c("n_genes_by_counts", "n_genes", "nFeature_RNA", "nGene")
+  )
+  recorded <- vapply(
+    candidates,
+    function(names) {
+      any(vapply(
+        intersect(names, colnames(col_data)),
+        function(name) is.numeric(col_data[[name]]),
+        logical(1)
+      ))
+    },
+    logical(1)
+  )
+  ## With counts, Seurat itself sums them (and obs is not consulted); without,
+  ## the matrix is summed only when obs records no totals.
+  cell_totals <- if (!is.null(counts_assay) || !all(recorded)) {
+    .h5adCellTotals(csr_source(reference), n_genes)
+  }
+  ## Stored values of the matrices that become Seurat layers, for the size
+  ## estimates the empty matrices cannot give.
+  layer_assays <- c(counts_assay, data_assay)
+  stored_values <- vapply(
+    stats::setNames(layer_assays, layer_assays),
+    function(assay) {
+      path <- path_of(assay)
+      if (.h5adEncoding(ctx, path) %in% c("csr_matrix", "csc_matrix")) {
+        major <- if (identical(.h5adEncoding(ctx, path), "csr_matrix")) {
+          n_cells
+        } else {
+          n_genes
+        }
+        as.numeric(.h5adRead(
+          ctx,
+          paste0(path, "/indptr"),
+          start = major + 1,
+          count = 1,
+          bit64conversion = "double"
+        ))
+      } else {
+        as.numeric(n_cells) * as.numeric(n_genes)
+      }
+    },
+    numeric(1)
+  )
+  list(
+    x_is_counts = x_is_counts,
+    cell_totals = cell_totals,
+    totals_from_counts = !is.null(counts_assay),
+    stored_values = stored_values,
+    ## the file matrix behind each Seurat layer, for streaming its expression
+    layer_sources = list(
+      counts = if (!is.null(counts_assay)) path_of(counts_assay),
+      data = if (!is.null(data_assay)) path_of(data_assay)
+    )
+  )
+}
+
+#' The first 100,000 values a dgCMatrix built from this CSR source would store
+#' (its genes x cells columns are the CSR rows, sorted by gene, repeated genes
+#' summed) are all whole numbers.
+#' @keywords internal
+#' @noRd
+.h5adFirstValuesWhole <- function(source, n_genes, n = 100000L) {
+  if (!source$nnz) {
+    return(FALSE)
+  }
+  rows <- min(source$n_obs, findInterval(n, source$indptr) + 1L)
+  block <- .h5adStreamReadBlock(source, 0, rows)
+  built <- Matrix::sparseMatrix(
+    i = block$gene + 1L,
+    j = rep.int(seq_len(rows), diff(block$p)),
+    x = block$value,
+    dims = c(n_genes, rows)
+  )
+  values <- built@x
+  sample <- if (length(values) > n) values[seq_len(n)] else values
+  length(sample) > 0L && all(sample == round(sample))
+}
+
+#' Per-cell sum and number of positive values of a CSR source, read block by
+#' block (as Matrix::colSums() of the genes x cells dgCMatrix would give them).
+#' @keywords internal
+#' @noRd
+.h5adCellTotals <- function(source, n_genes) {
+  count <- numeric(source$n_obs)
+  features <- numeric(source$n_obs)
+  blocks <- .h5adStreamBlocks(source)
+  for (k in seq_along(blocks$from)) {
+    c0 <- blocks$from[[k]]
+    c1 <- blocks$to[[k]]
+    block <- .h5adStreamReadBlock(source, c0, c1)
+    cell <- rep.int(seq_len(c1 - c0), diff(block$p))
+    gene <- block$gene
+    value <- block$value
+    ## A gene named twice in a row adds up before "positive" is judged.
+    later <- seq_along(gene)[-1L]
+    if (
+      length(later) &&
+        any(gene[later] <= gene[later - 1L] & cell[later] == cell[later - 1L])
+    ) {
+      key <- (cell - 1) * n_genes + gene
+      value <- as.numeric(rowsum(value, key, reorder = TRUE))
+      first <- !duplicated(key)
+      cell <- cell[first][order(key[first])]
+    }
+    ## rowsum() returns the cells that have entries; the others stay 0.
+    if (length(value)) {
+      sums <- rowsum(value, cell)
+      count[c0 + as.integer(rownames(sums))] <- sums[, 1L]
+    }
+    features[c0 + seq_len(c1 - c0)] <- tabulate(
+      cell[value > 0],
+      nbins = c1 - c0
+    )
+  }
+  list(count = count, features = features)
 }
 
 #' Read further modalities of a MuData file as alternative experiments.

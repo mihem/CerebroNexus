@@ -495,6 +495,21 @@ builder_source_image_payload <- function(object) {
   result
 }
 
+## A metadata-only h5ad snapshot holds empty matrices; the backend choice
+## needs the size the matrices will have when the Build reads them (as a
+## dgCMatrix: 12 bytes per stored value and 4 per column).
+.builder_deferred_matrix_bytes <- function(object) {
+  deferred <- tryCatch(
+    object@misc$.cerebro_deferred_h5ad,
+    error = function(error) NULL
+  )
+  values <- suppressWarnings(as.numeric(deferred$stored_values))
+  if (!is.list(deferred) || !length(values) || anyNA(values)) {
+    return(0)
+  }
+  sum(values * 12 + (as.numeric(deferred$n_cells) + 1) * 4)
+}
+
 .builder_adapter_inspect <- function(adapter, progress = NULL) {
   if (!inherits(adapter, "builder_source_adapter")) {
     .builder_adapter_abort("Expected a Builder source adapter.")
@@ -2120,7 +2135,10 @@ builder_open_snapshot <- function(snapshot) {
     source = inspected$source,
     matrix_summary = c(
       inspected$matrix_summary,
-      list(estimated_bytes = snapshot$closure_bytes)
+      list(
+        estimated_bytes = snapshot$closure_bytes +
+          .builder_deferred_matrix_bytes(inspected$object)
+      )
     ),
     snapshot = snapshot,
     previous_snapshot = previous_snapshot,

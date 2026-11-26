@@ -99,6 +99,9 @@ convertSCEToSeurat <- function(
     )
   }
 
+  ## A metadata-only h5ad read (readH5adAsSCE(.metadata_only = TRUE)) holds
+  ## empty matrices and brings what this function would have read from them.
+  deferred <- object@metadata$.cerebro_deferred_h5ad
   counts <- NULL
   data <- NULL
   if ("counts" %in% assay_names) {
@@ -110,7 +113,12 @@ convertSCEToSeurat <- function(
   if (is.null(counts) && is.null(data)) {
     m <- fetch(assay_names[[1L]])
     sample <- if (length(m@x) > 100000L) m@x[seq_len(100000L)] else m@x
-    if (length(sample) && all(sample == round(sample))) {
+    whole <- if (is.logical(deferred$x_is_counts)) {
+      isTRUE(deferred$x_is_counts)
+    } else {
+      length(sample) && all(sample == round(sample))
+    }
+    if (whole) {
       counts <- m
     } else {
       data <- m
@@ -165,6 +173,12 @@ convertSCEToSeurat <- function(
   } else {
     data[seq_len(n_genes), , drop = FALSE]
   }
+  ## Seurat sums a counts layer itself; for a metadata-only read the layer is
+  ## empty, so write the sums the file was read for.
+  if (!is.null(counts) && isTRUE(deferred$totals_from_counts)) {
+    result[[paste0("nCount_", main_assay)]] <- deferred$cell_totals$count
+    result[[paste0("nFeature_", main_assay)]] <- deferred$cell_totals$features
+  }
   fill <- function(target, candidates, from_matrix) {
     present <- result@meta.data[[target]]
     if (!is.null(present) && any(present > 0, na.rm = TRUE)) {
@@ -182,12 +196,16 @@ convertSCEToSeurat <- function(
   fill(
     paste0("nCount_", main_assay),
     c("total_counts", "n_counts", "nCount_RNA", "nUMI"),
-    function() Matrix::colSums(reference)
+    function() {
+      deferred$cell_totals$count %||% Matrix::colSums(reference)
+    }
   )
   fill(
     paste0("nFeature_", main_assay),
     c("n_genes_by_counts", "n_genes", "nFeature_RNA", "nGene"),
-    function() Matrix::colSums(reference > 0)
+    function() {
+      deferred$cell_totals$features %||% Matrix::colSums(reference > 0)
+    }
   )
 
   used_keys <- character()
@@ -265,6 +283,10 @@ convertSCEToSeurat <- function(
   }
 
   carried <- as.list(object@metadata)
+  if (is.list(carried$.cerebro_deferred_h5ad)) {
+    ## used above; per-cell vectors need not ride along in @misc
+    carried$.cerebro_deferred_h5ad$cell_totals <- NULL
+  }
   carried$spatial_images <- NULL
   carried$spatial_sections <- NULL
   if (is.list(carried$trajectories)) {
