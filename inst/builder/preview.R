@@ -977,21 +977,23 @@ builder_alignment_legend_ui <- function(frame, colors = NULL) {
     shared <- intersect(levels, names(colors))
     palette[shared] <- colors[shared]
   }
+  esc_attr <- function(x) htmltools::htmlEscape(as.character(x), attribute = TRUE)
+  esc_text <- function(x) htmltools::htmlEscape(as.character(x), attribute = FALSE)
+  count_text <- esc_text(trimws(format(unname(as.numeric(counts)), big.mark = ",", scientific = FALSE)))
   htmltools::tags$div(
     class = "spatial-alignment-legend",
     role = "list",
-    lapply(levels, function(level) {
-      htmltools::tags$span(
-        class = "spatial-alignment-legend-item",
-        role = "listitem",
-        htmltools::tags$i(
-          class = "spatial-alignment-legend-swatch",
-          style = paste0("background:", palette[[level]])
-        ),
-        htmltools::tags$span(level),
-        htmltools::tags$small(format(unname(counts[[level]]), big.mark = ","))
-      )
-    })
+    htmltools::HTML(paste0(
+      '<span class="spatial-alignment-legend-item" role="listitem">',
+      '<i class="spatial-alignment-legend-swatch" style="background:',
+      esc_attr(unname(palette[levels])),
+      '"></i><span>',
+      esc_text(levels),
+      "</span><small>",
+      count_text,
+      "</small></span>",
+      collapse = ""
+    ))
   )
 }
 
