@@ -2265,7 +2265,9 @@ readViewerPack <- function(file, pack = .viewerPackPath(file)) {
 #' @param file Existing canonical CRB path.
 #' @param viewer_binary One of `"auto"`, `"always"`, or `"never"`.
 #' @param viewer_binary_threshold Dataset-level threshold used by `"auto"`.
-#' @param overwrite Replace an existing valid or invalid pack.
+#' @param overwrite Replace an existing valid or invalid pack. A pack written by
+#'   the same package version keeps the files of the items whose content did not
+#'   change; delete the pack folder to write every file anew.
 #' @return The pack path invisibly, or `NULL` when disabled.
 #' @examples
 #' dir <- tempfile("cerebro-")

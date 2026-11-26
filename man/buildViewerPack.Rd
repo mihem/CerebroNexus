@@ -18,7 +18,9 @@ buildViewerPack(
 
 \item{viewer_binary_threshold}{Dataset-level threshold used by `"auto"`.}
 
-\item{overwrite}{Replace an existing valid or invalid pack.}
+\item{overwrite}{Replace an existing valid or invalid pack. A pack written by
+the same package version keeps the files of the items whose content did not
+change; delete the pack folder to write every file anew.}
 }
 \value{
 The pack path invisibly, or `NULL` when disabled.
