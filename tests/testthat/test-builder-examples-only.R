@@ -289,6 +289,96 @@ test_that("an examples-only build goes to a private folder that is downloaded an
   expect_false(dir.exists(kept$parent))
 })
 
+test_that("a new examples-only build removes the releases of the earlier ones", {
+  skip_if_not_installed("shiny")
+  app_env <- builder_examples_only_app()
+
+  shiny::testServer(app_env$server, {
+    parent <- builder_examples_only_output_parent()
+    for (name in c("CerebroNexus_crb_aaaaaa", "CerebroNexus_crb_bbbbbb")) {
+      dir.create(file.path(parent, name))
+      writeLines("crb", file.path(parent, name, "PBMC.crb"))
+    }
+    dir.create(file.path(parent, ".release-control"))
+    expect_identical(builder_examples_only_clear_releases(parent), 3L)
+    expect_length(
+      list.files(parent, all.files = TRUE, no.. = TRUE),
+      0L
+    )
+    ## The folder itself stays for the next build, and an empty one is fine.
+    expect_true(dir.exists(parent))
+    expect_identical(builder_examples_only_clear_releases(parent), 0L)
+  })
+})
+
+test_that("every file, table, image and picker request is refused on the server", {
+  skip_if_not_installed("shiny")
+  app_env <- builder_examples_only_app()
+  ## Count the refusals: a handler that lost its guard no longer says so.
+  refusals <- new.env(parent = emptyenv())
+  refusals$n <- 0L
+  app_env$builder_notify <- function(type = "info", message = "", ...) {
+    if (identical(message, app_env$builder_examples_only_message)) {
+      refusals$n <- refusals$n + 1L
+    }
+    invisible(TRUE)
+  }
+  upload <- withr::local_tempfile(fileext = ".rds")
+  saveRDS(list(), upload)
+  uploaded <- function(name) {
+    data.frame(
+      name = name,
+      size = 1L,
+      type = "",
+      datapath = upload,
+      stringsAsFactors = FALSE
+    )
+  }
+
+  shiny::testServer(app_env$server, {
+    before <- length(imports()$entries)
+    refused <- function(...) {
+      refusals$n <- 0L
+      session$setInputs(...)
+      refusals$n >= 1L
+    }
+    expect_true(
+      refused(dataset_files = uploaded("x.rds")),
+      info = "dataset_files"
+    )
+    ## Even a file Shiny let through is deleted, not kept.
+    expect_false(file.exists(upload))
+    saveRDS(list(), upload)
+    expect_true(
+      refused(
+        builder_client_import_dispatch = list(
+          client_id = "c1",
+          name = "x.rds",
+          size = 10
+        )
+      ),
+      info = "builder_client_import_dispatch"
+    )
+    expect_true(
+      refused(`enhance-table_files` = uploaded("t.csv")),
+      info = "enhance-table_files"
+    )
+    expect_true(
+      refused(`enhance-marker_import_files` = uploaded("m.csv")),
+      info = "enhance-marker_import_files"
+    )
+    expect_true(
+      refused(`enhance-tissue_image_file` = uploaded("i.png")),
+      info = "enhance-tissue_image_file"
+    )
+    expect_true(
+      refused(builder_choose_dataset_files = 1),
+      info = "builder_choose_dataset_files"
+    )
+    expect_identical(length(imports()$entries), before)
+  })
+})
+
 ## In a real browser: no file control, a dropped file is ignored, and the
 ## three examples build into a download. Opt-in, like the other browser tests.
 test_that("an examples-only Builder in a browser takes no file and downloads its build", {

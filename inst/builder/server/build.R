@@ -805,13 +805,34 @@ session$onSessionEnded(function() {
   }
 })
 
+## A visitor can build again and again, so the releases of earlier builds are
+## removed before a new one starts: only the latest is kept for download, and
+## the folder cannot grow without bound while the session stays open. Nothing
+## else lives in this private folder.
+builder_examples_only_clear_releases <- function(parent) {
+  old <- list.files(
+    parent,
+    all.files = TRUE,
+    full.names = TRUE,
+    no.. = TRUE
+  )
+  if (length(old)) {
+    unlink(old, recursive = TRUE, force = TRUE)
+  }
+  invisible(length(old))
+}
+
 start_builder_examples_only_release <- function() {
   on.exit(
     session$sendCustomMessage("builder_build_dialog", list(action = "close")),
     add = TRUE
   )
   tryCatch(
-    start_builder_new_release(builder_examples_only_output_parent()),
+    {
+      parent <- builder_examples_only_output_parent()
+      builder_examples_only_clear_releases(parent)
+      start_builder_new_release(parent)
+    },
     error = function(error) {
       build_flow(list(stage = "idle", plan = NULL))
       builder_notify(
