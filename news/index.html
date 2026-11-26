@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.5.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.5.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -69,6 +69,11 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="8.5.2" id="cerebronexus-852">CerebroNexus 8.5.2<a class="anchor" aria-label="anchor" href="#cerebronexus-852"></a></h2>
+<ul><li>
+<strong>Faster Viewer Pack builds and opens (<a href="https://github.com/mihem/CerebroNexus/issues/294" class="external-link">#294</a>).</strong> A Viewer Pack now stores a content digest for each section and item and the package version that built it, so a rebuild (<code>buildViewerPack(overwrite = TRUE)</code>) keeps the files of the items that did not change instead of writing them again. <code><a href="../reference/buildViewerPack.html">buildViewerPack()</a></code> shares the Viewer’s on-disk cache of CRB checksums, cell names are hashed in memory when possible, and Pack files are read and written with several threads. A pack written by another package version is built anew, which also gives older packs the point size of each spatial section (format revision 3).</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="8.5.1" id="cerebronexus-851">CerebroNexus 8.5.1<a class="anchor" aria-label="anchor" href="#cerebronexus-851"></a></h2>
 <ul><li>

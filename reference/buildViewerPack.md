@@ -29,7 +29,9 @@ buildViewerPack(
 
 - overwrite:
 
-  Replace an existing valid or invalid pack.
+  Replace an existing valid or invalid pack. A pack written by the same
+  package version keeps the files of the items whose content did not
+  change; delete the pack folder to write every file anew.
 
 ## Value
 
