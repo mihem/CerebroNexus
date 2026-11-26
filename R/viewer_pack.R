@@ -251,7 +251,7 @@
       writeBin(as.numeric(value), target, size = 4L, endian = "little")
     }
   } else {
-    qs2::qs_save(value, target, nthreads = .cerebroReadThreads())
+    .cerebroQs2Save(value, target)
   }
   data.frame(
     path = path,
@@ -1526,19 +1526,19 @@
         stop("Viewer Pack projection is not cell-aligned.", call. = FALSE)
       }
       ids <- rownames(value)
-      if (
-        is.null(ids) ||
-          anyNA(ids) ||
-          any(!nzchar(ids)) ||
-          anyDuplicated(ids) ||
-          !setequal(ids, cells)
-      ) {
-        stop(
-          "Viewer Pack projection requires unique, matching cell identities.",
-          call. = FALSE
-        )
-      }
       if (!identical(ids, cells)) {
+        if (
+          is.null(ids) ||
+            anyNA(ids) ||
+            any(!nzchar(ids)) ||
+            anyDuplicated(ids) ||
+            !setequal(ids, cells)
+        ) {
+          stop(
+            "Viewer Pack projection requires unique, matching cell identities.",
+            call. = FALSE
+          )
+        }
         value <- value[match(cells, ids), , drop = FALSE]
       }
       values[[i]] <- value
@@ -1591,19 +1591,19 @@
         stop("Viewer Pack projection is not cell-aligned.", call. = FALSE)
       }
       ids <- rownames(value)
-      if (
-        is.null(ids) ||
-          anyNA(ids) ||
-          any(!nzchar(ids)) ||
-          anyDuplicated(ids) ||
-          !setequal(ids, cells)
-      ) {
-        stop(
-          "Viewer Pack projection requires unique, matching cell identities.",
-          call. = FALSE
-        )
-      }
       if (!identical(ids, cells)) {
+        if (
+          is.null(ids) ||
+            anyNA(ids) ||
+            any(!nzchar(ids)) ||
+            anyDuplicated(ids) ||
+            !setequal(ids, cells)
+        ) {
+          stop(
+            "Viewer Pack projection requires unique, matching cell identities.",
+            call. = FALSE
+          )
+        }
         value <- value[match(cells, ids), , drop = FALSE]
       }
       value
@@ -1774,7 +1774,11 @@
           } else {
             unique(as.character(value[!is.na(value)]))
           }
-          codes <- match(as.character(value), dictionary)
+          codes <- if (is.factor(value) && !anyDuplicated(dictionary)) {
+            as.integer(value)
+          } else {
+            match(as.character(value), dictionary)
+          }
           codes[is.na(codes)] <- 0L
           dtype <- .viewerPackCodeDtype(length(dictionary) + 1L)
           assets <- rbind(

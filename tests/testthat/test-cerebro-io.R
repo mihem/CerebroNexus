@@ -2072,3 +2072,40 @@ test_that("a qs2 that only warns about TBB is read once and stays quiet", {
   )
   expect_false(isTRUE(state$no_tbb))
 })
+
+test_that("a qs2 without TBB also writes on one thread", {
+  state <- .cerebroQs2State
+  old <- state$no_tbb
+  on.exit(state$no_tbb <- old, add = TRUE)
+  state$no_tbb <- NULL
+  seen <- integer()
+  written <- list()
+  save <- function(object, file, nthreads) {
+    seen <<- c(seen, nthreads)
+    if (nthreads > 1L) {
+      stop("nthreads > 1 requires TBB", call. = FALSE)
+    }
+    written[[file]] <<- object
+    invisible(NULL)
+  }
+  expect_null(.cerebroQs2Save("payload", "x.qs2", save, threads = 8L))
+  expect_identical(seen, c(8L, 1L))
+  expect_identical(written, list(x.qs2 = "payload"))
+  ## remembered for the session, for writes and reads alike
+  .cerebroQs2Save("payload", "y.qs2", save, threads = 8L)
+  expect_identical(seen, c(8L, 1L, 1L))
+  ## other errors are not swallowed
+  state$no_tbb <- NULL
+  expect_error(
+    .cerebroQs2Save("payload", "z.qs2", function(...) stop("disk full"), 8L),
+    "disk full"
+  )
+})
+
+test_that("a qs2 CRB payload round-trips through the threaded writer", {
+  file <- withr::local_tempfile(fileext = ".qs2")
+  payload <- list(cells = paste0("cell-", 1:1000), values = stats::runif(1000))
+  .writeCerebroPayload(payload, file, "qs2")
+  expect_identical(.cerebroPayloadCodec(file), "qs2")
+  expect_identical(.readCerebroPayload(file), payload)
+})

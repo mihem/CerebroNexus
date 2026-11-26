@@ -1478,6 +1478,13 @@ builder_verify_crb <- function(
           item$name %||% basename(path)
         ),
         spatial_backend = spatial_backend_descriptor,
+        immune_backend = .builder_build_runtime_function(
+          ".immuneRepertoireBackend"
+        )(
+          object,
+          path
+        ),
+        viewer_pack_valid = is.list(viewer_pack),
         dataset_info = .builder_build_runtime_function(
           ".readBundleDatasetInfo"
         )(
@@ -2733,6 +2740,18 @@ builder_execute_plan <- function(
             function(x) x$bundle_preflight$spatial_backend
           ),
           plan$dataset_order
+        ),
+        immune_backends = stats::setNames(
+          lapply(
+            verified_preflight,
+            function(x) x$bundle_preflight$immune_backend
+          ),
+          plan$dataset_order
+        ),
+        viewer_pack_valid = vapply(
+          verified_preflight,
+          function(x) isTRUE(x$bundle_preflight$viewer_pack_valid),
+          logical(1)
         ),
         spatial_catalogs = stats::setNames(
           lapply(

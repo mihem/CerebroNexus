@@ -138,6 +138,27 @@ test_that("a saved source that no longer parses is reported as changed", {
   )
 })
 
+test_that("QS2 sources are read through the package's TBB-safe reader", {
+  path <- withr::local_tempfile(fileext = ".qs2")
+  qs2::qs_save(SeuratObject::pbmc_small, path)
+  seen <- integer()
+  testthat::local_mocked_bindings(
+    .cerebroQs2Read = function(file, read, threads = 8L) {
+      seen <<- c(seen, threads)
+      read(file, nthreads = 1L)
+    },
+    .package = "CerebroNexus"
+  )
+  read <- builder_read_object(path)
+  expect_null(read$error)
+  expect_s4_class(read$object, "Seurat")
+  expect_identical(
+    SeuratObject::Cells(read$object),
+    SeuratObject::Cells(SeuratObject::pbmc_small)
+  )
+  expect_identical(seen, 8L)
+})
+
 test_that("a saved source MD5 is deferred to snapshot verification", {
   root <- withr::local_tempdir()
   writers <- list(

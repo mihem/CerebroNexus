@@ -648,7 +648,9 @@ builder_preview_frame <- function(
   object,
   reduction,
   group = NULL,
-  max_cells = BUILDER_PREVIEW_MAX
+  max_cells = BUILDER_PREVIEW_MAX,
+  .cells = NULL,
+  .metadata_match = NULL
 ) {
   if (is.null(reduction) || !nzchar(reduction)) {
     return(NULL)
@@ -660,17 +662,21 @@ builder_preview_frame <- function(
   if (is.null(emb) || ncol(emb) < 2) {
     return(NULL)
   }
-  cells <- SeuratObject::Cells(object)
+  cells <- if (is.null(.cells)) SeuratObject::Cells(object) else .cells
   embedding_match <- builder_match_cells(
     rownames(emb),
     cells,
     mode = "exact"
   )
-  metadata_match <- builder_match_cells(
-    rownames(object@meta.data),
-    cells,
-    mode = "exact"
-  )
+  metadata_match <- if (is.null(.metadata_match)) {
+    builder_match_cells(
+      rownames(object@meta.data),
+      cells,
+      mode = "exact"
+    )
+  } else {
+    .metadata_match
+  }
   assert_preview_identity <- function(match, component) {
     if (isTRUE(match$valid)) {
       return(invisible(match))
@@ -697,33 +703,39 @@ builder_preview_frame <- function(
   }
   assert_preview_identity(embedding_match, "Projection")
   assert_preview_identity(metadata_match, "Metadata")
-  emb <- emb[embedding_match$reorder_index, , drop = FALSE]
-  metadata <- object@meta.data[
-    metadata_match$reorder_index,
-    ,
-    drop = FALSE
-  ]
+
+  ## Deterministic downsampling: the same object always previews the same way,
+  ## so a difference on screen means a difference in the data. Sample indices
+  ## first so we only slice the bounded subset of two embedding columns and one
+  ## metadata column instead of copying the full matrix and meta.data.
+  n_cells <- length(cells)
+  keep <- if (n_cells > max_cells) {
+    .builder_seeded_sample(n_cells, max_cells, 42L)
+  } else {
+    seq_len(n_cells)
+  }
+  emb_index <- embedding_match$reorder_index[keep]
 
   df <- data.frame(
-    cell_barcode = cells,
-    x = as.numeric(emb[, 1]),
-    y = as.numeric(emb[, 2]),
+    cell_barcode = cells[keep],
+    x = as.numeric(emb[emb_index, 1L]),
+    y = as.numeric(emb[emb_index, 2L]),
     stringsAsFactors = FALSE
   )
-  if (!is.null(group) && group %in% colnames(metadata)) {
-    df$group <- as.character(metadata[[group]])
+  if (!is.null(group) && group %in% colnames(object@meta.data)) {
+    meta_index <- metadata_match$reorder_index[keep]
+    df$group <- as.character(object@meta.data[[group]][meta_index])
     df$group[is.na(df$group)] <- "N/A"
   } else {
     df$group <- "cells"
   }
 
-  ## Deterministic downsampling: the same object always previews the same way,
-  ## so a difference on screen means a difference in the data.
-  if (nrow(df) > max_cells) {
-    df <- df[.builder_seeded_sample(nrow(df), max_cells, 42L), , drop = FALSE]
+  if (n_cells > max_cells) {
+    ## Same row names as subsetting the full frame, as the preview did before.
+    row.names(df) <- keep
   }
   attr(df, "reduction") <- reduction
-  attr(df, "capped") <- nrow(emb) > max_cells
+  attr(df, "capped") <- n_cells > max_cells
   df
 }
 
@@ -750,12 +762,20 @@ builder_projection_preview_catalog <- function(
   if (is.na(max_cells) || max_cells < 1L) {
     max_cells <- BUILDER_PREVIEW_MAX
   }
+  cells <- SeuratObject::Cells(object)
+  metadata_match <- builder_match_cells(
+    rownames(object@meta.data),
+    cells,
+    mode = "exact"
+  )
   previews <- lapply(projections, function(projection) {
     builder_preview_frame(
       object,
       reduction = projection,
       group = group,
-      max_cells = max_cells
+      max_cells = max_cells,
+      .cells = cells,
+      .metadata_match = metadata_match
     )
   })
   names(previews) <- projections

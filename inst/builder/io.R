@@ -1316,7 +1316,13 @@ builder_formats <- list(
     label = "qs2",
     extensions = "qs2",
     package = "qs2",
-    read = function(path) qs2::qs_read(path)
+    ## The package's CRB reader: up to eight threads, one on a qs2 without TBB.
+    read = function(path) {
+      get(".cerebroQs2Read", envir = asNamespace("CerebroNexus"))(
+        path,
+        qs2::qs_read
+      )
+    }
   ),
   ## Still read, but no longer advertised: the qs package is archived, so the
   ## Add files hints list RDS and QS2 and warn that QS support will end.

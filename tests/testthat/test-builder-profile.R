@@ -95,6 +95,35 @@ test_that("axis identities preserve order, missing values, and UTF-8 text", {
   expect_false(identical(identity, builder_axis_identity(rev(ids))))
 })
 
+test_that("axis identities hash the documented length-prefixed stream", {
+  ids <- c(sprintf("cell-%06d", seq_len(25001L)), "cell/一", "", NA_character_)
+  present <- !is.na(ids)
+  records <- rep("-1:", length(ids))
+  records[present] <- paste0(
+    nchar(enc2utf8(ids[present]), type = "bytes"),
+    ":",
+    enc2utf8(ids[present])
+  )
+  md5_of <- function(text) {
+    path <- withr::local_tempfile()
+    writeBin(charToRaw(text), path)
+    unname(as.character(tools::md5sum(path)))
+  }
+  expect_identical(
+    builder_axis_identity(ids)$md5,
+    md5_of(paste0(
+      "CEREBRO_AXIS_IDENTITY_V1:",
+      length(ids),
+      ":",
+      paste0(records, collapse = "")
+    ))
+  )
+  expect_identical(
+    builder_axis_identity(character())$md5,
+    md5_of("CEREBRO_AXIS_IDENTITY_V1:0:")
+  )
+})
+
 test_that("source records are inert validated data", {
   skip_if_not_installed("SeuratObject")
   object <- builder_profile_pbmc()
