@@ -1,3 +1,14 @@
+# CerebroNexus 8.5.2
+
+- **Faster Viewer Pack builds and opens (#294).** A Viewer Pack now stores a
+  content digest for each section and item and the package version that built
+  it, so a rebuild (`buildViewerPack(overwrite = TRUE)`) keeps the files of the
+  items that did not change instead of writing them again. `buildViewerPack()`
+  shares the Viewer's on-disk cache of CRB checksums, cell names are hashed in
+  memory when possible, and Pack files are read and written with several
+  threads. A pack written by another package version is built anew, which also
+  gives older packs the point size of each spatial section (format revision 3).
+
 # CerebroNexus 8.5.1
 
 - **Faster page loads and tables (#293).** The Viewer defers its remaining
