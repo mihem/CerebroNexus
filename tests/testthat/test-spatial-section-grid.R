@@ -893,7 +893,7 @@ test_that("the Builder offers the Spatial layout with the author's choice", {
   )
 })
 
-test_that("multi-section grids below 400k cells stream and skip coordinate reads when pack extents exist", {
+test_that("multi-section grids below 400k cells stream, and a section read from a Pack file takes its extent from its coordinates", {
   ## Kukanja-scale: 52 sections, 270k cells (< 400k) streams and opens with a
   ## first-screen head batch (~60k cells).
   expect_true(spatial_grid_should_stream(270878L, 52L))
