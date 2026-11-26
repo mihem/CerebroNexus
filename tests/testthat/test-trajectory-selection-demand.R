@@ -40,6 +40,9 @@ test_that("selected table does not require lazy appearance controls", {
 test_that("selected table matches barcodes first and coordinates as fallback", {
   expr <- trajectory_table_assignment()
   scope <- viewer_runtime_env()
+  ## The Viewer calls req() from an attached shiny; R CMD check does not
+  ## attach it, so the scope names it as the first test does.
+  scope$req <- shiny::req
   scope$output <- list()
   local_mocked_bindings(
     renderDataTable = function(expr, ...) {
