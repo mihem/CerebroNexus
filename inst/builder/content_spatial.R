@@ -324,19 +324,26 @@
 .builder_profile_spatial_barcode_summary <- function(
   ids,
   expected,
-  allow_outside = FALSE
+  allow_outside = FALSE,
+  match = NULL
 ) {
-  match <- builder_match_cells(ids, expected, mode = "subset")
+  if (is.null(match)) {
+    match <- builder_match_cells(ids, expected, mode = "subset")
+  }
   blanks <- is.na(match$ids) | !nzchar(match$ids)
   usable <- match$ids[!blanks]
   duplicate_rows <- duplicated(usable) |
     duplicated(usable, fromLast = TRUE)
-  outside <- !usable %in% match$expected
+  outside_count <- if (length(match$extra)) {
+    sum(usable %in% match$extra)
+  } else {
+    0L
+  }
   overlap_count <- length(match$matched_ids)
   relation <- match$relation
   if (!overlap_count && !any(blanks) && !any(duplicate_rows)) {
     relation <- "zero"
-  } else if (any(outside) && !isTRUE(allow_outside)) {
+  } else if (outside_count > 0L && !isTRUE(allow_outside)) {
     relation <- "invalid"
   }
 
@@ -345,7 +352,7 @@
     unique_count = length(unique(usable)),
     blank_count = sum(blanks),
     duplicate_count = sum(duplicate_rows),
-    outside_count = sum(outside),
+    outside_count = as.integer(outside_count),
     overlap_count = overlap_count,
     dataset_count = length(match$expected),
     coverage = if (length(match$expected)) match$coverage else 0,
@@ -489,7 +496,8 @@
   barcodes <- .builder_profile_spatial_barcode_summary(
     ids,
     context$cells,
-    allow_outside = TRUE
+    allow_outside = TRUE,
+    match = cell_match
   )
 
   raster_profile <- .builder_profile_spatial_raster(raster)
@@ -617,17 +625,20 @@
   }
 
   row_barcodes <- rownames(coordinates)
-  row_overlap <- sum(row_barcodes %in% expected_cells, na.rm = TRUE)
   selected <- .spx_find_barcode_column(coordinates, expected_cells)
   selected_barcodes <- if (is.null(selected)) {
     NULL
   } else {
     .spx_contract_barcode_values(coordinates, selected)
   }
+  ## One lookup for both candidates: `%in%` hashes all dataset cells each call.
+  found <- c(row_barcodes, selected_barcodes) %in% expected_cells
+  row_count <- length(row_barcodes)
+  row_overlap <- sum(found[seq_len(row_count)])
   selected_overlap <- if (is.null(selected_barcodes)) {
     0L
   } else {
-    sum(selected_barcodes %in% expected_cells, na.rm = TRUE)
+    sum(found[row_count + seq_along(selected_barcodes)])
   }
   use_selected <- !is.null(selected) && selected_overlap >= row_overlap
   if (use_selected) {

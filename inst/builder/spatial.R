@@ -171,18 +171,39 @@ builder_spatial_scene_layers <- function(object, id, kind) {
   kind,
   cells,
   unit,
-  label = id
+  label = id,
+  .row_index = NULL
 ) {
+  meta <- object@meta.data
+  sample_candidates <- c("sample", "sample_id", "orig.ident")
+  roi_candidates <- c("sample_roi", "roi", "roi_id", "region_of_interest")
+  row_index <- .row_index
+  if (
+    is.null(row_index) &&
+      is.data.frame(meta) &&
+      length(cells) &&
+      ncol(meta) &&
+      any(tolower(colnames(meta)) %in% c(sample_candidates, roi_candidates))
+  ) {
+    keys <- if ("cell_barcode" %in% colnames(meta)) {
+      as.character(meta[["cell_barcode"]])
+    } else {
+      rownames(meta)
+    }
+    row_index <- match(cells, keys)
+  }
   annotations <- list(
     sample = builder_viewer_spatial_annotation(
-      object@meta.data,
+      meta,
       cells,
-      c("sample", "sample_id", "orig.ident")
+      sample_candidates,
+      .row_index = row_index
     ),
     roi = builder_viewer_spatial_annotation(
-      object@meta.data,
+      meta,
       cells,
-      c("sample_roi", "roi", "roi_id", "region_of_interest")
+      roi_candidates,
+      .row_index = row_index
     )
   )
   builder_viewer_spatial_scene(
@@ -234,36 +255,34 @@ builder_spatial_alignment_sections <- function(object) {
     },
     reduction_names
   )
-  sections <- lapply(reduction_names, function(name) {
+
+  specs <- list()
+  for (name in reduction_names) {
     cells <- tryCatch(
       rownames(SeuratObject::Embeddings(object[[name]])),
       error = function(error) character()
     )
-    .builder_spatial_scene(
-      object,
-      name,
-      "spatial_reduction",
-      cells,
-      "Spatial coordinate units",
-      paste0(name, " (reduction)")
+    specs[[length(specs) + 1L]] <- list(
+      id = name,
+      kind = "spatial_reduction",
+      cells = cells,
+      unit = "Spatial coordinate units",
+      label = paste0(name, " (reduction)")
     )
-  })
-  sections <- c(
-    sections,
-    lapply(image_names, function(name) {
-      cells <- tryCatch(
-        SeuratObject::Cells(object[[name]]),
-        error = function(error) character()
-      )
-      .builder_spatial_scene(
-        object,
-        name,
-        "spatial",
-        cells,
-        "Spatial coordinate units"
-      )
-    })
-  )
+  }
+  for (name in image_names) {
+    cells <- tryCatch(
+      SeuratObject::Cells(object[[name]]),
+      error = function(error) character()
+    )
+    specs[[length(specs) + 1L]] <- list(
+      id = name,
+      kind = "spatial",
+      cells = cells,
+      unit = "Spatial coordinate units",
+      label = name
+    )
+  }
 
   trekker <- tryCatch(object@misc$trekker, error = function(error) NULL)
   has_trekker_coordinates <- is.list(trekker) &&
@@ -271,16 +290,73 @@ builder_spatial_alignment_sections <- function(object) {
     length(trekker$x %||% numeric()) > 0L &&
     length(trekker$y %||% numeric()) > 0L
   if (has_trekker_coordinates) {
-    sections[[length(sections) + 1L]] <- .builder_spatial_scene(
-      object,
-      "trekker",
-      "trekker",
-      as.character(trekker$barcodes),
-      "Physical coordinate units",
-      "Trekker physical space"
+    specs[[length(specs) + 1L]] <- list(
+      id = "trekker",
+      kind = "trekker",
+      cells = as.character(trekker$barcodes),
+      unit = "Physical coordinate units",
+      label = "Trekker physical space"
     )
   }
-  sections
+
+  if (!length(specs)) {
+    return(list())
+  }
+
+  ## Hash metadata cell keys once across all sections instead of rebuilding the
+  ## full hash table twice per section (e.g. 118x for 59 sections).
+  row_indices <- vector("list", length(specs))
+  meta <- object@meta.data
+  ann_candidates <- c(
+    "sample",
+    "sample_id",
+    "orig.ident",
+    "sample_roi",
+    "roi",
+    "roi_id",
+    "region_of_interest"
+  )
+  if (
+    is.data.frame(meta) &&
+      ncol(meta) &&
+      any(tolower(colnames(meta)) %in% ann_candidates)
+  ) {
+    lengths <- vapply(specs, function(s) length(s$cells), integer(1))
+    total <- sum(lengths)
+    if (total > 0L) {
+      keys <- if ("cell_barcode" %in% colnames(meta)) {
+        as.character(meta[["cell_barcode"]])
+      } else {
+        rownames(meta)
+      }
+      all_cells <- unlist(
+        lapply(specs, `[[`, "cells"),
+        use.names = FALSE
+      )
+      all_matched <- match(all_cells, keys)
+      offset <- 0L
+      for (i in seq_along(specs)) {
+        n_i <- lengths[[i]]
+        if (n_i > 0L) {
+          row_indices[[i]] <- all_matched[(offset + 1L):(offset + n_i)]
+          offset <- offset + n_i
+        }
+      }
+    }
+  }
+
+  lapply(seq_along(specs), function(i) {
+    spec <- specs[[i]]
+    .builder_spatial_scene(
+      object,
+      spec$id,
+      spec$kind,
+      spec$cells,
+      spec$unit,
+      spec$label,
+      .row_index = row_indices[[i]]
+    )
+  })
 }
 
 builder_profile_spatial_reductions <- function(profile) {

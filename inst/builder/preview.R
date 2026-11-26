@@ -224,6 +224,41 @@ builder_alignment_layer_cells <- function(object, assay, layer = NULL) {
 #' All-ROI previews stay raw for live section transforms in the browser; ROI
 #' previews receive the section transform first so the browser only applies the
 #' ROI-local transform, matching the built Viewer.
+## The alignment sections of a dataset depend only on its object, which the
+## worker never changes in place: it is loaded or reopened from one snapshot.
+## Each preview request (every section switch) recomputed them, 1.06 s for 59
+## sections of 4.3 million cells; they are kept per dataset id for the
+## snapshot they came from and recomputed when the snapshot changes.
+builder_alignment_sections_cached <- function(id, object) {
+  snapshots <- get0(".builder_snapshots", envir = globalenv(), inherits = FALSE)
+  snapshot <- if (is.environment(snapshots) && is.character(id)) {
+    get0(id, envir = snapshots, inherits = FALSE)
+  }
+  identity <- tryCatch(
+    .builder_worker_identity(snapshot),
+    error = function(error) NULL
+  )
+  if (is.null(identity)) {
+    return(builder_spatial_alignment_sections(object))
+  }
+  cache <- get0(
+    ".builder_alignment_sections_cache",
+    envir = globalenv(),
+    inherits = FALSE
+  )
+  if (!is.environment(cache)) {
+    cache <- new.env(parent = emptyenv())
+    assign(".builder_alignment_sections_cache", cache, envir = globalenv())
+  }
+  hit <- get0(id, envir = cache, inherits = FALSE)
+  if (is.list(hit) && identical(hit$identity, identity)) {
+    return(hit$sections)
+  }
+  sections <- builder_spatial_alignment_sections(object)
+  assign(id, list(identity = identity, sections = sections), envir = cache)
+  sections
+}
+
 builder_alignment_preview_model <- function(
   object,
   default_projection = NULL,
@@ -233,13 +268,14 @@ builder_alignment_preview_model <- function(
   assay = NULL,
   layer = NULL,
   base_coordinate_transform = NULL,
-  max_cells = BUILDER_PREVIEW_MAX
+  max_cells = BUILDER_PREVIEW_MAX,
+  .sections = NULL
 ) {
   roi <- as.character(roi %||% "")
   if (length(roi) != 1L || is.na(roi)) {
     roi <- ""
   }
-  sections <- builder_spatial_alignment_sections(object)
+  sections <- .sections %||% builder_spatial_alignment_sections(object)
   if (!length(sections)) {
     return(.builder_alignment_unavailable(
       sections,

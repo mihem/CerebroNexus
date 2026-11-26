@@ -1298,3 +1298,60 @@ test_that("columns with many distinct values are counted without sorting them", 
   expect_identical(profiled$groups$legacy$levels$cluster, c("A", "B", "C"))
   expect_identical(profiled$groups$candidates, "cluster")
 })
+
+test_that("factor level counts match the character-table counts exactly", {
+  cases <- list(
+    plain = factor(c("b", "a", "b", "c", "a", "b")),
+    ties_and_unused = factor(
+      c("z", "y", "y", "z", "x"),
+      levels = c("unused", "z", "y", "x")
+    ),
+    missing = factor(c("a", NA, "b", NA, "a")),
+    literal_na_level = factor(c("N/A", NA, "a", "N/A")),
+    blank_level = factor(c("", "a", "", "b")),
+    empty = factor(character()),
+    all_missing = factor(c(NA, NA), levels = "a")
+  )
+  for (case in names(cases)) {
+    values <- cases[[case]]
+    ## The factor route replaced as.character() + table(); the character route
+    ## below is that original code, so both must agree to the attribute.
+    expect_identical(
+      .builder_profile_level_counts(values),
+      .builder_profile_level_counts(as.character(values)),
+      info = case
+    )
+  }
+})
+
+test_that("character level counts equal the table() route they replaced", {
+  reference <- function(values) {
+    text <- if (is.atomic(values)) {
+      as.character(values)
+    } else {
+      rep(NA_character_, length(values))
+    }
+    text[is.na(text)] <- "N/A"
+    sort(table(text, useNA = "no"), decreasing = TRUE)
+  }
+  cases <- list(
+    plain = c("b", "a", "b", "c", "a", "b"),
+    mixed_case = c("beta", "Alpha", "alpha", "Beta", "beta", "ALPHA"),
+    unicode_and_blank = c("é", "e", "", "é", NA, "z", ""),
+    literal_na = c("N/A", NA, "a", "N/A"),
+    single = c("only", "only"),
+    empty = character(),
+    all_missing = c(NA_character_, NA_character_),
+    integers = c(3L, 1L, 3L, 2L, NA),
+    numeric_nan = c(1.5, NaN, NA, 1.5, NaN, 2),
+    string_nan = c("NaN", "a", "NaN", NA),
+    logical = c(TRUE, FALSE, TRUE, NA)
+  )
+  for (case in names(cases)) {
+    expect_identical(
+      attr(.builder_profile_level_counts(cases[[case]]), "builder_full_counts"),
+      reference(cases[[case]]),
+      info = case
+    )
+  }
+})

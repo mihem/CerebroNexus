@@ -413,10 +413,12 @@ builder_session_spatial_preview <- function(
         assay = args$assay,
         layer = args$layer,
         base_coordinate_transform = args$base_coordinate_transform,
-        max_cells = args$max_cells
+        max_cells = args$max_cells,
+        .sections = builder_alignment_sections_cached(args$id, object)
       )
     },
     list(
+      id = id,
       default_projection = default_projection,
       group = group,
       roi = roi,

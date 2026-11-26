@@ -693,3 +693,75 @@ test_that("oversized section names fail closed with a bounded summary", {
   expect_true(result$normalized$sections[[1L]]$name_truncated)
   expect_lt(as.numeric(object.size(result)), 100000)
 })
+
+test_that("a reused cell match gives the same barcode summary", {
+  expected <- paste0("cell-", 1:20)
+  ids <- c(
+    expected[c(1:8, 3, 4)],
+    "outside-1",
+    "outside-1",
+    "outside-2",
+    "",
+    NA_character_
+  )
+  for (allow_outside in c(TRUE, FALSE)) {
+    fresh <- .builder_profile_spatial_barcode_summary(
+      ids,
+      expected,
+      allow_outside = allow_outside
+    )
+    reused <- .builder_profile_spatial_barcode_summary(
+      ids,
+      expected,
+      allow_outside = allow_outside,
+      match = builder_match_cells(ids, expected, mode = "subset")
+    )
+    expect_identical(reused, fresh)
+  }
+  usable <- ids[!is.na(ids) & nzchar(ids)]
+  expect_identical(fresh$outside_count, sum(!usable %in% expected))
+  expect_identical(fresh$relation, "invalid")
+})
+
+test_that("section coordinates count both barcode sources in one lookup", {
+  skip_if_not_installed("SeuratObject")
+  object <- builder_content_spatial_example_object("fov")
+  image <- object[["fov"]]
+  cells <- colnames(object)
+  ## The two-lookup original, kept here as the reference.
+  reference <- function(image, expected_cells) {
+    coordinates <- builder_spatial_coordinate_table(
+      SeuratObject::GetTissueCoordinates(image)
+    )$data
+    row_barcodes <- rownames(coordinates)
+    row_overlap <- sum(row_barcodes %in% expected_cells, na.rm = TRUE)
+    selected <- .spx_find_barcode_column(coordinates, expected_cells)
+    selected_barcodes <- if (!is.null(selected)) {
+      .spx_contract_barcode_values(coordinates, selected)
+    }
+    selected_overlap <- if (is.null(selected_barcodes)) {
+      0L
+    } else {
+      sum(selected_barcodes %in% expected_cells, na.rm = TRUE)
+    }
+    if (!is.null(selected) && selected_overlap >= row_overlap) {
+      coordinates[[selected]] <- NULL
+      return(list(
+        coordinates = coordinates,
+        source = selected,
+        barcodes = selected_barcodes
+      ))
+    }
+    list(
+      coordinates = coordinates,
+      source = "rownames",
+      barcodes = row_barcodes
+    )
+  }
+  for (expected in list(cells, cells[1:10], paste0("other-", 1:5))) {
+    expect_identical(
+      .builder_profile_spatial_image_coordinates(image, expected),
+      reference(image, expected)
+    )
+  }
+})

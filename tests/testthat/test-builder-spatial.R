@@ -3572,3 +3572,100 @@ test_that("one slide applied to every section keeps each section's own extent", 
     c(A = 0L, B = 0L, C = 7L)
   )
 })
+
+test_that("batched section matching gives the per-section annotations", {
+  skip_if_not_installed("SeuratObject")
+  object <- builder_content_spatial_example_object(c("section-a", "section-b"))
+  object$sample_roi <- rep(
+    c("lesion", "border", "core"),
+    length.out = ncol(object)
+  )
+  ## Shuffle metadata rows so row order cannot stand in for barcode matching.
+  object@meta.data <- object@meta.data[rev(seq_len(nrow(object@meta.data))), ]
+  for (barcode_column in c(FALSE, TRUE)) {
+    if (barcode_column) {
+      object$cell_barcode <- rownames(object@meta.data)
+    }
+    batched <- builder_spatial_alignment_sections(object)
+    one_by_one <- lapply(c("section-a", "section-b"), function(name) {
+      .builder_spatial_scene(
+        object,
+        name,
+        "spatial",
+        SeuratObject::Cells(object[[name]]),
+        "Spatial coordinate units"
+      )
+    })
+    expect_identical(batched, one_by_one)
+    expect_identical(batched[[1L]]$annotations$roi$count, 3L)
+  }
+})
+
+test_that("alignment sections are computed once per dataset snapshot", {
+  skip_if_not_installed("SeuratObject")
+  object <- builder_content_spatial_example_object(c("section-a", "section-b"))
+  had <- vapply(
+    c(".builder_snapshots", ".builder_alignment_sections_cache"),
+    exists,
+    logical(1),
+    envir = globalenv(),
+    inherits = FALSE
+  )
+  snapshots <- new.env(parent = emptyenv())
+  assign(".builder_snapshots", snapshots, envir = globalenv())
+  withr::defer(rm(
+    list = c(".builder_snapshots", ".builder_alignment_sections_cache")[!had],
+    envir = globalenv()
+  ))
+  snapshot <- function(md5) {
+    list(
+      path = "/snapshots/ds1",
+      owner_token = "owner",
+      object_md5 = strrep(md5, 32L),
+      serialization = "rds"
+    )
+  }
+  assign("ds1", snapshot("a"), envir = snapshots)
+  runtime <- environment(builder_alignment_sections_cached)
+  compute <- runtime$builder_spatial_alignment_sections
+  withr::defer(runtime$builder_spatial_alignment_sections <- compute)
+  calls <- 0L
+  runtime$builder_spatial_alignment_sections <- function(object) {
+    calls <<- calls + 1L
+    compute(object)
+  }
+
+  first <- builder_alignment_sections_cached("ds1", object)
+  second <- builder_alignment_sections_cached("ds1", object)
+  expect_identical(calls, 1L)
+  expect_identical(second, first)
+  expect_identical(first, compute(object))
+
+  ## A reloaded dataset (another snapshot) is computed again.
+  assign("ds1", snapshot("b"), envir = snapshots)
+  builder_alignment_sections_cached("ds1", object)
+  expect_identical(calls, 2L)
+  ## Without a snapshot there is nothing to key on: computed every time.
+  builder_alignment_sections_cached("unknown", object)
+  builder_alignment_sections_cached("unknown", object)
+  expect_identical(calls, 4L)
+
+  ## The preview built from cached sections is the preview built without.
+  expect_identical(
+    builder_alignment_preview_model(
+      object,
+      default_projection = "umap",
+      group = "seurat_clusters",
+      section_id = "section-a",
+      layer = "counts",
+      .sections = first
+    ),
+    builder_alignment_preview_model(
+      object,
+      default_projection = "umap",
+      group = "seurat_clusters",
+      section_id = "section-a",
+      layer = "counts"
+    )
+  )
+})
