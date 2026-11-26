@@ -1169,3 +1169,103 @@ test_that("a new Builder sweeps the output folders a killed Builder used", {
     expect_false(file.exists(builder_release_registry_path()))
   })
 })
+
+test_that("release fingerprints match the single-entry contract", {
+  local({
+    builder_publish_source()
+    root <- withr::local_tempdir()
+    dir.create(file.path(root, "nested"))
+    writeLines("payload", file.path(root, "dataset.crb"))
+    writeLines("other", file.path(root, "nested", "other.txt"))
+    info <- fs::file_info(
+      c(
+        file.path(root, "dataset.crb"),
+        file.path(root, "nested"),
+        file.path(root, "nested", "other.txt")
+      ),
+      follow = FALSE
+    )
+    skip_if(
+      anyNA(info$inode) || anyNA(info$device_id),
+      "The file system reports no inode or device id."
+    )
+
+    vectorized <- .builder_release_file_fingerprints(info)
+    single <- lapply(seq_len(nrow(info)), function(index) {
+      .builder_release_file_fingerprint(info[index, , drop = FALSE])
+    })
+    expect_identical(vectorized, single)
+    expect_identical(.builder_release_file_fingerprints(info[0L, ]), list())
+
+    unsafe <- list(
+      type = function(x) {
+        x$type <- ""
+        x
+      },
+      permissions = function(x) {
+        x$permissions <- ""
+        x
+      },
+      negative_size = function(x) {
+        x$size <- -1
+        x
+      },
+      fractional_size = function(x) {
+        x$size <- 1.5
+        x
+      },
+      device = function(x) {
+        x$device_id <- -1
+        x
+      },
+      inode = function(x) {
+        x$inode <- -1
+        x
+      },
+      links = function(x) {
+        x$hard_links <- 0
+        x
+      }
+    )
+    plain <- data.frame(
+      type = as.character(info$type),
+      size = as.double(info$size),
+      permissions = as.character(info$permissions),
+      device_id = as.double(info$device_id),
+      inode = as.double(info$inode),
+      hard_links = as.double(info$hard_links),
+      modification_time = as.double(info$modification_time),
+      change_time = as.double(info$change_time),
+      stringsAsFactors = FALSE
+    )
+    expect_identical(.builder_release_file_fingerprints(plain), single)
+    for (field in names(unsafe)) {
+      row <- unsafe[[field]](plain[1L, , drop = FALSE])
+      expect_error(
+        .builder_release_file_fingerprint(row),
+        "could not be fingerprinted safely",
+        info = field
+      )
+      expect_error(
+        .builder_release_file_fingerprints(rbind(plain, row)),
+        "could not be fingerprinted safely",
+        info = field
+      )
+    }
+  })
+})
+
+test_that("in-memory release record MD5 matches the file digest", {
+  local({
+    builder_publish_source()
+    skip_if_not_installed("digest")
+    path <- withr::local_tempfile()
+    for (bytes in list(raw(), charToRaw("CEREBRO"), as.raw(0:255))) {
+      writeBin(bytes, path)
+      expect_identical(
+        .builder_release_raw_md5(bytes),
+        unname(as.character(tools::md5sum(path)))
+      )
+    }
+  })
+})

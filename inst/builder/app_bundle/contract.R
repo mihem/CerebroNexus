@@ -198,6 +198,9 @@ builder_planned_viewer_packs <- function(items) {
 )
 
 .builder_app_spatial_path_digest <- function(bytes) {
+  if (requireNamespace("digest", quietly = TRUE)) {
+    return(unname(digest::digest(bytes, algo = "md5", serialize = FALSE)))
+  }
   path <- tempfile("cerebro-builder-spatial-path-")
   on.exit(unlink(path), add = TRUE)
   writeBin(bytes, path)

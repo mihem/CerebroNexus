@@ -1778,6 +1778,61 @@ test_that("the worker seeds copied App data from request identities", {
   ))
 })
 
+test_that("the worker seeds copied Spatial images from request identities", {
+  app_dir <- withr::local_tempdir()
+  record <- list(path = "/source/images/H&E.png")
+  target <- .builder_app_spatial_target("ds1", "fov", "H&E", record$path)
+  dir.create(dirname(file.path(app_dir, target)), recursive = TRUE)
+  writeBin(as.raw(0:255), file.path(app_dir, target))
+  identity <- list(
+    type = "file",
+    size = as.double(file.size(file.path(app_dir, target))),
+    md5 = unname(toupper(tools::md5sum(file.path(app_dir, target))))
+  )
+  request <- list(
+    spatial_images = list(ds1 = list(fov = list(`H&E` = record))),
+    spatial_image_identities = list(ds1 = list(fov = list(`H&E` = identity)))
+  )
+  hashed <- character()
+  counting <- function(path) {
+    hashed <<- c(hashed, basename(path))
+    tools::md5sum(path)
+  }
+
+  seed <- .builder_build_app_tree_seed(app_dir, request)
+  expect_identical(names(seed$entries), target)
+  expect_identical(seed$entries[[target]]$md5, tolower(identity$md5))
+  seeded <- .builder_app_tree_identity(
+    app_dir,
+    .digest_file = counting,
+    .previous = seed
+  )
+  expect_false(basename(target) %in% hashed)
+  expect_identical(
+    .builder_app_tree_summary(seeded),
+    .builder_app_tree_summary(.builder_app_tree_identity(app_dir))
+  )
+
+  # A size that differs from the identity is not trusted.
+  request$spatial_image_identities$ds1$fov$`H&E`$size <- identity$size + 1
+  expect_length(.builder_build_app_tree_seed(app_dir, request)$entries, 0L)
+})
+
+test_that("in-memory path digests match the temporary-file digests", {
+  skip_if_not_installed("digest")
+  path <- withr::local_tempfile()
+  for (bytes in list(
+    raw(),
+    charToRaw("cerebro-spatial-image-v1:"),
+    as.raw(0:255)
+  )) {
+    writeBin(bytes, path)
+    expected <- unname(as.character(tools::md5sum(path)))
+    expect_identical(.builder_app_spatial_path_digest(bytes), expected)
+    expect_identical(.bundlePathDigest(bytes), expected)
+  }
+})
+
 test_that("read-back rejects a Viewer page-gate mismatch", {
   crb <- tempfile(fileext = ".crb")
   on.exit(unlink(crb), add = TRUE)

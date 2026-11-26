@@ -1062,6 +1062,9 @@
 }
 
 .bundlePathDigest <- function(bytes) {
+  if (requireNamespace("digest", quietly = TRUE)) {
+    return(unname(digest::digest(bytes, algo = "md5", serialize = FALSE)))
+  }
   path <- tempfile("cerebro-bundle-path-")
   on.exit(unlink(path), add = TRUE)
   writeBin(bytes, path)

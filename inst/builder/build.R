@@ -2127,6 +2127,55 @@ builder_verify_crb <- function(
       )
     }
   }
+  spatial_images <- request$spatial_images %||% list()
+  spatial_identities <- request$spatial_image_identities %||% list()
+  for (dataset in names(spatial_images)) {
+    sections <- spatial_images[[dataset]] %||% list()
+    for (section in names(sections)) {
+      records <- sections[[section]] %||% list()
+      for (label in names(records)) {
+        record <- records[[label]]
+        identity <- tryCatch(
+          spatial_identities[[dataset]][[section]][[label]],
+          error = function(error) NULL
+        )
+        if (
+          !is.list(record) ||
+            !is.list(identity) ||
+            !identical(identity$type, "file")
+        ) {
+          next
+        }
+        target <- tryCatch(
+          .builder_app_spatial_target(dataset, section, label, record$path),
+          error = function(error) NULL
+        )
+        if (is.null(target)) {
+          next
+        }
+        fingerprint <- tryCatch(
+          .builder_app_file_fingerprint(fs::file_info(
+            file.path(app_dir, target),
+            fail = TRUE,
+            follow = FALSE
+          )),
+          error = function(error) NULL
+        )
+        if (
+          !is.list(fingerprint) ||
+            !identical(fingerprint$type, "file") ||
+            !identical(fingerprint$size, as.double(identity$size))
+        ) {
+          next
+        }
+        entries[[target]] <- c(
+          list(path = target),
+          fingerprint,
+          list(md5 = tolower(identity$md5))
+        )
+      }
+    }
+  }
   list(entries = entries)
 }
 
