@@ -27,191 +27,7 @@ viewerPackCellOrderFingerprint <- function(cells) {
   paste0("md5-cell-order-v1:", digest)
 }
 
-## TRUE when `domain` is eligible to be served from `pack`.
-## Packs opened via exact CRB MD5 match have `eligible_domains = NULL` and
-## `runtime_object = NULL` (all domains eligible); packs opened via lazy
-## content-digest decoupling evaluate ONLY the requested domain on first access
-## and cache the boolean result in `pack$domain_cache`.
-viewerPackDomainEligible <- function(pack, domain) {
-  if (!is.list(pack)) {
-    return(FALSE)
-  }
-  domain <- as.character(domain)
-  eligible <- pack$eligible_domains
-  if (!is.null(eligible)) {
-    return(isTRUE(eligible[[domain]]))
-  }
-  obj <- pack$runtime_object
-  if (is.null(obj)) {
-    return(TRUE)
-  }
-  if (identical(domain, "common")) {
-    return(TRUE)
-  }
-  dcache <- pack$domain_cache
-  if (
-    is.environment(dcache) && exists(domain, envir = dcache, inherits = FALSE)
-  ) {
-    return(get(domain, envir = dcache, inherits = FALSE))
-  }
-  manifest_digests <- pack$manifest$content_digests
-  if (!is.list(manifest_digests)) {
-    return(FALSE)
-  }
-  ok <- if (identical(domain, "groups")) {
-    viewerPackDomainEligible(pack, "metadata")
-  } else if (identical(domain, "trajectory")) {
-    viewerPackDomainEligible(pack, "projections") &&
-      identical(
-        as.character(manifest_digests[["trajectories"]]),
-        as.character(.viewerPackRuntimeDomainDigest(obj, "trajectories"))
-      )
-  } else if (
-    domain %in% c("projections", "metadata", "spatial", "immune", "hla_tcr")
-  ) {
-    identical(
-      as.character(manifest_digests[[domain]]),
-      as.character(.viewerPackRuntimeDomainDigest(obj, domain))
-    )
-  } else {
-    FALSE
-  }
-  if (is.environment(dcache)) {
-    assign(domain, isTRUE(ok), envir = dcache)
-  }
-  isTRUE(ok)
-}
-
-.viewerPackAssetDomain <- function(path) {
-  path <- as.character(path)
-  if (length(path) != 1L || is.na(path)) {
-    return(NA_character_)
-  }
-  slash <- regexpr("/", path, fixed = TRUE)
-  if (slash <= 1L) {
-    return(NA_character_)
-  }
-  substr(path, 1L, slash - 1L)
-}
-
-.viewerPackRuntimeDomainDigest <- function(object, domain) {
-  hash_section <- function(value) paste0("xxh128-v1:", rlang::hash(value))
-  if (identical(domain, "projections")) {
-    projections <- tryCatch(object$availableProjections(), error = function(e) {
-      character()
-    })
-    proj_digests <- stats::setNames(
-      lapply(projections, function(nm) {
-        hash_section(tryCatch(object$getProjection(nm), error = function(e) {
-          NULL
-        }))
-      }),
-      projections
-    )
-    return(hash_section(proj_digests))
-  }
-  if (identical(domain, "metadata")) {
-    metadata <- tryCatch(object$getMetaData(), error = function(e) NULL)
-    metadata_names <- if (is.data.frame(metadata)) {
-      setdiff(colnames(metadata), "cell_barcode")
-    } else {
-      character()
-    }
-    meta_col_digests <- stats::setNames(
-      lapply(metadata_names, function(col) hash_section(metadata[[col]])),
-      metadata_names
-    )
-    return(hash_section(list(
-      groups = tryCatch(object$getGroups(), error = function(e) character()),
-      cell_cycle = tryCatch(object$getCellCycle(), error = function(e) {
-        character()
-      }),
-      columns = meta_col_digests
-    )))
-  }
-  if (identical(domain, "trajectories")) {
-    return(hash_section(object$trajectories))
-  }
-  if (identical(domain, "spatial")) {
-    spatial_names <- tryCatch(object$availableSpatial(), error = function(e) {
-      character()
-    })
-    spatial_digests <- stats::setNames(
-      lapply(spatial_names, function(nm) {
-        hash_section(tryCatch(
-          object$getSpatialData(nm, hydrate_molecules = FALSE)[["coordinates"]],
-          error = function(e) NULL
-        ))
-      }),
-      spatial_names
-    )
-    return(hash_section(spatial_digests))
-  }
-  if (identical(domain, "immune")) {
-    repertoire <- tryCatch(object$getImmuneRepertoire(), error = function(e) {
-      list()
-    })
-    ir_version <- if (length(repertoire)) {
-      if (exists("IR_ENCODING_VERSION", inherits = TRUE)) {
-        get("IR_ENCODING_VERSION", inherits = TRUE)
-      } else {
-        tryCatch(
-          {
-            enc_env <- new.env(parent = baseenv())
-            sys.source(
-              system.file(
-                "viewer",
-                "immune_repertoire",
-                "encode.R",
-                package = "CerebroNexus"
-              ),
-              envir = enc_env
-            )
-            enc_env$IR_ENCODING_VERSION
-          },
-          error = function(e) NA_integer_
-        )
-      }
-    } else {
-      0L
-    }
-    return(hash_section(list(version = ir_version, repertoire = repertoire)))
-  }
-  if (identical(domain, "hla_tcr")) {
-    repertoire <- tryCatch(object$getImmuneRepertoire(), error = function(e) {
-      list()
-    })
-    has_hla_pkgs <- requireNamespace("igraph", quietly = TRUE) &&
-      requireNamespace("stringdist", quietly = TRUE)
-    meta_col_digests <- if (length(repertoire)) {
-      metadata <- tryCatch(object$getMetaData(), error = function(e) NULL)
-      metadata_names <- if (is.data.frame(metadata)) {
-        setdiff(colnames(metadata), "cell_barcode")
-      } else {
-        character()
-      }
-      stats::setNames(
-        lapply(metadata_names, function(col) hash_section(metadata[[col]])),
-        metadata_names
-      )
-    } else {
-      NULL
-    }
-    return(hash_section(list(
-      enabled = has_hla_pkgs,
-      groups = tryCatch(object$getGroups(), error = function(e) character()),
-      lineage = tryCatch(
-        object$getTechnicalInfo()$lineage_column,
-        error = function(e) NULL
-      ),
-      repertoire = repertoire,
-      metadata = meta_col_digests
-    )))
-  }
-  NA_character_
-}
-
-viewerPackOpen <- function(file, object = NULL) {
+viewerPackOpen <- function(file) {
   if (
     !is.character(file) ||
       length(file) != 1L ||
@@ -236,7 +52,11 @@ viewerPackOpen <- function(file, object = NULL) {
   )
   if (
     !is.list(manifest) ||
-      !identical(manifest$schema_version, VIEWER_PACK_SCHEMA_VERSION)
+      !identical(manifest$schema_version, VIEWER_PACK_SCHEMA_VERSION) ||
+      !identical(
+        manifest$dataset_fingerprint,
+        paste0("md5-crb-v1:", .viewerCrbMd5(file))
+      )
   ) {
     return(NULL)
   }
@@ -257,61 +77,11 @@ viewerPackOpen <- function(file, object = NULL) {
   ) {
     return(NULL)
   }
-  md5_matches <- identical(
-    manifest$dataset_fingerprint,
-    paste0("md5-crb-v1:", .viewerCrbMd5(file))
-  )
-  match_mode <- "crb_md5"
-  eligible_domains <- NULL
-  runtime_object <- NULL
-  domain_cache <- NULL
-  if (!md5_matches) {
-    if (is.null(object) || !is.list(manifest$content_digests)) {
-      return(NULL)
-    }
-    metadata <- tryCatch(object$getMetaData(), error = function(e) NULL)
-    cells <- if (
-      is.data.frame(metadata) && "cell_barcode" %in% colnames(metadata)
-    ) {
-      as.character(metadata$cell_barcode)
-    } else {
-      NULL
-    }
-    if (is.null(cells) || !identical(length(cells), cell_count)) {
-      return(NULL)
-    }
-    ## Check cell order against verified Pack cell_order.qs2 first (fast), else hash.
-    probe_pack <- list(
-      path = pack,
-      manifest = manifest,
-      cell_count = cell_count,
-      canonical_order = TRUE,
-      cache = new.env(parent = emptyenv())
-    )
-    stored_cells <- viewerPackReadAsset(probe_pack, "common/cell_order.qs2")
-    order_ok <- is.character(stored_cells) && identical(stored_cells, cells)
-    if (
-      !order_ok &&
-        !identical(
-          as.character(manifest$cell_order_fingerprint),
-          as.character(viewerPackCellOrderFingerprint(cells))
-        )
-    ) {
-      return(NULL)
-    }
-    match_mode <- "lazy_domain"
-    runtime_object <- object
-    domain_cache <- new.env(parent = emptyenv())
-  }
   list(
     path = pack,
     manifest = manifest,
     cell_count = cell_count,
     canonical_order = TRUE,
-    match_mode = match_mode,
-    eligible_domains = eligible_domains,
-    runtime_object = runtime_object,
-    domain_cache = domain_cache,
     cache = new.env(parent = emptyenv())
   )
 }
@@ -346,34 +116,7 @@ viewerPackSourceSignature <- function(file) {
   )
 }
 
-.viewerPackQsThreads <- function() {
-  configured <- suppressWarnings(as.integer(getOption(
-    "cerebro.viewer_pack_threads",
-    NA_integer_
-  )))
-  if (length(configured) == 1L && !is.na(configured) && configured >= 1L) {
-    return(configured)
-  }
-  cores <- suppressWarnings(tryCatch(
-    parallel::detectCores(logical = FALSE),
-    error = function(e) 1L
-  ))
-  if (length(cores) != 1L || is.na(cores) || cores < 1L) {
-    1L
-  } else {
-    min(4L, as.integer(cores))
-  }
-}
-
-.viewerPackCacheSlots <- function() {
-  slots <- suppressWarnings(as.integer(getOption(
-    "cerebro.viewer_pack_cache_slots",
-    8L
-  )))
-  if (length(slots) != 1L || is.na(slots) || slots < 1L) 8L else slots
-}
-
-viewerPackOpenCached <- function(file, cache, object = NULL) {
+viewerPackOpenCached <- function(file, cache) {
   if (!is.environment(cache)) {
     stop("Viewer Pack descriptor cache must be an environment.", call. = FALSE)
   }
@@ -383,13 +126,11 @@ viewerPackOpenCached <- function(file, cache, object = NULL) {
   }
   cached <- cache[[signature$key]]
   if (!is.null(cached) && identical(cached$signature, signature)) {
-    cached$last_used <- as.numeric(Sys.time())
-    cache[[signature$key]] <- cached
     pack <- cached$descriptor
     pack$cache <- new.env(parent = emptyenv())
     return(pack)
   }
-  pack <- viewerPackOpen(file, object = object)
+  pack <- viewerPackOpen(file)
   if (is.null(pack)) {
     if (!is.null(cached)) {
       rm(list = signature$key, envir = cache)
@@ -400,26 +141,8 @@ viewerPackOpenCached <- function(file, cache, object = NULL) {
   descriptor$cache <- NULL
   cache[[signature$key]] <- list(
     signature = signature,
-    descriptor = descriptor,
-    last_used = as.numeric(Sys.time())
+    descriptor = descriptor
   )
-  max_slots <- .viewerPackCacheSlots()
-  keys <- ls(cache, all.names = TRUE)
-  if (length(keys) > max_slots) {
-    older <- setdiff(keys, signature$key)
-    ages <- vapply(
-      older,
-      function(k) {
-        val <- cache[[k]]$last_used
-        if (is.numeric(val) && length(val) == 1L) val else 0
-      },
-      numeric(1)
-    )
-    rm(
-      list = older[order(ages)][seq_len(length(keys) - max_slots)],
-      envir = cache
-    )
-  }
   pack
 }
 
@@ -448,90 +171,19 @@ viewerPackOpenCached <- function(file, cache, object = NULL) {
     return(unname(tools::md5sum(file)))
   }
   key <- .viewerFileVersionKey(normalizePath(file, winslash = "/"), info)
-  version_line <- paste(
-    normalizePath(file, winslash = "/"),
-    info$size,
-    format(as.numeric(info$mtime), digits = 17),
-    format(as.numeric(info$ctime), digits = 17),
-    sep = "\t"
-  )
   cached <- .viewer_file_md5_cache[[key]]
   if (!is.null(cached)) {
     return(cached)
   }
-  store <- tryCatch(
-    file.path(
-      tools::R_user_dir("CerebroNexus", "cache"),
-      "crb-md5",
-      paste0(.viewerCrbMd5Key(key), ".txt")
-    ),
-    error = function(error) NULL
-  )
-  sample <- NULL
-  value <- if (!is.null(store) && file.exists(store)) {
-    stored <- tryCatch(
-      readLines(store, n = 3L, warn = FALSE),
-      error = function(error) character()
-    )
-    ## The file version, the hash of its first and last MiB, its md5.
-    if (
-      length(stored) == 3L &&
-        identical(stored[[1L]], version_line) &&
-        grepl("^[0-9a-f]{32}$", stored[[3L]])
-    ) {
-      sample <- .viewerCrbSample(file, info$size)
-      if (identical(stored[[2L]], sample)) stored[[3L]]
-    }
-  }
-  if (is.null(value)) {
-    value <- unname(tools::md5sum(file))
-    if (!is.na(value) && !is.null(store)) {
-      tryCatch(
-        {
-          dir.create(dirname(store), recursive = TRUE, showWarnings = FALSE)
-          temporary <- paste0(store, ".", Sys.getpid(), ".tmp")
-          if (is.null(sample)) {
-            sample <- .viewerCrbSample(file, info$size)
-          }
-          writeLines(
-            c(version_line, sample, value),
-            temporary,
-            useBytes = TRUE
-          )
-          file.rename(temporary, store)
-        },
-        error = function(error) NULL
-      )
-    }
+  value <- if (requireNamespace("CerebroNexus", quietly = TRUE)) {
+    CerebroNexus:::.viewerPackCrbMd5(file)
+  } else {
+    unname(tools::md5sum(file))
   }
   if (!is.na(value)) {
     assign(key, value, envir = .viewer_file_md5_cache)
   }
   value
-}
-## The hash of the first and last MiB of a file of `size` bytes (the whole of
-## a smaller one): a replaced CRB differs there (its header, its payload's
-## last block), and reading them takes milliseconds.
-.viewerCrbSample <- function(file, size, bytes = 2^20) {
-  connection <- file(file, open = "rb")
-  on.exit(close(connection), add = TRUE)
-  head <- readBin(connection, "raw", n = min(size, bytes))
-  tail <- if (size > bytes) {
-    seek(connection, max(bytes, size - bytes))
-    readBin(connection, "raw", n = bytes)
-  }
-  rlang::hash(c(head, tail))
-}
-## A file name for a file version key (its md5, of the key's bytes).
-.viewerCrbMd5Key <- function(key) {
-  raw_bytes <- charToRaw(enc2utf8(key))
-  if ("bytes" %in% names(formals(tools::md5sum))) {
-    return(unname(tools::md5sum(bytes = raw_bytes)))
-  }
-  path <- tempfile("crb-md5-key-")
-  on.exit(unlink(path), add = TRUE)
-  writeBin(raw_bytes, path)
-  unname(tools::md5sum(path))
 }
 ## Viewer Pack assets are verified against their manifest checksum before a
 ## session exposes them. Hash each file version once per process, not once per
@@ -570,10 +222,6 @@ viewerPackVerifiedAsset <- function(
   md5 = .viewerFileMd5,
   accept = NULL
 ) {
-  domain <- .viewerPackAssetDomain(path)
-  if (!is.na(domain) && !viewerPackDomainEligible(pack, domain)) {
-    return(NULL)
-  }
   assets <- pack$manifest$assets
   row <- which(as.character(assets$path) == as.character(path))
   if (length(row) != 1L) {
@@ -617,8 +265,13 @@ viewerPackReadAsset <- function(pack, path) {
   if (is.null(asset)) {
     return(NULL)
   }
+  nthreads <- if (requireNamespace("CerebroNexus", quietly = TRUE)) {
+    CerebroNexus:::.cerebroReadThreads()
+  } else {
+    1L
+  }
   value <- tryCatch(
-    qs2::qs_read(asset$file, nthreads = .viewerPackQsThreads()),
+    qs2::qs_read(asset$file, nthreads = nthreads),
     error = function(error) NULL
   )
   if (!is.null(value)) {
@@ -718,43 +371,7 @@ viewerPackDropTrajectoryNames <- function(pack, object) {
   invisible(object)
 }
 
-viewerPackProjectionFrame <- function(pack, name) {
-  if (!viewerPackDomainEligible(pack, "projections")) {
-    return(NULL)
-  }
-  frames <- pack$manifest$projection_frames
-  if (!is.data.frame(frames) || !nrow(frames)) {
-    return(NULL)
-  }
-  row <- which(as.character(frames$name) == as.character(name))
-  if (length(row) != 1L) {
-    return(NULL)
-  }
-  frame <- as.list(frames[row, , drop = FALSE])
-  frame <- lapply(frame, function(value) value[[1L]])
-  frame$cells <- suppressWarnings(as.integer(frame$cells))
-  frame$dimensions <- suppressWarnings(as.integer(frame$dimensions))
-  x_min <- suppressWarnings(as.numeric(frame$x_min))
-  x_max <- suppressWarnings(as.numeric(frame$x_max))
-  y_min <- suppressWarnings(as.numeric(frame$y_min))
-  y_max <- suppressWarnings(as.numeric(frame$y_max))
-  if (
-    length(x_min) == 1L &&
-      length(x_max) == 1L &&
-      length(y_min) == 1L &&
-      length(y_max) == 1L &&
-      all(is.finite(c(x_min, x_max, y_min, y_max)))
-  ) {
-    frame$x_range <- c(x_min, x_max)
-    frame$y_range <- c(y_min, y_max)
-  }
-  frame
-}
-
 viewerPackTrajectoryFrame <- function(pack, method, name) {
-  if (!viewerPackDomainEligible(pack, "trajectory")) {
-    return(NULL)
-  }
   frames <- pack$manifest$trajectory_frames
   if (!is.data.frame(frames) || !nrow(frames)) {
     return(NULL)
@@ -822,20 +439,6 @@ viewerPackTrajectoryFrame <- function(pack, method, name) {
       logical(1)
     )) &&
     frame$state_dtype %in% c("uint8", "uint16", "uint32")
-  x_min <- suppressWarnings(as.numeric(frame$x_min))
-  x_max <- suppressWarnings(as.numeric(frame$x_max))
-  y_min <- suppressWarnings(as.numeric(frame$y_min))
-  y_max <- suppressWarnings(as.numeric(frame$y_max))
-  if (
-    length(x_min) == 1L &&
-      length(x_max) == 1L &&
-      length(y_min) == 1L &&
-      length(y_max) == 1L &&
-      all(is.finite(c(x_min, x_max, y_min, y_max)))
-  ) {
-    frame$x_range <- c(x_min, x_max)
-    frame$y_range <- c(y_min, y_max)
-  }
   if (!isTRUE(valid)) NULL else frame
 }
 
@@ -948,9 +551,6 @@ viewerPackSpatialIndex <- function(pack, name) {
 }
 
 viewerPackSpatialFrame <- function(pack, name) {
-  if (!viewerPackDomainEligible(pack, "spatial")) {
-    return(NULL)
-  }
   frames <- pack$manifest$spatial_frames
   if (!is.data.frame(frames) || !nrow(frames)) {
     return(NULL)
@@ -963,20 +563,6 @@ viewerPackSpatialFrame <- function(pack, name) {
   frame <- lapply(frame, function(value) value[[1L]])
   frame$cells <- suppressWarnings(as.integer(frame$cells))
   frame$dimensions <- suppressWarnings(as.integer(frame$dimensions))
-  x_min <- suppressWarnings(as.numeric(frame$x_min))
-  x_max <- suppressWarnings(as.numeric(frame$x_max))
-  y_min <- suppressWarnings(as.numeric(frame$y_min))
-  y_max <- suppressWarnings(as.numeric(frame$y_max))
-  if (
-    length(x_min) == 1L &&
-      length(x_max) == 1L &&
-      length(y_min) == 1L &&
-      length(y_max) == 1L &&
-      all(is.finite(c(x_min, x_max, y_min, y_max)))
-  ) {
-    frame$x_range <- c(x_min, x_max)
-    frame$y_range <- c(y_min, y_max)
-  }
   valid <- length(frame$cells) == 1L &&
     !is.na(frame$cells) &&
     frame$cells >= 0L &&

@@ -7,10 +7,10 @@
 ##      (version 3, hla_tcr/<chain>.first.v3.qs2), which are in
 ##      hla_tcr/<chain>.first.segments.qs2.
 ##   3: each spatial section's point size (`spatial_frames$point_size`), the
-##      extents of projections, trajectories and spatial sections, and the
+##      package version that built the Pack (`package_version`), and the
 ##      content digests a rebuild reuses unchanged assets by. A rebuild reuses
-##      only a Pack of the same revision, so a Pack written before these
-##      fields existed is built anew instead of keeping frames without them.
+##      only a Pack of the same revision and package version, so a Pack written
+##      before these fields existed or by older builder code is built anew.
 ## A Viewer uses each asset only when its manifest entry is present and valid,
 ## so an older Pack opens as before and a newer one is never rejected. An asset
 ## whose content changes gets a new path: a Viewer of revision 1 reads
@@ -18,6 +18,10 @@
 ## segments from it, so a first frame without them must not be found there
 ## (that Viewer builds the first view from the repertoire instead).
 .viewerPackFormatRevision <- 3L
+
+.viewerPackPackageVersion <- function() {
+  as.character(utils::packageVersion("CerebroNexus"))
+}
 
 .viewerDatasetCapabilities <- function(object) {
   ## Each capability is one stored field. An object without the accessor
@@ -81,25 +85,6 @@
   )
 }
 
-.viewerPackQsThreads <- function() {
-  configured <- suppressWarnings(as.integer(getOption(
-    "cerebro.viewer_pack_threads",
-    NA_integer_
-  )))
-  if (length(configured) == 1L && !is.na(configured) && configured >= 1L) {
-    return(configured)
-  }
-  cores <- suppressWarnings(tryCatch(
-    parallel::detectCores(logical = FALSE),
-    error = function(e) 1L
-  ))
-  if (length(cores) != 1L || is.na(cores) || cores < 1L) {
-    1L
-  } else {
-    min(4L, as.integer(cores))
-  }
-}
-
 .viewerPackCrbSample <- function(file, size, bytes = 2^20) {
   connection <- file(file, open = "rb")
   on.exit(close(connection), add = TRUE)
@@ -148,68 +133,60 @@
   )
 }
 
-.viewerPackWriteCrbMd5Cache <- function(file, md5_value) {
+.viewerPackCrbMd5 <- function(file, min_size = 0) {
   info <- suppressWarnings(file.info(file, extra_cols = FALSE))
-  if (
-    is.na(info$size) ||
-      isTRUE(info$isdir) ||
-      info$size < 1048576 ||
-      is.na(md5_value) ||
-      !nzchar(md5_value)
-  ) {
-    return(invisible(FALSE))
+  if (is.na(info$size) || isTRUE(info$isdir) || info$size < min_size) {
+    return(unname(tools::md5sum(file)))
   }
+  version_line <- .viewerPackCrbVersionLine(file, info)
   store <- .viewerPackCrbMd5CachePath(file, info)
-  if (is.null(store)) {
-    return(invisible(FALSE))
+  sample <- NULL
+  value <- if (!is.null(store) && file.exists(store)) {
+    stored <- tryCatch(
+      readLines(store, n = 3L, warn = FALSE),
+      error = function(error) character()
+    )
+    if (
+      length(stored) == 3L &&
+        identical(stored[[1L]], version_line) &&
+        grepl("^[0-9a-f]{32}$", stored[[3L]])
+    ) {
+      sample <- .viewerPackCrbSample(file, info$size)
+      if (identical(stored[[2L]], sample)) stored[[3L]]
+    }
   }
-  tryCatch(
-    {
-      dir.create(dirname(store), recursive = TRUE, showWarnings = FALSE)
-      temporary <- paste0(store, ".", Sys.getpid(), ".tmp")
-      writeLines(
-        c(
-          .viewerPackCrbVersionLine(file, info),
-          .viewerPackCrbSample(file, info$size),
-          as.character(md5_value)
-        ),
-        temporary,
-        useBytes = TRUE
+  if (is.null(value)) {
+    value <- unname(tools::md5sum(file))
+    if (!is.na(value) && !is.null(store)) {
+      tryCatch(
+        {
+          dir.create(dirname(store), recursive = TRUE, showWarnings = FALSE)
+          temporary <- paste0(store, ".", Sys.getpid(), ".tmp")
+          if (is.null(sample)) {
+            sample <- .viewerPackCrbSample(file, info$size)
+          }
+          writeLines(
+            c(version_line, sample, value),
+            temporary,
+            useBytes = TRUE
+          )
+          file.rename(temporary, store)
+        },
+        error = function(error) NULL
       )
-      file.rename(temporary, store)
-      invisible(TRUE)
-    },
-    error = function(error) invisible(FALSE)
-  )
+    }
+  }
+  value
 }
 
 .viewerPackMd5 <- function(path, use_crb_cache = FALSE) {
-  if (isTRUE(use_crb_cache)) {
-    info <- suppressWarnings(file.info(path, extra_cols = FALSE))
-    if (!is.na(info$size) && !isTRUE(info$isdir) && info$size >= 1048576) {
-      store <- .viewerPackCrbMd5CachePath(path, info)
-      if (!is.null(store) && file.exists(store)) {
-        stored <- tryCatch(
-          readLines(store, n = 3L, warn = FALSE),
-          error = function(e) character()
-        )
-        if (
-          length(stored) == 3L &&
-            identical(stored[[1L]], .viewerPackCrbVersionLine(path, info)) &&
-            grepl("^[0-9a-f]{32}$", stored[[3L]]) &&
-            identical(stored[[2L]], .viewerPackCrbSample(path, info$size))
-        ) {
-          return(stored[[3L]])
-        }
-      }
-    }
+  value <- if (isTRUE(use_crb_cache)) {
+    .viewerPackCrbMd5(path, min_size = 1048576)
+  } else {
+    unname(tools::md5sum(path))
   }
-  value <- unname(tools::md5sum(path))
   if (length(value) != 1L || is.na(value) || !nzchar(value)) {
     stop("Could not checksum Viewer Pack input.", call. = FALSE)
-  }
-  if (isTRUE(use_crb_cache)) {
-    .viewerPackWriteCrbMd5Cache(path, value)
   }
   value
 }
@@ -274,7 +251,7 @@
       writeBin(as.numeric(value), target, size = 4L, endian = "little")
     }
   } else {
-    qs2::qs_save(value, target, nthreads = .viewerPackQsThreads())
+    qs2::qs_save(value, target, nthreads = .cerebroReadThreads())
   }
   data.frame(
     path = path,
@@ -689,12 +666,6 @@
           nrow(trajectory[["edges"]])
         )
       )
-      finite_x <- geometry[, 1L][is.finite(geometry[, 1L])]
-      finite_y <- geometry[, 2L][is.finite(geometry[, 2L])]
-      x_min <- if (length(finite_x)) min(finite_x) else NA_real_
-      x_max <- if (length(finite_x)) max(finite_x) else NA_real_
-      y_min <- if (length(finite_y)) min(finite_y) else NA_real_
-      y_max <- if (length(finite_y)) max(finite_y) else NA_real_
       frames[[length(frames) + 1L]] <- data.frame(
         method = method,
         name = name,
@@ -713,10 +684,6 @@
         state_codes_path = state_codes_path,
         state_dictionary_path = state_dictionary_path,
         state_dtype = state_dtype,
-        x_min = x_min,
-        x_max = x_max,
-        y_min = y_min,
-        y_max = y_max,
         stringsAsFactors = FALSE
       )
     }
@@ -739,10 +706,6 @@
       state_codes_path = character(),
       state_dictionary_path = character(),
       state_dtype = character(),
-      x_min = numeric(),
-      x_max = numeric(),
-      y_min = numeric(),
-      y_max = numeric(),
       stringsAsFactors = FALSE
     )
   }
@@ -882,11 +845,11 @@
           drop = FALSE
         ]
         if (nrow(old_asset_row) == 1L) {
-          reused_asset <- .viewerPackStageVerifiedRenamedAsset(
+          reused_asset <- .viewerPackStageVerifiedAssets(
             existing_pack,
             old_asset_row,
             stage,
-            geometry_path
+            new_rel_paths = geometry_path
           )
           if (!is.null(reused_asset)) {
             old_frame_row <- old_frames[match_row, , drop = FALSE]
@@ -902,10 +865,6 @@
     ) {
       indexes[[i]] <- as.integer(old_indexes[[name]])
       assets <- rbind(assets, reused_asset)
-      x_min <- suppressWarnings(as.numeric(old_frame_row$x_min[[1L]]))
-      x_max <- suppressWarnings(as.numeric(old_frame_row$x_max[[1L]]))
-      y_min <- suppressWarnings(as.numeric(old_frame_row$y_min[[1L]]))
-      y_max <- suppressWarnings(as.numeric(old_frame_row$y_max[[1L]]))
       ## A section without usable coordinates has an NA point size, which the
       ## manifest omits.
       point_size <- suppressWarnings(as.numeric(
@@ -916,10 +875,6 @@
         cells = as.integer(old_frame_row$cells[[1L]]),
         dimensions = as.integer(old_frame_row$dimensions[[1L]]),
         geometry_path = geometry_path,
-        x_min = if (length(x_min) == 1L) x_min else NA_real_,
-        x_max = if (length(x_max) == 1L) x_max else NA_real_,
-        y_min = if (length(y_min) == 1L) y_min else NA_real_,
-        y_max = if (length(y_max) == 1L) y_max else NA_real_,
         point_size = if (length(point_size) == 1L) point_size else NA_real_,
         stringsAsFactors = FALSE
       )
@@ -950,24 +905,6 @@
     }
     if (!is.null(reused_asset)) {
       assets <- rbind(assets, reused_asset)
-      x_min <- suppressWarnings(as.numeric(old_frame_row$x_min[[1L]]))
-      x_max <- suppressWarnings(as.numeric(old_frame_row$x_max[[1L]]))
-      y_min <- suppressWarnings(as.numeric(old_frame_row$y_min[[1L]]))
-      y_max <- suppressWarnings(as.numeric(old_frame_row$y_max[[1L]]))
-      if (
-        length(x_min) != 1L ||
-          length(x_max) != 1L ||
-          length(y_min) != 1L ||
-          length(y_max) != 1L ||
-          !all(is.finite(c(x_min, x_max, y_min, y_max)))
-      ) {
-        finite_x <- coordinate_matrix[, 1L][is.finite(coordinate_matrix[, 1L])]
-        finite_y <- coordinate_matrix[, 2L][is.finite(coordinate_matrix[, 2L])]
-        x_min <- if (length(finite_x)) min(finite_x) else NA_real_
-        x_max <- if (length(finite_x)) max(finite_x) else NA_real_
-        y_min <- if (length(finite_y)) min(finite_y) else NA_real_
-        y_max <- if (length(finite_y)) max(finite_y) else NA_real_
-      }
     } else {
       assets <- rbind(
         assets,
@@ -979,22 +916,12 @@
           dim(coordinate_matrix)
         )
       )
-      finite_x <- coordinate_matrix[, 1L][is.finite(coordinate_matrix[, 1L])]
-      finite_y <- coordinate_matrix[, 2L][is.finite(coordinate_matrix[, 2L])]
-      x_min <- if (length(finite_x)) min(finite_x) else NA_real_
-      x_max <- if (length(finite_x)) max(finite_x) else NA_real_
-      y_min <- if (length(finite_y)) min(finite_y) else NA_real_
-      y_max <- if (length(finite_y)) max(finite_y) else NA_real_
     }
     frames[[length(frames) + 1L]] <- data.frame(
       name = name,
       cells = nrow(coordinate_matrix),
       dimensions = ncol(coordinate_matrix),
       geometry_path = geometry_path,
-      x_min = x_min,
-      x_max = x_max,
-      y_min = y_min,
-      y_max = y_max,
       point_size = .viewerPackSpatialPointSize(coordinate_matrix),
       stringsAsFactors = FALSE
     )
@@ -1007,10 +934,6 @@
       cells = integer(),
       dimensions = integer(),
       geometry_path = character(),
-      x_min = numeric(),
-      x_max = numeric(),
-      y_min = numeric(),
-      y_max = numeric(),
       point_size = numeric(),
       stringsAsFactors = FALSE
     )
@@ -1240,11 +1163,11 @@
               drop = FALSE
             ]
             if (nrow(old_asset_row) == 1L) {
-              reused_asset <- .viewerPackStageVerifiedRenamedAsset(
+              reused_asset <- .viewerPackStageVerifiedAssets(
                 existing_pack,
                 old_asset_row,
                 stage,
-                path
+                new_rel_paths = path
               )
               if (!is.null(reused_asset)) {
                 reused_rows <- as.integer(old_frames$rows[[match_row]])
@@ -1318,6 +1241,10 @@
         suppressWarnings(as.integer(manifest$format_revision)),
         .viewerPackFormatRevision
       ) ||
+      !identical(
+        as.character(manifest$package_version),
+        .viewerPackPackageVersion()
+      ) ||
       !is.data.frame(manifest$assets) ||
       !all(
         c("path", "dtype", "dimensions", "bytes", "checksum") %in%
@@ -1333,56 +1260,21 @@
   existing_pack,
   rows_df,
   stage,
+  new_rel_paths = NULL,
   verify_md5 = FALSE
 ) {
   if (!is.data.frame(rows_df) || !nrow(rows_df)) {
     return(NULL)
   }
-  rel_paths <- as.character(rows_df$path)
-  src_paths <- file.path(existing_pack, rel_paths)
-  if (any(!file.exists(src_paths)) || any(dir.exists(src_paths))) {
-    return(NULL)
-  }
-  sizes <- unname(as.numeric(file.info(src_paths, extra_cols = FALSE)$size))
-  if (!identical(sizes, as.numeric(rows_df$bytes))) {
-    return(NULL)
-  }
-  if (
-    isTRUE(verify_md5) &&
-      !identical(
-        unname(tools::md5sum(src_paths)),
-        as.character(rows_df$checksum)
-      )
-  ) {
-    return(NULL)
-  }
-  dst_paths <- file.path(stage, rel_paths)
-  ok <- vapply(
-    seq_along(src_paths),
-    function(i) .viewerPackLinkOrCopy(src_paths[[i]], dst_paths[[i]]),
-    logical(1)
-  )
-  if (!all(ok)) {
-    return(NULL)
-  }
-  rows_df
-}
-
-.viewerPackStageVerifiedRenamedAsset <- function(
-  existing_pack,
-  rows_df,
-  stage,
-  new_rel_paths,
-  verify_md5 = FALSE
-) {
-  if (
-    !is.data.frame(rows_df) ||
-      !nrow(rows_df) ||
-      length(new_rel_paths) != nrow(rows_df)
-  ) {
-    return(NULL)
-  }
   old_rel_paths <- as.character(rows_df$path)
+  target_rel_paths <- if (is.null(new_rel_paths)) {
+    old_rel_paths
+  } else {
+    as.character(new_rel_paths)
+  }
+  if (length(target_rel_paths) != nrow(rows_df)) {
+    return(NULL)
+  }
   src_paths <- file.path(existing_pack, old_rel_paths)
   if (any(!file.exists(src_paths)) || any(dir.exists(src_paths))) {
     return(NULL)
@@ -1400,7 +1292,7 @@
   ) {
     return(NULL)
   }
-  dst_paths <- file.path(stage, as.character(new_rel_paths))
+  dst_paths <- file.path(stage, target_rel_paths)
   ok <- vapply(
     seq_along(src_paths),
     function(i) .viewerPackLinkOrCopy(src_paths[[i]], dst_paths[[i]]),
@@ -1410,7 +1302,9 @@
     return(NULL)
   }
   out <- rows_df
-  out$path <- as.character(new_rel_paths)
+  if (!is.null(new_rel_paths)) {
+    out$path <- target_rel_paths
+  }
   out
 }
 
@@ -1528,14 +1422,6 @@
   ) {
     return(NULL)
   }
-  if (
-    length(existing_manifest$projection_names) &&
-      (!is.data.frame(existing_manifest$projection_frames) ||
-        nrow(existing_manifest$projection_frames) !=
-          length(existing_manifest$projection_names))
-  ) {
-    return(NULL)
-  }
   for (nm in names(content_digests)) {
     if (
       !identical(
@@ -1559,7 +1445,6 @@
     modules = existing_manifest$modules,
     capabilities = .viewerDatasetCapabilities(object),
     projection_names = existing_manifest$projection_names,
-    projection_frames = existing_manifest$projection_frames,
     metadata_names = existing_manifest$metadata_names,
     group_metric_frames = existing_manifest$group_metric_frames,
     trajectory_frames = existing_manifest$trajectory_frames,
@@ -1661,29 +1546,13 @@
     values
   }
   projection_values <- NULL
-  empty_projection_frames <- function() {
-    data.frame(
-      name = character(),
-      cells = integer(),
-      dimensions = integer(),
-      path = character(),
-      x_min = numeric(),
-      x_max = numeric(),
-      y_min = numeric(),
-      y_max = numeric(),
-      stringsAsFactors = FALSE
-    )
-  }
-  projection_frames <- empty_projection_frames()
   reused_projections <- if (
     length(projections) &&
       section_unchanged("projections") &&
       identical(
         as.character(existing_manifest$projection_names),
         as.character(projections)
-      ) &&
-      is.data.frame(existing_manifest$projection_frames) &&
-      nrow(existing_manifest$projection_frames) == length(projections)
+      )
   ) {
     reuse_prefix("projections/")
   } else {
@@ -1692,7 +1561,6 @@
   if (!is.null(reused_projections)) {
     modules <- c(modules, "projections")
     assets <- rbind(assets, reused_projections)
-    projection_frames <- existing_manifest$projection_frames
     reused_sections <- c(reused_sections, "projections")
   } else if (length(projections)) {
     modules <- c(modules, "projections")
@@ -1700,13 +1568,6 @@
       as.character(existing_manifest$projection_names)
     } else {
       character()
-    }
-    old_proj_frames <- if (
-      can_reuse && is.data.frame(existing_manifest$projection_frames)
-    ) {
-      existing_manifest$projection_frames
-    } else {
-      NULL
     }
     old_proj_digests <- if (
       can_reuse &&
@@ -1724,7 +1585,6 @@
     } else {
       NULL
     }
-    proj_frame_rows <- list()
     load_one_projection <- function(nm) {
       value <- as.matrix(object$getProjection(nm))
       if (!is.numeric(value) || nrow(value) != length(cells)) {
@@ -1752,20 +1612,17 @@
       nm <- projections[[i]]
       new_path <- file.path("projections", sprintf("%03d.bin", i))
       reused_one <- NULL
-      reused_frame <- NULL
       if (
         can_reuse &&
           !is.null(old_proj_digests) &&
           !is.null(new_proj_digests) &&
-          !is.null(old_proj_frames) &&
           identical(
             as.character(old_proj_digests[[nm]]),
             as.character(new_proj_digests[[nm]])
           )
       ) {
         old_i <- match(nm, old_proj_names)
-        old_frame_idx <- which(as.character(old_proj_frames$name) == nm)
-        if (!is.na(old_i) && length(old_frame_idx) == 1L) {
+        if (!is.na(old_i)) {
           old_path <- file.path("projections", sprintf("%03d.bin", old_i))
           old_row <- existing_manifest$assets[
             as.character(existing_manifest$assets$path) == old_path,
@@ -1773,22 +1630,17 @@
             drop = FALSE
           ]
           if (nrow(old_row) == 1L) {
-            reused_one <- .viewerPackStageVerifiedRenamedAsset(
+            reused_one <- .viewerPackStageVerifiedAssets(
               existing_pack,
               old_row,
               stage,
-              new_path
+              new_rel_paths = new_path
             )
-            if (!is.null(reused_one)) {
-              reused_frame <- old_proj_frames[old_frame_idx, , drop = FALSE]
-              reused_frame$path <- new_path
-            }
           }
         }
       }
-      if (!is.null(reused_one) && !is.null(reused_frame)) {
+      if (!is.null(reused_one)) {
         assets <- rbind(assets, reused_one)
-        proj_frame_rows[[i]] <- reused_frame
       } else {
         value <- load_one_projection(nm)
         assets <- rbind(
@@ -1801,27 +1653,8 @@
             dim(value)
           )
         )
-        finite_x <- value[, 1L][is.finite(value[, 1L])]
-        finite_y <- if (ncol(value) >= 2L) {
-          value[, 2L][is.finite(value[, 2L])]
-        } else {
-          numeric()
-        }
-        proj_frame_rows[[i]] <- data.frame(
-          name = nm,
-          cells = nrow(value),
-          dimensions = ncol(value),
-          path = new_path,
-          x_min = if (length(finite_x)) min(finite_x) else NA_real_,
-          x_max = if (length(finite_x)) max(finite_x) else NA_real_,
-          y_min = if (length(finite_y)) min(finite_y) else NA_real_,
-          y_max = if (length(finite_y)) max(finite_y) else NA_real_,
-          stringsAsFactors = FALSE
-        )
       }
     }
-    projection_frames <- do.call(rbind, proj_frame_rows)
-    rownames(projection_frames) <- NULL
   }
   metadata <- object$getMetaData()
   metadata_names <- setdiff(colnames(metadata), "cell_barcode")
@@ -1922,11 +1755,11 @@
                 ".",
                 substring(as.character(old_rows$path), nchar(old_prefix) + 1L)
               )
-              reused_col <- .viewerPackStageVerifiedRenamedAsset(
+              reused_col <- .viewerPackStageVerifiedAssets(
                 existing_pack,
                 old_rows,
                 stage,
-                new_paths
+                new_rel_paths = new_paths
               )
             }
           }
@@ -2230,7 +2063,6 @@
     modules = unique(modules),
     capabilities = .viewerDatasetCapabilities(object),
     projection_names = projections,
-    projection_frames = projection_frames,
     metadata_names = metadata_names,
     group_metric_frames = group_metrics$frames,
     trajectory_frames = trajectory$frames,
@@ -2289,9 +2121,6 @@
 #' @param file Path to the canonical CRB.
 #' @param pack Optional Viewer Pack directory.
 #' @param full Verify every asset size and checksum.
-#' @param allow_content_match Accept a pack whose dataset fingerprint differs from
-#'   the CRB's checksum when the content digests it stored still describe the
-#'   CRB (a CRB that was rewritten with the same content).
 #' @return A validation result.
 #' @examples
 #' dir <- tempfile("cerebro-")
@@ -2305,15 +2134,9 @@
 validateViewerPack <- function(
   file,
   pack = .viewerPackPath(file),
-  full = TRUE,
-  allow_content_match = FALSE
+  full = TRUE
 ) {
-  .validateViewerPack(
-    file,
-    pack,
-    full,
-    allow_content_match = allow_content_match
-  )
+  .validateViewerPack(file, pack, full)
 }
 
 ## `payload` is the CRB's serialized object when the caller has read it
@@ -2325,8 +2148,7 @@ validateViewerPack <- function(
   pack,
   full,
   payload = NULL,
-  crb_md5 = NULL,
-  allow_content_match = FALSE
+  crb_md5 = NULL
 ) {
   if (!file.exists(file) || dir.exists(file)) {
     return(.viewerPackInvalid("CRB is missing"))
@@ -2345,24 +2167,17 @@ validateViewerPack <- function(
   ) {
     return(.viewerPackInvalid("Viewer Pack schema is incompatible"))
   }
-  md5_matches <- identical(
-    manifest$dataset_fingerprint,
-    paste0("md5-crb-v1:", crb_md5 %||% .viewerPackMd5(file))
-  )
   if (
-    !md5_matches &&
-      (!isTRUE(allow_content_match) || !is.list(manifest$content_digests))
+    !identical(
+      manifest$dataset_fingerprint,
+      paste0("md5-crb-v1:", crb_md5 %||% .viewerPackMd5(file))
+    )
   ) {
     return(.viewerPackInvalid("Viewer Pack dataset fingerprint mismatch"))
   }
-  match_mode <- if (md5_matches) "crb_md5" else "content_digest"
-  eligible_domains <- NULL
-  thin_match <- md5_matches &&
-    isTRUE(full) &&
+  thin_match <- isTRUE(full) &&
     !is.null(payload) &&
     .viewerPackMatchesThinCrb(file, pack, manifest, payload)
-  object <- NULL
-  cells <- NULL
   if (!thin_match) {
     object <- tryCatch(
       if (is.null(payload)) {
@@ -2399,38 +2214,6 @@ validateViewerPack <- function(
       return(.viewerPackInvalid("Viewer Pack cell-order fingerprint mismatch"))
     }
   }
-  if (!md5_matches) {
-    current_digests <- .viewerPackDigests(object, cells)$content_digests
-    domain_matches <- vapply(
-      names(current_digests),
-      function(nm) {
-        identical(
-          as.character(manifest$content_digests[[nm]]),
-          as.character(current_digests[[nm]])
-        )
-      },
-      logical(1)
-    )
-    eligible_domains <- list(
-      common = TRUE,
-      projections = isTRUE(domain_matches[["projections"]]),
-      metadata = isTRUE(domain_matches[["metadata"]]),
-      groups = isTRUE(domain_matches[["metadata"]]),
-      trajectory = isTRUE(domain_matches[["trajectories"]]) &&
-        isTRUE(domain_matches[["projections"]]),
-      spatial = isTRUE(domain_matches[["spatial"]]),
-      immune = isTRUE(domain_matches[["immune"]]),
-      hla_tcr = isTRUE(domain_matches[["hla_tcr"]])
-    )
-    if (!any(domain_matches)) {
-      return(.viewerPackInvalid("Viewer Pack content digests mismatch"))
-    }
-    match_mode <- if (all(domain_matches)) {
-      "content_digest"
-    } else {
-      "partial_domain"
-    }
-  }
   assets <- manifest$assets
   if (
     !is.data.frame(assets) ||
@@ -2457,14 +2240,7 @@ validateViewerPack <- function(
   ) {
     return(.viewerPackInvalid("Viewer Pack asset checksum mismatch"))
   }
-  list(
-    valid = TRUE,
-    reason = NULL,
-    manifest = manifest,
-    path = pack,
-    match_mode = match_mode,
-    eligible_domains = eligible_domains
-  )
+  list(valid = TRUE, reason = NULL, manifest = manifest, path = pack)
 }
 
 #' Read a valid Viewer Pack descriptor
@@ -2594,13 +2370,13 @@ buildViewerPack <- function(
   manifest <- list(
     schema_version = .viewerPackSchemaVersion,
     format_revision = .viewerPackFormatRevision,
+    package_version = .viewerPackPackageVersion(),
     dataset_fingerprint = paste0("md5-crb-v1:", crb_md5),
     cell_order_fingerprint = cell_order_fingerprint,
     n_cells = length(cells),
     modules = built$modules,
     capabilities = built$capabilities,
     projection_names = built$projection_names,
-    projection_frames = built$projection_frames,
     metadata_names = built$metadata_names,
     group_metric_frames = built$group_metric_frames,
     trajectory_frames = built$trajectory_frames,
@@ -2644,13 +2420,13 @@ buildViewerPack <- function(
     manifest <- list(
       schema_version = .viewerPackSchemaVersion,
       format_revision = .viewerPackFormatRevision,
+      package_version = .viewerPackPackageVersion(),
       dataset_fingerprint = paste0("md5-crb-v1:", crb_md5),
       cell_order_fingerprint = cell_order_fingerprint,
       n_cells = length(cells),
       modules = built$modules,
       capabilities = built$capabilities,
       projection_names = built$projection_names,
-      projection_frames = built$projection_frames,
       metadata_names = built$metadata_names,
       group_metric_frames = built$group_metric_frames,
       trajectory_frames = built$trajectory_frames,

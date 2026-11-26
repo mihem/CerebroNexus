@@ -4,12 +4,7 @@
 \alias{validateViewerPack}
 \title{Validate a Viewer Pack}
 \usage{
-validateViewerPack(
-  file,
-  pack = .viewerPackPath(file),
-  full = TRUE,
-  allow_content_match = FALSE
-)
+validateViewerPack(file, pack = .viewerPackPath(file), full = TRUE)
 }
 \arguments{
 \item{file}{Path to the canonical CRB.}
@@ -17,10 +12,6 @@ validateViewerPack(
 \item{pack}{Optional Viewer Pack directory.}
 
 \item{full}{Verify every asset size and checksum.}
-
-\item{allow_content_match}{Accept a pack whose dataset fingerprint differs from
-the CRB's checksum when the content digests it stored still describe the
-CRB (a CRB that was rewritten with the same content).}
 }
 \value{
 A validation result.

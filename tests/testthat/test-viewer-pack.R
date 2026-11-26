@@ -1148,7 +1148,7 @@ test_that("a CRB replaced with the same size and mtime does not keep its md5", {
   expect_false(identical(runtime$.viewerCrbMd5(file), first))
 })
 
-test_that("Viewer Pack records spatial extents and reuses unchanged assets incrementally", {
+test_that("Viewer Pack reuses unchanged assets incrementally", {
   root <- tempfile("pack-incremental-")
   dir.create(root)
   on.exit(unlink(root, recursive = TRUE), add = TRUE)
@@ -1161,13 +1161,10 @@ test_that("Viewer Pack records spatial extents and reuses unchanged assets incre
   pack <- buildViewerPack(crb, viewer_binary = "always")
   expect_true(validateViewerPack(crb, pack, full = TRUE)$valid)
 
-  ## Spatial frame extents are recorded and readable by runtime viewerPackSpatialFrame().
   runtime <- new.env(parent = globalenv())
   sys.source(viewer_test_path("core", "viewer_pack.R"), envir = runtime)
   opened <- runtime$viewerPackOpen(crb)
-  sf <- runtime$viewerPackSpatialFrame(opened, "slice")
-  expect_equal(sf$x_range, c(10, 30))
-  expect_equal(sf$y_range, c(1, 3))
+  expect_false(is.null(opened))
 
   ## Cell-order fingerprint matches legacy byte stream exactly.
   cells <- sprintf("cell-%03d", 1:6)
@@ -1278,7 +1275,7 @@ test_that("Viewer Pack records spatial extents and reuses unchanged assets incre
   }
 })
 
-test_that("Viewer Pack persists projection/trajectory extents, reuses unchanged sub-items, and supports runtime domain decoupling", {
+test_that("Viewer Pack reuses unchanged sub-items and rebuilds when package version changes", {
   root <- tempfile("viewer-pack-granular-")
   dir.create(root)
   on.exit(unlink(root, recursive = TRUE), add = TRUE)
@@ -1301,19 +1298,9 @@ test_that("Viewer Pack persists projection/trajectory extents, reuses unchanged 
   runtime <- new.env(parent = globalenv())
   sys.source(viewer_test_path("core", "viewer_pack.R"), envir = runtime)
   opened <- runtime$viewerPackOpen(crb)
-  expect_identical(opened$match_mode, "crb_md5")
+  expect_false(is.null(opened))
 
-  ## 1) Persisted projection & trajectory extents
-  pframe <- runtime$viewerPackProjectionFrame(opened, "umap")
-  expect_equal(pframe$x_range, range(obj$getProjection("umap")[, 1]))
-  expect_equal(pframe$y_range, range(obj$getProjection("umap")[, 2]))
-  tframe <- runtime$viewerPackTrajectoryFrame(opened, "monocle2", "subset")
-  tmeta <- obj$getTrajectory("monocle2", "subset")$meta
-  tmeta <- tmeta[!is.na(tmeta$pseudotime), , drop = FALSE]
-  expect_equal(tframe$x_range, range(tmeta$DR_1))
-  expect_equal(tframe$y_range, range(tmeta$DR_2))
-
-  ## 2) Sub-domain granular reuse: adding 1 metadata col reuses existing
+  ## 1) Sub-domain granular reuse: adding 1 metadata col reuses existing
   ##    metadata columns AND existing group metric violins!
   old_mtime <- Sys.time() - 3600
   f_proj1 <- file.path(pack, "projections", "001.bin")
@@ -1378,54 +1365,27 @@ test_that("Viewer Pack persists projection/trajectory extents, reuses unchanged 
   expect_setequal(spatial_frames$name, c("slice", "slice2"))
   expect_true(all(is.finite(spatial_frames$point_size)))
 
-  ## 3) Runtime domain-level decoupling without rebuilding Pack:
-  ## 3a) Non-pack edit (extra_material) -> strict MD5 fails, decoupled succeeds for ALL domains
-  obj$addExtraMaterial("tables", "notes", data.frame(a = 1L))
-  saveCerebro(obj, crb, codec = "rds")
-  expect_false(validateViewerPack(crb, pack, full = TRUE)$valid)
-  decoupled_val <- validateViewerPack(
-    crb,
-    pack,
-    full = TRUE,
-    allow_content_match = TRUE
+  ## 3) A Pack built by a different package version is rebuilt from scratch
+  ##    instead of reusing old assets.
+  manifest_path <- file.path(pack, "manifest.json")
+  manifest <- jsonlite::read_json(manifest_path, simplifyVector = FALSE)
+  manifest$package_version <- "0.0.0"
+  jsonlite::write_json(
+    manifest,
+    manifest_path,
+    auto_unbox = TRUE,
+    pretty = TRUE
   )
-  expect_true(decoupled_val$valid)
-  expect_identical(decoupled_val$match_mode, "content_digest")
-  expect_null(runtime$viewerPackOpen(crb))
-  opened_full <- runtime$viewerPackOpen(crb, object = readCerebro(crb))
-  expect_identical(opened_full$match_mode, "lazy_domain")
-  expect_true(runtime$viewerPackDomainEligible(opened_full, "projections"))
-  expect_true(runtime$viewerPackDomainEligible(opened_full, "metadata"))
-  expect_false(is.null(runtime$viewerPackProjectionFrame(opened_full, "umap")))
-
-  ## 3b) Partial-domain edit (add metadata col) -> unchanged domains hit Pack, metadata/groups fall back
-  obj$meta_data$unbuilt_col <- seq_len(nrow(obj$meta_data))
-  saveCerebro(obj, crb, codec = "rds")
-  opened_partial <- runtime$viewerPackOpen(crb, object = readCerebro(crb))
-  expect_identical(opened_partial$match_mode, "lazy_domain")
-  expect_true(runtime$viewerPackDomainEligible(opened_partial, "projections"))
-  expect_true(runtime$viewerPackDomainEligible(opened_partial, "spatial"))
-  expect_false(runtime$viewerPackDomainEligible(opened_partial, "metadata"))
-  expect_false(runtime$viewerPackDomainEligible(opened_partial, "groups"))
-  expect_false(is.null(runtime$viewerPackSpatialFrame(opened_partial, "slice")))
-  expect_false(is.null(runtime$viewerPackReadAsset(
-    opened_partial,
-    "spatial/cell_index.qs2"
-  )))
-  expect_null(runtime$viewerPackVerifiedAsset(
-    opened_partial,
-    "metadata/001.codes.bin"
-  ))
-
-  ## 3c) Cell-order mutation -> Pack rejected even with object provided
-  obj_reordered <- readCerebro(crb)
-  obj_reordered$meta_data <- obj_reordered$meta_data[
-    rev(seq_len(nrow(obj_reordered$meta_data))),
-    ,
-    drop = FALSE
-  ]
-  saveCerebro(obj_reordered, crb, codec = "rds")
-  expect_null(runtime$viewerPackOpen(crb, object = readCerebro(crb)))
+  Sys.setFileTime(c(f_proj1, f_grp1), old_mtime)
+  buildViewerPack(crb, viewer_binary = "always", overwrite = TRUE)
+  expect_true(validateViewerPack(crb, pack, full = TRUE)$valid)
+  expect_gt(as.numeric(file.info(f_proj1)$mtime), as.numeric(old_mtime) + 10)
+  expect_gt(as.numeric(file.info(f_grp1)$mtime), as.numeric(old_mtime) + 10)
+  rebuilt_manifest <- jsonlite::read_json(manifest_path, simplifyVector = TRUE)
+  expect_identical(
+    as.character(rebuilt_manifest$package_version),
+    as.character(utils::packageVersion("CerebroNexus"))
+  )
 })
 
 test_that("the Pack records the point size that suits each section", {
