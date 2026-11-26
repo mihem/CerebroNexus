@@ -1849,6 +1849,26 @@ details > summary:focus-visible { outline: 2px solid var(--builder-action); outl
   font-size: var(--builder-type-caption);
   font-weight: 600;
 }
+/* The Palette select lists up to fourteen palettes with their colour counts:
+   a smaller type keeps each on one line, and the block headings stay quiet. */
+.builder-palette-select .selectize-input,
+.builder-palette-select .selectize-dropdown {
+  font-size: var(--builder-type-caption);
+}
+.builder-palette-select .selectize-dropdown .optgroup-header {
+  padding: .35rem .6rem .15rem;
+  color: var(--c-text-muted);
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .02em;
+  text-transform: none;
+}
+.builder-palette-select .selectize-dropdown .option {
+  padding: .22rem .6rem;
+}
+.builder-palette-select .selectize-dropdown-content {
+  max-height: 22rem;
+}
 .group-color-empty {
   margin: var(--space-1) 0 var(--space-2);
   color: var(--c-text-muted);

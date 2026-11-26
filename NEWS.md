@@ -4,8 +4,18 @@
   select for the dataset: Cerebro default, Seurat / ggplot2 default,
   ColorBrewer Set1, Set2, Dark2 and Paired, Tableau 10, Okabe-Ito, Paul Tol
   Bright and greyscale, so group colors can match the figures of a
-  manuscript. A color picked by hand keeps its value when the palette changes;
-  "Reset colors" drops it.
+  manuscript, and Cols25, Alphabet, Glasbey and Polychrome (from the pals
+  package, MIT) for Groups with 20 or more levels. Each option says how many
+  colours it has, and the list is ordered for the Group on show: palettes with
+  enough colours first, then the ones generated for any number of levels, then
+  those that would have to interpolate. A color picked by hand keeps its value
+  when the palette changes; "Reset colors" drops it.
+- **The Builder's default colours are the Viewer's.** "Cerebro default" was a
+  separate set of 20 low-saturation colours, so an App built by the Builder
+  drew a Group in different colours than the Viewer does for a data set
+  without them. It is now the Viewer's own default (Flat UI Colors, Dutch then
+  Spanish, 40 colours). Apps that were built before keep their colours; a
+  project built again gets the new ones unless its colours were set by hand.
 
 # CerebroNexus 8.5.3
 

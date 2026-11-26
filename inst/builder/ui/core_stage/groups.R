@@ -65,17 +65,20 @@ builder_group_colors_model <- function(
 
 ## The palette applies to every Group of the dataset; a swatch picked by hand
 ## keeps its colour when the palette changes ("Reset colors" drops them).
-builder_palette_select_ui <- function(ns, selected) {
-  palettes <- builder_palettes()
-  ids <- vapply(palettes, function(p) p$id, character(1))
-  selectInput(
-    ns("palette"),
-    "Palette",
-    choices = stats::setNames(
-      ids,
-      vapply(palettes, function(p) p$label, character(1))
-    ),
-    selected = if (selected %in% ids) selected else ids[[1L]]
+## The choices are ordered for the number of levels of the Group on show:
+## palettes with enough colours first, then the generated ones, then those that
+## would have to interpolate.
+builder_palette_select_ui <- function(ns, selected, n_levels = 1L) {
+  choices <- builder_palette_choices(n_levels)
+  ids <- unlist(choices, use.names = FALSE)
+  div(
+    class = "builder-palette-select",
+    selectInput(
+      ns("palette"),
+      "Palette",
+      choices = choices,
+      selected = if (selected %in% ids) selected else ids[[1L]]
+    )
   )
 }
 
@@ -106,7 +109,7 @@ builder_group_colors_ui <- function(id, model) {
   div(
     class = "builder-group-colors",
     `data-group` = model$group,
-    builder_palette_select_ui(ns, model$palette %||% "cerebro"),
+    builder_palette_select_ui(ns, model$palette %||% "cerebro", model$total),
     div(
       class = "viewer-group-distribution-head",
       h5("Distribution"),

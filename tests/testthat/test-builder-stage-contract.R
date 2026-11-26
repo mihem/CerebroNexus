@@ -851,3 +851,124 @@ test_that("every palette gives one distinct colour per level and a select lists 
     "core-palette"
   )
 })
+
+test_that("the default palette is the Viewer's own default colour set", {
+  viewer <- new.env(parent = baseenv())
+  exprs <- parse(system.file("viewer/color_setup.R", package = "CerebroNexus"))
+  for (expr in exprs) {
+    is_set <- is.call(expr) &&
+      identical(expr[[1L]], as.name("<-")) &&
+      as.character(expr[[2L]]) %in%
+        c("colorset_dutch", "colorset_spanish", "default_colorset_base")
+    if (is_set) {
+      eval(expr, viewer)
+    }
+  }
+  expect_identical(
+    toupper(builder_viewer_colorset()),
+    toupper(viewer$default_colorset_base)
+  )
+  expect_identical(
+    builder_preview_palette(25L),
+    toupper(viewer$default_colorset_base)[1:25]
+  )
+})
+
+test_that("the palettes copied from pals are the pals colours", {
+  skip_if_not_installed("pals")
+  pals_of <- list(
+    pals_cols25 = pals::cols25(),
+    pals_alphabet = pals::alphabet(),
+    pals_glasbey = pals::glasbey(),
+    pals_polychrome = pals::polychrome()
+  )
+  for (id in names(pals_of)) {
+    palette <- Filter(function(p) identical(p$id, id), builder_palettes())[[1L]]
+    expect_identical(
+      toupper(palette$colors(palette$n)),
+      toupper(unname(pals_of[[id]])),
+      info = id
+    )
+  }
+})
+
+test_that("the Palette select puts the palettes with enough colours first", {
+  palettes <- builder_palettes()
+  size <- stats::setNames(
+    vapply(palettes, function(p) p$n, numeric(1)),
+    vapply(palettes, function(p) p$id, character(1))
+  )
+  ids_of <- function(choices) lapply(choices, unname)
+
+  ## 5 groups: every palette with colours to spare is in the first block, in
+  ## the order of the list; the generated ones follow; none is short
+  few <- builder_palette_choices(5L)
+  expect_identical(
+    names(few),
+    c("Enough colours for 5 groups", "Generated for any number of groups")
+  )
+  expect_identical(
+    ids_of(few)[[1L]][1:3],
+    c("cerebro", "okabe_ito", "tol_bright")
+  )
+  expect_identical(
+    sort(unname(unlist(few))),
+    sort(unname(names(size)))
+  )
+
+  ## 30 groups: Cerebro (40), Glasbey and Polychrome have enough; the rest interpolate,
+  ## the one closest to enough first
+  many <- builder_palette_choices(30L)
+  expect_identical(
+    names(many),
+    c(
+      "Enough colours for 30 groups",
+      "Generated for any number of groups",
+      "Fewer than 30 colours (interpolated)"
+    )
+  )
+  expect_identical(
+    ids_of(many)[[1L]],
+    c("cerebro", "pals_glasbey", "pals_polychrome")
+  )
+  expect_identical(ids_of(many)[[2L]], c("hue", "grey"))
+  expect_identical(ids_of(many)[[3L]][1:2], c("pals_alphabet", "pals_cols25"))
+  expect_true(all(size[ids_of(many)[[3L]]] < 30))
+  expect_identical(
+    sort(unname(unlist(many))),
+    sort(unname(names(size)))
+  )
+
+  ## 100 groups: no palette has enough, so there is no first block
+  expect_identical(
+    names(builder_palette_choices(100L)),
+    c(
+      "Generated for any number of groups",
+      "Fewer than 100 colours (interpolated)"
+    )
+  )
+})
+
+test_that("a palette's option says how many colours it has", {
+  by_id <- function(id) {
+    Filter(function(p) identical(p$id, id), builder_palettes())[[1L]]
+  }
+  expect_identical(
+    builder_palette_option_label(by_id("cerebro")),
+    "Cerebro default (40 colours)"
+  )
+  expect_identical(
+    builder_palette_option_label(by_id("okabe_ito")),
+    "Okabe–Ito (8 colours, colour-vision friendly)"
+  )
+  expect_identical(
+    builder_palette_option_label(by_id("hue")),
+    "Seurat / ggplot2 default (any number of colours)"
+  )
+  ## the rendered select holds the blocks as option groups
+  html <- as.character(
+    builder_palette_select_ui(shiny::NS("core"), "pals_glasbey", 30L)
+  )
+  expect_match(html, "optgroup label=\"Enough colours for 30 groups\"")
+  expect_match(html, "Glasbey (32 colours)", fixed = TRUE)
+})

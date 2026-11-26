@@ -876,36 +876,57 @@ builder_trajectory_preview_catalog <- function(
   previews
 }
 
-#' The viewer's own qualitative palette, so the preview is not a different
-#' picture from the one the data set will produce.
-builder_preview_palette <- function(n) {
-  base <- c(
-    "#4C78A8",
-    "#E07B39",
-    "#59A14F",
-    "#B279A2",
-    "#76B7B2",
-    "#E15759",
-    "#9C755F",
-    "#D6B84C",
-    "#6F6F78",
-    "#86A873",
-    "#5B8E9E",
-    "#C26D8A",
-    "#7A6FA8",
-    "#B88A44",
-    "#4F8A76",
-    "#A8644A",
-    "#7896C1",
-    "#8C7B6B",
-    "#6E9E9A",
-    "#A77B9D"
+#' The Viewer's own default qualitative palette (Flat UI Colors, Dutch then
+#' Spanish: `default_colorset_base` in `inst/viewer/color_setup.R`), so the
+#' preview and the colours baked into the built CRB are the ones the Viewer
+#' draws for a data set that carries none. A test keeps the two in step.
+builder_viewer_colorset <- function() {
+  c(
+    "#FFC312",
+    "#C4E538",
+    "#12CBC4",
+    "#FDA7DF",
+    "#ED4C67",
+    "#F79F1F",
+    "#A3CB38",
+    "#1289A7",
+    "#D980FA",
+    "#B53471",
+    "#EE5A24",
+    "#009432",
+    "#0652DD",
+    "#9980FA",
+    "#833471",
+    "#EA2027",
+    "#006266",
+    "#1B1464",
+    "#5758BB",
+    "#6F1E51",
+    "#40407A",
+    "#706FD3",
+    "#F7F1E3",
+    "#34ACE0",
+    "#33D9B2",
+    "#2C2C54",
+    "#474787",
+    "#AAA69D",
+    "#227093",
+    "#218C74",
+    "#FF5252",
+    "#FF793F",
+    "#D1CCC0",
+    "#FFB142",
+    "#FFDA79",
+    "#B33939",
+    "#CD6133",
+    "#84817A",
+    "#CC8E35",
+    "#CCAE62"
   )
-  n <- max(1L, as.integer(n))
-  if (n <= length(base)) {
-    return(base[seq_len(n)])
-  }
-  grDevices::colorRampPalette(base)(n)
+}
+
+builder_preview_palette <- function(n) {
+  builder_ramp(builder_viewer_colorset(), n)
 }
 
 
@@ -943,59 +964,305 @@ builder_alignment_legend_ui <- function(frame, colors = NULL) {
 ## Palettes
 ## ---------------------------------------------------------------------------
 
-#' The palettes on offer, as functions of the number of levels.
+#' The palettes on offer.
 #'
-#' `cerebro` is the viewer's own, so "leave it alone" is the default and the
+#' `cerebro` is the Viewer's own, so "leave it alone" is the default and the
 #' preview matches what the app will draw. The rest exist because a lab usually
-#' has a convention to match, and because the viewer's palette is tuned for
+#' has a convention to match, and because the Viewer's palette is tuned for
 #' distinctness rather than for being readable by someone with a colour vision
 #' deficiency.
+#'
+#' `n` is how many distinct colours a palette really has (`Inf` for one that is
+#' generated for any number of levels); past it the colours are interpolated.
+builder_palette <- function(id, label, base, note = NULL, cvd = FALSE) {
+  force(base)
+  list(
+    id = id,
+    label = label,
+    n = length(base),
+    cvd = cvd,
+    note = note %||%
+      sprintf(
+        "%d colours; interpolated beyond %d groups",
+        length(base),
+        length(base)
+      ),
+    colors = function(n) builder_ramp(base, n)
+  )
+}
+
 builder_palettes <- function() {
   list(
-    list(
-      id = "cerebro",
-      label = "Cerebro default",
-      note = "The viewer's built-in palette",
-      colors = function(n) builder_preview_palette(n)
+    builder_palette(
+      "cerebro",
+      "Cerebro default",
+      builder_viewer_colorset(),
+      "The Viewer's built-in palette"
     ),
-    list(
-      id = "okabe_ito",
-      label = "Okabe–Ito (colour-vision friendly)",
-      note = "Eight colours designed for red–green colour-vision deficiency; interpolated beyond eight groups",
-      colors = function(n) {
-        base <- c(
-          "#E69F00",
-          "#56B4E9",
-          "#009E73",
-          "#F0E442",
-          "#0072B2",
-          "#D55E00",
-          "#CC79A7",
-          "#000000"
-        )
-        builder_ramp(base, n)
-      }
+    builder_palette(
+      "okabe_ito",
+      "Okabe–Ito",
+      c(
+        "#E69F00",
+        "#56B4E9",
+        "#009E73",
+        "#F0E442",
+        "#0072B2",
+        "#D55E00",
+        "#CC79A7",
+        "#000000"
+      ),
+      "Designed for red–green colour-vision deficiency",
+      cvd = TRUE
     ),
-    list(
-      id = "tol_bright",
-      label = "Paul Tol Bright (colour-vision friendly)",
-      note = "Seven colours that remain distinct in print and projection",
-      colors = function(n) {
-        base <- c(
-          "#4477AA",
-          "#EE6677",
-          "#228833",
-          "#CCBB44",
-          "#66CCEE",
-          "#AA3377",
-          "#BBBBBB"
-        )
-        builder_ramp(base, n)
-      }
+    builder_palette(
+      "tol_bright",
+      "Paul Tol Bright",
+      c(
+        "#4477AA",
+        "#EE6677",
+        "#228833",
+        "#CCBB44",
+        "#66CCEE",
+        "#AA3377",
+        "#BBBBBB"
+      ),
+      "Remains distinct in print and projection",
+      cvd = TRUE
+    ),
+    builder_palette(
+      "brewer_set1",
+      "ColorBrewer Set1",
+      c(
+        "#E41A1C",
+        "#377EB8",
+        "#4DAF4A",
+        "#984EA3",
+        "#FF7F00",
+        "#FFFF33",
+        "#A65628",
+        "#F781BF",
+        "#999999"
+      )
+    ),
+    builder_palette(
+      "brewer_set2",
+      "ColorBrewer Set2",
+      c(
+        "#66C2A5",
+        "#FC8D62",
+        "#8DA0CB",
+        "#E78AC3",
+        "#A6D854",
+        "#FFD92F",
+        "#E5C494",
+        "#B3B3B3"
+      )
+    ),
+    builder_palette(
+      "brewer_dark2",
+      "ColorBrewer Dark2",
+      c(
+        "#1B9E77",
+        "#D95F02",
+        "#7570B3",
+        "#E7298A",
+        "#66A61E",
+        "#E6AB02",
+        "#A6761D",
+        "#666666"
+      )
+    ),
+    builder_palette(
+      "brewer_paired",
+      "ColorBrewer Paired",
+      c(
+        "#A6CEE3",
+        "#1F78B4",
+        "#B2DF8A",
+        "#33A02C",
+        "#FB9A99",
+        "#E31A1C",
+        "#FDBF6F",
+        "#FF7F00",
+        "#CAB2D6",
+        "#6A3D9A",
+        "#FFFF99",
+        "#B15928"
+      ),
+      "Twelve colours in light/dark pairs"
+    ),
+    builder_palette(
+      "tableau10",
+      "Tableau 10",
+      c(
+        "#4E79A7",
+        "#F28E2B",
+        "#E15759",
+        "#76B7B2",
+        "#59A14F",
+        "#EDC948",
+        "#B07AA1",
+        "#FF9DA7",
+        "#9C755F",
+        "#BAB0AC"
+      )
+    ),
+    ## The four below are `pals::cols25()`, `pals::alphabet()`,
+    ## `pals::glasbey()` and `pals::polychrome()` (pals 1.10, MIT), copied here
+    ## so the Builder needs no extra package; a test compares them with pals.
+    builder_palette(
+      "pals_cols25",
+      "Cols25",
+      c(
+        "#1F78C8",
+        "#FF0000",
+        "#33A02C",
+        "#6A33C2",
+        "#FF7F00",
+        "#565656",
+        "#FFD700",
+        "#A6CEE3",
+        "#FB6496",
+        "#B2DF8A",
+        "#CAB2D6",
+        "#FDBF6F",
+        "#999999",
+        "#EEE685",
+        "#C8308C",
+        "#FF83FA",
+        "#C814FA",
+        "#0000FF",
+        "#36648B",
+        "#00E2E5",
+        "#00FF00",
+        "#778B00",
+        "#BEBE00",
+        "#8B3B00",
+        "#A52A3C"
+      ),
+      "pals::cols25(), for many groups"
+    ),
+    builder_palette(
+      "pals_alphabet",
+      "Alphabet",
+      c(
+        "#F0A0FF",
+        "#0075DC",
+        "#993F00",
+        "#4C005C",
+        "#191919",
+        "#005C31",
+        "#2BCE48",
+        "#FFCC99",
+        "#808080",
+        "#94FFB5",
+        "#8F7C00",
+        "#9DCC00",
+        "#C20088",
+        "#003380",
+        "#FFA405",
+        "#FFA8BB",
+        "#426600",
+        "#FF0010",
+        "#5EF1F2",
+        "#00998F",
+        "#E0FF66",
+        "#740AFF",
+        "#990000",
+        "#FFFF80",
+        "#FFE100",
+        "#FF5005"
+      ),
+      "pals::alphabet(), for many groups"
+    ),
+    builder_palette(
+      "pals_glasbey",
+      "Glasbey",
+      c(
+        "#0000FF",
+        "#FF0000",
+        "#00FF00",
+        "#000033",
+        "#FF00B6",
+        "#005300",
+        "#FFD300",
+        "#009FFF",
+        "#9A4D42",
+        "#00FFBE",
+        "#783FC1",
+        "#1F9698",
+        "#FFACFD",
+        "#B1CC71",
+        "#F1085C",
+        "#FE8F42",
+        "#DD00FF",
+        "#201A01",
+        "#720055",
+        "#766C95",
+        "#02AD24",
+        "#C8FF00",
+        "#886C00",
+        "#FFB79F",
+        "#858567",
+        "#A10300",
+        "#14F9FF",
+        "#00479E",
+        "#DC5E93",
+        "#93D4FF",
+        "#004CFF",
+        "#F2F318"
+      ),
+      "pals::glasbey(), for many groups"
+    ),
+    builder_palette(
+      "pals_polychrome",
+      "Polychrome",
+      c(
+        "#5A5156",
+        "#E4E1E3",
+        "#F6222E",
+        "#FE00FA",
+        "#16FF32",
+        "#3283FE",
+        "#FEAF16",
+        "#B00068",
+        "#1CFFCE",
+        "#90AD1C",
+        "#2ED9FF",
+        "#DEA0FD",
+        "#AA0DFE",
+        "#F8A19F",
+        "#325A9B",
+        "#C4451C",
+        "#1C8356",
+        "#85660D",
+        "#B10DA1",
+        "#FBE426",
+        "#1CBE4F",
+        "#FA0087",
+        "#FC1CBF",
+        "#F7E1A0",
+        "#C075A6",
+        "#782AB6",
+        "#AAF400",
+        "#BDCDFF",
+        "#822E1C",
+        "#B5EFB5",
+        "#7ED7D1",
+        "#1C7F93",
+        "#D85FF7",
+        "#683B79",
+        "#66B0FF",
+        "#3B00FB"
+      ),
+      "pals::polychrome(), for many groups"
     ),
     list(
       id = "hue",
       label = "Seurat / ggplot2 default",
+      n = Inf,
+      cvd = FALSE,
       note = "Evenly spaced hues, as DimPlot() and ggplot2 draw a discrete colour scale",
       colors = function(n) {
         n <- max(1L, as.integer(n))
@@ -1007,120 +1274,58 @@ builder_palettes <- function() {
       }
     ),
     list(
-      id = "brewer_set1",
-      label = "ColorBrewer Set1",
-      note = "Nine colours; interpolated beyond nine groups",
-      colors = function(n) {
-        builder_ramp(
-          c(
-            "#E41A1C",
-            "#377EB8",
-            "#4DAF4A",
-            "#984EA3",
-            "#FF7F00",
-            "#FFFF33",
-            "#A65628",
-            "#F781BF",
-            "#999999"
-          ),
-          n
-        )
-      }
-    ),
-    list(
-      id = "brewer_set2",
-      label = "ColorBrewer Set2",
-      note = "Eight soft colours; interpolated beyond eight groups",
-      colors = function(n) {
-        builder_ramp(
-          c(
-            "#66C2A5",
-            "#FC8D62",
-            "#8DA0CB",
-            "#E78AC3",
-            "#A6D854",
-            "#FFD92F",
-            "#E5C494",
-            "#B3B3B3"
-          ),
-          n
-        )
-      }
-    ),
-    list(
-      id = "brewer_dark2",
-      label = "ColorBrewer Dark2",
-      note = "Eight darker colours; interpolated beyond eight groups",
-      colors = function(n) {
-        builder_ramp(
-          c(
-            "#1B9E77",
-            "#D95F02",
-            "#7570B3",
-            "#E7298A",
-            "#66A61E",
-            "#E6AB02",
-            "#A6761D",
-            "#666666"
-          ),
-          n
-        )
-      }
-    ),
-    list(
-      id = "brewer_paired",
-      label = "ColorBrewer Paired",
-      note = "Twelve colours in light/dark pairs; interpolated beyond twelve groups",
-      colors = function(n) {
-        builder_ramp(
-          c(
-            "#A6CEE3",
-            "#1F78B4",
-            "#B2DF8A",
-            "#33A02C",
-            "#FB9A99",
-            "#E31A1C",
-            "#FDBF6F",
-            "#FF7F00",
-            "#CAB2D6",
-            "#6A3D9A",
-            "#FFFF99",
-            "#B15928"
-          ),
-          n
-        )
-      }
-    ),
-    list(
-      id = "tableau10",
-      label = "Tableau 10",
-      note = "Ten colours; interpolated beyond ten groups",
-      colors = function(n) {
-        builder_ramp(
-          c(
-            "#4E79A7",
-            "#F28E2B",
-            "#E15759",
-            "#76B7B2",
-            "#59A14F",
-            "#EDC948",
-            "#B07AA1",
-            "#FF9DA7",
-            "#9C755F",
-            "#BAB0AC"
-          ),
-          n
-        )
-      }
-    ),
-    list(
       id = "grey",
       label = "Greyscale",
+      n = Inf,
+      cvd = FALSE,
       note = "Emphasises density without a categorical colour rhythm",
       colors = function(n) {
         grDevices::colorRampPalette(c("#1c1c1e", "#c8c8cc"))(max(1L, n))
       }
     )
+  )
+}
+
+#' The text of a palette in the select: its name and how many colours it has.
+builder_palette_option_label <- function(palette) {
+  detail <- if (is.finite(palette$n)) {
+    sprintf("%d colours", palette$n)
+  } else {
+    "any number of colours"
+  }
+  if (isTRUE(palette$cvd)) {
+    detail <- paste0(detail, ", colour-vision friendly")
+  }
+  sprintf("%s (%s)", palette$label, detail)
+}
+
+#' The choices of the Palette select for a Group of `n_levels` levels, in
+#' three blocks: palettes with enough colours (in the order above), palettes
+#' generated for any number of levels, and palettes that would have to
+#' interpolate (the one closest to enough first).
+builder_palette_choices <- function(n_levels, palettes = builder_palettes()) {
+  n_levels <- max(1L, as.integer(n_levels))
+  size <- vapply(palettes, function(p) as.numeric(p$n), numeric(1))
+  short <- palettes[is.finite(size) & size < n_levels]
+  blocks <- list(
+    palettes[is.finite(size) & size >= n_levels],
+    palettes[is.infinite(size)],
+    short[order(-vapply(short, function(p) p$n, numeric(1)))]
+  )
+  headings <- c(
+    sprintf("Enough colours for %d groups", n_levels),
+    "Generated for any number of groups",
+    sprintf("Fewer than %d colours (interpolated)", n_levels)
+  )
+  keep <- lengths(blocks) > 0L
+  stats::setNames(
+    lapply(blocks[keep], function(block) {
+      stats::setNames(
+        vapply(block, function(p) p$id, character(1)),
+        vapply(block, builder_palette_option_label, character(1))
+      )
+    }),
+    headings[keep]
   )
 }
 
