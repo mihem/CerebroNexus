@@ -1,3 +1,21 @@
+# CerebroNexus 8.5.7
+
+- **The Builder opens large h5ad files without loading their matrices.** A file
+  of at least 1 GiB (`options(cerebro.builder.h5ad_metadata_only_bytes)`) is
+  inspected from its metadata, embeddings and per-cell totals, read block by
+  block. The Allen MERFISH atlas (4.3 million cells) is opened with 5.9 GB
+  instead of 28.2 GB.
+- **Large h5ad files are built without holding their matrix.** With the H5
+  backend, no analyses and no spatial data, the expression file is written
+  from the h5ad block by block; the CRB is the same as from a full read. A
+  COVID-19 atlas of 1.46 million cells and 2.3 billion values, too large to
+  read at all before, is imported in 8.5 minutes and built in 8.7 minutes
+  with 5.7 GB. Other Builds read the file in full first.
+- **The Builder starts about 5 s sooner**: its server code is byte-compiled
+  when the package is installed.
+- A SingleCellExperiment saved as .rds or .qs2 is no longer reused as its own
+  snapshot, which could fail to reopen.
+
 # CerebroNexus 8.5.6
 
 - **Faster Builder on large and multi-section datasets.** Switching sections
