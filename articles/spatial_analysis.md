@@ -63,13 +63,17 @@ pan with the Canvas toolbar.
 
 ### Main parameters
 
-- **Spatial data**: which image/FOV to plot when several are present.
-- **Plot type**: `ImageDimPlot` (categorical) or `ImageFeaturePlot`
-  (gene).
-- **Color cells by**: metadata variable used for cell coloring.
+- **Sections**: which image/FOV to plot when several are present;
+  several give the section grid (below).
+- **Display mode**: *Groups* (colour by a metadata column, Seurat’s
+  `ImageDimPlot`), *Gene expression* (`ImageFeaturePlot`) or *RGB
+  co-expression* (three genes, one per colour channel).
+- **Colour by**: metadata variable used for cell coloring.
 - **Background image**: histology overlay (only shown when a matching
   `spatial_images` entry exists for the loaded dataset).
-- **Image opacity**: blend factor for the background image.
+- **Background image** in the settings: opacity, position, scale,
+  rotation and flips of the picture of each section on screen, and *Copy
+  alignment as preset* for the `spatial_image_settings` code.
 
 ### Additional parameters
 
@@ -92,6 +96,63 @@ Lasso or box-select cells in the projection to view:
   (categorical) or violin/box plot (continuous).
 - **Table of selected cells**: interactive DT table with metadata,
   exportable to CSV or Excel.
+
+### Section grid
+
+When a dataset has more than one spatial entry (one per tissue section,
+FOV or capture area), the **Sections** field takes one or more of them:
+one section shows the single view, several a grid with one panel per
+section. Clicking a panel’s title shows only that section. The grid
+needs no change to the data or the export.
+
+![The Spatial grid of the Allen whole mouse brain MERFISH atlas (59
+coronal sections, 3.9 million cells), cells coloured by class, with the
+Sections, Display mode, Colour by, Columns and Embedding fields above
+the panels.](img/spatial-grid-allen.png)
+
+The Spatial grid of the Allen whole mouse brain MERFISH atlas (59
+coronal sections, 3.9 million cells), cells coloured by class, with the
+Sections, Display mode, Colour by, Columns and Embedding fields above
+the panels.
+
+- **Same colours, same scale**: every section is coloured by the same
+  metadata column or gene. A group has one colour in every section, and
+  a gene has one colour scale whose range covers all sections, so the
+  same value has the same colour in each section.
+- **Own image**: each section starts with the first histology image
+  bound to it (embedded, or from `spatial_images`), and the **Background
+  images** field lists the images grouped by section, so a section’s
+  image can be changed or removed. A section without an image shows its
+  cells without one.
+- **Dark pictures**: over a dark picture, such as a fluorescence image,
+  points are drawn with a light outline so they stay visible. It is on
+  by default and can be switched off with *Outline points on dark
+  pictures* in the page’s settings.
+- **Order** and **Columns**: the panels follow the order of the sections
+  in the field; remove a section to hide it, and add it back to move it
+  to the end. **Columns** fixes the number of columns; *Auto* fits them
+  to the window. Changes among several sections only rearrange the drawn
+  panels and do not reload data.
+- **Embedding**: adds a UMAP (or another projection) panel. Selecting
+  cells in it highlights them in every section, and selecting cells in a
+  section highlights them in the embedding. The selected-cells plot and
+  table list the cells of all sections.
+- **Sync zoom**: zooming or panning one section moves the others to the
+  same relative region.
+- **Panel shape** (top right of the page): *Fit tissue* shapes the
+  panels to the sections and picks the columns that show the most
+  tissue; *Square* draws square panels. Every panel has the same size,
+  so all sections are drawn at one scale.
+- **Opening in the grid**: a data set with several sections opens
+  Spatial in the grid. In the Builder, the Spatial card of the Viewer
+  display settings has *Open Spatial with*, which can be set to *The
+  first section*. Readers can always pick one section or all of them.
+
+Each panel zooms and pans on its own and shows the usual tooltips. RGB
+co-expression works in the grid: *RGB layout* shows one composite panel
+per section, or with *Separate channels* one panel per section and
+channel. The ROI controls and region outlines apply to a single section
+and are not available in the grid.
 
 ## Data preparation
 

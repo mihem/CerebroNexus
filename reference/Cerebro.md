@@ -1477,12 +1477,14 @@ Add spatial data.
 - `data`:
 
   `list` containing 'coordinates' (data.frame) and 'expression' (sparse
-  matrix). Embedded backgrounds are stored in 'histology_images', a
-  uniquely named list of image payloads. Each payload contains
-  'histology_image' (a base64 `data:` URI), 'histology_image_bounds'
-  (xmin/xmax/ymin/ymax in coordinate space), and may contain a
-  declarative 'histology_alignment'. Bounds omitted from a payload are
-  derived from the coordinates. The singular 'histology_image' /
+  matrix, or the reference to the object's matrix that
+  `getSpatialData(hydrate_expression = FALSE)` returns). Embedded
+  backgrounds are stored in 'histology_images', a uniquely named list of
+  image payloads. Each payload contains 'histology_image' (a base64
+  `data:` URI), 'histology_image_bounds' (xmin/xmax/ymin/ymax in
+  coordinate space), and may contain a declarative
+  'histology_alignment'. Bounds omitted from a payload are derived from
+  the coordinates. The singular 'histology_image' /
   'histology_image_bounds' fields are rejected.
 
 ------------------------------------------------------------------------
@@ -1493,7 +1495,11 @@ Retrieve spatial data.
 
 #### Usage
 
-    Cerebro$getSpatialData(name, hydrate_molecules = TRUE)
+    Cerebro$getSpatialData(
+      name,
+      hydrate_molecules = TRUE,
+      hydrate_expression = TRUE
+    )
 
 #### Arguments
 
@@ -1505,6 +1511,13 @@ Retrieve spatial data.
 
   Whether to read an external molecule table. Set to `FALSE` for Viewer
   paths that only consume coordinates, expression, or images.
+
+- `hydrate_expression`:
+
+  Whether to return the section's expression matrix. A saved CRB keeps
+  it as a reference to the columns of the object's expression matrix;
+  set to `FALSE` to leave that reference in place when only coordinates
+  or images are needed.
 
 #### Returns
 

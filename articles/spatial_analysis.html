@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.12</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.5.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -92,7 +92,7 @@
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Spatial Transcriptomics Analysis</h1>
             
-            <h4 data-toc-skip class="date">24 November, 2026</h4>
+            <h4 data-toc-skip class="date">26 November, 2026</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/articles/spatial_analysis.Rmd" class="external-link"><code>vignettes/articles/spatial_analysis.Rmd</code></a></small>
       <div class="d-none name"><code>spatial_analysis.Rmd</code></div>
@@ -169,21 +169,25 @@ pan with the Canvas toolbar.</p>
 </h3>
 <ul>
 <li>
-<strong>Spatial data</strong>: which image/FOV to plot when several
-are present.</li>
+<strong>Sections</strong>: which image/FOV to plot when several are
+present; several give the section grid (below).</li>
 <li>
-<strong>Plot type</strong>: <code>ImageDimPlot</code> (categorical)
-or <code>ImageFeaturePlot</code> (gene).</li>
+<strong>Display mode</strong>: <em>Groups</em> (colour by a metadata
+column, Seurat’s <code>ImageDimPlot</code>), <em>Gene expression</em>
+(<code>ImageFeaturePlot</code>) or <em>RGB co-expression</em> (three
+genes, one per colour channel).</li>
 <li>
-<strong>Color cells by</strong>: metadata variable used for cell
+<strong>Colour by</strong>: metadata variable used for cell
 coloring.</li>
 <li>
 <strong>Background image</strong>: histology overlay (only shown
 when a matching <code>spatial_images</code> entry exists for the loaded
 dataset).</li>
 <li>
-<strong>Image opacity</strong>: blend factor for the background
-image.</li>
+<strong>Background image</strong> in the settings: opacity,
+position, scale, rotation and flips of the picture of each section on
+screen, and <em>Copy alignment as preset</em> for the
+<code>spatial_image_settings</code> code.</li>
 </ul>
 </div>
 <div class="section level3">
@@ -222,6 +226,71 @@ composition (categorical) or violin/box plot (continuous).</li>
 <strong>Table of selected cells</strong>: interactive DT table with
 metadata, exportable to CSV or Excel.</li>
 </ul>
+</div>
+<div class="section level3">
+<h3 id="section-grid">Section grid<a class="anchor" aria-label="anchor" href="#section-grid"></a>
+</h3>
+<p>When a dataset has more than one spatial entry (one per tissue
+section, FOV or capture area), the <strong>Sections</strong> field takes
+one or more of them: one section shows the single view, several a grid
+with one panel per section. Clicking a panel’s title shows only that
+section. The grid needs no change to the data or the export.</p>
+<div class="float">
+<img src="img/spatial-grid-allen.png" alt="The Spatial grid of the Allen whole mouse brain MERFISH atlas (59 coronal sections, 3.9 million cells), cells coloured by class, with the Sections, Display mode, Colour by, Columns and Embedding fields above the panels."><div class="figcaption">The Spatial grid of the Allen whole mouse brain
+MERFISH atlas (59 coronal sections, 3.9 million cells), cells coloured
+by class, with the Sections, Display mode, Colour by, Columns and
+Embedding fields above the panels.</div>
+</div>
+<ul>
+<li>
+<strong>Same colours, same scale</strong>: every section is coloured
+by the same metadata column or gene. A group has one colour in every
+section, and a gene has one colour scale whose range covers all
+sections, so the same value has the same colour in each section.</li>
+<li>
+<strong>Own image</strong>: each section starts with the first
+histology image bound to it (embedded, or from
+<code>spatial_images</code>), and the <strong>Background images</strong>
+field lists the images grouped by section, so a section’s image can be
+changed or removed. A section without an image shows its cells without
+one.</li>
+<li>
+<strong>Dark pictures</strong>: over a dark picture, such as a
+fluorescence image, points are drawn with a light outline so they stay
+visible. It is on by default and can be switched off with <em>Outline
+points on dark pictures</em> in the page’s settings.</li>
+<li>
+<strong>Order</strong> and <strong>Columns</strong>: the panels
+follow the order of the sections in the field; remove a section to hide
+it, and add it back to move it to the end. <strong>Columns</strong>
+fixes the number of columns; <em>Auto</em> fits them to the window.
+Changes among several sections only rearrange the drawn panels and do
+not reload data.</li>
+<li>
+<strong>Embedding</strong>: adds a UMAP (or another projection)
+panel. Selecting cells in it highlights them in every section, and
+selecting cells in a section highlights them in the embedding. The
+selected-cells plot and table list the cells of all sections.</li>
+<li>
+<strong>Sync zoom</strong>: zooming or panning one section moves the
+others to the same relative region.</li>
+<li>
+<strong>Panel shape</strong> (top right of the page): <em>Fit
+tissue</em> shapes the panels to the sections and picks the columns that
+show the most tissue; <em>Square</em> draws square panels. Every panel
+has the same size, so all sections are drawn at one scale.</li>
+<li>
+<strong>Opening in the grid</strong>: a data set with several
+sections opens Spatial in the grid. In the Builder, the Spatial card of
+the Viewer display settings has <em>Open Spatial with</em>, which can be
+set to <em>The first section</em>. Readers can always pick one section
+or all of them.</li>
+</ul>
+<p>Each panel zooms and pans on its own and shows the usual tooltips.
+RGB co-expression works in the grid: <em>RGB layout</em> shows one
+composite panel per section, or with <em>Separate channels</em> one
+panel per section and channel. The ROI controls and region outlines
+apply to a single section and are not available in the grid.</p>
 </div>
 </div>
 <div class="section level2">
