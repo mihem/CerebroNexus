@@ -4,7 +4,8 @@
   read on up to eight threads, but a qs2 built without TBB only reads on one,
   so the Builder could not reopen the CRB it had just staged. The read now
   repeats on one thread after that error (and remembers it for the session);
-  other read errors are reported as before.
+  other read errors are reported as before. qs2 0.1.6 and later only warn
+  about the missing TBB; that warning no longer appears on every CRB read.
 
 # CerebroNexus 8.5.2
 
