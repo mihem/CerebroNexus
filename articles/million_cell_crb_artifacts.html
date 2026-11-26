@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.5.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.5.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -528,6 +528,57 @@ or repair (an expression backend other than <code>embedded</code> or
 type than <code>"file"</code>) is rejected and cannot be converted.
 Re-export it from the source Seurat object with
 <code>exportFromSeurat(..., expression_matrix_mode = "h5")</code>.</p>
+</div>
+<div class="section level2">
+<h2 id="viewer-options-for-large-data">Viewer options for large data<a class="anchor" aria-label="anchor" href="#viewer-options-for-large-data"></a>
+</h2>
+<p>Set these with <code><a href="https://rdrr.io/r/base/options.html" class="external-link">options()</a></code> before
+<code><a href="../reference/launchCerebro.html">launchCerebro()</a></code>, or in the <code>.Rprofile</code> of a
+server that hosts the Viewer.</p>
+<table class="table">
+<colgroup>
+<col width="33%">
+<col width="33%">
+<col width="33%">
+</colgroup>
+<thead><tr class="header">
+<th>Option</th>
+<th>Default</th>
+<th>What it does</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><code>cerebro.crb_cache_slots</code></td>
+<td><code>2</code></td>
+<td>How many loaded <code>.crb</code> files the R process keeps, so a
+later session or a switch back to a data set does not read the file
+again. Each one keeps its metadata and projections in memory.</td>
+</tr>
+<tr class="even">
+<td><code>cerebro.idle_initial_delay</code></td>
+<td><code>1.2</code></td>
+<td>Seconds a new session must be quiet (no click, no frame asked for)
+before the Viewer prepares the pages that are not open yet.</td>
+</tr>
+<tr class="odd">
+<td><code>cerebro.idle_delay</code></td>
+<td><code>2</code></td>
+<td>The same after any later activity. Values below <code>0.05</code>
+fall back to the default.</td>
+</tr>
+<tr class="even">
+<td><code>cerebro.dev_reload</code></td>
+<td><code>FALSE</code></td>
+<td>For work on the Viewer itself: <code>TRUE</code> checks the
+installed Viewer source files for changes in every session. Otherwise an
+installed package’s files are read once per process.</td>
+</tr>
+</tbody>
+</table>
+<p>Sessions on the same data set file also share what they compute (the
+sorted gene list, ROI scopes, the trajectory’s cells, clonal UMAP
+points). Each kind keeps a few entries, and all are dropped when the
+last session ends.</p>
 </div>
 <div class="section level2">
 <h2 id="troubleshooting">Troubleshooting<a class="anchor" aria-label="anchor" href="#troubleshooting"></a>

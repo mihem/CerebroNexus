@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.5.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.5.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -69,6 +69,15 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="8.5.1" id="cerebronexus-851">CerebroNexus 8.5.1<a class="anchor" aria-label="anchor" href="#cerebronexus-851"></a></h2>
+<ul><li>
+<strong>Faster page loads and tables (<a href="https://github.com/mihem/CerebroNexus/issues/293" class="external-link">#293</a>).</strong> The Viewer defers its remaining scripts and mounts result tables lazily, flushes tables in the first round trip and builds the colour ramps of <code>prettifyTable()</code> in one vectorised step, with cut points to 15 significant digits as <code><a href="https://rdrr.io/pkg/DT/man/styleInterval.html" class="external-link">DT::styleInterval()</a></code> has them. Gene expression no longer debounces twice and reads the mean of several H5 genes without a dense row per gene. Hidden pages stop leaking outputs across tabs, <code>fill_height</code> batches its DOM reads, and subsetting and copying of projection tables avoid needless copies. Moran’s I, ROI rotation and group hulls are defined once per process.</li>
+<li>
+<strong>Sessions on one file share what they compute.</strong> The sorted gene list, a section’s ROI scope, the trajectory’s cells and the clonal UMAP points are kept once per R process for each data set file (path, size and modification time), so a second visitor on the same file gets them without computing them again. Each kind holds a few entries, and all are dropped when the last session ends.</li>
+<li>
+<strong>Options for large data.</strong> <code>cerebro.crb_cache_slots</code>, <code>cerebro.idle_initial_delay</code>, <code>cerebro.idle_delay</code> and <code>cerebro.dev_reload</code> are described in the large-data article.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="8.5.0" id="cerebronexus-850">CerebroNexus 8.5.0<a class="anchor" aria-label="anchor" href="#cerebronexus-850"></a></h2>
 <ul><li>

@@ -460,6 +460,24 @@ an immune sidecar of another type than `"file"`) is rejected and cannot
 be converted. Re-export it from the source Seurat object with
 `exportFromSeurat(..., expression_matrix_mode = "h5")`.
 
+## Viewer options for large data
+
+Set these with [`options()`](https://rdrr.io/r/base/options.html) before
+[`launchCerebro()`](https://www.mheming.com/CerebroNexus/reference/launchCerebro.md),
+or in the `.Rprofile` of a server that hosts the Viewer.
+
+| Option | Default | What it does |
+|----|----|----|
+| `cerebro.crb_cache_slots` | `2` | How many loaded `.crb` files the R process keeps, so a later session or a switch back to a data set does not read the file again. Each one keeps its metadata and projections in memory. |
+| `cerebro.idle_initial_delay` | `1.2` | Seconds a new session must be quiet (no click, no frame asked for) before the Viewer prepares the pages that are not open yet. |
+| `cerebro.idle_delay` | `2` | The same after any later activity. Values below `0.05` fall back to the default. |
+| `cerebro.dev_reload` | `FALSE` | For work on the Viewer itself: `TRUE` checks the installed Viewer source files for changes in every session. Otherwise an installed package’s files are read once per process. |
+
+Sessions on the same data set file also share what they compute (the
+sorted gene list, ROI scopes, the trajectory’s cells, clonal UMAP
+points). Each kind keeps a few entries, and all are dropped when the
+last session ends.
+
 ## Troubleshooting
 
 - **Missing sidecar:** restore the recorded sibling `.h5` (or
