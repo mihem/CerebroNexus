@@ -1026,7 +1026,7 @@ render_configure_workbench <- function() {
   id <- current()
   entry <- isolate(entry_of(id))
   if (is.null(entry)) {
-    return(builder_empty_workbench_ui())
+    return(builder_empty_workbench_ui(examples_only = builder_examples_only()))
   }
   if (identical(entry$load_state %||% "loaded", "artifact_ready")) {
     project <- isolate(builder_project())
@@ -1254,13 +1254,18 @@ render_configure_workbench <- function() {
       "enhance",
       enhance_model,
       dynamic_modules = TRUE,
-      include_spatial = FALSE
+      include_spatial = FALSE,
+      examples_only = builder_examples_only()
     ),
     builder_core_advanced_ui("core", core_model),
     builder_views_stage_ui(
       "core",
       core_model,
-      builder_spatial_stage_ui("enhance", enhance_model)
+      builder_spatial_stage_ui(
+        "enhance",
+        enhance_model,
+        examples_only = builder_examples_only()
+      )
     ),
     uiOutput("configure_actions")
   )

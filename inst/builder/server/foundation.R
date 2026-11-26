@@ -1,5 +1,22 @@
 ## Builder server: foundation.
 
+## An examples-only Builder (see access.R) refuses every request that would
+## bring a file in or reach a server folder, whatever the page sends. TRUE
+## when the request was refused; the visitor is told why.
+builder_examples_only_refused <- function(target = NULL) {
+  if (!builder_examples_only()) {
+    return(FALSE)
+  }
+  builder_notify(
+    "info",
+    builder_examples_only_message,
+    target = target,
+    id = "builder-examples-only",
+    duration = 6
+  )
+  TRUE
+}
+
 ## Each entry: id, path, format, object, profile, settings.
 ## `settings` is what the user chose; it is written back whenever an input
 ## changes so switching between data sets does not lose it.
@@ -1199,6 +1216,9 @@ output$builder_server_browser <- renderUI({
 })
 
 observeEvent(input$builder_server_browse, {
+  if (builder_examples_only_refused()) {
+    return()
+  }
   state <- builder_server_browser()
   event <- input$builder_server_browse
   if (!is.list(state) || !is.list(event)) {
@@ -1242,6 +1262,13 @@ builder_schedule_native_picker <- function(
   stopifnot(is.function(on_result), builder_has_text(key))
   key <- as.character(key)[1L]
   if (exists(key, envir = builder_native_pickers, inherits = FALSE)) {
+    return(invisible(FALSE))
+  }
+  ## No file dialog opens on an examples-only server.
+  if (builder_examples_only_refused()) {
+    if (is.function(on_finally)) {
+      shiny::isolate(on_finally())
+    }
     return(invisible(FALSE))
   }
   picker <- tryCatch(builder_start_native_picker(kind), error = identity)

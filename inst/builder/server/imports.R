@@ -38,6 +38,15 @@ start_load <- function(
   if (isTRUE(replay_existing_client_import(client_id))) {
     return(invisible(FALSE))
   }
+  ## An examples-only Builder loads nothing but its examples (see access.R).
+  if (!identical(kind, "example") && builder_examples_only_refused()) {
+    release_client_import(
+      client_id,
+      outcome = "rejected",
+      message = builder_examples_only_message
+    )
+    return(invisible(FALSE))
+  }
   source_name <- if (identical(kind, "file")) {
     file_meta$name %||% retained_path %||% arg
   } else {
@@ -595,6 +604,14 @@ observeEvent(input$builder_client_import_dispatch, {
     pending_client_import_dispatch(NULL)
     return()
   }
+  if (builder_examples_only_refused()) {
+    release_client_import(
+      event$client_id %||% NULL,
+      outcome = "rejected",
+      message = builder_examples_only_message
+    )
+    return()
+  }
   too_large <- builder_upload_limit_message(event$name, event$size)
   if (!is.null(too_large)) {
     release_client_import(
@@ -642,6 +659,15 @@ observeEvent(input$builder_client_import_dispatch, {
 })
 
 observeEvent(input$dataset_files, {
+  ## Shiny lets only files of at most one byte through in an examples-only
+  ## Builder (app.R); drop even those.
+  if (builder_examples_only_refused()) {
+    files <- input$dataset_files
+    if (is.data.frame(files) && "datapath" %in% names(files)) {
+      unlink(files$datapath, force = TRUE)
+    }
+    return()
+  }
   token <- isolate(pending_client_upload_sequence()) + 1L
   pending_client_upload_sequence(token)
   pending_client_upload(list(

@@ -1111,6 +1111,53 @@ builder_reveal_release <- function(result, .reveal = NULL) {
   isTRUE(.reveal(model$release_dir))
 }
 
+## Zip a finished release folder into `zipfile`, the folder itself at the top
+## of the archive. Used by the examples-only download (server/build.R). The
+## zip package is used when installed; otherwise utils::zip(), which needs a
+## zip program on the server.
+builder_zip_directory <- function(
+  directory,
+  zipfile,
+  .use_zip_package = requireNamespace("zip", quietly = TRUE)
+) {
+  if (
+    !is.character(directory) ||
+      length(directory) != 1L ||
+      is.na(directory) ||
+      !dir.exists(directory)
+  ) {
+    stop("The folder to zip does not exist.", call. = FALSE)
+  }
+  directory <- normalizePath(directory, winslash = "/", mustWork = TRUE)
+  zipfile <- normalizePath(zipfile, winslash = "/", mustWork = FALSE)
+  if (isTRUE(.use_zip_package)) {
+    zip::zip(
+      zipfile,
+      files = basename(directory),
+      root = dirname(directory),
+      recurse = TRUE,
+      include_directories = TRUE
+    )
+  } else {
+    old <- setwd(dirname(directory))
+    on.exit(setwd(old), add = TRUE)
+    command <- Sys.getenv("R_ZIPCMD")
+    status <- utils::zip(
+      zipfile,
+      files = basename(directory),
+      flags = "-r -q",
+      zip = if (nzchar(command)) command else "zip"
+    )
+    if (!identical(as.integer(status), 0L)) {
+      stop("The build could not be zipped.", call. = FALSE)
+    }
+  }
+  if (!file.exists(zipfile)) {
+    stop("The build could not be zipped.", call. = FALSE)
+  }
+  invisible(zipfile)
+}
+
 builder_copy_result_path <- function(result, kind, .copy) {
   result <- builder_as_result(result)
   model <- builder_build_status_model(result)
@@ -1558,7 +1605,8 @@ builder_build_stage_status_label <- function(model) {
 
 builder_build_stage_primary_action_ui <- function(
   model,
-  controls_disabled = FALSE
+  controls_disabled = FALSE,
+  examples_only = FALSE
 ) {
   builder_build_stage_status_validate(model)
   repeatable <- identical(model$state, "result") &&
@@ -1566,8 +1614,11 @@ builder_build_stage_primary_action_ui <- function(
   if (!identical(model$state, "ready") && !isTRUE(repeatable)) {
     return(NULL)
   }
+  ## An examples-only Builder chooses no folder (see access.R), so "Build
+  ## again" is the same thing.
   same_folder <- if (
-    identical(model$state, "result") &&
+    !isTRUE(examples_only) &&
+      identical(model$state, "result") &&
       identical(model$result_model$type, "success") &&
       builder_stage_has_text(model$last_output_parent %||% "")
   ) {
@@ -1597,7 +1648,7 @@ builder_build_stage_primary_action_ui <- function(
   if (is.null(same_folder)) primary else tagList(same_folder, primary)
 }
 
-builder_build_stage_status_body_ui <- function(model) {
+builder_build_stage_status_body_ui <- function(model, examples_only = FALSE) {
   builder_build_stage_status_validate(model)
   switch(
     model$state,
@@ -1638,7 +1689,10 @@ builder_build_stage_status_body_ui <- function(model) {
       builder_build_progress_detail_ui(step = TRUE)
     ),
     result = tagList(
-      builder_build_status_ui(model$result_model),
+      builder_build_status_ui(
+        model$result_model,
+        examples_only = examples_only
+      ),
       if (builder_stage_has_text(model$message %||% "")) {
         div(
           class = "builder-build-waiting builder-build-post-processing",
@@ -1651,7 +1705,7 @@ builder_build_stage_status_body_ui <- function(model) {
   )
 }
 
-builder_build_status_ui <- function(model) {
+builder_build_status_ui <- function(model, examples_only = FALSE) {
   if (inherits(model, "builder_result")) {
     model <- builder_build_status_model(model)
   }
@@ -1927,7 +1981,28 @@ builder_build_status_ui <- function(model) {
         }
       )
     },
-    if (
+    ## An examples-only Builder starts no App and shows no server path; the
+    ## visitor downloads the release instead (see access.R).
+    if (isTRUE(examples_only)) {
+      if (identical(model$type, "success") && !is.null(model$release_dir)) {
+        div(
+          class = "builder-result-actions",
+          downloadButton(
+            "builder_examples_only_download",
+            if (!is.null(model$app_dir)) {
+              "Download Viewer app (.zip)"
+            } else {
+              "Download CRB files (.zip)"
+            },
+            class = "btn btn-primary"
+          ),
+          p(
+            class = "hint",
+            "The download is kept until you close this page."
+          )
+        )
+      }
+    } else if (
       !is.null(model$app_dir) ||
         !is.null(model$release_dir) ||
         !is.null(model$report_path)

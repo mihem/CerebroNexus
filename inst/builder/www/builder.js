@@ -1393,6 +1393,15 @@
     });
   }
 
+  // An examples-only Builder (inst/builder/access.R) takes no file from the
+  // page: no picker, no drop, no upload. The server refuses them as well.
+  // A dropped file still reaches enqueueClientFiles(), which returns early;
+  // app.R hides the drop overlay.
+  var builderExamplesOnly = (function () {
+    var meta = document.querySelector('meta[name="cerebro-builder-mode"]');
+    return Boolean(meta && meta.getAttribute("content") === "examples-only");
+  })();
+
   function activityCapability(name) {
     var importSensitive = [
       "save_project",
@@ -2405,6 +2414,7 @@
   }
 
   function openDatasetPicker(message) {
+    if (builderExamplesOnly) return;
     if (datasetMutationsLocked || !activityCapability("add_dataset")) return;
     var picker = document.createElement("input");
     picker.type = "file";
@@ -2445,6 +2455,7 @@
   }
 
   function addDatasetFiles() {
+    if (builderExamplesOnly) return;
     if (datasetMutationsLocked || datasetPickerOpening) return;
     if (!activityCapability("add_dataset")) return;
     setDatasetPickerOpening(true);
@@ -2453,6 +2464,7 @@
   }
 
   function addTableFiles() {
+    if (builderExamplesOnly) return;
     if (datasetMutationsLocked || !activityCapability("edit_dataset")) return;
     var picker = document.getElementById("enhance-table_files");
     if (!picker) return;
@@ -2846,6 +2858,7 @@
   }
 
   function enqueueClientFiles(fileList) {
+    if (builderExamplesOnly) return;
     if (!activityCapability("add_dataset")) return;
     var files = Array.from(fileList || []);
     files.forEach(function (file) {

@@ -57,3 +57,38 @@ builder_access_denied_response <- function() {
     headers = list(`Cache-Control` = "no-store")
   )
 }
+
+## Examples-only mode, for a public demonstration (issue #272).
+##
+## Visitors load the bundled examples, configure them, build, and download the
+## result. Nothing of theirs reaches the server: the page offers no upload,
+## no server folder and no Project, and the server refuses each of them as
+## well (builder_examples_only_refused() in server/foundation.R), so a page
+## that sends the inputs anyway changes nothing. Builds go to a folder of
+## their own below tempdir(), removed when the session ends.
+##
+## launchCerebroBuilder(examples_only = TRUE) sets the option; a server that
+## runs app.R directly sets it before the app starts. Read once, like the
+## access token.
+builder_examples_only_mode <- function(
+  value = getOption("CerebroNexus.builder.examples_only", FALSE)
+) {
+  if (!is.logical(value) || length(value) != 1L || is.na(value)) {
+    stop(
+      "The option CerebroNexus.builder.examples_only must be TRUE or FALSE.",
+      call. = FALSE
+    )
+  }
+  value
+}
+
+## TRUE in an examples-only Builder. Code sourced without app.R (as many tests
+## do) sees no setting and runs the full Builder.
+builder_examples_only <- function() {
+  isTRUE(get0(".builder_examples_only", inherits = TRUE, ifnotfound = FALSE))
+}
+
+builder_examples_only_message <- paste(
+  "This demonstration Builder works with the bundled examples only:",
+  "uploads, server folders and Projects are turned off."
+)

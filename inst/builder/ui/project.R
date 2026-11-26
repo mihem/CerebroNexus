@@ -1,6 +1,13 @@
 ## Builder project controls and recovery surfaces.
 
-builder_project_toolbar_ui <- function() {
+builder_project_toolbar_ui <- function(examples_only = FALSE) {
+  ## An examples-only Builder saves and opens no Project (see access.R).
+  if (isTRUE(examples_only)) {
+    return(tags$div(
+      class = "builder-project-toolbar builder-examples-only-badge",
+      tags$span(class = "builder-project-status", "Examples-only demo")
+    ))
+  }
   tags$div(
     class = "builder-project-toolbar",
     uiOutput("project_status"),

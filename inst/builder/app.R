@@ -234,8 +234,13 @@ builder_app_start <- function(
   ## Apps started by Open App live as long as the Builder.
   shiny::onStop(builder_stop_opened_apps)
   ## Local Seurat objects and microscopy images can be arbitrarily large.
-  ## Respect an explicit launcher-supplied cap; otherwise impose none.
-  if (is.null(getOption("shiny.maxRequestSize"))) {
+  ## Respect an explicit launcher-supplied cap; otherwise impose none. An
+  ## examples-only Builder accepts no upload at all: Shiny refuses any file
+  ## larger than one byte before it is sent. (Shiny trusts the size the page
+  ## declares; a proxy in front of a public demo should cap request bodies.)
+  if (builder_examples_only()) {
+    options(shiny.maxRequestSize = 1)
+  } else if (is.null(getOption("shiny.maxRequestSize"))) {
     options(shiny.maxRequestSize = Inf)
   }
   if (!is.null(builder_source_package)) {
@@ -269,6 +274,7 @@ source("coordinator.R", local = TRUE)
 source("access.R", local = TRUE)
 ## Read once: the page and every session are checked against this token.
 .builder_access_token <- builder_access_token()
+.builder_examples_only <- builder_examples_only_mode()
 source("notify.R", local = TRUE)
 source("io.R", local = TRUE)
 source("project.R", local = TRUE)
@@ -535,6 +541,14 @@ ui <- shiny::bootstrapPage(
         asset_stamp("www/builder-spatial-canvas.js")
       )
     ),
+    ## builder.js reads this to refuse picked and dropped files, and no drop
+    ## overlay invites them (see access.R).
+    if (builder_examples_only()) {
+      tagList(
+        tags$meta(name = "cerebro-builder-mode", content = "examples-only"),
+        tags$style(".builder-window-drop { display: none !important; }")
+      )
+    },
     tags$script(src = paste0("builder.js", asset_stamp("www/builder.js"))),
     tags$title("Cerebro Dataset Builder")
   ),
@@ -576,7 +590,7 @@ ui <- shiny::bootstrapPage(
         )
       )
     ),
-    builder_project_toolbar_ui()
+    builder_project_toolbar_ui(examples_only = builder_examples_only())
   ),
   uiOutput("workflow_progress"),
   ## Global notices (builder_notify with no target) slide in here.
@@ -617,55 +631,66 @@ ui <- shiny::bootstrapPage(
           `aria-relevant` = "additions text"
         )
       ),
-      div(
-        class = "rail-add-actions",
-        tags$button(
-          type = "button",
-          class = "btn builder-add-datasets",
-          `aria-label` = "Add dataset files",
-          tags$span(
-            class = "rail-add-title",
-            tags$span(
-              class = "rail-add-icon",
-              `aria-hidden` = "true",
-              shiny::icon("folder-open")
-            ),
-            tags$strong(class = "builder-add-label", "Add files")
-          ),
-          {
-            ## The rail may cut the list short; the tooltip keeps it whole.
-            format_hint <- paste(
-              builder_advertised_format_labels(),
-              collapse = ", "
-            )
-            tags$small(
-              class = "rail-add-detail",
-              title = format_hint,
-              format_hint
-            )
-          }
-        ),
-        builder_deprecated_format_note_ui(),
-        builder_format_unavailable_ui(builder_format_capabilities()),
-        tags$input(
-          id = "dataset_files",
-          name = "dataset_files",
-          class = "shiny-input-file builder-upload-transport",
-          type = "file",
-          accept = builder_file_accept(
-            builder_dataset_extensions(available_only = TRUE)
-          ),
-          hidden = "hidden"
-        ),
-        # Shiny reports upload progress into this bar; builder.js mirrors it
-        # into the client import queue row.
-        tags$div(
-          id = "dataset_files_progress",
-          class = "shiny-file-input-progress builder-upload-transport-progress",
-          hidden = "hidden",
-          tags$div(class = "progress-bar")
+      ## An examples-only Builder has no file to add (see access.R).
+      if (builder_examples_only()) {
+        div(
+          class = "rail-add-actions builder-examples-only-rail",
+          p(
+            class = "hint builder-examples-only-note",
+            builder_examples_only_message
+          )
         )
-      )
+      } else {
+        div(
+          class = "rail-add-actions",
+          tags$button(
+            type = "button",
+            class = "btn builder-add-datasets",
+            `aria-label` = "Add dataset files",
+            tags$span(
+              class = "rail-add-title",
+              tags$span(
+                class = "rail-add-icon",
+                `aria-hidden` = "true",
+                shiny::icon("folder-open")
+              ),
+              tags$strong(class = "builder-add-label", "Add files")
+            ),
+            {
+              ## The rail may cut the list short; the tooltip keeps it whole.
+              format_hint <- paste(
+                builder_advertised_format_labels(),
+                collapse = ", "
+              )
+              tags$small(
+                class = "rail-add-detail",
+                title = format_hint,
+                format_hint
+              )
+            }
+          ),
+          builder_deprecated_format_note_ui(),
+          builder_format_unavailable_ui(builder_format_capabilities()),
+          tags$input(
+            id = "dataset_files",
+            name = "dataset_files",
+            class = "shiny-input-file builder-upload-transport",
+            type = "file",
+            accept = builder_file_accept(
+              builder_dataset_extensions(available_only = TRUE)
+            ),
+            hidden = "hidden"
+          ),
+          # Shiny reports upload progress into this bar; builder.js mirrors it
+          # into the client import queue row.
+          tags$div(
+            id = "dataset_files_progress",
+            class = "shiny-file-input-progress builder-upload-transport-progress",
+            hidden = "hidden",
+            tags$div(class = "progress-bar")
+          )
+        )
+      }
     ),
     tags$main(
       id = "builder-workspace",
@@ -679,7 +704,8 @@ ui <- shiny::bootstrapPage(
           tabindex = "-1",
           builder_empty_workbench_ui(
             formats = builder_format_capabilities(),
-            examples = builder_example_directory()
+            examples = builder_example_directory(),
+            examples_only = builder_examples_only()
           )
         )
       )

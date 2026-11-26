@@ -670,7 +670,7 @@ builder_spatial_image_storage_ui <- function(ns, selected = "external") {
   )
 }
 
-builder_spatial_alignment_ui <- function(id, model) {
+builder_spatial_alignment_ui <- function(id, model, examples_only = FALSE) {
   ns <- NS(id)
   sections <- as.character(model$sections %||% character())
   section_labels <- model$section_labels %||% sections
@@ -825,28 +825,32 @@ builder_spatial_alignment_ui <- function(id, model) {
                 ),
                 ns = ns
               ),
-              div(
-                class = "enhance-tissue-file-control builder-file-picker builder-file-picker--compact",
-                tags$input(
-                  id = ns("tissue_image_file"),
-                  name = ns("tissue_image_file"),
-                  class = "shiny-input-file enhance-tissue-file-input builder-file-input",
-                  type = "file",
-                  accept = builder_file_accept(builder_image_extensions()),
-                  `tabindex` = "-1"
-                ),
-                tags$label(
-                  `for` = ns("tissue_image_file"),
-                  class = "btn btn-action enhance-tissue-file-button",
-                  `tabindex` = "0",
-                  role = "button",
-                  tags$span(
-                    `aria-hidden` = "true",
-                    shiny::icon("image")
+              ## An examples-only Builder takes no uploaded image (see
+              ## access.R); the examples bring their own.
+              if (!isTRUE(examples_only)) {
+                div(
+                  class = "enhance-tissue-file-control builder-file-picker builder-file-picker--compact",
+                  tags$input(
+                    id = ns("tissue_image_file"),
+                    name = ns("tissue_image_file"),
+                    class = "shiny-input-file enhance-tissue-file-input builder-file-input",
+                    type = "file",
+                    accept = builder_file_accept(builder_image_extensions()),
+                    `tabindex` = "-1"
                   ),
-                  uiOutput(ns("add_image_label"), inline = TRUE)
+                  tags$label(
+                    `for` = ns("tissue_image_file"),
+                    class = "btn btn-action enhance-tissue-file-button",
+                    `tabindex` = "0",
+                    role = "button",
+                    tags$span(
+                      `aria-hidden` = "true",
+                      shiny::icon("image")
+                    ),
+                    uiOutput(ns("add_image_label"), inline = TRUE)
+                  )
                 )
-              ),
+              },
               conditionalPanel(
                 condition = "output['has_multiple_images']",
                 selectInput(
@@ -1022,7 +1026,8 @@ builder_enhance_stage_ui <- function(
   id,
   model,
   dynamic_modules = FALSE,
-  include_spatial = TRUE
+  include_spatial = TRUE,
+  examples_only = FALSE
 ) {
   ns <- NS(id)
   analysis_modules <- Filter(
@@ -1078,27 +1083,35 @@ builder_enhance_stage_ui <- function(
             class = "enhance-attachment-description",
             "Add CSV, TSV or Excel tables. Selected sheets are included at build time."
           ),
-          div(
-            class = "enhance-table-file-actions builder-action-row",
-            tags$button(
-              class = "btn enhance-table-add-button",
-              type = "button",
-              span(
-                `aria-hidden` = "true",
-                shiny::icon("folder-open")
-              ),
-              span(class = "builder-add-label", "Add tables")
-            ),
-            tags$input(
-              id = ns("table_files"),
-              name = ns("table_files"),
-              class = "shiny-input-file enhance-table-file-input builder-file-input",
-              type = "file",
-              multiple = "multiple",
-              accept = builder_file_accept(builder_table_extensions()),
-              `tabindex` = "-1"
+          ## An examples-only Builder takes no uploaded table (see access.R).
+          if (isTRUE(examples_only)) {
+            p(
+              class = "hint builder-examples-only-note",
+              builder_examples_only_message
             )
-          ),
+          } else {
+            div(
+              class = "enhance-table-file-actions builder-action-row",
+              tags$button(
+                class = "btn enhance-table-add-button",
+                type = "button",
+                span(
+                  `aria-hidden` = "true",
+                  shiny::icon("folder-open")
+                ),
+                span(class = "builder-add-label", "Add tables")
+              ),
+              tags$input(
+                id = ns("table_files"),
+                name = ns("table_files"),
+                class = "shiny-input-file enhance-table-file-input builder-file-input",
+                type = "file",
+                multiple = "multiple",
+                accept = builder_file_accept(builder_table_extensions()),
+                `tabindex` = "-1"
+              )
+            )
+          },
           uiOutput(ns("table_list")),
           key = "extra-material",
           count = paste(
@@ -1109,11 +1122,13 @@ builder_enhance_stage_ui <- function(
         )
       )
     ),
-    if (isTRUE(include_spatial)) builder_spatial_stage_ui(id, model)
+    if (isTRUE(include_spatial)) {
+      builder_spatial_stage_ui(id, model, examples_only = examples_only)
+    }
   )
 }
 
-builder_spatial_stage_ui <- function(id, model) {
+builder_spatial_stage_ui <- function(id, model, examples_only = FALSE) {
   histology <- model$attachments$histology %||% list()
   if (!isTRUE(histology$relevant)) {
     return(NULL)
@@ -1123,7 +1138,11 @@ builder_spatial_stage_ui <- function(id, model) {
     builder_viewer_card(
       "builder-viewer-card builder-viewer-spatial-alignment",
       "Spatial alignment",
-      builder_spatial_alignment_ui(id, histology),
+      builder_spatial_alignment_ui(
+        id,
+        histology,
+        examples_only = examples_only
+      ),
       key = "spatial-alignment",
       count = paste(
         length(histology$sections %||% character()),

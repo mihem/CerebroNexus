@@ -312,7 +312,10 @@ observeEvent(
 )
 
 output$build_stage_status_content <- renderUI({
-  body <- builder_build_stage_status_body_ui(build_stage_status_projection())
+  body <- builder_build_stage_status_body_ui(
+    build_stage_status_projection(),
+    examples_only = builder_examples_only()
+  )
   if (is.null(body)) {
     return(NULL)
   }
@@ -326,7 +329,8 @@ output$build_stage_status_content <- renderUI({
 output$build_stage_footer <- renderUI({
   builder_build_stage_footer_ui(
     build_stage_status_projection(),
-    controls_disabled = builder_build_controls_locked(build_flow())
+    controls_disabled = builder_build_controls_locked(build_flow()),
+    examples_only = builder_examples_only()
   )
 })
 
@@ -771,7 +775,102 @@ show_builder_build_server_path <- function(detail = NULL) {
   )
 }
 
+## An examples-only Builder (see access.R) asks for no folder: each session
+## builds into a private folder of its own below tempdir(), and the visitor
+## downloads the result (output$builder_examples_only_download). The folder
+## goes when the session ends.
+builder_examples_only_output <- reactiveVal(NULL)
+
+builder_examples_only_output_parent <- function() {
+  parent <- isolate(builder_examples_only_output())
+  if (builder_has_text(parent %||% "") && dir.exists(parent)) {
+    return(parent)
+  }
+  suffix <- paste(
+    sprintf("%02x", as.integer(.builderRandomBytes(8L))),
+    collapse = ""
+  )
+  parent <- file.path(tempdir(), paste0("cerebro-builder-demo-", suffix))
+  if (!dir.create(parent, mode = "0700")) {
+    stop("A private build folder could not be created.", call. = FALSE)
+  }
+  builder_examples_only_output(parent)
+  parent
+}
+
+session$onSessionEnded(function() {
+  parent <- isolate(builder_examples_only_output())
+  if (builder_has_text(parent %||% "")) {
+    unlink(parent, recursive = TRUE, force = TRUE)
+  }
+})
+
+start_builder_examples_only_release <- function() {
+  on.exit(
+    session$sendCustomMessage("builder_build_dialog", list(action = "close")),
+    add = TRUE
+  )
+  tryCatch(
+    start_builder_new_release(builder_examples_only_output_parent()),
+    error = function(error) {
+      build_flow(list(stage = "idle", plan = NULL))
+      builder_notify(
+        "error",
+        paste0("The build could not start: ", conditionMessage(error)),
+        target = "build"
+      )
+      FALSE
+    }
+  )
+}
+
+## The finished release of this session, zipped for download.
+builder_examples_only_release_dir <- function() {
+  parent <- isolate(builder_examples_only_output())
+  value <- isolate(result())
+  if (
+    !builder_has_text(parent %||% "") ||
+      !inherits(value, "builder_result") ||
+      !identical(value$state, "success")
+  ) {
+    return(NULL)
+  }
+  release <- builder_build_status_model(value)$release_dir
+  if (
+    !builder_has_text(release %||% "") ||
+      !dir.exists(release) ||
+      !.pathWithin(
+        normalizePath(release, winslash = "/", mustWork = TRUE),
+        normalizePath(parent, winslash = "/", mustWork = TRUE)
+      )
+  ) {
+    return(NULL)
+  }
+  normalizePath(release, winslash = "/", mustWork = TRUE)
+}
+
+output$builder_examples_only_download <- downloadHandler(
+  filename = function() {
+    release <- builder_examples_only_release_dir()
+    paste0(
+      if (is.null(release)) "CerebroNexus_build" else basename(release),
+      ".zip"
+    )
+  },
+  content = function(file) {
+    release <- builder_examples_only_release_dir()
+    if (is.null(release) || !builder_examples_only()) {
+      stop("No finished build is available for download.", call. = FALSE)
+    }
+    builder_zip_directory(release, file)
+  },
+  contentType = "application/zip"
+)
+
 choose_build_folder <- function() {
+  if (builder_examples_only()) {
+    return(invisible(start_builder_examples_only_release()))
+  }
   build_flow(list(stage = "choosing_folder", plan = NULL))
   builder_schedule_native_picker(
     "output_directory",
@@ -820,6 +919,9 @@ choose_build_folder <- function() {
 
 observeEvent(input$use_builder_build_server_folder, {
   if (builder_build_controls_locked(isolate(build_flow()))) {
+    return()
+  }
+  if (builder_examples_only_refused(target = "build")) {
     return()
   }
   path <- tryCatch(

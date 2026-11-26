@@ -372,7 +372,11 @@ builder_server_browser_ui <- function(listing) {
   )
 }
 
-builder_build_stage_footer_ui <- function(model, controls_disabled = FALSE) {
+builder_build_stage_footer_ui <- function(
+  model,
+  controls_disabled = FALSE,
+  examples_only = FALSE
+) {
   builder_stage_footer_ui(
     builder_build_stage_status_label(model),
     actionButton(
@@ -383,7 +387,8 @@ builder_build_stage_footer_ui <- function(model, controls_disabled = FALSE) {
     ),
     builder_build_stage_primary_action_ui(
       model,
-      controls_disabled = controls_disabled
+      controls_disabled = controls_disabled,
+      examples_only = examples_only
     )
   )
 }

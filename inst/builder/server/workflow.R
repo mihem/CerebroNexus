@@ -139,7 +139,8 @@ output$workbench <- renderUI({
           dataset_count = length(store()$datasets %||% list()),
           formats = builder_format_capabilities(),
           examples = builder_example_directory(),
-          loading_count = import_counts[["active"]]
+          loading_count = import_counts[["active"]],
+          examples_only = builder_examples_only()
         ),
         class = "builder-stage-upload",
         `data-workflow-stage` = "upload"

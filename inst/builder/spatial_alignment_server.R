@@ -2559,6 +2559,19 @@ builder_spatial_alignment_server <- function(
 
   shiny::observeEvent(input[["enhance-tissue_image_file"]], {
     upload <- input[["enhance-tissue_image_file"]]
+    ## An examples-only Builder takes no uploaded image (see access.R).
+    if (
+      exists("builder_examples_only", mode = "function") &&
+        isTRUE(builder_examples_only())
+    ) {
+      builder_notify(
+        "info",
+        builder_examples_only_message,
+        id = "builder-examples-only",
+        duration = 6
+      )
+      return()
+    }
     if (
       !is.data.frame(upload) ||
         !nrow(upload) ||

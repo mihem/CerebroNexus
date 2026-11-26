@@ -1,6 +1,6 @@
 ## Marker gene source dialogs.
 
-builder_marker_source_choice_ui <- function(id) {
+builder_marker_source_choice_ui <- function(id, examples_only = FALSE) {
   ns <- NS(id)
   div(
     class = "marker-source-choice",
@@ -24,20 +24,23 @@ builder_marker_source_choice_ui <- function(id) {
         ),
         class = "marker-source-choice-card"
       ),
-      actionButton(
-        ns("marker_genes_upload"),
-        tagList(
-          span(
-            class = "marker-source-choice-title",
-            "Upload precomputed results"
+      ## An examples-only Builder takes no uploaded results (see access.R).
+      if (!isTRUE(examples_only)) {
+        actionButton(
+          ns("marker_genes_upload"),
+          tagList(
+            span(
+              class = "marker-source-choice-title",
+              "Upload precomputed results"
+            ),
+            span(
+              class = "marker-source-choice-description",
+              "Import CSV, TSV, or XLSX tables and confirm their cluster mapping."
+            )
           ),
-          span(
-            class = "marker-source-choice-description",
-            "Import CSV, TSV, or XLSX tables and confirm their cluster mapping."
-          )
-        ),
-        class = "marker-source-choice-card"
-      )
+          class = "marker-source-choice-card"
+        )
+      }
     )
   )
 }

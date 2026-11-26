@@ -42,6 +42,19 @@ The launcher opens a browser on a free local port. Use `launchCerebroBuilder(por
 
 The launcher always runs the Builder shipped inside the installed package. If you are developing CerebroNexus itself, reinstall the package before checking the final user experience.
 
+## A demonstration with the examples only
+
+`launchCerebroBuilder(examples_only = TRUE)` runs the Builder as a demonstration. It offers only the bundled examples, and visitors download what they build as a `.zip` file. Uploads, server folders, Projects and **Open App** are turned off, in the page and on the server. Each session builds into a private folder that is removed when the session ends.
+
+To host such a demonstration, for example on Shiny Server, set the option in the app file:
+
+```{r}
+options(CerebroNexus.builder.examples_only = TRUE)
+shiny::shinyAppDir(system.file("builder", package = "CerebroNexus"))
+```
+
+Run this way, the Builder has no access token, so anyone who reaches the address can use it. Every session starts background R processes, so limit the number of sessions and the request size in the server or proxy in front of it.
+
 ## Dependencies
 
 Install CerebroNexus with its declared Imports, then install the optional packages needed by your workflow:
