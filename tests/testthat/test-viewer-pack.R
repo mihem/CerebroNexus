@@ -1370,6 +1370,13 @@ test_that("Viewer Pack persists projection/trajectory extents, reuses unchanged 
     tolerance = 2
   )
   expect_gt(as.numeric(file.info(f_spat2)$mtime), as.numeric(old_mtime) + 10)
+  ## The reused section keeps its point size, the rebuilt one gets its own.
+  spatial_frames <- jsonlite::read_json(
+    file.path(pack, "manifest.json"),
+    simplifyVector = TRUE
+  )$spatial_frames
+  expect_setequal(spatial_frames$name, c("slice", "slice2"))
+  expect_true(all(is.finite(spatial_frames$point_size)))
 
   ## 3) Runtime domain-level decoupling without rebuilding Pack:
   ## 3a) Non-pack edit (extra_material) -> strict MD5 fails, decoupled succeeds for ALL domains
