@@ -35,6 +35,15 @@ output[["spatial_projection_point_border_UI"]] <- renderUI({
   )
 })
 
+output[["spatial_projection_picture_outline_UI"]] <- renderUI({
+  req(input[["spatial_projection_more_render_request"]])
+  checkboxInput(
+    inputId = "spatial_projection_picture_outline",
+    label = "Outline points on dark pictures",
+    value = isolate(spatial_projection_appearance$picture_outline)
+  )
+})
+
 output[["spatial_projection_keep_square_UI"]] <- renderUI({
   req(input[["spatial_projection_more_render_request"]])
   checkboxInput(
@@ -48,6 +57,11 @@ output[["spatial_projection_keep_square_UI"]] <- renderUI({
 outputOptions(
   output,
   "spatial_projection_point_border_UI",
+  suspendWhenHidden = FALSE
+)
+outputOptions(
+  output,
+  "spatial_projection_picture_outline_UI",
   suspendWhenHidden = FALSE
 )
 outputOptions(

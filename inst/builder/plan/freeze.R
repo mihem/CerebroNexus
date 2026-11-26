@@ -668,7 +668,7 @@ builder_freeze_plan <- function(
         saved$immune_repertoire_tabs <- viewerImmuneRepertoireTabSelection(
           settings$immune_repertoire_tabs
         )
-        saved$overview_point_size <- settings$overview_point_size %||% 5
+        saved$overview_point_size <- settings$overview_point_size %||% 4
         saved$overview_point_opacity <- settings$overview_point_opacity %||% 1
         saved$overview_percentage_cells_to_show <- settings[[
           "overview_percentage_cells_to_show"
@@ -841,7 +841,7 @@ builder_freeze_plan <- function(
           settings$marker_imports %||% list()
         ),
         images = alignments$spatial,
-        spatial_image_storage = "external",
+        spatial_image_storage = builder_spatial_image_storage(settings),
         trekker_alignment = alignments$trekker,
         colors = builder_resolve_colors(settings, entry$levels %||% list()),
         group_color_overrides = selected_color_overrides,
@@ -859,7 +859,7 @@ builder_freeze_plan <- function(
         ),
         spatial_percentage_cells_to_show = settings$spatial_percentage_cells_to_show %||%
           100,
-        overview_point_size = settings$overview_point_size %||% 5,
+        overview_point_size = settings$overview_point_size %||% 4,
         overview_point_opacity = settings$overview_point_opacity %||% 1,
         overview_percentage_cells_to_show = settings[[
           "overview_percentage_cells_to_show"

@@ -388,7 +388,13 @@ builder_review_snapshot <- function(
       list(),
     expression_backend = backend$mode,
     sidecars = backend$sidecars,
-    spatial_image_storage = "external",
+    spatial_image_storage = if (
+      identical(settings$spatial_image_storage, "embedded")
+    ) {
+      "embedded"
+    } else {
+      "external"
+    },
     manifest = state$manifest %||% saved$manifest %||% list(),
     viewer_page_expectations = state$page_expectations %||%
       saved$viewer_page_expectations %||%

@@ -52,21 +52,21 @@ IR_PARAM_SPEC <- list(
   "Clonal UMAP" = list(
     list(
       id = "ir_p_umap_receptor",
-      label = "Receptor:",
+      label = "Receptor",
       type = "select",
       choices = "<<receptors>>",
       value = NULL
     ),
     list(
       id = "ir_p_umap_projection",
-      label = "Projection:",
+      label = "Projection",
       type = "select",
       choices = "<<projections>>",
       value = NULL
     ),
     list(
       id = "ir_p_umap_group_by",
-      label = "Group results by:",
+      label = "Group results by",
       type = "select",
       choices = "<<groups>>",
       value = ""
@@ -82,7 +82,7 @@ IR_PARAM_SPEC <- list(
   "Diversity" = list(
     list(
       id = "ir_p_metric",
-      label = "Metric:",
+      label = "Metric",
       type = "select",
       choices = c(
         "shannon",
@@ -102,14 +102,14 @@ IR_PARAM_SPEC <- list(
     ),
     list(
       id = "ir_p_x_axis",
-      label = "X axis (metadata):",
+      label = "X axis (metadata)",
       type = "select",
       choices = "<<groups>>",
       value = ""
     ),
     list(
       id = "ir_p_n_boots",
-      label = "Bootstrap iterations:",
+      label = "Bootstrap iterations",
       type = "numeric",
       value = 20,
       min = 3,
@@ -121,14 +121,14 @@ IR_PARAM_SPEC <- list(
   "Paired Scatter" = list(
     list(
       id = "ir_p_graph",
-      label = "Graph:",
+      label = "Graph",
       type = "select",
       choices = c("proportion", "count"),
       value = "proportion"
     ),
     list(
       id = "ir_p_dot_size",
-      label = "Dot size:",
+      label = "Dot size",
       type = "select",
       choices = c("total", "x", "y"),
       value = "total"
@@ -138,7 +138,7 @@ IR_PARAM_SPEC <- list(
   "Homeostasis" = list(
     list(
       id = "ir_p_clone_size",
-      label = "Clone size thresholds:",
+      label = "Clone size thresholds",
       type = "text",
       value = "0.0001, 0.001, 0.01, 0.1, 1"
     )
@@ -147,7 +147,7 @@ IR_PARAM_SPEC <- list(
   "Abundance" = list(
     list(
       id = "ir_p_scale",
-      label = "Scale (proportion):",
+      label = "Scale (proportion)",
       type = "checkbox",
       value = FALSE
     )
@@ -156,7 +156,7 @@ IR_PARAM_SPEC <- list(
   "SizeDist" = list(
     list(
       id = "ir_p_sd_method",
-      label = "Clustering method:",
+      label = "Clustering method",
       type = "select",
       choices = c(
         "ward.D2",
@@ -172,7 +172,7 @@ IR_PARAM_SPEC <- list(
     ),
     list(
       id = "ir_p_sd_threshold",
-      label = "Threshold:",
+      label = "Threshold",
       type = "numeric",
       value = 1,
       min = 1,
@@ -183,13 +183,13 @@ IR_PARAM_SPEC <- list(
   "Compare" = list(
     list(
       id = "ir_p_compare_prop",
-      label = "Proportion (vs counts):",
+      label = "Proportion (vs counts)",
       type = "checkbox",
       value = TRUE
     ),
     list(
       id = "ir_p_top_clones",
-      label = "Top clones:",
+      label = "Top clones",
       type = "numeric",
       value = 10,
       min = 1,
@@ -210,7 +210,7 @@ IR_PARAM_SPEC <- list(
 IR_DISPLAY_SCATTER <- list(
   list(
     id = "ir_d_point_size",
-    label = "Point size:",
+    label = "Point size",
     type = "slider",
     value = 1,
     min = 0.1,
@@ -219,7 +219,7 @@ IR_DISPLAY_SCATTER <- list(
   ),
   list(
     id = "ir_d_alpha",
-    label = "Point opacity:",
+    label = "Point opacity",
     type = "slider",
     value = 0.8,
     min = 0.1,
@@ -241,7 +241,7 @@ IR_SCATTER_TABS <- c("Clonal UMAP", "Paired Scatter")
 ## ---------------------------------------------------------------------------
 IR_ORDER_BY_PARAM <- list(
   id = "ir_p_order_by",
-  label = "Order groups:",
+  label = "Order groups",
   type = "select",
   choices = c("Default" = "", "Alphanumeric" = "alphanumeric"),
   value = ""
@@ -265,7 +265,7 @@ ir_display_params_for <- function(tab) {
       params,
       list(list(
         id = "ir_d_percentage_cells_to_show",
-        label = "Show % of cells:",
+        label = "Show % of cells",
         type = "slider",
         value = 100,
         min = 10,

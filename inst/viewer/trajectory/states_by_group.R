@@ -20,44 +20,44 @@ output[["trajectory_states_by_group_UI"]] <- renderUI({
         cerebroInfoButton("states_by_group_info")
       ),
       tagList(
-        fluidRow(
-          column(
-            width = 3,
-            shinyWidgets::radioGroupButtons(
-              inputId = "states_by_group_plot_type",
-              label = NULL,
-              choices = c("Bar chart", "Sankey plot"),
-              status = "primary",
-              justified = TRUE,
-              width = "100%",
-              size = "sm"
+        ## The same fields as the page toolbars, in a row of the box.
+        div(
+          class = "cerebro-viz-toolbar cerebro-box-toolbar",
+          selectInput(
+            "states_by_group_select_other_group",
+            label = "Group to compare to",
+            choices = c(getGroups(), getCellCycle())
+          ),
+          selectInput(
+            "states_by_group_plot_type",
+            label = "Plot type",
+            choices = c("Bar chart", "Sankey plot"),
+            selected = "Bar chart"
+          ),
+          ## The values are the keys of the plot's views ("Bar chart|TRUE").
+          conditionalPanel(
+            condition = "input.states_by_group_plot_type !== 'Sankey plot'",
+            selectInput(
+              "states_by_group_show_as_percent",
+              label = "Bars show",
+              choices = c(
+                "Number of cells" = "FALSE",
+                "Percent of cells" = "TRUE"
+              ),
+              selected = "FALSE"
             )
           ),
-          column(
-            width = 9,
-            style = "padding: 5px;",
-            shinyWidgets::materialSwitch(
-              inputId = "states_by_group_show_as_percent",
-              label = "Show composition as percent [%]:",
-              status = "primary",
-              inline = TRUE
-            ),
+          div(
+            class = "cerebro-groups-switches",
             shinyWidgets::materialSwitch(
               inputId = "states_by_group_show_table",
-              label = "Show table:",
+              label = "Show table",
               status = "primary",
               inline = TRUE
             )
           )
         ),
-        tagList(
-          selectInput(
-            "states_by_group_select_other_group",
-            label = "Group to compare to:",
-            choices = c(getGroups(), getCellCycle())
-          ),
-          uiOutput("states_by_group_table_UI")
-        )
+        uiOutput("states_by_group_table_UI")
       )
     )
   )
@@ -158,11 +158,11 @@ output[["states_by_group_table"]] <- viewerLazyRender(function() {
         "state",
         grouping_variable,
         mode = "wide",
-        percent = input[["states_by_group_show_as_percent"]]
+        percent = isTRUE(as.logical(input[["states_by_group_show_as_percent"]]))
       )
 
     ## get indices of columns that should be formatted as percent
-    if (input[["states_by_group_show_as_percent"]] == TRUE) {
+    if (isTRUE(as.logical(input[["states_by_group_show_as_percent"]]))) {
       columns_percentage <- c(3:ncol(composition_df))
     } else {
       columns_percentage <- NULL

@@ -381,7 +381,13 @@ builder_viewer_display_ui <- function(id, entry, epoch) {
   flags <- function(...) {
     div(class = "builder-display-flags", ...)
   }
-  page <- function(prefix, label, labels = TRUE, extras = NULL) {
+  page <- function(
+    prefix,
+    label,
+    labels = TRUE,
+    extras = NULL,
+    square_label = "Keep plots square"
+  ) {
     builder_viewer_card(
       "builder-viewer-card",
       label,
@@ -390,7 +396,7 @@ builder_viewer_display_ui <- function(id, entry, epoch) {
           flag(paste0(prefix, "_group_labels"), "Show group labels")
         },
         flag(paste0(prefix, "_draw_border"), "Draw cell borders"),
-        flag(paste0(prefix, "_keep_square"), "Keep plots square")
+        flag(paste0(prefix, "_keep_square"), square_label)
       ),
       extras,
       body_class = "builder-viewer-card-body builder-advanced-grid"
@@ -502,9 +508,26 @@ builder_viewer_display_ui <- function(id, entry, epoch) {
     page(
       "spatial",
       "Spatial",
-      extras = flag(
-        "spatial_region_outlines",
-        "Outline group regions (convex hull)"
+      ## The Viewer's "Panel shape: Fit tissue | Square" switch.
+      square_label = "Square panels",
+      extras = tagList(
+        flag(
+          "spatial_region_outlines",
+          "Outline group regions (convex hull)"
+        ),
+        ## Light outline around points over a dark picture (on unless the
+        ## author turns it off).
+        flag(
+          "spatial_picture_outline",
+          "Outline points on dark pictures"
+        ),
+        ## Which sections the Spatial page starts with: all of them draw the
+        ## grid. A data set with one section ignores it.
+        select(
+          "spatial_layout",
+          "Open Spatial with (data sets with several sections)",
+          c("All sections" = "grid", "The first section" = "single")
+        )
       )
     ),
     page(

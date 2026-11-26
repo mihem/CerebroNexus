@@ -11,7 +11,10 @@ tab_groups <- tabItem(
     "
   ),
   div(class = "cerebro-viz-page-heading", h1("Groups")),
-  uiOutput("groups_controls_UI", class = "cerebro-groups-controls"),
+  uiOutput(
+    "groups_controls_UI",
+    class = "cerebro-groups-controls cerebro-viz-toolbar"
+  ),
   fluidRow(
     cerebroBox(
       title = tagList(

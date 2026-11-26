@@ -247,7 +247,7 @@ test_that("Build output UI locks CRB-only when external images require an App", 
     html,
     paste0(
       '<p id="build_output_crb_reason" class="hint builder-app-required-reason">',
-      "Spatial images or ROI settings require CRB files + Viewer App output."
+      "Spatial images kept as separate files, Trekker images or ROI settings"
     ),
     fixed = TRUE
   )

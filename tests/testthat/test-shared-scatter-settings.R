@@ -17,11 +17,43 @@ test_that("projection defaults are canonical and spatial defaults independent", 
   }
   expect_identical(
     env$viewerScatterDefaults(options, "a", "spatial"),
-    list(point_size = 5, point_opacity = 1, percentage_cells_to_show = 50)
+    list(point_size = 4, point_opacity = 1, percentage_cells_to_show = 50)
   )
   expect_equal(
     env$viewerScatterDefaults(list(point_size = c(a = 2)), "b")$point_size,
-    5
+    4
+  )
+})
+
+test_that("a page starts with the author's size, else 4, however large the data set", {
+  env <- viewer_runtime_env()
+  ## Installed, the package's internals are not on the search path.
+  sys.source(
+    viewer_test_path("core", "viewer_content_contract.R"),
+    envir = env
+  )
+  options <- list(point_size = c(a = 3), spatial_point_size = c(a = 7))
+  for (page in list(NULL, "spatial")) {
+    expect_identical(
+      env$viewerScatterDefaults(options, "a", page)$point_size,
+      if (is.null(page)) 3 else 7
+    )
+  }
+  ## Without an author's size: 4.
+  expect_identical(env$viewerScatterDefaults(list(), "a")$point_size, 4)
+  ## A section's own Builder appearance is used as saved.
+  section <- list(
+    viewer_content = list(
+      a = list(
+        spatial_point_appearance = list(
+          s1 = list(point_opacity = 0.8, point_size = 6)
+        )
+      )
+    )
+  )
+  expect_identical(
+    env$spatialPointAppearance(section, "a", "s1"),
+    list(point_opacity = 0.8, point_size = 6)
   )
 })
 
@@ -208,4 +240,23 @@ test_that("Builder, function and Viewer agree on coordinate appearance bounds", 
       expect_null(env$viewerSpatialPointSetting(leaf, roi))
     }
   }
+})
+
+test_that("no Viewer code passes a cell count to the point-size defaults", {
+  ## They take none: an extra argument stops the page that calls them.
+  files <- list.files(
+    viewer_test_path(),
+    pattern = "[.]R$",
+    recursive = TRUE,
+    full.names = TRUE
+  )
+  call <- "(viewerScatterDefaults|spatialPointAppearance)[(]([^()]|[(][^()]*[)])*n_cells"
+  offenders <- Filter(
+    function(file) {
+      text <- paste(readLines(file, warn = FALSE), collapse = " ")
+      grepl(call, text, perl = TRUE)
+    },
+    files
+  )
+  expect_identical(offenders, character())
 })

@@ -7,6 +7,15 @@ spatial_projection_render_request_seen <- reactiveVal(NULL)
 spatial_projection_last_render <- NULL
 spatial_projection_last_feedback <- NULL
 spatial_projection_last_token <- NULL
+## Counts the whole frames asked for, and whether the last is still waiting for
+## its turn (spatial_projection_defer()).
+spatial_projection_send_serial <- 0L
+spatial_projection_send_pending <- FALSE
+## Runs `task` in a turn of the event loop of its own; a test that wants the
+## frame at once defines this before sourcing the file.
+if (!exists("spatial_projection_defer", inherits = FALSE)) {
+  spatial_projection_defer <- function(task) later::later(task, 0)
+}
 
 observe({
   render_request <- input[["spatial_projection_render_request"]]
@@ -33,10 +42,12 @@ observe({
   # Calling the raw reactive keeps this observer invalidated while replacement
   # renderUI inputs settle.
   ## A new section is one discrete choice: draw it now rather than after the
-  ## debounce that gathers slider and filter changes.
+  ## debounce that gathers slider and filter changes. So is a switch between
+  ## one section and the grid.
+  scene_fields <- c("projection", "grid_sections", "grid_projection")
   section_changed <- !identical(
-    spatial_projection_controls()$projection,
-    spatial_projection_last_render$plot_parameters$projection
+    unname(spatial_projection_controls()[scene_fields]),
+    unname(spatial_projection_last_render$plot_parameters[scene_fields])
   )
   data <- if (dataset_changed || render_requested || section_changed) {
     spatial_projection_data_to_plot_raw()
@@ -82,25 +93,91 @@ observe({
   }
   drawn <- data
   data$feedback <- feedback
+  ## A data set switch or a render request draws the whole frame, never only
+  ## new colours over what the browser may no longer have. So does any frame
+  ## while such a frame is still waiting to be sent.
+  whole_frame <- dataset_changed ||
+    render_requested ||
+    spatial_projection_send_pending
+  data$fresh_render <- whole_frame
   ## The switch's current value: plot parameters hold the value from their
   ## last rebuild, and a filter or ROI change rebuilds only the frame.
   data$plot_parameters[["show_region_outlines"]] <- isTRUE(
     isolate(spatial_projection_region_outlines())
   )
   token_before <- .cerebro_cell_view_render_serial
+  frame_sent <- function() {
+    if (.cerebro_cell_view_render_serial > token_before) {
+      spatial_projection_last_token <<- .cerebro_cell_view_render_serial
+      spatial_projection_last_feedback <<- feedback
+    }
+  }
 
-  if (dataset_changed || render_requested) {
-    withProgress(message = 'Updating spatial plot...', value = 0.5, {
-      isolate(spatial_projection_update_plot(data))
+  if (whole_frame) {
+    ## The frame is built and sent in a turn of the event loop of its own: the
+    ## scene, the controls and the data of this flush go out first, and the
+    ## other sessions of the process are answered in between (the Allen atlas
+    ## held the process for 0.65 s, 0.17 s of it for the frame). A newer frame
+    ## replaces one that has not been sent.
+    spatial_projection_send_serial <<- spatial_projection_send_serial + 1L
+    spatial_projection_send_pending <<- TRUE
+    serial <- spatial_projection_send_serial
+    fresh_load <- dataset_changed || render_requested
+    spatial_projection_defer(function() {
+      if (
+        !identical(serial, spatial_projection_send_serial) ||
+          isTRUE(tryCatch(session$isClosed(), error = function(error) TRUE))
+      ) {
+        return(invisible(NULL))
+      }
+      current <- tryCatch(
+        isolate(viewer_loaded_dataset_context()),
+        error = function(error) NULL
+      )
+      sent <- !is.null(current) &&
+        viewerDatasetContextEqual(data$dataset_context, current) &&
+        tryCatch(
+          {
+            shiny::withReactiveDomain(session, {
+              if (fresh_load) {
+                withProgress(
+                  message = 'Updating spatial plot...',
+                  value = 0.5,
+                  {
+                    isolate(spatial_projection_update_plot(data))
+                  }
+                )
+              } else {
+                isolate(spatial_projection_update_plot(data))
+              }
+            })
+            TRUE
+          },
+          error = function(error) {
+            message(
+              "[spatial] the frame could not be sent: ",
+              conditionMessage(error)
+            )
+            FALSE
+          }
+        )
+      spatial_projection_send_pending <<- FALSE
+      ## Recorded once sent: a frame that failed is drawn again on the next run.
+      if (sent) {
+        frame_sent()
+      } else {
+        spatial_projection_last_render <<- NULL
+      }
+      invisible(NULL)
     })
+    ## The frame is the one the next run is compared with from here on; its
+    ## turn comes before any input that the browser answers this flush with.
+    spatial_projection_last_render <<- drawn
   } else {
     isolate(spatial_projection_update_plot(data))
-  }
-  ## Recorded once sent: a frame that failed is drawn again on the next run.
-  spatial_projection_last_render <<- drawn
-  if (.cerebro_cell_view_render_serial > token_before) {
-    spatial_projection_last_token <<- .cerebro_cell_view_render_serial
-    spatial_projection_last_feedback <<- feedback
+    ## Recorded once sent: a frame that failed is drawn again on the next run.
+    spatial_projection_last_render <<- drawn
+    frame_sent()
   }
   spatial_projection_render_context(viewerDatasetContextToken(current_context))
   spatial_projection_render_request_seen(request_nonce)

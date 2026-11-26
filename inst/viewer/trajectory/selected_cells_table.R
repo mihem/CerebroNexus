@@ -36,19 +36,22 @@ output[["trajectory_details_selected_cells_table"]] <- viewerLazyRender(
       req(trajectory_selection_ok())
 
       selected_cells <- trajectory_projection_selected_cells()
+      ## A selection by row is matched by position; the table then names the
+      ## selected cells only. A selection by name needs every name.
+      selected <- viewerSelectionRows(selected_cells)
       cells_df <- trajectory_cells_reactive(
         colnames(viewerProjectionFirstFrameMetadata()),
-        barcodes = TRUE
+        barcodes = is.null(selected)
       )
-      ## A selection by row is matched by position; the table then matches the
-      ## names of the selected cells only.
-      selected <- viewerSelectionRows(selected_cells)
       if (!is.null(selected)) {
         cells_df <- cells_df[
           viewerRowMask(selected, cells_df[["cell_index"]]),
           ,
           drop = FALSE
         ]
+        cells_df[["cell_barcode"]] <- viewerCellBarcodesAt(
+          cells_df[["cell_index"]]
+        )
         selected_cells <- data.frame(
           selection_key = as.character(cells_df[["cell_barcode"]])
         )

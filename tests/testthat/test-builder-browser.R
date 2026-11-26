@@ -1122,7 +1122,11 @@ test_that("a ruled-out output choice is faded and cannot be picked", {
       "document.getElementById('build_output_crb_reason')",
       ".textContent.trim()"
     )),
-    "Spatial images or ROI settings require CRB files + Viewer App output."
+    paste(
+      "Spatial images kept as separate files, Trekker images or ROI settings",
+      "require CRB files + Viewer App output. To build CRB files only, store",
+      "the Spatial images inside the CRB."
+    )
   )
 
   ## A real click anywhere on the card, the radio circle included, changes

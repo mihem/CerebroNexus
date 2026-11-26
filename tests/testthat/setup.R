@@ -26,6 +26,11 @@ if (
 ## and pay seconds each; R's JIT still compiles what a test calls.
 options(cerebro.builder.precompile = FALSE)
 
+## A browser without a GPU shows 2 panels at a time in the Viewer, and the
+## tests' headless Chrome draws in software: the apps they start (which inherit
+## this) show every panel, as the tests expect.
+Sys.setenv(CEREBRO_PANEL_CAP = "off")
+
 ## The Builder remembers its output folders for a crash sweep; keep that
 ## record out of the user's cache during tests.
 Sys.setenv(CEREBRO_BUILDER_STATE_DIR = tempfile("builder-state-"))

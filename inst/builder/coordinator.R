@@ -256,7 +256,13 @@ environment(builder_runtime_assert_identity) <- baseenv()
         )
       },
       expression_backend = .subset2(item, "expression_backend"),
-      spatial_image_storage = "external",
+      spatial_image_storage = if (
+        identical(.subset2(item, "spatial_image_storage"), "embedded")
+      ) {
+        "embedded"
+      } else {
+        "external"
+      },
       spatial_alignment = {
         alignment <- .subset2(item, "spatial_alignment") %||% list()
         list(

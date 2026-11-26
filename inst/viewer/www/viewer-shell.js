@@ -1076,7 +1076,29 @@
     var HANDLE = ".cerebro-selection-composition-drag";
     var HEADER = ".cerebro-selection-composition-head";
     var SLOT = ".cerebro-selection-composition-slot";
+    var TOGGLE = ".cerebro-selection-composition-toggle";
     var MOBILE = "(max-width: 700px)";
+    // Collapsed, every Composition card is a strip of colour dots, names and
+    // percents. One choice for all pages, kept for the next visit; the cards
+    // are drawn again with each selection, so the body carries it.
+    var COLLAPSED_KEY = "cerebro.composition.collapsed";
+    function setCollapsed(collapsed) {
+      document.body.classList.toggle("cerebro-composition-collapsed", collapsed);
+      try {
+        window.localStorage.setItem(COLLAPSED_KEY, collapsed ? "1" : "0");
+      } catch (ignore) {}
+      scheduleClamp();
+    }
+    try {
+      if (window.localStorage.getItem(COLLAPSED_KEY) === "1") {
+        document.body.classList.add("cerebro-composition-collapsed");
+      }
+    } catch (ignore) {}
+    document.addEventListener("click", function (event) {
+      if (!(event.target.closest && event.target.closest(TOGGLE))) return;
+      event.preventDefault();
+      setCollapsed(!document.body.classList.contains("cerebro-composition-collapsed"));
+    });
     var EDGE = 8;
     var drag = null;
     var clampPending = false;
@@ -1140,6 +1162,7 @@
     document.addEventListener("pointerdown", function (event) {
       var header = event.target.closest && event.target.closest(HEADER);
       if (!header || event.button !== 0 || isMobile()) return;
+      if (event.target.closest(TOGGLE)) return;
       var slot = header.closest(SLOT);
       if (!slot || !slot.getClientRects().length) return;
       pin(slot);
@@ -1469,4 +1492,37 @@
       document.documentElement.classList.remove("cerebro-resizing");
     }, 300);
   });
+
+  // The "i" after a Preferences switch: a click (or Enter / Space) keeps its
+  // help bubble open until a click elsewhere or Escape. It sits inside the
+  // switch's label, so the click must not toggle the switch.
+  function setPreferenceHelp(row, open) {
+    row.classList.toggle("is-open", open);
+    var info = row.querySelector(".cerebro-pref-info");
+    if (info) info.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+  function closePreferenceHelp(except) {
+    document.querySelectorAll(".cerebro-preference.is-open").forEach(function (row) {
+      if (row !== except) setPreferenceHelp(row, false);
+    });
+  }
+  function togglePreferenceHelp(event) {
+    var info = event.target.closest && event.target.closest(".cerebro-pref-info");
+    if (!info) {
+      if (event.type === "click") closePreferenceHelp(null);
+      return;
+    }
+    if (event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    event.stopPropagation();
+    var row = info.closest(".cerebro-preference");
+    if (!row) return;
+    closePreferenceHelp(row);
+    setPreferenceHelp(row, !row.classList.contains("is-open"));
+  }
+  document.addEventListener("click", togglePreferenceHelp, true);
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") closePreferenceHelp(null);
+    else togglePreferenceHelp(event);
+  }, true);
 }());

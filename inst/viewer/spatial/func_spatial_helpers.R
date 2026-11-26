@@ -589,41 +589,130 @@ blend_genes_to_rgb <- function(r = NULL, g = NULL, b = NULL) {
 
 morans_i <- function(x, y, values, k = 6) {
   ok <- !is.na(x) & !is.na(y) & !is.na(values)
-  x <- x[ok]
-  y <- y[ok]
-  values <- values[ok]
+  x <- as.numeric(x[ok])
+  y <- as.numeric(y[ok])
+  values <- as.numeric(values[ok])
   n <- length(values)
-  if (n < k + 1) {
+  k <- as.integer(k)
+  if (n < k + 1L || k < 1L) {
     return(NA_real_)
   }
   if (stats::sd(values) == 0) {
     return(0)
   }
-  ## Euclidean distance matrix, then a binary weight for each cell's k nearest
-  ## neighbours (excluding itself). O(n^2); callers down-sample large inputs.
-  dmat <- as.matrix(stats::dist(cbind(x, y)))
-  weight <- matrix(0, n, n)
-  for (i in seq_len(n)) {
-    di <- dmat[i, ]
-    di[i] <- Inf # never neighbour itself
-    nn <- order(di)[seq_len(k)]
-    weight[i, nn] <- 1
+  ## Exact k-nearest-neighbour graph via 2D uniform spatial grid bucketing
+  ## (O(n) average time and O(k*n) memory instead of O(n^2) dense matrices).
+  from <- integer(n * k)
+  to <- integer(n * k)
+  rx <- range(x)
+  ry <- range(y)
+  dx <- rx[2L] - rx[1L]
+  dy <- ry[2L] - ry[1L]
+  if (n <= 128L || (dx == 0 && dy == 0)) {
+    dmat <- as.matrix(stats::dist(cbind(x, y)))
+    for (i in seq_len(n)) {
+      di <- dmat[i, ]
+      di[i] <- Inf
+      nn <- order(di)[seq_len(k)]
+      off <- (i - 1L) * k
+      from[off + seq_len(k)] <- i
+      to[off + seq_len(k)] <- nn
+    }
+  } else {
+    g <- max(2L, as.integer(floor(sqrt(n / max(k, 4L)))))
+    gx_n <- if (dx > 0) g else 1L
+    gy_n <- if (dy > 0) g else 1L
+    cell_w <- if (dx > 0) dx / gx_n else Inf
+    cell_h <- if (dy > 0) dy / gy_n else Inf
+    min_step <- min(cell_w, cell_h)
+    gx <- if (dx > 0) {
+      pmin(gx_n, pmax(1L, as.integer(floor((x - rx[1L]) / cell_w)) + 1L))
+    } else {
+      rep(1L, n)
+    }
+    gy <- if (dy > 0) {
+      pmin(gy_n, pmax(1L, as.integer(floor((y - ry[1L]) / cell_h)) + 1L))
+    } else {
+      rep(1L, n)
+    }
+    bucket_id <- gx + (gy - 1L) * gx_n
+    buckets <- split(
+      seq_len(n),
+      factor(bucket_id, levels = seq_len(gx_n * gy_n))
+    )
+    max_ring <- max(gx_n, gy_n)
+    for (i in seq_len(n)) {
+      cx <- gx[[i]]
+      cy <- gy[[i]]
+      xi <- x[[i]]
+      yi <- y[[i]]
+      cand <- integer()
+      for (r in 0L:max_ring) {
+        x0 <- max(1L, cx - r)
+        x1 <- min(gx_n, cx + r)
+        y0 <- max(1L, cy - r)
+        y1 <- min(gy_n, cy + r)
+        if (r == 0L) {
+          ids <- cx + (cy - 1L) * gx_n
+        } else {
+          ids <- integer()
+          if (cy - r >= 1L) {
+            ids <- c(ids, (x0:x1) + (cy - r - 1L) * gx_n)
+          }
+          if (cy + r <= gy_n) {
+            ids <- c(ids, (x0:x1) + (cy + r - 1L) * gx_n)
+          }
+          ym0 <- max(1L, cy - r + 1L)
+          ym1 <- min(gy_n, cy + r - 1L)
+          if (ym0 <= ym1) {
+            if (cx - r >= 1L) {
+              ids <- c(ids, (cx - r) + (ym0:ym1 - 1L) * gx_n)
+            }
+            if (cx + r <= gx_n) {
+              ids <- c(ids, (cx + r) + (ym0:ym1 - 1L) * gx_n)
+            }
+          }
+        }
+        if (length(ids)) {
+          added <- unlist(buckets[ids], use.names = FALSE)
+          if (length(added)) {
+            if (r == 0L) {
+              added <- added[added != i]
+            }
+            if (length(added)) {
+              cand <- c(cand, added)
+            }
+          }
+        }
+        if (length(cand) >= k) {
+          d2 <- (x[cand] - xi)^2 + (y[cand] - yi)^2
+          ord <- order(d2)
+          dk2 <- d2[[ord[[k]]]]
+          min_next_d2 <- (r * min_step)^2
+          if (r == max_ring || dk2 < min_next_d2) {
+            nn <- cand[ord[seq_len(k)]]
+            off <- (i - 1L) * k
+            from[off + seq_len(k)] <- i
+            to[off + seq_len(k)] <- nn
+            break
+          }
+        }
+      }
+    }
   }
-  ## kNN adjacency is directional (i may be j's neighbour without the reverse),
-  ## which yields an asymmetric, un-normalised weight matrix and pushes
-  ## ape::Moran.I's statistic outside the documented [-1, 1] range. Symmetrise
-  ## (undirected edge if either cell lists the other) then row-normalise so the
-  ## weights sum to 1 per cell, giving a well-scaled statistic.
-  weight <- pmax(weight, t(weight))
-  row_sums <- rowSums(weight)
-  row_sums[row_sums == 0] <- 1 # avoid 0/0 for isolated cells
-  weight <- weight / row_sums
-  ## Moran's I observed statistic, computed natively (matches ape::Moran.I()
-  ## $observed to floating-point precision) so the viewer needs no ape dependency:
-  ##   I = (n / W) * sum_ij w_ij (x_i - xbar)(x_j - xbar) / sum_i (x_i - xbar)^2
+  ## Symmetrise into an undirected sparse edge list and row-normalise weights
+  ## (algebraically identical to pmax(W, t(W)) / rowSums(...) and ape::Moran.I()).
+  u <- pmin(from, to)
+  v <- pmax(from, to)
+  edge_key <- as.numeric(u) + (as.numeric(v) - 1) * as.numeric(n)
+  keep <- !duplicated(edge_key)
+  u <- u[keep]
+  v <- v[keep]
+  deg <- tabulate(c(u, v), nbins = n)
+  inv_deg <- ifelse(deg > 0L, 1 / deg, 0)
   z <- values - mean(values)
-  W <- sum(weight)
-  (n / W) * sum(weight * outer(z, z)) / sum(z^2)
+  W <- sum(deg > 0L)
+  (n / W) * sum((inv_deg[u] + inv_deg[v]) * z[u] * z[v]) / sum(z^2)
 }
 
 
@@ -1197,13 +1286,22 @@ spatial_roi_transform_context <- function(
       !is.na(sample$by_cell) & sample$by_cell == sample_value
     ]
   }
-  scoped_coordinates <- coordinates[scoped_cells, , drop = FALSE]
+  ## Every cell of the section (no sample chosen): its rows as they are.
+  ## Looking 66,000 cells up by name, rows and ROIs, took 2 s for the 59
+  ## sections of the Allen atlas in Linked views.
+  whole <- identical(scoped_cells, cells)
+  scoped_coordinates <- if (whole) {
+    coordinates
+  } else {
+    coordinates[scoped_cells, , drop = FALSE]
+  }
+  scoped_roi <- if (whole) unname(roi$by_cell) else roi$by_cell[scoped_cells]
   list(
     roi_by_cell = roi$by_cell,
     scoped_cells = scoped_cells,
     pivots = spatialRoiPivots(
       scoped_coordinates,
-      as.character(roi$by_cell[scoped_cells]),
+      as.character(scoped_roi),
       degrees
     )
   )
@@ -1372,4 +1470,823 @@ authorized_spatial_image_path <- function(
   }
 
   image_path
+}
+
+##----------------------------------------------------------------------------##
+## Section grid: every section of the shown sample side by side.
+##
+## The grid is one frame of the cells of all sections, section after section,
+## and one panel per section that draws its rows [start, start + count) of the
+## frame (cell_views.js, buildSpecialistPanels()). The panels therefore share
+## the frame's colour values and colour scale, and the browser's selection,
+## which is by cell, spans the sections. Each panel carries the background
+## image of its own section only.
+##
+## These helpers take their data through arguments, so tests can call them
+## without a session.
+##----------------------------------------------------------------------------##
+
+## The layout Spatial opens with: the author's (Builder's display setting
+## `spatial_layout`, read here without its page prefix), and the grid only
+## for a data set with more than one section.
+spatial_default_layout <- function(display, sections) {
+  layout <- if (is.list(display)) display[["layout"]] else NULL
+  if (identical(layout, "grid") && length(sections) > 1L) "grid" else "single"
+}
+
+## The sections the Sections field names, in its order: one is the single
+## view, several the grid. `input` is the session's, `sections` the data
+## set's. Before the field binds, the single section the older FOV input
+## names (still set by saved views and test harnesses), or the author's
+## default (spatial_projection_default_layout()).
+spatial_projection_chosen_sections <- function(input, sections) {
+  chosen <- input[["spatial_projection_sections"]]
+  if (is.null(chosen)) {
+    chosen <- input[["spatial_projection_to_display"]]
+  }
+  chosen <- as.character(chosen %||% character())
+  chosen <- chosen[chosen %in% sections]
+  if (
+    !length(chosen) &&
+      !"spatial_projection_sections" %in% shiny::isolate(names(input)) &&
+      identical(spatial_projection_default_layout(), "grid")
+  ) {
+    chosen <- as.character(sections)
+  }
+  chosen
+}
+## The section of the single view (the first chosen), or NULL.
+spatial_projection_single_section <- function(input, sections) {
+  chosen <- spatial_projection_chosen_sections(input, sections)
+  if (length(chosen)) chosen[[1L]] else NULL
+}
+
+## The layout the author chose for the session's data set. A Viewer without
+## page display settings (or a test harness) opens one section.
+spatial_projection_default_layout <- function() {
+  display <- tryCatch(
+    current_page_display_defaults("spatial"),
+    error = function(error) list()
+  )
+  sections <- tryCatch(availableSpatial(), error = function(error) character())
+  spatial_default_layout(display, sections)
+}
+
+## ImageFeaturePlot before a gene is chosen colours every cell by this one
+## placeholder group, in light grey (hover reads "Gene: No gene selected").
+spatial_no_gene_variable <- "Gene"
+spatial_no_gene_label <- "No gene selected"
+spatial_no_gene_color <- "#d5d9dd"
+
+## Adds the placeholder column to `metadata` when the frame colours by it.
+spatial_with_no_gene_column <- function(metadata, color_variable) {
+  if (
+    identical(color_variable, spatial_no_gene_variable) && !is.null(metadata)
+  ) {
+    metadata[[spatial_no_gene_variable]] <- factor(
+      rep(spatial_no_gene_label, nrow(metadata)),
+      levels = spatial_no_gene_label
+    )
+  }
+  metadata
+}
+
+## The grid colours by a metadata column, one gene or the RGB blend of up to
+## three genes.
+spatial_grid_plot_types <- c(
+  "ImageDimPlot",
+  "ImageFeaturePlot",
+  "Co-expression (RGB)"
+)
+
+## Whether a frame is a grid: asked for, for a plot type the grid draws, with
+## more than one section to show.
+spatial_grid_active <- function(layout, sections, plot_type) {
+  identical(layout, "grid") &&
+    length(sections) > 1L &&
+    isTRUE(plot_type %in% spatial_grid_plot_types)
+}
+
+## The sections a grid frame holds. Up to `budget` cells in all it holds every
+## section, so that a change among the chosen ones asks for no frame. Past it
+## (the Allen atlas: 3.9 million cells in 59 sections) a first grid would wait
+## for every section: the frame holds the chosen sections and as many others as
+## fit, the nearest to a chosen one first, so the sections a user picks next
+## are usually drawn already. The sections of the frame on screen (`previous`)
+## stay while they hold every chosen one. In the order of `all`.
+spatial_grid_frame_budget <- 1e6
+spatial_grid_frame_sections <- function(
+  all,
+  chosen,
+  cells_of,
+  previous = character(),
+  budget = spatial_grid_frame_budget
+) {
+  all <- as.character(all)
+  counts <- vapply(all, function(section) as.numeric(cells_of(section)), 0)
+  if (sum(counts) <= budget) {
+    return(all)
+  }
+  if (
+    length(previous) &&
+      all(chosen %in% previous) &&
+      all(previous %in% all)
+  ) {
+    return(all[all %in% previous])
+  }
+  keep <- all %in% chosen
+  total <- sum(counts[keep])
+  picked <- which(keep)
+  others <- which(!keep)
+  if (length(picked)) {
+    distance <- vapply(others, function(i) min(abs(i - picked)), 0)
+    others <- others[order(distance, others)]
+  }
+  for (i in others) {
+    if (total + counts[[i]] <= budget) {
+      keep[[i]] <- TRUE
+      total <- total + counts[[i]]
+    }
+  }
+  all[keep]
+}
+
+## The number of cells of a section, from its stored coordinates (a thin CRB
+## keeps them as metadata rows: no cell name is read).
+spatial_section_cell_count <- function(spatial_name) {
+  coordinates <- tryCatch(
+    data_set()$spatial[[spatial_name]][["coordinates"]],
+    error = function(error) NULL
+  )
+  if (is.data.frame(coordinates)) nrow(coordinates) else 0L
+}
+
+## A section's positions for the grid. The grid places a section's rows by the
+## Pack's index of the section (spatial_section_index()), in stored order, so it
+## needs no cell names: naming every section's cells took 6 to 11 s of a first
+## grid of the 3.9 million cells of the Allen atlas. Without that index, or with
+## coordinates that are not plain x and y, as viewerSpatialCoordinates().
+spatial_grid_section_xy <- function(spatial_name) {
+  if (!is.null(spatial_section_index(spatial_name))) {
+    coordinates <- tryCatch(
+      data_set()$spatial[[spatial_name]][["coordinates"]],
+      error = function(error) NULL
+    )
+    if (
+      is.data.frame(coordinates) &&
+        nrow(coordinates) > 0L &&
+        is.numeric(coordinates[["x"]]) &&
+        is.numeric(coordinates[["y"]])
+    ) {
+      return(coordinates)
+    }
+  }
+  viewerSpatialCoordinates(spatial_name)
+}
+
+## The cells of a grid frame: the canonical rows of each section in turn,
+## narrowed by `keep` (sample scope and group filters), each section sampled
+## on its own to `percentage`. The sections and their cell counts travel as
+## the "spatial_grid" attribute of the result.
+spatial_grid_cells <- function(
+  sections,
+  index_of,
+  keep = function(rows) rows,
+  percentage = 100
+) {
+  sections <- as.character(sections)
+  parts <- lapply(sections, function(section) {
+    rows <- as.integer(keep(as.integer(index_of(section))))
+    if (length(rows) && is.finite(percentage) && percentage < 100) {
+      take <- ceiling(length(rows) * percentage / 100)
+      rows <- rows[sort(sample.int(length(rows), take))]
+    }
+    rows
+  })
+  cells <- as.integer(unlist(parts, use.names = FALSE))
+  attr(cells, "spatial_grid") <- list(
+    sections = sections,
+    counts = as.integer(lengths(parts))
+  )
+  cells
+}
+
+## The sections and counts of a grid frame's cells, or NULL for a frame of
+## one section.
+spatial_grid_of <- function(cells) {
+  grid <- attr(cells, "spatial_grid", exact = TRUE)
+  if (
+    !is.list(grid) ||
+      length(grid$sections) != length(grid$counts) ||
+      sum(grid$counts) != length(cells)
+  ) {
+    return(NULL)
+  }
+  grid
+}
+
+## A data frame of x and y. data.frame() deparses a vector argument to name
+## it: 0.5 s of a grid of the 3.9 million cells of the Allen atlas.
+spatial_grid_xy_frame <- function(x, y) {
+  structure(
+    list(x = x, y = y),
+    class = "data.frame",
+    row.names = c(NA_integer_, -length(x))
+  )
+}
+
+## The x and y columns of a section's coordinates.
+spatial_grid_xy <- function(coordinates) {
+  columns <- if (all(c("x", "y") %in% colnames(coordinates))) {
+    c("x", "y")
+  } else {
+    1:2
+  }
+  spatial_grid_xy_frame(
+    as.numeric(coordinates[[columns[[1L]]]]),
+    as.numeric(coordinates[[columns[[2L]]]])
+  )
+}
+
+## The extent of a section with a 2% margin, as the single-section frame pins
+## its axes (spatial_projection_full_ranges()).
+spatial_grid_range <- function(values) {
+  if (!any(is.finite(values))) {
+    return(NULL)
+  }
+  extent <- range(values, finite = TRUE)
+  margin <- if (diff(extent) > 0) diff(extent) * 0.02 else 1
+  c(extent[[1L]] - margin, extent[[2L]] + margin)
+}
+
+## Coordinates of a grid frame, in the frame's row order, each section rotated
+## by its own rotation, with every section's full extent (all its cells, not
+## only the sampled ones) for its panel's axes.
+##   coordinates_of(section): the section's coordinates (rows in index order)
+##   index_of(section): canonical rows of those coordinates
+##   rotation_of(section): degrees
+##   geometry_of(section, rows): the Viewer Pack file of the section's
+##     positions for these rows, or NULL. A section with one has no positions
+##     in the frame (NA): the browser reads them from the file
+##     (`layout$geometry`, one entry per section).
+spatial_grid_coordinates <- function(
+  cells,
+  coordinates_of,
+  index_of,
+  rotation_of = function(section) 0,
+  geometry_of = function(section, rows) NULL
+) {
+  grid <- spatial_grid_of(cells)
+  stopifnot(!is.null(grid))
+  ends <- cumsum(grid$counts)
+  starts <- ends - grid$counts
+  xs <- ys <- vector("list", length(grid$sections))
+  x_ranges <- y_ranges <- geometry <- vector("list", length(grid$sections))
+  for (i in seq_along(grid$sections)) {
+    section <- grid$sections[[i]]
+    rows <- if (grid$counts[[i]]) {
+      as.integer(cells[(starts[[i]] + 1L):ends[[i]]])
+    } else {
+      integer()
+    }
+    file <- if (length(rows)) geometry_of(section, rows)
+    full <- spatial_grid_xy(coordinates_of(section))
+    full <- rotateSpatialCoordinates(full, rotation_of(section))
+    x_ranges[i] <- list(spatial_grid_range(full$x))
+    y_ranges[i] <- list(spatial_grid_range(full$y))
+    if (!is.null(file)) {
+      geometry[i] <- list(file)
+      xs[[i]] <- ys[[i]] <- rep(NA_real_, length(rows))
+      next
+    }
+    index <- as.integer(index_of(section))
+    ## Every cell of the section in its own order (no filter, no sampling):
+    ## its positions as they are.
+    if (identical(rows, index)) {
+      xs[[i]] <- full$x
+      ys[[i]] <- full$y
+      next
+    }
+    at <- match(rows, index)
+    if (anyNA(at)) {
+      stop("Grid cells are not in their section: ", section)
+    }
+    xs[[i]] <- full$x[at]
+    ys[[i]] <- full$y[at]
+  }
+  coordinates <- spatial_grid_xy_frame(
+    as.numeric(unlist(xs, use.names = FALSE)),
+    as.numeric(unlist(ys, use.names = FALSE))
+  )
+  list(
+    coordinates = coordinates,
+    sections = grid$sections,
+    starts = as.integer(starts),
+    counts = grid$counts,
+    x_ranges = x_ranges,
+    y_ranges = y_ranges,
+    geometry = geometry,
+    all_from_geometry = length(grid$sections) > 0L &&
+      all(!vapply(geometry, is.null, logical(1)))
+  )
+}
+
+## The grid's picture picker: one group per shown section that has pictures,
+## offering each of the section's pictures. A token names the section by its
+## place among all sections and the picture by its place in the section, so it
+## stays the same while sections come and go.
+spatial_grid_background_groups <- function(
+  options,
+  dataset,
+  sections,
+  all_sections,
+  record
+) {
+  groups <- lapply(sections, function(section) {
+    spatial_data <- record(section)
+    embedded <- if (is.null(spatial_data)) {
+      list()
+    } else {
+      embedded_spatial_images(spatial_data, "")
+    }
+    external <- configured_spatial_images(options, dataset, section, "")
+    choices <- spatial_background_choices(embedded, external)
+    if (!length(choices)) {
+      return(NULL)
+    }
+    prefix <- paste0("grid-", match(section, all_sections), "-background-")
+    list(
+      section = section,
+      tokens = stats::setNames(
+        paste0(prefix, seq_along(choices)),
+        names(choices)
+      )
+    )
+  })
+  groups <- groups[!vapply(groups, is.null, logical(1))]
+  stats::setNames(groups, vapply(groups, `[[`, character(1), "section"))
+}
+
+## The picker's tokens as section -> picture index (0: no picture).
+spatial_grid_background_picks <- function(tokens, all_sections) {
+  parts <- regmatches(
+    as.character(tokens %||% character()),
+    regexec("^grid-([0-9]+)-background-([0-9]+)$", tokens %||% character())
+  )
+  picks <- list()
+  for (part in parts) {
+    if (length(part) != 3L) {
+      next
+    }
+    section <- all_sections[as.integer(part[[2L]])]
+    if (length(section) == 1L && !is.na(section)) {
+      picks[[section]] <- as.integer(part[[3L]])
+    }
+  }
+  picks
+}
+
+## The background a section shows in the grid: picture `pick` of the section
+## (spatial_grid_background_picks(); its first without a pick), embedded or
+## configured, for the whole section (no ROI). NULL without one or for 0.
+spatial_grid_section_background <- function(
+  options,
+  dataset,
+  spatial_name,
+  spatial_data,
+  pick = NULL
+) {
+  if (identical(pick, 0L)) {
+    return(NULL)
+  }
+  embedded <- if (is.null(spatial_data)) {
+    list()
+  } else {
+    embedded_spatial_images(spatial_data, "")
+  }
+  external <- configured_spatial_images(options, dataset, spatial_name, "")
+  choices <- spatial_background_choices(embedded, external)
+  if (!length(choices)) {
+    return(NULL)
+  }
+  index <- if (is.null(pick) || pick > length(choices)) 1L else pick
+  descriptor <- resolve_spatial_background(
+    unname(choices[[index]]),
+    embedded,
+    external
+  )
+  if (is.null(descriptor)) {
+    return(NULL)
+  }
+  list(
+    descriptor = descriptor,
+    identity = spatial_background_identity(dataset, spatial_name, descriptor),
+    preset = spatial_background_preset(
+      options,
+      dataset,
+      spatial_name,
+      descriptor
+    ),
+    image_allowlist = vapply(external, `[[`, character(1), "path")
+  )
+}
+
+## The image fields of one panel from its configured background (see
+## spatial_grid_section_background()), placed over `coordinates`. An empty
+## list draws the panel without an image.
+spatial_panel_background <- function(configured, coordinates, cerebro_root) {
+  if (is.null(configured) || is.null(configured$descriptor)) {
+    return(list())
+  }
+  rendered <- spatial_background_render_payload(
+    configured$descriptor,
+    configured$image_allowlist,
+    configured$identity,
+    configured$preset,
+    coordinates,
+    cerebro_root
+  )
+  if (is.null(rendered$background_image)) {
+    return(list())
+  }
+  list(
+    background_image = rendered$background_image,
+    image_bounds = rendered$image_bounds,
+    image_identity = rendered$background_identity,
+    image_label = configured$descriptor$label,
+    image_preset = configured$preset
+  )
+}
+
+## The size the Pack's builder recommends for a section, or the same rule on its
+## cells when the Pack has none (viewerPackSpatialPointSize()); NULL when the
+## author set a point size for the section (an opacity alone does not count).
+## The browser scales it to the panel it draws the section in.
+spatial_section_point_size_hint <- function(options, dataset, section) {
+  appearance <- spatialPointAppearance(options, dataset, section)
+  if (!is.null(appearance$point_size)) {
+    return(NULL)
+  }
+  tryCatch(
+    viewerPackSpatialPointSize(
+      viewerPackCurrent(),
+      section,
+      coordinates = function() {
+        getSpatialData(section, name_cells = FALSE)$coordinates
+      }
+    ),
+    error = function(error) NULL
+  )
+}
+
+## One panel per section, drawing its slice of the frame. `backgrounds` is
+## named by section; a section without one has no image fields.
+## `point_size_hints`: section -> the size the Pack's builder recommends for it
+## (viewerPackSpatialPointSize()), for the sections nothing set a size for; the
+## browser scales it to the panel.
+spatial_grid_panels <- function(
+  layout,
+  backgrounds = list(),
+  cerebro_root = NULL,
+  point_size_hints = list()
+) {
+  lapply(seq_along(layout$sections), function(i) {
+    section <- layout$sections[[i]]
+    rows <- layout$starts[[i]] + seq_len(layout$counts[[i]])
+    image <- spatial_panel_background(
+      backgrounds[[section]],
+      layout$coordinates[rows, , drop = FALSE],
+      cerebro_root
+    )
+    c(
+      list(
+        id = paste0("section-", i),
+        label = section,
+        section = section,
+        start = as.integer(layout$starts[[i]]),
+        count = as.integer(layout$counts[[i]]),
+        spatial = TRUE,
+        preserve_aspect = TRUE,
+        x_range = layout$x_ranges[[i]],
+        y_range = layout$y_ranges[[i]],
+        point_size_hint = point_size_hints[[section]]
+      ),
+      if (!is.null(layout$geometry[[i]])) {
+        list(geometry_resource = layout$geometry[[i]])
+      },
+      image
+    )
+  })
+}
+
+## The embedding panel of a grid (a list of one panel, or none): its own x
+## and y for every row of the frame, so a selection in it is a selection of
+## the cells in every section, and the reverse.
+spatial_grid_projection_panel <- function(projection) {
+  if (
+    !is.list(projection) ||
+      !length(projection$x) ||
+      length(projection$x) != length(projection$y)
+  ) {
+    return(list())
+  }
+  list(list(
+    id = "projection",
+    label = projection$label,
+    projection = TRUE,
+    x = as.numeric(projection$x),
+    y = as.numeric(projection$y),
+    x_range = spatial_grid_range(projection$x),
+    y_range = spatial_grid_range(projection$y)
+  ))
+}
+
+## The colour range shared by all panels: the finite range of the frame's
+## values over every section, so one value reads as one colour in each.
+spatial_grid_color_range <- function(values) {
+  if (!is.numeric(values)) {
+    return(NULL)
+  }
+  values <- values[is.finite(values)]
+  if (!length(values)) {
+    return(NULL)
+  }
+  range(values)
+}
+
+## The metadata columns a frame reads: the colour column of a group plot and
+## the split column.
+spatial_projection_metadata_columns <- function(parameters) {
+  color_variable <- if (identical(parameters[["plot_type"]], "ImageDimPlot")) {
+    parameters[["color_variable"]]
+  } else {
+    character()
+  }
+  unique(Filter(nzchar, c(color_variable, parameters$split_by)))
+}
+
+## The metadata of a grid's cells: those columns and the cells' canonical
+## rows, without row names. Subsetting the data frame named every one of the
+## 3.9 million cells of the Allen atlas (0.4 s).
+spatial_grid_metadata <- function(full_metadata, cells, columns) {
+  values <- lapply(columns, function(column) full_metadata[[column]][cells])
+  names(values) <- columns
+  values$cell_index <- cells
+  structure(
+    values,
+    class = "data.frame",
+    row.names = c(NA_integer_, -length(cells))
+  )
+}
+
+## A grid frame of many cells streams (cell_views.js, onGridRows()): the first
+## message holds every panel and the cells' names, but the positions and
+## colours of the first sections shown only; the others follow a batch of
+## sections at a time, so the first panels draw while the rest are on their
+## way. All 59 sections of the Allen atlas (3.9 million cells) drew only after
+## their 51 MB frame had arrived and been read, about 5 s.
+spatial_grid_stream_min <- 4e5
+## Multi-section grids (e.g. Kukanja EAE: 52 sections, 270k cells) benefit from
+## Viewer Pack static geometry and head-first streaming well below 400k cells.
+spatial_grid_stream_min_sections <- 6L
+spatial_grid_stream_min_multi <- 5e4
+## The cells of the first batch (a few sections, drawn about 1.5 s sooner than
+## the whole grid) and of every other.
+spatial_grid_stream_first <- 1.5e5
+spatial_grid_stream_first_multi <- 6e4
+spatial_grid_stream_step <- 1e6
+
+spatial_grid_should_stream <- function(
+  n_cells,
+  n_sections = 0L,
+  min_cells = spatial_grid_stream_min,
+  min_sections = spatial_grid_stream_min_sections,
+  min_multi = spatial_grid_stream_min_multi
+) {
+  if (n_cells >= min_cells) {
+    return(TRUE)
+  }
+  identical(min_cells, spatial_grid_stream_min) &&
+    n_sections >= min_sections &&
+    n_cells >= min_multi
+}
+
+## The batches of a streaming grid: lists of indices into `counts` (the cells
+## of each section panel, in frame order). `order` names the panels in the
+## order they show; the others follow in frame order. The first batch ends at
+## `first` cells, every other at `step`; a batch is at least one section.
+spatial_grid_stream_batches <- function(
+  counts,
+  order = seq_along(counts),
+  first = spatial_grid_stream_first,
+  step = spatial_grid_stream_step
+) {
+  panels <- seq_along(counts)
+  order <- unique(as.integer(order))
+  order <- c(order[order %in% panels], setdiff(panels, order))
+  batches <- list()
+  current <- integer()
+  total <- 0
+  limit <- first
+  for (i in order) {
+    current <- c(current, i)
+    total <- total + counts[[i]]
+    if (total >= limit) {
+      batches[[length(batches) + 1L]] <- current
+      current <- integer()
+      total <- 0
+      limit <- step
+    }
+  }
+  if (length(current)) {
+    batches[[length(batches) + 1L]] <- current
+  }
+  batches
+}
+
+## The frame rows (1-based) of the section panels `batch`, given each panel's
+## 0-based `starts` and `counts`.
+spatial_grid_stream_rows <- function(batch, starts, counts) {
+  as.integer(unlist(
+    lapply(batch, function(i) starts[[i]] + seq_len(counts[[i]])),
+    use.names = FALSE
+  ))
+}
+
+## Splits the data of a grid frame (`data`, flat x, y and colours over the
+## frame's rows, one panel per section) for streaming: the first batch as the
+## head, with `grid_stream` naming its sections' rows, and part(k) the
+## positions and colours of batch k. `shown` names the sections in the order
+## they show. NULL for a frame too small to stream, or one whose colours do not
+## travel per cell (RGB, sparse or packed colours).
+spatial_grid_stream_split <- function(
+  data,
+  shown = character(),
+  min_cells = spatial_grid_stream_min,
+  ...
+) {
+  n <- length(data$x)
+  panels <- data$panels
+  if (
+    !is.list(panels) ||
+      length(data$y) != n ||
+      !is.null(data$rgb) ||
+      !is.null(data$sparse_color) ||
+      !is.null(data$packed_colors)
+  ) {
+    return(NULL)
+  }
+  section_at <- which(vapply(
+    panels,
+    function(panel) !is.null(panel$section) && !is.null(panel$start),
+    logical(1)
+  ))
+  if (
+    length(section_at) < 2L ||
+      !spatial_grid_should_stream(n, length(section_at), min_cells = min_cells)
+  ) {
+    return(NULL)
+  }
+  sections <- vapply(
+    panels[section_at],
+    function(panel) as.character(panel$section),
+    ""
+  )
+  starts <- vapply(
+    panels[section_at],
+    function(panel) as.integer(panel$start),
+    0L
+  )
+  counts <- vapply(
+    panels[section_at],
+    function(panel) as.integer(panel$count),
+    0L
+  )
+  dots <- list(...)
+  if (
+    is.null(dots$first) &&
+      n < spatial_grid_stream_min &&
+      length(section_at) >= spatial_grid_stream_min_sections
+  ) {
+    dots$first <- min(
+      spatial_grid_stream_first,
+      spatial_grid_stream_first_multi
+    )
+  }
+  batches <- do.call(
+    spatial_grid_stream_batches,
+    c(list(counts = counts, order = match(shown, sections)), dots)
+  )
+  ## Sections whose positions come from a Viewer Pack file carry none here,
+  ## and a frame with such sections always streams: its first message names
+  ## the files.
+  from_file <- vapply(
+    panels[section_at],
+    function(panel) is.list(panel$geometry_resource),
+    logical(1)
+  )
+  if (length(batches) < 2L && !any(from_file)) {
+    return(NULL)
+  }
+  per_cell <- Filter(
+    function(field) length(data[[field]]) == n,
+    intersect(c("x", "y", "group_code", "color"), names(data))
+  )
+  projection_at <- which(vapply(
+    panels,
+    function(panel) isTRUE(panel$projection) && length(panel$x) == n,
+    logical(1)
+  ))
+  rows_of <- function(k) spatial_grid_stream_rows(batches[[k]], starts, counts)
+  part <- function(k) {
+    batch <- batches[[k]]
+    rows <- rows_of(k)
+    out <- list(
+      section = sections[batch],
+      start = starts[batch],
+      count = counts[batch]
+    )
+    positioned <- batch[!from_file[batch]]
+    xy_rows <- spatial_grid_stream_rows(positioned, starts, counts)
+    for (field in per_cell) {
+      out[[field]] <- unclass(data[[field]])[
+        if (field %in% c("x", "y")) xy_rows else rows
+      ]
+    }
+    if (length(projection_at)) {
+      projection <- panels[[projection_at[[1L]]]]
+      out$projection <- list(x = projection$x[rows], y = projection$y[rows])
+    }
+    out
+  }
+  first <- part(1L)
+  head <- data
+  for (field in per_cell) {
+    head[[field]] <- first[[field]]
+  }
+  if (length(projection_at)) {
+    head$panels[[projection_at[[1L]]]]$x <- first$projection$x
+    head$panels[[projection_at[[1L]]]]$y <- first$projection$y
+  }
+  head$grid_stream <- list(
+    rows = n,
+    section = I(first$section),
+    start = I(first$start),
+    count = I(first$count),
+    batches = length(batches)
+  )
+  list(head = head, batches = length(batches), part = part, rows_of = rows_of)
+}
+
+## Canonical rows (0-based) as the runs of consecutive rows they are, when
+## there are few: a section whose cells are one block of the data set travels
+## as its start and length instead of a number per cell.
+spatial_grid_row_runs <- function(rows) {
+  rows <- as.integer(rows)
+  n <- length(rows)
+  if (n < 2L || anyNA(rows)) {
+    return(rows)
+  }
+  breaks <- which(diff(rows) != 1L)
+  if (length(breaks) + 1L > n %/% 8L) {
+    return(rows)
+  }
+  starts <- c(1L, breaks + 1L)
+  ends <- c(breaks, n)
+  list(
+    kind = "ranges",
+    start = I(rows[starts]),
+    length = I(ends - starts + 1L)
+  )
+}
+
+## The cells' keys of a streaming grid travel with their batches as well: the
+## first message names the cells of the first batch only. `aux` is the frame's
+## auxiliary data (cerebroCellViewDeferredAux()): canonical rows with a
+## cell-name resource, else the names themselves. Every 4 bytes a cell of the
+## Allen atlas were 16 MB in its first message.
+spatial_grid_stream_keys <- function(stream, aux) {
+  index <- aux$selection_index
+  if (is.list(index) && identical(index$kind, "range")) {
+    index <- index$start + seq_len(index$length) - 1L
+  }
+  index <- if (!is.null(index)) as.integer(unclass(index))
+  keys <- if (!is.null(aux$selection_key)) unclass(aux$selection_key)
+  slice <- function(rows) {
+    out <- list()
+    if (!is.null(index)) {
+      out$selection_index <- spatial_grid_row_runs(index[rows])
+    }
+    if (!is.null(keys)) {
+      out$selection_key <- keys[rows]
+    }
+    out
+  }
+  head_aux <- aux
+  head_aux$selection_index <- NULL
+  head_aux$selection_key <- NULL
+  stream$head_aux <- c(head_aux, slice(stream$rows_of(1L)))
+  part <- stream$part
+  stream$part <- function(k) c(part(k), slice(stream$rows_of(k)))
+  stream
 }

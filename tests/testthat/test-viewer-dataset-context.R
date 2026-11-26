@@ -269,7 +269,7 @@ test_that("binary and progressive auxiliary renders carry one exact context", {
   )
 })
 
-test_that("background messages carry context and missing context fails closed", {
+test_that("a rendered view without a data-set context fails closed", {
   runtime <- viewer_runtime_env()
   sent <- new.env(parent = emptyenv())
   sent$messages <- list()
@@ -279,19 +279,6 @@ test_that("background messages carry context and missing context fails closed", 
       message = message
     )
   })
-  context <- runtime$viewerDatasetContext("session", "dataset-b", 2L)
-  identity <- list(spatial = "sample-1", image = "hires")
-
-  runtime$cerebroCellViewBackground(
-    "spatial_projection",
-    values = list(opacity = 0.7),
-    dataset_context = context,
-    background_identity = identity
-  )
-  expect_identical(sent$messages[[1L]]$type, "cell_view_background")
-  expect_identical(sent$messages[[1L]]$message$dataset_context, context)
-  expect_identical(sent$messages[[1L]]$message$background_identity, identity)
-
   expect_error(
     runtime$cerebroCellViewRender(
       "spatial_projection",
@@ -301,15 +288,7 @@ test_that("background messages carry context and missing context fails closed", 
     ),
     "Invalid Viewer data-set context"
   )
-  expect_error(
-    runtime$cerebroCellViewBackground(
-      "spatial_projection",
-      values = list(),
-      dataset_context = NULL
-    ),
-    "Invalid Viewer data-set context"
-  )
-  expect_length(sent$messages, 1L)
+  expect_length(sent$messages, 0L)
 })
 
 test_that("server rejects stale auxiliary requests before consuming payloads", {

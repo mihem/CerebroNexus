@@ -7,7 +7,7 @@ const end = source.indexOf('    var activeName = ', start);
 assert(start >= 0 && end > start);
 function choose(names, previousSelected = [], dataChanged = true, hadSpatial = false) {
   const context = {spatialSamples: () => names.map(name => typeof name === 'string' ? {name} : name),
-    previousSelected, dataChanged, hadSpatial};
+    previousSelected, dataChanged, hadSpatial, trimSelectionToCap: () => false};
   vm.runInNewContext(source.slice(start, end), context);
   return Array.from(context.selectedSpatial);
 }

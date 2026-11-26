@@ -21,16 +21,7 @@ expressionSparseColor <- function(values, max_density = 0.5, entries = NULL) {
       ))
     }
   }
-  present <- which(is.na(values) | !is.finite(values) | values != 0)
-  if (length(present) >= length(values) * max_density) {
-    return(NULL)
-  }
-  list(
-    protocol = "sparse-f64-v1",
-    length = length(values),
-    index = as.integer(present - 1L),
-    color = unname(values[present])
-  )
+  cerebroSparseColorPacket(values, max_density)
 }
 
 ## The entries the row cache kept for `gene`'s full row, when `values` is it.

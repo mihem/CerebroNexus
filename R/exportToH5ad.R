@@ -325,7 +325,7 @@
   libraries <- list()
   for (name in names(object$spatial)) {
     section <- tryCatch(
-      object$getSpatialData(name, FALSE),
+      .spatialRecordWithoutExpression(object, name),
       error = function(e) NULL
     )
     frame <- section$coordinates

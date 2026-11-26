@@ -38,11 +38,8 @@ tab_hla_tcr_motifs <- tabItem(
         tagAppendAttributes(
           cerebroSettingsDrawer(
             "hla_more",
-            cerebroSettingsSection(
-              "Filters",
-              uiOutput("hla_group_filters_ui"),
-              cerebroInfoButton("hla_group_filters_info")
-            ),
+            ## Appearance, Analysis, Group filters: the order of the other
+            ## pages' drawers.
             cerebroSettingsSection(
               "Appearance",
               uiOutput("hla_additional_params_ui"),
@@ -51,6 +48,11 @@ tab_hla_tcr_motifs <- tabItem(
             cerebroSettingsSection(
               "Analysis",
               uiOutput("hla_more_parameters_ui")
+            ),
+            cerebroSettingsSection(
+              "Group filters",
+              uiOutput("hla_group_filters_ui"),
+              cerebroInfoButton("hla_group_filters_info")
             ),
             cerebroSettingsSection(
               "Evidence status",

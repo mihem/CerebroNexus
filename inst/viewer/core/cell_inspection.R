@@ -15,6 +15,36 @@ viewerCellDetailRow <- function(metadata, cell) {
   metadata[index, , drop = FALSE]
 }
 
+## The clicked cell's metadata row. The browser sends the cell's index in its
+## frame, which is the canonical row when the frame holds every cell: the row
+## is taken from the first-frame metadata at that index once the Pack's name
+## at that row is the cell's name (one name, not a match over every name).
+## Otherwise the cell is looked up by name, as before.
+viewerCellDetailRowAt <- function(client_index, cell) {
+  row <- suppressWarnings(as.integer(client_index)) + 1L
+  at_row <- tryCatch(
+    {
+      frame <- viewerProjectionFirstFrameMetadata()
+      if (
+        length(row) == 1L &&
+          !is.na(row) &&
+          is.data.frame(frame) &&
+          row >= 1L &&
+          row <= nrow(frame) &&
+          identical(as.character(viewerCellBarcodesAt(row)), cell)
+      ) {
+        frame[row, , drop = FALSE]
+      }
+    },
+    error = function(error) NULL
+  )
+  if (is.null(at_row)) {
+    viewerCellDetailRow(getMetaData(), cell)
+  } else {
+    at_row
+  }
+}
+
 viewerCellDetailValue <- function(value) {
   if (length(value) != 1L || is.na(value)) {
     return("NA")
@@ -35,7 +65,7 @@ observeEvent(input[["coordviews_cell_detail"]], {
   cell <- as.character(request$cell)
   req(length(cell) == 1L, !is.na(cell), nzchar(cell))
   metadata <- tryCatch(
-    viewerCellDetailRow(getMetaData(), cell),
+    viewerCellDetailRowAt(request$client_index, cell),
     error = function(e) NULL
   )
   response <- list(

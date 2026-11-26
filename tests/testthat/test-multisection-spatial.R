@@ -165,6 +165,94 @@ test_that("external histology remains scoped to its own section", {
   })
 })
 
+test_that("embedded histology goes into its own section of the CRB", {
+  skip_if_not_installed("Seurat")
+  skip_if_not_installed("png")
+
+  local({
+    builder_multisection_source_extras(environment())
+
+    dir <- withr::local_tempdir()
+    sections <- c("sectionA1", "sectionB1")
+    images <- list()
+    for (i in seq_along(sections)) {
+      image_path <- file.path(dir, paste0(sections[[i]], ".png"))
+      png::writePNG(
+        array(stats::runif(6 * 6 * 3), dim = c(6, 6, 3)),
+        image_path
+      )
+      image <- builder_read_image(image_path)
+      record <- builder_alignment_record(
+        source = list(name = basename(image_path), type = image$mime),
+        base_bounds = list(
+          xmin = (i - 1) * 1000,
+          xmax = (i - 1) * 1000 + 100,
+          ymin = 0,
+          ymax = 80
+        ),
+        section = list(id = sections[[i]], kind = "spatial"),
+        source_path = image$source_path
+      )
+      record$flip_y <- TRUE
+      record$source_content_md5 <- image$source_content_md5
+      images[[sections[[i]]]] <- record
+    }
+
+    crb <- readCerebro(multisection_fixture()$crb_path)
+    expect_null(.builder_apply_external_spatial_appearance(crb, images)$error)
+    .builder_embed_spatial_images(crb, images)
+    saved <- file.path(dir, "embedded.crb")
+    saveCerebro(crb, saved)
+    crb <- readCerebro(saved)
+
+    for (i in seq_along(sections)) {
+      embedded <- crb$getSpatialData(sections[[i]])$histology_images
+      expect_length(embedded, 1L)
+      payload <- embedded[[1L]]
+      path <- file.path(dir, paste0(sections[[i]], ".png"))
+      expect_identical(
+        payload$histology_image,
+        paste0(
+          "data:image/png;base64,",
+          gsub(
+            "\n",
+            "",
+            jsonlite::base64_enc(readBin(path, "raw", file.size(path))),
+            fixed = TRUE
+          )
+        )
+      )
+      expect_equal(
+        unlist(payload$histology_image_bounds),
+        c(
+          xmin = (i - 1) * 1000,
+          xmax = (i - 1) * 1000 + 100,
+          ymin = 0,
+          ymax = 80
+        )
+      )
+      ## The alignment stays live: the same settings an external image gets.
+      expect_identical(payload$histology_alignment$geometry, "live")
+      expect_equal(
+        payload$histology_alignment$viewer_setting,
+        builder_alignment_viewer_setting(images[[sections[[i]]]])
+      )
+    }
+    expect_length(crb$getSpatialData("sectionA2")$histology_images, 0L)
+
+    ## Nothing is left to copy beside the App.
+    external <- .builder_build_materialize_spatial_images(
+      list(
+        id = "dataset",
+        images = images,
+        spatial_image_storage = "embedded"
+      ),
+      dir
+    )
+    expect_length(external$images, 0L)
+  })
+})
+
 test_that("attaching to some sections leaves the others without an image", {
   skip_if_not_installed("Seurat")
   skip_if_not_installed("png")

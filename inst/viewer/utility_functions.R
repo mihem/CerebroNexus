@@ -367,7 +367,10 @@ viewerColourGroupChoices <- function(
   )
 }
 
+## The size, opacity and share of cells a page starts with: the author's
+## options, else points of size 4.
 viewerScatterDefaults <- function(options, dataset = NULL, page = NULL) {
+  default_size <- 4
   resolve <- function(key, fallback, minimum, maximum) {
     value <- options[[key]]
     if (!is.null(dataset) && !is.null(names(value))) {
@@ -387,7 +390,7 @@ viewerScatterDefaults <- function(options, dataset = NULL, page = NULL) {
     }
   }
   defaults <- list(
-    point_size = resolve("point_size", 5, 1, 20),
+    point_size = resolve("point_size", default_size, 1, 20),
     point_opacity = resolve("point_opacity", 1, 0.1, 1),
     percentage_cells_to_show = resolve(
       "percentage_cells_to_show",
@@ -401,7 +404,7 @@ viewerScatterDefaults <- function(options, dataset = NULL, page = NULL) {
     return(defaults)
   }
   list(
-    point_size = resolve("spatial_point_size", 5, 1, 20),
+    point_size = resolve("spatial_point_size", default_size, 1, 20),
     point_opacity = resolve("spatial_point_opacity", 1, 0.1, 1),
     percentage_cells_to_show = resolve(
       "spatial_percentage_cells_to_show",
@@ -439,6 +442,21 @@ spatialImagePreset <- function(options, dataset, spatial_name, image_label) {
   setting <- options[["spatial_image_settings"]][[dataset]][[spatial_name]][[
     image_label
   ]]
+  spatialImageSettingPreset(setting)
+}
+
+## The drawing preset of one per-image setting (offset_x ... image_opacity).
+spatialImageSettingPreset <- function(setting) {
+  defaults <- list(
+    offsetX = 0,
+    offsetY = 0,
+    scaleX = 1,
+    scaleY = 1,
+    flipX = FALSE,
+    flipY = FALSE,
+    rotation = 0,
+    opacity = 1
+  )
   if (!is.list(setting)) {
     return(defaults)
   }
@@ -471,6 +489,11 @@ spatialImagePreset <- function(options, dataset, spatial_name, image_label) {
 spatialEmbeddedImagePreset <- function(preset, alignment) {
   if (!is.list(alignment)) {
     return(preset)
+  }
+  ## The Builder's "embedded" storage keeps the picture as uploaded and the
+  ## alignment as the same live settings an external image gets.
+  if (identical(alignment[["geometry"]], "live")) {
+    return(spatialImageSettingPreset(alignment[["viewer_setting"]]))
   }
   number <- function(key, fallback) {
     value <- suppressWarnings(as.numeric(alignment[[key]]))
@@ -1704,6 +1727,27 @@ cv_wire_pack_message <- function(message, min_length = 4096L) {
 ## later render with the same cells lets the browser reuse those barcodes.
 .cerebro_cell_view_aux_served <- new.env(parent = emptyenv())
 
+## Continuous colours as the sparse packet the browser expands
+## (hydrateColorPacket() in cell_views.js): the cells whose value is not 0
+## (missing and infinite values included) and their values, in double
+## precision. NULL for fewer than 4096 values, or when at least `max_density`
+## of the cells have a value: the dense vector is then no larger.
+cerebroSparseColorPacket <- function(values, max_density = 0.5) {
+  if (!is.numeric(values) || length(values) < 4096L) {
+    return(NULL)
+  }
+  present <- which(is.na(values) | !is.finite(values) | values != 0)
+  if (length(present) >= length(values) * max_density) {
+    return(NULL)
+  }
+  list(
+    protocol = "sparse-f64-v1",
+    length = length(values),
+    index = as.integer(present - 1L),
+    color = unname(values[present])
+  )
+}
+
 ## With a cell-name resource, `cell_rows` (canonical rows of the points) are
 ## sent instead of `cell_barcodes`, and the browser looks the names up.
 ## Contiguous 0-based rows as list(kind = "range", start, length), else NULL.
@@ -1837,7 +1881,10 @@ cerebroCellViewRecolor <- function(
     "color_cache_key",
     "packed_rgb",
     "packed_rgb_cache_keys",
-    "zero_color"
+    "zero_color",
+    ## A Spatial grid coloured by a group
+    "group_code",
+    "canonical_group"
   )
   message$data <- message$data[intersect(fields, names(message$data))]
   session$sendBinaryMessage(
@@ -1973,7 +2020,7 @@ cerebroFeedbackControls <- function(id, input, overrides = list()) {
     id,
     overview_projection = "^overview_projection_(to_display|point_color|point_size|point_opacity|point_border|group_labels|keep_square|percentage_cells_to_show|group_filter_.+)$",
     expression_projection = "^expression_projection_(to_display|point_size|point_opacity|point_border|group_labels|keep_square|percentage_cells_to_show|group_filter_.+)$",
-    spatial_projection = "^spatial_projection_(to_display|plot_type|point_color|point_size|point_opacity|group_labels|point_border|keep_square|percentage_cells_to_show|feature_to_display|coexpr_[rgb]|show_region_outlines|background_image|group_filter_.+)$",
+    spatial_projection = "^spatial_projection_(to_display|plot_type|point_color|point_size|point_opacity|group_labels|point_border|picture_outline|keep_square|percentage_cells_to_show|feature_to_display|coexpr_[rgb]|rgb_layout|show_region_outlines|background_image|group_filter_.+)$",
     trajectory_projection = "^trajectory_(selected_method|selected_name|point_color|point_size|point_opacity|projection_group_labels|projection_point_border|projection_keep_square|percentage_cells_to_show|projection_group_filter_.+)$",
     hla_motif_network = "^hla_(chain|scope|color_by|color_allele|pair_allele_i|pair_allele_ii|min_nodes|by_v|show_isolated|node_scale|legend_mode|group_filter_.+)$",
     "a^"
@@ -2173,28 +2220,6 @@ cerebroCellViewRender <- function(
   invisible(message$render_token)
 }
 
-cerebroCellViewBackground <- function(
-  id,
-  values,
-  dataset_context,
-  background_identity = NULL
-) {
-  dataset_context <- viewerDatasetContext(
-    dataset_context[["epoch"]],
-    dataset_context[["dataset_key"]],
-    dataset_context[["generation"]]
-  )
-  session$sendCustomMessage(
-    "cell_view_background",
-    list(
-      id = id,
-      values = values,
-      dataset_context = dataset_context,
-      background_identity = background_identity
-    )
-  )
-}
-
 cerebroCellViewScatterPayload <- function(
   coordinates,
   color,
@@ -2216,7 +2241,8 @@ cerebroCellViewScatterPayload <- function(
   space_label = NULL,
   cell_count = NULL,
   coordinate_resource = NULL,
-  categorical_resource = NULL
+  categorical_resource = NULL,
+  picture_outline = TRUE
 ) {
   dimensions <- if (as.integer(n_dimensions) == 3L) 3L else 2L
   resource_coordinates <- is.list(coordinate_resource) &&
@@ -2279,7 +2305,8 @@ cerebroCellViewScatterPayload <- function(
       draw_border = isTRUE(
         suppressWarnings(as.numeric(point_line[["width"]])) > 0
       ),
-      keep_square = isTRUE(keep_square)
+      keep_square = isTRUE(keep_square),
+      picture_outline = !isFALSE(picture_outline)
     )
   )
   if (!is.null(space_label)) {
@@ -2691,12 +2718,14 @@ cerebroSelectionSummary <- function(
         ),
         shiny::tags$span(
           class = "cerebro-selection-composition-value",
-          paste0(
-            formatC(count, format = "f", big.mark = ",", digits = 0),
-            " · ",
-            round(percent),
-            "%"
-          )
+          shiny::tags$span(
+            class = "cerebro-selection-composition-count",
+            paste0(
+              formatC(count, format = "f", big.mark = ",", digits = 0),
+              " · "
+            )
+          ),
+          paste0(round(percent), "%")
         )
       )
     })
@@ -2721,7 +2750,13 @@ cerebroSelectionSummary <- function(
           formatC(n_selected, format = "f", big.mark = ",", digits = 0),
           " / ",
           formatC(total, format = "f", big.mark = ",", digits = 0)
-        ))
+        )),
+        shiny::tags$button(
+          type = "button",
+          class = "cerebro-selection-composition-toggle",
+          `aria-label` = "Collapse or expand the composition card",
+          title = "Collapse / expand"
+        )
       ),
       shiny::tags$div(
         class = "cerebro-selection-composition-sub",
@@ -5186,7 +5221,12 @@ availableSpatial <- function() {
 ## image (about a second for large images). Its result depends only on the
 ## loaded object, so keep it per section until data_set() changes.
 .viewer_spatial_data_cache <- new.env(parent = emptyenv())
-getSpatialData <- function(name) {
+## `name_cells = FALSE` is for a caller that reads only the images or the
+## shape: a section of a thin CRB whose rows the Viewer Pack's index states
+## then keeps its metadata rows as row names, and no cell name is read (about
+## 0.17 s for a section of 66,000 cells, the first time in the process). A
+## section named already, or one that cannot be read so, comes as usual.
+getSpatialData <- function(name, name_cells = TRUE) {
   ds <- data_set()
   if (!is_cerebro_dataset(ds)) {
     return(NULL)
@@ -5202,11 +5242,67 @@ getSpatialData <- function(name) {
   if (!is.null(key) && !is.null(cache[[key]])) {
     return(cache[[key]])
   }
+  if (!is.null(key) && !isTRUE(name_cells)) {
+    rows_key <- paste0("rows:", name)
+    if (is.null(cache[[rows_key]])) {
+      by_rows <- viewerSpatialDataByRows(ds, name)
+      if (!is.null(by_rows)) {
+        assign(rows_key, by_rows, envir = cache)
+      }
+    }
+    if (!is.null(cache[[rows_key]])) {
+      return(cache[[rows_key]])
+    }
+  }
   value <- viewerReadSpatialData(ds, name)
   if (!is.null(key) && !is.null(value)) {
     assign(key, value, envir = cache)
   }
   value
+}
+## The section as getSpatialData(name_cells = FALSE) and Linked views' compact
+## scenes read it, without a cell name: the coordinates keep the metadata rows
+## a thin CRB stores as their row names (so `rownames()` of them are row
+## numbers, not cell names). Only for a section whose rows the Viewer Pack's
+## index states the same way; NULL otherwise.
+viewerSpatialDataByRows <- function(crb, nm) {
+  coordinates <- tryCatch(
+    crb$spatial[[nm]][["coordinates"]],
+    error = function(error) NULL
+  )
+  pack <- attr(crb, "cerebro_viewer_pack", exact = TRUE)
+  if (
+    !is.data.frame(coordinates) ||
+      !isTRUE(attr(coordinates, "cerebro_cell_index_rownames", exact = TRUE)) ||
+      !viewerPackCanonical(pack)
+  ) {
+    return(NULL)
+  }
+  stored <- attr(coordinates, "row.names")
+  index <- tryCatch(viewerPackSpatialIndex(pack, nm), error = function(e) NULL)
+  if (
+    !is.integer(stored) ||
+      !identical(index, stored) ||
+      anyNA(stored) ||
+      any(stored < 1L) ||
+      anyDuplicated(stored)
+  ) {
+    return(NULL)
+  }
+  ## The object's getter names the cells of a thin CRB's section from its
+  ## metadata (and an object saved by an older release has no argument to
+  ## stop that): hand it the section without the flag, and put the stored
+  ## section back afterwards.
+  original <- crb$spatial
+  plain <- coordinates
+  attr(plain, "cerebro_cell_index_rownames") <- NULL
+  entry <- original[[nm]]
+  entry[["coordinates"]] <- plain
+  swapped <- original
+  swapped[[nm]] <- entry
+  crb$spatial <- swapped
+  on.exit(crb$spatial <- original, add = TRUE)
+  tryCatch(viewerGetSpatialData(crb, nm), error = function(error) NULL)
 }
 viewerReadSpatialData <- function(ds, name) {
   ## Rows a thin CRB stores as metadata rows get the Pack's cell names first.
@@ -5216,9 +5312,22 @@ viewerReadSpatialData <- function(ds, name) {
     name
   )
   tryCatch(
-    ds$getSpatialData(name, hydrate_molecules = FALSE),
+    viewerGetSpatialData(ds, name),
     error = function(e) NULL
   )
+}
+
+## A section's spatial record as the Viewer reads it: no molecule table, and
+## the expression left as the CRB's reference to the object's matrix (the
+## Viewer reads genes from that matrix). A CRB written before the reference
+## existed has a getter without `hydrate_expression`.
+viewerGetSpatialData <- function(ds, name) {
+  getter <- ds$getSpatialData
+  if ("hydrate_expression" %in% names(formals(getter))) {
+    getter(name, hydrate_molecules = FALSE, hydrate_expression = FALSE)
+  } else {
+    getter(name, hydrate_molecules = FALSE)
+  }
 }
 
 ## Coordinate-only Spatial consumers run after spatial_projection_parameters_plot
@@ -5633,14 +5742,13 @@ viewerPackCellNames <- function() {
   }
   cache$cells
 }
+## The names of some canonical rows, and only those: they are cut out of the
+## Pack's names file, so a table of ten selected cells does not make the
+## 3.9 million strings of every name first.
 viewerCellBarcodesAt <- function(rows) {
-  cells <- viewerPackCellNames()
-  barcodes <- if (
-    !is.null(cells) &&
-      !anyNA(rows) &&
-      all(rows >= 1L & rows <= length(cells))
-  ) {
-    cells[rows]
+  pack <- viewerPackCurrent()
+  barcodes <- if (is.list(pack) && !anyNA(rows)) {
+    viewerPackCellBarcodesAt(pack, as.integer(rows))
   }
   barcodes %||% as.character(getMetaData()[["cell_barcode"]][rows])
 }
@@ -6510,6 +6618,9 @@ viewerPrivateImageUrl <- function(path, session = NULL, expected_md5 = NULL) {
           "Cache-Control" = "private, max-age=31536000, immutable",
           "ETag" = paste0('"', data$md5, '"'),
           "X-Content-Type-Options" = "nosniff",
+          ## httpuv would gzip every response: 110 ms for a 6.7 MB PNG that
+          ## comes out larger, 8 ms without.
+          "Content-Encoding" = "identity",
           ## An SVG opened as a document must not run script, whatever its
           ## markup; as an image it is unaffected.
           "Content-Security-Policy" = paste(

@@ -701,7 +701,7 @@
         if (active && roiImage.active) activeImageGeometry = geometry;
       });
       ctx.globalAlpha = finite(roiControls.point_opacity, .85);
-      var radius = Math.max(1, finite(roiControls.point_size, 5) / 2);
+      var radius = Math.max(1, finite(roiControls.point_size, 4) / 2);
       var cx = (bounds.xmin + bounds.xmax) / 2;
       var cy = (bounds.ymin + bounds.ymax) / 2;
       var radians = angle * Math.PI / 180;
@@ -839,7 +839,7 @@
   function drawPoints(ctx, scene, screen) {
     var p = scene.points, c = state.controls || {};
     ctx.globalAlpha = finite(c.point_opacity, .85);
-    var radius = Math.max(1, finite(c.point_size, 5) / 2);
+    var radius = Math.max(1, finite(c.point_size, 4) / 2);
     var bounds = scene.bounds;
     var cx = (bounds.xmin + bounds.xmax) / 2;
     var cy = (bounds.ymin + bounds.ymax) / 2;

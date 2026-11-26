@@ -216,7 +216,13 @@ builder_enhance_model <- function(
           0,
         controls = controls,
         images = spatial_images,
-        spatial_image_storage = "external",
+        spatial_image_storage = if (
+          identical(settings$spatial_image_storage, "embedded")
+        ) {
+          "embedded"
+        } else {
+          "external"
+        },
         selected = names(settings$images %||% list()) %||% character(),
         replacement_policy = "Named images remain separate within each FOV.",
         skip_consequence = paste(
@@ -618,6 +624,52 @@ builder_spatial_scene_inventory_ui <- function(scenes) {
   )
 }
 
+## Where this dataset's Spatial images go. Separate files are the default: the
+## CRB stays small and the Viewer serves and caches each picture as a file.
+## Inside the CRB, one file carries everything, so CRB files can be built
+## without a Viewer App, at the cost of a larger CRB that opens slower.
+builder_spatial_image_storage_ui <- function(ns, selected = "external") {
+  if (!selected %in% c("external", "embedded")) {
+    selected <- "external"
+  }
+  choice <- function(title, detail) {
+    tags$span(
+      class = "spatial-image-storage-choice",
+      tags$strong(title),
+      tags$span(class = "hint", detail)
+    )
+  }
+  conditionalPanel(
+    condition = "output['has_any_image']",
+    tags$fieldset(
+      class = "spatial-image-storage",
+      radioButtons(
+        ns("image_storage"),
+        "Store images",
+        choiceNames = list(
+          choice(
+            "Separate files (recommended)",
+            paste(
+              "Smaller CRB that opens and switches faster.",
+              "Needs the Viewer App output."
+            )
+          ),
+          choice(
+            "Inside the CRB",
+            paste(
+              "One self-contained CRB; allows CRB files only output.",
+              "The CRB grows by about 1.3 times the image size."
+            )
+          )
+        ),
+        choiceValues = c("external", "embedded"),
+        selected = selected
+      )
+    ),
+    ns = ns
+  )
+}
+
 builder_spatial_alignment_ui <- function(id, model) {
   ns <- NS(id)
   sections <- as.character(model$sections %||% character())
@@ -749,7 +801,7 @@ builder_spatial_alignment_ui <- function(id, model) {
                       "Size",
                       1,
                       20,
-                      controls$point_size %||% 5,
+                      controls$point_size %||% 4,
                       1
                     ),
                     builder_coordinate_control_ui(
@@ -809,6 +861,10 @@ builder_spatial_alignment_ui <- function(id, model) {
                 class = "spatial-alignment-status",
                 `aria-live` = "polite",
                 uiOutput(ns("alignment_status"))
+              ),
+              builder_spatial_image_storage_ui(
+                ns,
+                model$spatial_image_storage %||% "external"
               ),
             ),
             div(

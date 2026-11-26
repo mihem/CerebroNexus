@@ -77,6 +77,8 @@ test_that("selection composition shows count, top groups, and Other", {
   expect_match(card, "Other", fixed = TRUE)
   expect_match(card, "cerebro-selection-composition-drag", fixed = TRUE)
   expect_match(card, "Move composition card; use arrow keys", fixed = TRUE)
+  expect_match(card, "cerebro-selection-composition-toggle", fixed = TRUE)
+  expect_match(card, "cerebro-selection-composition-count", fixed = TRUE)
 })
 
 test_that("empty selection composition does not hydrate metadata", {
