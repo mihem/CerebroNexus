@@ -90,6 +90,10 @@ output[["groups_by_other_group_plot"]] <- renderCerebroChart({
 ##----------------------------------------------------------------------------##
 ## Table showing numbers of plot.
 ##----------------------------------------------------------------------------##
+output[["groups_by_other_group_table_UI"]] <- renderUI({
+  DT::dataTableOutput("groups_by_other_group_table")
+})
+
 output[["groups_by_other_group_table"]] <- viewerLazyRender(function() {
   DT::renderDataTable({
     ## only proceed if the two groups are not the same (otherwise it can give an

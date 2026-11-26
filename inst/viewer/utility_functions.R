@@ -748,6 +748,8 @@ debounceAfterFirst <- function(reactive, millis, active = NULL) {
       ## settle, and its last value is taken then.
       last_change <- now_ms()
       first_run <- TRUE
+      pending <- shiny::reactiveVal(FALSE)
+      pending_value <- NULL
       shiny::observeEvent(reactive(), {
         next_value <- reactive()
         ## Its first run sees the value taken above, unless it changed since.
@@ -760,10 +762,27 @@ debounceAfterFirst <- function(reactive, millis, active = NULL) {
         quiet <- now - last_change >= millis
         ## A return to the value on show is a change too: it extends the burst.
         last_change <<- now
-        if (quiet) publish(next_value)
+        if (quiet) {
+          pending_value <<- NULL
+          pending(FALSE)
+          publish(next_value)
+        } else {
+          pending_value <<- next_value
+          pending(TRUE)
+        }
       })
-      delayed <- shiny::debounce(reactive, millis)
-      shiny::observeEvent(delayed(), publish(delayed()), ignoreInit = TRUE)
+      shiny::observe({
+        shiny::req(isTRUE(pending()))
+        elapsed <- now_ms() - last_change
+        if (elapsed >= millis) {
+          val <- pending_value
+          pending_value <<- NULL
+          pending(FALSE)
+          publish(val)
+        } else {
+          shiny::invalidateLater(max(1, ceiling(millis - elapsed)))
+        }
+      })
     }
     current
   })
@@ -866,7 +885,13 @@ viewerOutputTab <- function(ids) {
     ir_ = "immune_repertoire",
     trajectory_ = "trajectory",
     trekker_ = "trekker",
-    hla_ = "hla_tcr_motifs"
+    hla_ = "hla_tcr_motifs",
+    marker_genes_ = "markerGenes",
+    enriched_pathways_ = "enrichedPathways",
+    most_expressed_genes_ = "mostExpressedGenes",
+    extra_material_ = "extra_material",
+    gene_info = "geneIdConversion",
+    color_assignments_ = "color_management"
   )
   vapply(
     ids,
@@ -1275,11 +1300,18 @@ viewerProjectionSubsetRows <- function(
   indices,
   columns = colnames(table)
 ) {
-  if (is.null(columns)) {
-    columns <- colnames(table)
+  if (!is.null(columns) && !identical(columns, colnames(table))) {
+    table <- table[, columns, drop = FALSE]
   }
-  table <- table[, columns, drop = FALSE]
-  if (identical(indices, seq_len(nrow(table)))) {
+  n <- nrow(table)
+  if (
+    is.integer(indices) &&
+      length(indices) == n &&
+      (n == 0L ||
+        (indices[[1L]] == 1L &&
+          indices[[n]] == n &&
+          !is.unsorted(indices, strictly = TRUE)))
+  ) {
     return(table)
   }
   table[indices, , drop = FALSE]
@@ -1356,8 +1388,11 @@ viewerH5ExpressionMean <- function(data_set, cells, genes) {
   ) {
     return(NULL)
   }
-  ## Every cell: add each gene's non-zero cells into one vector, not a dense
-  ## row per gene (twelve genes on a million cells: 12 vectors of 8 MB).
+  ## Every cell: accumulate directly in a local vector (no closure `<<-`
+  ## copy-on-modify) and without holding a dense row per gene.
+  if (is.null(cells) && is.function(rows$mean_sparse)) {
+    return(rows$mean_sparse(genes))
+  }
   if (is.null(cells) && is.function(rows$each_sparse)) {
     total <- numeric(rows$n_cells())
     found <- rows$each_sparse(genes, function(i, entries) {
@@ -2828,33 +2863,66 @@ cerebroSelectionSummary <- function(
 ## Functions to find columns of specific type (for automatic formatting).
 ##----------------------------------------------------------------------------##
 findColumnsInteger <- function(df, columns_to_test) {
-  columns_indices <- c()
+  columns_indices <- integer()
   for (i in columns_to_test) {
+    values <- df[[i]]
+    if (anyNA(values) || !is.numeric(values)) {
+      next
+    }
     if (
-      any(is.na(df[[i]])) == FALSE &&
-        is.numeric(df[[i]]) &&
-        all.equal(df[[i]], as.integer(df[[i]]), check.attributes = FALSE) ==
-          TRUE
+      is.integer(values) ||
+        isTRUE(all.equal(values, as.integer(values), check.attributes = FALSE))
     ) {
       columns_indices <- c(columns_indices, i)
     }
   }
-  return(columns_indices)
+  columns_indices
 }
 
 ## Numeric columns without NA whose name matches `pattern` and whose values lie
 ## within [lower, upper].
 findColumnsMatching <- function(df, pattern, lower = -Inf, upper = Inf) {
-  which(vapply(
-    seq_along(df),
+  candidates <- which(grepl(pattern, colnames(df), ignore.case = TRUE))
+  if (!length(candidates)) {
+    return(integer())
+  }
+  candidates[vapply(
+    candidates,
     function(i) {
       values <- df[[i]]
-      grepl(colnames(df)[i], pattern = pattern, ignore.case = TRUE) &&
-        !anyNA(values) &&
+      !anyNA(values) &&
         is.numeric(values) &&
         all(values >= lower & values <= upper)
     },
     logical(1)
+  )]
+}
+
+## Vectorized equivalent of DT::styleInterval() for finite numeric cuts and
+## pre-quoted CSS colour strings. Avoids DT:::jsValues()'s 200+ per-element
+## jsonlite::toJSON() calls and O(n^2) string concatenation per numeric column.
+.prettifyStyleInterval <- function(cuts, quoted_values) {
+  n <- length(cuts)
+  if (n != length(quoted_values) - 1L) {
+    stop("length(cuts) must be equal to length(values) - 1")
+  }
+  if (n == 0L) {
+    return(quoted_values)
+  }
+  ## 15 significant digits: every double keeps its own cut point (6 would merge
+  ## the steps of large values in a narrow range, as DT::styleInterval() does not).
+  cut_tokens <- sprintf("%.15g", cuts)
+  DT::JS(paste0(
+    "isNaN(parseFloat(value)) ? '' : ",
+    paste0(
+      "value <= ",
+      cut_tokens,
+      " ? ",
+      quoted_values[seq_len(n)],
+      " : ",
+      collapse = ""
+    ),
+    quoted_values[[n + 1L]]
   ))
 }
 
@@ -3108,22 +3176,33 @@ prettifyTable <- function(
         "}"
       )
     )
-  ) %>%
-    DT::formatStyle(
-      columns = c(columns_character),
-      textAlign = 'left',
-      "white-space" = "nowrap"
-    ) %>%
-    DT::formatStyle(
-      columns = c(columns_factor, columns_logical),
-      textAlign = 'center',
-      "white-space" = "nowrap"
-    ) %>%
-    DT::formatStyle(
-      columns = c(columns_numeric, columns_p_value),
-      textAlign = 'right',
-      "white-space" = "nowrap"
-    )
+  )
+  if (length(columns_character)) {
+    table <- table %>%
+      DT::formatStyle(
+        columns = columns_character,
+        textAlign = 'left',
+        "white-space" = "nowrap"
+      )
+  }
+  center_columns <- c(columns_factor, columns_logical)
+  if (length(center_columns)) {
+    table <- table %>%
+      DT::formatStyle(
+        columns = center_columns,
+        textAlign = 'center',
+        "white-space" = "nowrap"
+      )
+  }
+  right_columns <- c(columns_numeric, columns_p_value)
+  if (length(right_columns)) {
+    table <- table %>%
+      DT::formatStyle(
+        columns = right_columns,
+        textAlign = 'right',
+        "white-space" = "nowrap"
+      )
+  }
 
   # show cellular barcodes in monospace font
   if ('cell_barcode' %in% colnames(table_original)) {
@@ -3192,8 +3271,13 @@ prettifyTable <- function(
     down_col <- if (is.null(chart_theme)) "#c05b5b" else chart_theme$down
 
     ## 101-step white-to-accent background over each column's own range.
+    ramp_colors_js <- paste0(
+      '"',
+      grDevices::colorRampPalette(colors = c('white', ramp_hi))(102L),
+      '"'
+    )
     ramp <- function(table, columns) {
-      if (nrow(table_original) <= 1) {
+      if (nrow(table_original) <= 1 || !length(columns)) {
         return(table)
       }
       for (i in columns) {
@@ -3209,9 +3293,9 @@ prettifyTable <- function(
           table <- table %>%
             DT::formatStyle(
               columns = i,
-              backgroundColor = DT::styleInterval(
+              backgroundColor = .prettifyStyleInterval(
                 seq(range[1], range[2], (range[2] - range[1]) / 100),
-                colorRampPalette(colors = c('white', ramp_hi))(102)
+                ramp_colors_js
               )
             )
         }
@@ -3557,14 +3641,13 @@ randomlySubsetCells <- function(table, percentage) {
   ## check if subsetting is necessary
   ## ... percentage is less than 100
   if (percentage < 100) {
-    ## calculate how many cells should be left after subsetting
-    size_of_subset <- ceiling(percentage / 100 * nrow(table))
-    ## get IDs of all cells
-    cell_ids <- rownames(table)
-    ## subset cell IDs
-    subset_of_cell_ids <- cell_ids[sample(seq_along(cell_ids), size_of_subset)]
-    ## subset table and return
-    return(table[subset_of_cell_ids, ])
+    n <- nrow(table)
+    if (n == 0L) {
+      return(table)
+    }
+    size_of_subset <- min(n, as.integer(ceiling(percentage / 100 * n)))
+    ## Integer index subsetting avoids materializing and hashing 1.3M rownames.
+    return(table[sample.int(n, size_of_subset), , drop = FALSE])
     ## ... percentage is 100 -> no subsetting needed
   } else {
     ## return original table
@@ -4208,54 +4291,86 @@ get_or_load_crb <- function(
       state$genes <- .runtimeH5Names(sidecar, "barcodes")
     }
   }
-  ## The non-zero cells (1-based `index`) and `value`s of genes, one file
-  ## and dataset open for all of them (h5read opens the file for every
-  ## array: 3 x 12 times for twelve genes). `visit(i, entries)` gets the i-th
-  ## gene's entries. FALSE, with nothing read, when the file lacks a gene.
+  ## Opens the file and its TENx arrays once and calls `use(read)`, where
+  ## `read(column)` returns the non-zero cells (1-based `index`) and `value`s
+  ## of the gene in that column (h5read opens the file for every array: 3 x 12
+  ## times for twelve genes). Everything is closed when `use()` returns.
+  with_sparse_reader <- function(use) {
+    file <- rhdf5::H5Fopen(sidecar, flags = "H5F_ACC_RDONLY")
+    datasets <- lapply(c("indptr", "indices", "data"), function(name) {
+      rhdf5::H5Dopen(file, paste0("expression/", name))
+    })
+    spaces <- lapply(datasets, rhdf5::H5Dget_space)
+    on.exit({
+      for (space in spaces) {
+        rhdf5::H5Sclose(space)
+      }
+      for (dataset in datasets) {
+        rhdf5::H5Dclose(dataset)
+      }
+      rhdf5::H5Fclose(file)
+    })
+    use_int_index <- is.finite(state$n_cells) &&
+      state$n_cells < .Machine$integer.max
+    slice <- function(slot, start, count, as_int = FALSE) {
+      space <- spaces[[slot]]
+      rhdf5::H5Sselect_hyperslab(space, start = start, count = count)
+      memory <- rhdf5::H5Screate_simple(count)
+      on.exit(rhdf5::H5Sclose(memory), add = TRUE)
+      as.vector(rhdf5::H5Dread(
+        datasets[[slot]],
+        h5spaceFile = space,
+        h5spaceMem = memory,
+        bit64conversion = if (as_int) "int" else "double"
+      ))
+    }
+    read <- function(column) {
+      bounds <- slice(1L, column, 2L)
+      count <- bounds[[2L]] - bounds[[1L]]
+      if (count <= 0) {
+        return(list(index = integer(), value = numeric()))
+      }
+      start <- bounds[[1L]] + 1
+      idx <- slice(2L, start, count, as_int = use_int_index)
+      list(
+        index = if (is.integer(idx)) idx + 1L else idx + 1,
+        value = slice(3L, start, count)
+      )
+    }
+    use(read)
+  }
+  ## `visit(i, entries)` gets the i-th gene's entries. FALSE, with nothing
+  ## read, when the file lacks a gene.
   each_sparse <- function(genes, visit) {
     prepare()
     columns <- match(genes, state$genes)
     if (anyNA(columns)) {
       return(FALSE)
     }
-    file <- rhdf5::H5Fopen(sidecar, flags = "H5F_ACC_RDONLY")
-    datasets <- lapply(c("indptr", "indices", "data"), function(name) {
-      rhdf5::H5Dopen(file, paste0("expression/", name))
-    })
-    on.exit({
-      for (dataset in datasets) {
-        rhdf5::H5Dclose(dataset)
+    with_sparse_reader(function(read) {
+      for (i in seq_along(columns)) {
+        visit(i, read(columns[[i]]))
       }
-      rhdf5::H5Fclose(file)
     })
-    slice <- function(dataset, start, count) {
-      space <- rhdf5::H5Dget_space(dataset)
-      on.exit(rhdf5::H5Sclose(space), add = TRUE)
-      rhdf5::H5Sselect_hyperslab(space, start = start, count = count)
-      memory <- rhdf5::H5Screate_simple(count)
-      on.exit(rhdf5::H5Sclose(memory), add = TRUE)
-      as.vector(rhdf5::H5Dread(
-        dataset,
-        h5spaceFile = space,
-        h5spaceMem = memory,
-        bit64conversion = "double"
-      ))
-    }
-    for (i in seq_along(columns)) {
-      bounds <- slice(datasets[[1L]], columns[[i]], 2L)
-      count <- bounds[[2L]] - bounds[[1L]]
-      entries <- if (count > 0) {
-        start <- bounds[[1L]] + 1
-        list(
-          index = slice(datasets[[2L]], start, count) + 1,
-          value = slice(datasets[[3L]], start, count)
-        )
-      } else {
-        list(index = integer(), value = numeric())
-      }
-      visit(i, entries)
-    }
     TRUE
+  }
+  ## The mean of genes over every cell, summed without a dense row per gene.
+  ## NULL when there are no genes or the file lacks one.
+  mean_sparse <- function(genes) {
+    prepare()
+    columns <- match(genes, state$genes)
+    if (anyNA(columns) || !length(columns)) {
+      return(NULL)
+    }
+    with_sparse_reader(function(read) {
+      total <- numeric(state$n_cells)
+      for (column in columns) {
+        entries <- read(column)
+        index <- entries$index
+        total[index] <- total[index] + entries$value
+      }
+      total / length(columns)
+    })
   }
   list(
     n_cells = function() {
@@ -4263,12 +4378,14 @@ get_or_load_crb <- function(
       state$n_cells
     },
     each_sparse = each_sparse,
+    mean_sparse = mean_sparse,
     ## NULL for a gene the file does not have.
     row = function(gene) {
       values <- NULL
       each_sparse(gene, function(i, entries) {
-        values <<- numeric(state$n_cells)
-        values[entries$index] <<- entries$value
+        dense <- numeric(state$n_cells)
+        dense[entries$index] <- entries$value
+        values <<- dense
       })
       values
     }
@@ -5372,16 +5489,103 @@ canonicalGeneSelection <- function(selected, genes) {
   selected
 }
 
+## A small LRU memo shared by every browser session of the R process, kept in
+## `.viewer_process_memo_store` (shiny_server.R), which is emptied when the
+## last session ends. Sourced on its own (unit tests), it keeps a store of
+## its own.
+viewerProcessMemo <- function(slot, limit = 4L) {
+  store <- get0(".viewer_process_memo_store", inherits = TRUE)
+  if (!is.environment(store)) {
+    store <- new.env(parent = emptyenv())
+  }
+  state <- store[[slot]]
+  if (!is.environment(state)) {
+    state <- new.env(parent = emptyenv())
+    state$entries <- list()
+    store[[slot]] <- state
+  }
+  function(key, compute) {
+    for (i in seq_along(state$entries)) {
+      if (identical(state$entries[[i]]$key, key)) {
+        entry <- state$entries[[i]]
+        if (i > 1L) {
+          state$entries <- c(list(entry), state$entries[-i])
+        }
+        return(entry$value)
+      }
+    }
+    value <- compute()
+    state$entries <- c(
+      list(list(key = key, value = value)),
+      utils::head(state$entries, max(0L, as.integer(limit) - 1L))
+    )
+    value
+  }
+}
+
+## Drops every entry of the process memos (shiny_server.R, when the last
+## session ends). The slots stay, so a memo made earlier keeps working.
+viewerProcessMemoClear <- function(
+  store = get0(".viewer_process_memo_store", inherits = TRUE)
+) {
+  if (!is.environment(store)) {
+    return(invisible(NULL))
+  }
+  for (slot in ls(store, all.names = TRUE)) {
+    state <- store[[slot]]
+    if (is.environment(state)) {
+      state$entries <- list()
+    }
+  }
+  invisible(NULL)
+}
+
+## The key of a data set read from a file: its path, size and modification
+## time, so a changed or replaced file gets new entries. NULL for a data set
+## that has no file (an uploaded or in-memory one).
+viewerProcessDatasetKey <- function(ds) {
+  path <- attr(ds, "cerebro_dataset_path", exact = TRUE)
+  if (
+    !is.character(path) ||
+      length(path) != 1L ||
+      is.na(path) ||
+      !nzchar(path)
+  ) {
+    return(NULL)
+  }
+  info <- suppressWarnings(file.info(path, extra_cols = FALSE))
+  if (is.na(info$size) || is.na(info$mtime)) {
+    return(NULL)
+  }
+  list(
+    path = normalizePath(path, winslash = "/", mustWork = FALSE),
+    size = as.numeric(info$size),
+    mtime = as.numeric(info$mtime)
+  )
+}
+
+## `compute()` through the process memo `slot` when the data set has a file
+## key (viewerProcessDatasetKey()), so every session on that file shares the
+## value; `key` holds what else the value depends on. Without a file key,
+## `fallback()` (the session's own memo) answers instead.
+viewerSharedMemo <- function(slot, limit, dataset_key, key, compute, fallback) {
+  if (is.null(dataset_key)) {
+    return(fallback())
+  }
+  viewerProcessMemo(slot, limit)(c(list(dataset_key), key), compute)
+}
+
 ## Gene expression registers four selectors on the same gene list; a locale
-## sort of a whole transcriptome takes about half a second. Share one.
-.viewer_sorted_gene_choices <- viewerMemoOne()
+## sort of a whole transcriptome takes about half a second. Share one across
+## sessions in the process.
+.viewer_sorted_gene_choices <- viewerProcessMemo("sorted_genes", limit = 4L)
 
 ## Gene selectors search the whole gene list in the browser (www/gene-selector.js).
 ## A server-side search answered from the first 1000 genes until the typed
 ## text's request returned, so typing "CD4" highlighted ABCD4 and Enter chose
 ## it; text typed before the search existed was never searched at all. The
 ## list is about 270 KB of JSON for 28,000 genes; encode it once per process.
-.viewer_gene_choices_json <- viewerMemoOne()
+.viewer_gene_choices_json <- viewerProcessMemo("gene_choices_json", limit = 4L)
 
 viewerGeneChoicesJSON <- function(data, req) {
   shiny::httpResponse(
@@ -6230,6 +6434,11 @@ registerCellViewPointBorder <- function(
   prefix,
   defaults = function() list(draw_border = FALSE, keep_square = FALSE)
 ) {
+  set_options <- if (exists("outputOptions", mode = "function")) {
+    outputOptions
+  } else {
+    shiny::outputOptions
+  }
   output_id <- paste0(prefix, "_point_border_UI")
   output[[output_id]] <- shiny::renderUI({
     shiny::checkboxInput(
@@ -6238,7 +6447,7 @@ registerCellViewPointBorder <- function(
       value = defaults()$draw_border
     )
   })
-  shiny::outputOptions(output, output_id, suspendWhenHidden = FALSE)
+  set_options(output, output_id, suspendWhenHidden = FALSE)
   square_id <- paste0(prefix, "_keep_square_UI")
   output[[square_id]] <- shiny::renderUI({
     shiny::checkboxInput(
@@ -6247,7 +6456,7 @@ registerCellViewPointBorder <- function(
       value = defaults()$keep_square
     )
   })
-  shiny::outputOptions(output, square_id, suspendWhenHidden = FALSE)
+  set_options(output, square_id, suspendWhenHidden = FALSE)
 }
 
 ## The switches of a stored-result table as it opens (cerebroResultTableControls()
@@ -6924,6 +7133,11 @@ cerebroResultPageServer <- function(
       }
     })
   })
+  ## Flush the table shell and table data together in the first round trip when
+  ## the page is active (shiny_server.R re-suspends it on every other tab via
+  ## viewerOutputTab()). Guarded so standalone testServer() tests stay lazy.
+  outputOptions(output, id("table_or_text_UI"), priority = 10)
+  outputOptions(output, id("table"), suspendWhenHidden = FALSE)
   invisible(NULL)
 }
 

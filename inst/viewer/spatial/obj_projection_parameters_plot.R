@@ -391,18 +391,29 @@ spatial_projection_parameters_plot_current <- reactive({
   ## The section's ROIs for the sample, from its cells' metadata rows (the
   ## Viewer Pack's section index), kept per section and data set. They depend
   ## only on the section and sample, so colour or feature changes reuse them.
-  roi_facet <- spatial_projection_facet_memo(
-    list(data_set(), spatial_name, selected_sample),
+  roi_facet_compute <- function() {
+    scope <- spatial_section_scope(
+      spatial_name,
+      selected_sample,
+      viewerProjectionFirstFrameMetadata(),
+      function() {
+        rownames(getSpatialData(spatial_name)$coordinates) %||% character()
+      }
+    )
+    list(field = scope$roi_field, values = scope$roi_values)
+  }
+  ds <- data_set()
+  roi_facet <- viewerSharedMemo(
+    "spatial_facet",
+    16L,
+    viewerProcessDatasetKey(ds),
+    list(spatial_name, selected_sample),
+    roi_facet_compute,
     function() {
-      scope <- spatial_section_scope(
-        spatial_name,
-        selected_sample,
-        viewerProjectionFirstFrameMetadata(),
-        function() {
-          rownames(getSpatialData(spatial_name)$coordinates) %||% character()
-        }
+      spatial_projection_facet_memo(
+        list(ds, spatial_name, selected_sample),
+        roi_facet_compute
       )
-      list(field = scope$roi_field, values = scope$roi_values)
     }
   )
   roi_values <- roi_facet$values

@@ -24,6 +24,9 @@ test_that("Gene progress closes when hidden and does not reopen painted keys", {
       expression_projection_coordinates <- function() {
         data.frame(x = 1:2, y = 2:1)
       }
+      expression_projection_parameters_plot <- function() {
+        list(n_dimensions = 2L)
+      }
       expression_selected_genes <- function() {
         list(genes_to_display_present = "g1")
       }
@@ -186,6 +189,10 @@ test_that("plot parameter changes reuse expression values", {
       expression_projection_coordinates <- reactive({
         input$projection
         data.frame(x = 1:2, y = 2:1)
+      })
+      expression_projection_parameters_plot <- reactive({
+        input$projection
+        list(n_dimensions = 2L)
       })
       expression_selected_genes <- reactive({
         list(genes_to_display_present = input$genes)

@@ -33,10 +33,19 @@ output[["expression_details_selected_cells_UI"]] <- renderUI({
           status = "primary",
           inline = TRUE
         ),
-        DT::dataTableOutput("expression_details_selected_cells")
+        uiOutput("expression_details_selected_cells_table_UI")
       )
     )
   )
+})
+
+output[["expression_details_selected_cells_table_UI"]] <- renderUI({
+  req(
+    expression_projection_summary_ready(),
+    expression_selection_present(),
+    expression_summary_data()
+  )
+  DT::dataTableOutput("expression_details_selected_cells")
 })
 
 ##----------------------------------------------------------------------------##

@@ -765,13 +765,19 @@
         var img = element.querySelector('img');
         return !!img && img.complete && img.naturalWidth > 0;
       }
+      if (element.classList.contains('shiny-html-output') &&
+          element.classList.contains('cerebro-result-slot')) {
+        return element.children.length > 0 || element.textContent.trim().length > 0;
+      }
       return true;
     }
     function ownsOutput(pane, element) {
       if (!localCompletion(pane)) return true;
       if (!element.getClientRects().length) return false;
       return paneName(pane) !== 'groups' || element.id === 'groups_controls_UI' ||
-        element.id === 'groups_by_other_group_plot' || element.id === 'groups_by_other_group_table';
+        element.id === 'groups_by_other_group_plot' ||
+        element.id === 'groups_by_other_group_table_UI' ||
+        element.id === 'groups_by_other_group_table';
     }
     function localResultSettled(pane) {
       var phase = window.CerebroDatasetContext && window.CerebroDatasetContext.phase();
@@ -800,7 +806,7 @@
       if (!outputSettled(slot)) return false;
       // A renderUI value is only the start: all mounted, visible child outputs
       // must also finish. In particular a DT value is not a completed draw.
-      return Array.from(pane.querySelectorAll('.shiny-bound-output')).every(function (element) {
+      return Array.from(pane.querySelectorAll('.shiny-bound-output, .datatables.html-widget-output')).every(function (element) {
         return !element.getClientRects().length || outputSettled(element);
       });
     }
@@ -975,7 +981,11 @@
         scheduleFinish(pane);
       })
       .on("shiny:value.cerebroPageLoader", function (event) {
-        markDelivered(event.target);
+        if (typeof event.name === "string" && event.name) {
+          delivered.add(event.name);
+        } else {
+          markDelivered(event.target);
+        }
         drawnTables.delete(event.target);
         drawnPlots.delete(event.target);
         var pane = paneFor(event.target);
@@ -988,7 +998,11 @@
         }
       })
       .on('shiny:outputinvalidated.cerebroPageLoader', function (event) {
-        clearDelivered(event.target);
+        if (typeof event.name === "string" && event.name) {
+          delivered.delete(event.name);
+        } else {
+          clearDelivered(event.target);
+        }
         drawnTables.delete(event.target);
         drawnPlots.delete(event.target);
         if (paneFor(event.target) === activePane && localCompletion(activePane) && ownsOutput(activePane, event.target)) cancelScheduledFinish();

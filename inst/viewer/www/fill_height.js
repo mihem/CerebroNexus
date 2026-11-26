@@ -103,7 +103,7 @@
      If the fill grows by 100 px, both scrollHeight and its bottom grow by 100,
      so the result stays stable. The wrapper's bottom padding lives outside the
      section.content scroll height and is therefore added once. */
-  function contentBelow(el) {
+  function contentBelow(el, wrapperPaddingCache) {
     /* Measure within the fill's OWN plot column (.cerebro-viz-col) when it has
        one, so a TALLER sibling column — a long parameter / legend / evidence
        panel beside the plot — cannot inflate `remaining` and squeeze the fill to
@@ -125,30 +125,46 @@
     var fillRect = el.getBoundingClientRect();
     var fillBottom = fillRect.bottom - frameRect.top + (frame.scrollTop || 0);
     var remaining = Math.max(0, (frame.scrollHeight || 0) - fillBottom);
-    var wrapperPadding = wrapper ?
-      px(window.getComputedStyle(wrapper).paddingBottom) : 0;
+    var wrapperPadding = 0;
+    if (wrapper) {
+      if (wrapperPaddingCache && wrapperPaddingCache.has(wrapper)) {
+        wrapperPadding = wrapperPaddingCache.get(wrapper);
+      } else {
+        wrapperPadding = px(window.getComputedStyle(wrapper).paddingBottom);
+        if (wrapperPaddingCache) {
+          wrapperPaddingCache.set(wrapper, wrapperPadding);
+        }
+      }
+    }
     return remaining + wrapperPadding;
   }
 
-  function sizeOne(el) {
-    if (!el || typeof window.innerHeight !== "number") {
-      return;
+  function measureOne(el, viewportHeight, wrapperPaddingCache) {
+    if (!el || typeof viewportHeight !== "number") {
+      return null;
     }
     /* A hidden element (for example, one inside an inactive tab) has no client
        rectangles. Skip it until layout resumes; the observers below re-fire
        when the tab becomes visible. This also handles hidden elements whose
        stale bounding box does not happen to start at zero. */
     if (!isVisible(el)) {
-      return;
+      return null;
     }
     var top = layoutTop(el);
     var h = targetHeight(
-      window.innerHeight,
+      viewportHeight,
       top,
-      contentBelow(el),
+      contentBelow(el, wrapperPaddingCache),
       BOTTOM_GAP,
       MIN_HEIGHT
     );
+    return { el: el, h: h };
+  }
+
+  function applyOne(entry) {
+    var el = entry.el;
+    var h = entry.h;
+    var needConfirm = false;
     /* Idempotent: only write when the value actually changed. This is what keeps
        the ResizeObserver below from looping — resizing this element changes the
        page height, which fires the observer, which recomputes the SAME height
@@ -172,9 +188,10 @@
         el.classList.add("is-filled");
       } else {
         el.__cerebroSettledH = h;
-        scheduleSize();
+        needConfirm = true;
       }
     }
+    return needConfirm;
   }
 
   /* Pure: reveal once a measurement equals the previous one. Undefined previous
@@ -197,11 +214,29 @@
     }
   }
 
+  /* Batch all DOM geometry reads before all style/class writes so multiple
+     visible .cerebro-fill containers trigger one layout instead of N forced
+     synchronous reflows. */
   function sizeAll() {
     var els = document.getElementsByClassName(FILL_CLASS);
+    var viewportHeight = window.innerHeight;
+    var wrapperPaddingCache = typeof window.Map === "function" ? new window.Map() : null;
+    var plan = [];
     for (var i = 0; i < els.length; i++) {
       observeLayout(els[i]);
-      sizeOne(els[i]);
+      var entry = measureOne(els[i], viewportHeight, wrapperPaddingCache);
+      if (entry) {
+        plan.push(entry);
+      }
+    }
+    var needConfirm = false;
+    for (var j = 0; j < plan.length; j++) {
+      if (applyOne(plan[j])) {
+        needConfirm = true;
+      }
+    }
+    if (needConfirm) {
+      scheduleSize();
     }
   }
 
