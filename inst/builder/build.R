@@ -1990,14 +1990,38 @@ builder_verify_crb <- function(
         stop("A Builder Spatial image asset is missing.", call. = FALSE)
       }
       source <- record[["source", exact = TRUE]]
-      inspected <- builder_read_image(
-        source_path,
-        filename = if (is.list(source)) {
-          source$name %||% source_path
-        } else {
-          source_path
-        }
-      )
+      image_name <- if (is.list(source)) {
+        source$name %||% source_path
+      } else {
+        source_path
+      }
+      ## The image was decoded and checked when it was added, and its bytes'
+      ## MD5 recorded. The same bytes need no second decode (2.13 s for the 44
+      ## EAE images against 0.06 s for their MD5): only the type, the size and
+      ## the MD5 are used below.
+      recorded_md5 <- record$source_content_md5
+      inspected <- if (
+        is.character(recorded_md5) &&
+          length(recorded_md5) == 1L &&
+          grepl("^[[:xdigit:]]{32}$", recorded_md5) &&
+          .builder_file_extension(image_name) %in% c("png", "jpg", "jpeg") &&
+          identical(
+            unname(as.character(tools::md5sum(source_path))),
+            recorded_md5
+          )
+      ) {
+        list(
+          mime = if (identical(.builder_file_extension(image_name), "png")) {
+            "image/png"
+          } else {
+            "image/jpeg"
+          },
+          bytes = unname(file.size(source_path)),
+          source_content_md5 = recorded_md5
+        )
+      } else {
+        builder_read_image(source_path, filename = image_name)
+      }
       if (!is.null(inspected$error)) {
         stop(inspected$error, call. = FALSE)
       }
@@ -2033,14 +2057,7 @@ builder_verify_crb <- function(
       if (materialized %in% materialized_paths || file.exists(materialized)) {
         stop("Builder Spatial image asset paths must be unique.", call. = FALSE)
       }
-      if (
-        !file.copy(
-          source_path,
-          materialized,
-          overwrite = FALSE,
-          copy.mode = TRUE
-        )
-      ) {
+      if (!.builder_build_copy_file(source_path, materialized)) {
         stop("A Builder Spatial image could not be copied.", call. = FALSE)
       }
       if (

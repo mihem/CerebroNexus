@@ -1256,6 +1256,64 @@ test_that("external Spatial images materialize without entering CRB payloads", {
   )
 })
 
+test_that("an external image with its recorded MD5 is not decoded again", {
+  skip_if_not_installed("png")
+  root <- withr::local_tempdir()
+  source_path <- file.path(root, "source.png")
+  png::writePNG(matrix(seq(0, 1, length.out = 24L), nrow = 4L), source_path)
+  inspected <- builder_read_image(source_path)
+  item_with <- function(md5) {
+    record <- builder_alignment_record(
+      source = list(name = "H&E.png", type = "image/png"),
+      base_bounds = list(xmin = 0, xmax = 10, ymin = 0, ymax = 8),
+      section = list(id = "slice-a", kind = "spatial"),
+      source_path = inspected$source_path
+    )
+    record$source_content_md5 <- md5
+    list(
+      id = "dataset-a",
+      name = "Dataset A",
+      images = list(`slice-a` = list(`H&E` = record))
+    )
+  }
+  runtime <- environment(.builder_build_materialize_spatial_images)
+  read_image <- runtime$builder_read_image
+  withr::defer(runtime$builder_read_image <- read_image)
+  decoded <- 0L
+  runtime$builder_read_image <- function(...) {
+    decoded <<- decoded + 1L
+    read_image(...)
+  }
+
+  same <- .builder_build_materialize_spatial_images(
+    item_with(inspected$source_content_md5),
+    file.path(root, "same")
+  )
+  expect_identical(decoded, 0L)
+  path <- same$images[["dataset-a"]][["slice-a"]][["H&E"]]$path
+  expect_match(basename(path), "[.]png$")
+  expect_identical(
+    unname(as.character(tools::md5sum(path))),
+    inspected$source_content_md5
+  )
+
+  ## Without a recorded MD5 the image is decoded and checked as before.
+  .builder_build_materialize_spatial_images(
+    item_with(NULL),
+    file.path(root, "none")
+  )
+  expect_identical(decoded, 1L)
+  ## A recorded MD5 the file no longer has is decoded and refused.
+  expect_error(
+    .builder_build_materialize_spatial_images(
+      item_with(strrep("0", 32L)),
+      file.path(root, "changed")
+    ),
+    "failed its integrity check"
+  )
+  expect_identical(decoded, 2L)
+})
+
 test_that("external Spatial paths cannot collide after normalization", {
   skip_if_not_installed("png")
   root <- withr::local_tempdir()

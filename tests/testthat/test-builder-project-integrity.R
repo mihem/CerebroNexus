@@ -1375,3 +1375,67 @@ test_that("attachments count as a managed Project folder", {
     "attachments"
   )
 })
+
+test_that("a save skips the backup walk only for the bytes it already checked", {
+  runtime <- builder_project_integrity_runtime()
+  root <- withr::local_tempdir()
+  walks <- character()
+  assert_integrity <- runtime$builder_project_assert_manifest_integrity
+  runtime$builder_project_assert_manifest_integrity <- function(manifest, ...) {
+    walks <<- c(walks, deparse(substitute(manifest)))
+    assert_integrity(manifest, ...)
+  }
+  save <- function(manifest, previous, ...) {
+    manifest$project <- previous$manifest$project
+    walks <<- character()
+    runtime$builder_project_write(
+      manifest,
+      root,
+      expected_revision = previous$manifest$project$revision,
+      ...
+    )
+  }
+  entry <- builder_project_integrity_entry("first", 1L)
+  first <- runtime$builder_project_write(
+    builder_project_integrity_manifest(runtime, root, entry),
+    root
+  )
+  checked <- c("disk", "manifest", "staged_manifest", "committed")
+
+  ## The backup is the manifest file checked at the start, byte for byte.
+  second <- save(
+    builder_project_integrity_manifest(runtime, root, entry),
+    first
+  )
+  expect_identical(walks, checked)
+
+  ## The same holds when a dataset is dropped: the start check used the same
+  ## dropped ids as the backup check would.
+  emptied <- builder_project_integrity_manifest(runtime, root, entry)
+  emptied$datasets <- list()
+  third <- save(emptied, second)
+  expect_identical(walks, checked)
+
+  ## A backup whose bytes changed on the way is checked again.
+  move <- function(from, to) {
+    moved <- file.rename(from, to)
+    if (moved && endsWith(to, ".bak")) {
+      cat(
+        "
+",
+        file = to,
+        append = TRUE
+      )
+    }
+    moved
+  }
+  save(
+    builder_project_integrity_manifest(runtime, root, entry),
+    third,
+    .move = move
+  )
+  expect_identical(
+    walks,
+    c("disk", "manifest", "staged_manifest", "backup_manifest", "committed")
+  )
+})
