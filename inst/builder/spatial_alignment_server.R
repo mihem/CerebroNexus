@@ -2706,6 +2706,7 @@ builder_spatial_alignment_server <- function(
           entry$settings
         )[[group]] %||%
           character(),
+        dataset_colors = entry$dataset_colors[[group]],
         spatial_point_appearance = entry$settings$spatial_point_appearance %||%
           list()
       )
@@ -2729,7 +2730,8 @@ builder_spatial_alignment_server <- function(
     builder_level_colors(
       levels,
       contract$palette,
-      contract$color_overrides
+      contract$color_overrides,
+      contract$dataset_colors
     )
   })
   shiny::observe({

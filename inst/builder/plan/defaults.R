@@ -102,7 +102,7 @@ builder_normalize_analyses <- function(selected, has_marker_genes = FALSE) {
   .builder_state_normalize_analyses(selected, has_marker_genes)
 }
 
-builder_resolve_colors <- function(settings, levels) {
+builder_resolve_colors <- function(settings, levels, dataset_colors = list()) {
   groups <- settings$included_groups %||% settings$groups %||% character()
   palette <- settings$palette %||% "cerebro"
   overrides <- builder_settings_color_overrides(settings)
@@ -113,7 +113,8 @@ builder_resolve_colors <- function(settings, levels) {
       out[[group]] <- builder_level_colors(
         group_levels,
         palette,
-        overrides[[group]]
+        overrides[[group]],
+        dataset_colors[[group]]
       )
     }
   }

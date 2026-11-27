@@ -678,3 +678,35 @@ test_that("analysis dependencies are normalized before a build", {
     )
   })
 })
+
+test_that("The data set's own Group colours reach the colours a build writes", {
+  local({
+    builder_repo_source("preview.R")
+    builder_repo_source("plan.R")
+    settings <- list(
+      included_groups = c("cluster", "sample"),
+      palette = "dataset"
+    )
+    resolved <- builder_resolve_colors(
+      settings,
+      list(cluster = c("A", "B"), sample = c("x", "y")),
+      list(cluster = c(A = "#111111", B = "#222222"))
+    )
+    expect_identical(unname(resolved$cluster), c("#111111", "#222222"))
+    ## a Group without colours of its own gets Cerebro default
+    expect_identical(
+      resolved$sample,
+      builder_level_colors(c("x", "y"), "cerebro")
+    )
+    ## another palette ignores what the data set brought
+    settings$palette <- "hue"
+    expect_identical(
+      builder_resolve_colors(
+        settings,
+        list(cluster = c("A", "B")),
+        list(cluster = c(A = "#111111", B = "#222222"))
+      )$cluster,
+      builder_level_colors(c("A", "B"), "hue")
+    )
+  })
+})

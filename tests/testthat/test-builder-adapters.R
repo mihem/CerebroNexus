@@ -911,3 +911,27 @@ test_that("releasing an owned snapshot does not rehash its content", {
   expect_true(.builder_snapshot_release(snapshot))
   expect_false(dir.exists(snapshot$path))
 })
+
+test_that("a data set's own Group colours are read and checked", {
+  object <- SeuratObject::pbmc_small
+  object@misc$group_colors <- list(
+    RNA_snn_res.1 = c(`0` = "#111111", `1` = "#222222", `2` = "#333333"),
+    ## not a Group the Builder offers
+    not_a_group = c(a = "#444444"),
+    ## incomplete, malformed, unnamed or duplicated: ignored
+    groups = c(`0` = "red", `1` = "#222222"),
+    letter.idents = c("#111111", "#222222"),
+    other = c(a = "#111111", a = "#222222")
+  )
+  groups <- c("RNA_snn_res.1", "groups", "letter.idents", "other")
+  found <- builder_dataset_group_colors(object, groups)
+  expect_identical(names(found), "RNA_snn_res.1")
+  expect_identical(
+    found$RNA_snn_res.1,
+    c(`0` = "#111111", `1` = "#222222", `2` = "#333333")
+  )
+  expect_identical(
+    builder_dataset_group_colors(SeuratObject::pbmc_small, groups),
+    list()
+  )
+})

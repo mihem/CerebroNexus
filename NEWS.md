@@ -1,15 +1,22 @@
 # CerebroNexus 8.5.4
 
-- **Standard colour palettes in the Builder.** Group colors has a Palette
-  select for the dataset: Cerebro default, Seurat / ggplot2 default,
-  ColorBrewer Set1, Set2, Dark2 and Paired, Tableau 10, Okabe-Ito, Paul Tol
-  Bright and greyscale, so group colors can match the figures of a
-  manuscript, and Cols25, Alphabet, Glasbey and Polychrome (from the pals
-  package, MIT) for Groups with 20 or more levels. Each option says how many
-  colours it has, and the list is ordered for the Group on show: palettes with
-  enough colours first, then the ones generated for any number of levels, then
-  those that would have to interpolate. A color picked by hand keeps its value
-  when the palette changes; "Reset colors" drops it.
+- **Choose the group colours in the Builder.** Group colors has a Palette
+  select for the dataset, so group colors can match the figures of a
+  manuscript: From the data set, Cerebro default, Seurat / ggplot2 default,
+  Okabe-Ito (colour-vision friendly) and Many distinct colours. A color picked
+  by hand keeps its value when the palette changes; "Reset colors" drops it.
+- **The Builder starts from the colours a data set brings.** The Group colours
+  stored in a Seurat object (`@misc$group_colors`), a SingleCellExperiment
+  (`metadata()$group_colors`) or an h5ad file (`uns[<column>_colors]`) used to
+  be replaced by the Builder's own colours in the App it built. "From the data
+  set" now takes them and is the default when there are some; a level without a
+  colour gets one from Cerebro default.
+- **More than 40 distinct colours.** "Many distinct colours" starts from
+  `pals::glasbey()` (32 colours, MIT) and adds the colour farthest from all the
+  chosen ones in CIELAB for every further level, so the closest pair stays
+  about 11 apart at 338 levels where stretching a palette with
+  `colorRampPalette()` leaves under 1. The list is ordered for the Group on
+  show, and each option says how many colours it has.
 - **The Builder's default colours are the Viewer's.** "Cerebro default" was a
   separate set of 20 low-saturation colours, so an App built by the Builder
   drew a Group in different colours than the Viewer does for a data set

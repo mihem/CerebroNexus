@@ -1030,7 +1030,8 @@ output[["core-group_colors"]] <- renderUI({
     levels,
     entry$settings$palette %||% "cerebro",
     builder_settings_color_overrides(entry$settings),
-    if (length(full) > length(distribution)) full else distribution
+    if (length(full) > length(distribution)) full else distribution,
+    dataset_colors = entry$dataset_colors %||% list()
   )
   builder_group_colors_ui("core", model)
 })
@@ -1048,7 +1049,8 @@ output[["core-projection_gallery"]] <- renderUI({
       levels,
       entry$settings$palette %||% "cerebro",
       builder_settings_color_overrides(entry$settings)[[group]] %||%
-        character()
+        character(),
+      entry$dataset_colors[[group]]
     )
   } else {
     character()
@@ -1178,6 +1180,10 @@ observeEvent(
     entry <- rendered_core_entry()
     palette <- input[["core-palette"]]
     known <- vapply(builder_palettes(), function(p) p$id, character(1))
+    ## "From the data set" is on offer only for a data set that brought colours.
+    if (!is.null(entry) && !length(entry$dataset_colors %||% list())) {
+      known <- setdiff(known, "dataset")
+    }
     if (
       is.null(entry) ||
         !is.character(palette) ||

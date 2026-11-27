@@ -494,6 +494,38 @@ builder_source_image_payload <- function(object) {
   result
 }
 
+#' The colours a source object brought for its Groups, as plain strings.
+#'
+#' Seurat `@misc$group_colors`, SingleCellExperiment `metadata()$group_colors`
+#' (kept in `@misc` by convertSCEToSeurat()) and scanpy's `uns[<column>_colors]`
+#' (read into the same slot) all arrive as a list named by Group, each a named
+#' vector level -> "#RRGGBB". Only the Groups the Builder offers
+#' (`groups`) and only complete, valid vectors are kept; the exporter applies
+#' the same rule (`export_core.R`).
+#'
+#' @return `list(group = c(level = "#RRGGBB"))`, empty when there are none.
+builder_dataset_group_colors <- function(object, groups) {
+  colors <- tryCatch(object@misc$group_colors, error = function(e) NULL)
+  if (!is.list(colors) || !length(colors) || is.null(names(colors))) {
+    return(list())
+  }
+  out <- list()
+  for (group in intersect(names(colors), groups)) {
+    value <- colors[[group]]
+    valid <- is.character(value) &&
+      !is.null(names(value)) &&
+      length(value) > 0L &&
+      !anyNA(value) &&
+      !anyNA(names(value)) &&
+      !anyDuplicated(names(value)) &&
+      all(grepl("^#[0-9A-Fa-f]{6}$", value))
+    if (valid) {
+      out[[group]] <- stats::setNames(toupper(unname(value)), names(value))
+    }
+  }
+  out
+}
+
 .builder_adapter_inspect <- function(adapter, progress = NULL) {
   if (!inherits(adapter, "builder_source_adapter")) {
     .builder_adapter_abort("Expected a Builder source adapter.")
@@ -526,6 +558,7 @@ builder_source_image_payload <- function(object) {
     legacy_profile = legacy,
     matrix_summary = matrix_summary,
     levels = levels,
+    dataset_colors = builder_dataset_group_colors(object, names(levels)),
     format = adapter$format,
     source = source,
     snapshot_source = loaded$snapshot_source,
@@ -2116,6 +2149,7 @@ builder_open_snapshot <- function(snapshot) {
     dataset_profile = inspected$profile,
     format = inspected$format,
     levels = inspected$levels,
+    dataset_colors = inspected$dataset_colors,
     source = inspected$source,
     matrix_summary = c(
       inspected$matrix_summary,
@@ -2135,6 +2169,7 @@ builder_open_snapshot <- function(snapshot) {
           "dataset_profile",
           "format",
           "levels",
+          "dataset_colors",
           "source",
           "matrix_summary",
           "source_images"

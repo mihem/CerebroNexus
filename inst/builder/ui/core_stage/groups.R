@@ -17,7 +17,8 @@ builder_group_colors_model <- function(
   levels,
   palette = "cerebro",
   overrides = list(),
-  distribution = list()
+  distribution = list(),
+  dataset_colors = list()
 ) {
   valid_group <- builder_stage_has_text(group %||% "")
   levels <- unname(as.character(levels %||% character()))
@@ -26,7 +27,12 @@ builder_group_colors_model <- function(
     return(list(group = "", items = list(), total = 0L, custom_count = 0L))
   }
   group_overrides <- overrides[[group]] %||% character()
-  colors <- builder_level_colors(levels, palette, group_overrides)
+  colors <- builder_level_colors(
+    levels,
+    palette,
+    group_overrides,
+    dataset_colors[[group]]
+  )
   custom_levels <- intersect(levels, names(group_overrides))
   distribution_labels <- vapply(
     distribution,
@@ -59,17 +65,23 @@ builder_group_colors_model <- function(
     items = items,
     total = length(items),
     custom_count = length(custom_levels),
-    palette = palette
+    palette = palette,
+    has_dataset_colors = length(dataset_colors) > 0L
   )
 }
 
 ## The palette applies to every Group of the dataset; a swatch picked by hand
 ## keeps its colour when the palette changes ("Reset colors" drops them).
-## The choices are ordered for the number of levels of the Group on show:
-## palettes with enough colours first, then the generated ones, then those that
-## would have to interpolate.
-builder_palette_select_ui <- function(ns, selected, n_levels = 1L) {
-  choices <- builder_palette_choices(n_levels)
+## The choices are ordered for the number of levels of the Group on show: the
+## data set's own colours (when it brought some), palettes with enough colours,
+## the generated ones, then those that would have to interpolate.
+builder_palette_select_ui <- function(
+  ns,
+  selected,
+  n_levels = 1L,
+  has_dataset = FALSE
+) {
+  choices <- builder_palette_choices(n_levels, has_dataset = has_dataset)
   ids <- unlist(choices, use.names = FALSE)
   div(
     class = "builder-palette-select",
@@ -109,7 +121,12 @@ builder_group_colors_ui <- function(id, model) {
   div(
     class = "builder-group-colors",
     `data-group` = model$group,
-    builder_palette_select_ui(ns, model$palette %||% "cerebro", model$total),
+    builder_palette_select_ui(
+      ns,
+      model$palette %||% "cerebro",
+      model$total,
+      isTRUE(model$has_dataset_colors)
+    ),
     div(
       class = "viewer-group-distribution-head",
       h5("Distribution"),

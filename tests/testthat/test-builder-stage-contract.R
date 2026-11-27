@@ -830,25 +830,27 @@ test_that("the group colours show the cells of every level, not only the first 1
   expect_identical(builder_group_full_distribution(profile, "other"), list())
 })
 
-test_that("every palette gives one distinct colour per level and a select lists them", {
+palette_by_id <- function(id) {
+  Filter(function(p) identical(p$id, id), builder_palettes())[[1L]]
+}
+
+test_that("the palettes on offer are the six of the Builder", {
+  ids <- vapply(builder_palettes(), function(p) p$id, character(1))
+  expect_identical(
+    ids,
+    c("dataset", "cerebro", "hue", "okabe_ito", "distinct")
+  )
   for (palette in builder_palettes()) {
-    for (n in c(1L, 5L, 14L)) {
+    for (n in c(1L, 5L, 14L, 60L)) {
       colors <- palette$colors(n)
       expect_length(colors, n)
       expect_true(all(grepl("^#[0-9A-Fa-f]{6}$", colors)), info = palette$id)
     }
   }
-  ids <- vapply(builder_palettes(), function(p) p$id, character(1))
-  expect_true(all(c("hue", "brewer_set1", "tableau10") %in% ids))
-  expect_false(anyDuplicated(ids) > 0L)
   ## Seurat's DimPlot colours for three groups
   expect_identical(
-    toupper(builder_palettes()[[which(ids == "hue")]]$colors(3L)),
+    toupper(palette_by_id("hue")$colors(3L)),
     c("#F8766D", "#00BA38", "#619CFF")
-  )
-  expect_match(
-    as.character(builder_palette_select_ui(shiny::NS("core"), "hue")),
-    "core-palette"
   )
 })
 
@@ -874,50 +876,55 @@ test_that("the default palette is the Viewer's own default colour set", {
   )
 })
 
-test_that("the palettes copied from pals are the pals colours", {
+test_that("the generated palette starts from pals::glasbey()", {
   skip_if_not_installed("pals")
-  pals_of <- list(
-    pals_cols25 = pals::cols25(),
-    pals_alphabet = pals::alphabet(),
-    pals_glasbey = pals::glasbey(),
-    pals_polychrome = pals::polychrome()
+  expect_identical(
+    toupper(builder_distinct_seed()),
+    toupper(unname(pals::glasbey()))
   )
-  for (id in names(pals_of)) {
-    palette <- Filter(function(p) identical(p$id, id), builder_palettes())[[1L]]
-    expect_identical(
-      toupper(palette$colors(palette$n)),
-      toupper(unname(pals_of[[id]])),
-      info = id
-    )
+})
+
+test_that("Many distinct colours keeps its colours apart where interpolating does not", {
+  lab_gap <- function(colors) {
+    lab <- builder_srgb_to_lab(t(grDevices::col2rgb(colors)))
+    distance <- as.matrix(stats::dist(lab))
+    diag(distance) <- Inf
+    min(distance)
   }
+  distinct <- palette_by_id("distinct")
+  expect_identical(distinct$colors(10L), builder_distinct_seed()[1:10])
+  ## the same colours every time, and every one of them different
+  expect_identical(distinct$colors(60L), distinct$colors(60L))
+  expect_identical(
+    distinct$colors(60L)[1:32],
+    builder_distinct_seed()
+  )
+  expect_false(anyDuplicated(distinct$colors(338L)) > 0L)
+  ## the closest pair (CIELAB distance) stays far apart up to 50 levels, where
+  ## stretching Cerebro default with colorRampPalette() squeezes it to ~2.6
+  for (n in c(24L, 37L, 50L)) {
+    expect_gt(lab_gap(distinct$colors(n)), 15)
+    expect_lt(lab_gap(palette_by_id("cerebro")$colors(n)), 10)
+  }
+  expect_gt(lab_gap(distinct$colors(338L)), 8)
+  ## and the colours are still plain colours
+  expect_true(all(grepl("^#[0-9A-F]{6}$", distinct$colors(338L))))
 })
 
 test_that("the Palette select puts the palettes with enough colours first", {
-  palettes <- builder_palettes()
-  size <- stats::setNames(
-    vapply(palettes, function(p) p$n, numeric(1)),
-    vapply(palettes, function(p) p$id, character(1))
-  )
   ids_of <- function(choices) lapply(choices, unname)
 
-  ## 5 groups: every palette with colours to spare is in the first block, in
-  ## the order of the list; the generated ones follow; none is short
+  ## 5 groups: the palettes with colours to spare, in the order of the list;
+  ## then the generated ones; none is short
   few <- builder_palette_choices(5L)
   expect_identical(
     names(few),
     c("Enough colours for 5 groups", "Generated for any number of groups")
   )
-  expect_identical(
-    ids_of(few)[[1L]][1:3],
-    c("cerebro", "okabe_ito", "tol_bright")
-  )
-  expect_identical(
-    sort(unname(unlist(few))),
-    sort(unname(names(size)))
-  )
+  expect_identical(ids_of(few)[[1L]], c("cerebro", "okabe_ito"))
+  expect_identical(ids_of(few)[[2L]], c("hue", "distinct"))
 
-  ## 30 groups: Cerebro (40), Glasbey and Polychrome have enough; the rest interpolate,
-  ## the one closest to enough first
+  ## 30 groups: only Cerebro default (40) has enough; Okabe-Ito interpolates
   many <- builder_palette_choices(30L)
   expect_identical(
     names(many),
@@ -927,19 +934,11 @@ test_that("the Palette select puts the palettes with enough colours first", {
       "Fewer than 30 colours (interpolated)"
     )
   )
-  expect_identical(
-    ids_of(many)[[1L]],
-    c("cerebro", "pals_glasbey", "pals_polychrome")
-  )
-  expect_identical(ids_of(many)[[2L]], c("hue", "grey"))
-  expect_identical(ids_of(many)[[3L]][1:2], c("pals_alphabet", "pals_cols25"))
-  expect_true(all(size[ids_of(many)[[3L]]] < 30))
-  expect_identical(
-    sort(unname(unlist(many))),
-    sort(unname(names(size)))
-  )
+  expect_identical(ids_of(many)[[1L]], "cerebro")
+  expect_identical(ids_of(many)[[2L]], c("hue", "distinct"))
+  expect_identical(ids_of(many)[[3L]], "okabe_ito")
 
-  ## 100 groups: no palette has enough, so there is no first block
+  ## 100 groups: no palette has enough
   expect_identical(
     names(builder_palette_choices(100L)),
     c(
@@ -947,28 +946,70 @@ test_that("the Palette select puts the palettes with enough colours first", {
       "Fewer than 100 colours (interpolated)"
     )
   )
+
+  ## the data set's own colours are listed first, and only when it has some
+  expect_false("dataset" %in% unlist(builder_palette_choices(5L)))
+  with_colors <- builder_palette_choices(5L, has_dataset = TRUE)
+  expect_identical(names(with_colors)[[1L]], "Colours of the data set")
+  expect_identical(ids_of(with_colors)[[1L]], "dataset")
 })
 
 test_that("a palette's option says how many colours it has", {
-  by_id <- function(id) {
-    Filter(function(p) identical(p$id, id), builder_palettes())[[1L]]
-  }
   expect_identical(
-    builder_palette_option_label(by_id("cerebro")),
+    builder_palette_option_label(palette_by_id("cerebro")),
     "Cerebro default (40 colours)"
   )
   expect_identical(
-    builder_palette_option_label(by_id("okabe_ito")),
+    builder_palette_option_label(palette_by_id("okabe_ito")),
     "Okabe–Ito (8 colours, colour-vision friendly)"
   )
   expect_identical(
-    builder_palette_option_label(by_id("hue")),
-    "Seurat / ggplot2 default (any number of colours)"
+    builder_palette_option_label(palette_by_id("hue")),
+    "Seurat / ggplot2 default (any number)"
+  )
+  expect_identical(
+    builder_palette_option_label(palette_by_id("dataset")),
+    "From the data set"
   )
   ## the rendered select holds the blocks as option groups
   html <- as.character(
-    builder_palette_select_ui(shiny::NS("core"), "pals_glasbey", 30L)
+    builder_palette_select_ui(shiny::NS("core"), "distinct", 30L, TRUE)
   )
+  expect_match(html, "core-palette")
+  expect_match(html, "optgroup label=\"Colours of the data set\"")
   expect_match(html, "optgroup label=\"Enough colours for 30 groups\"")
-  expect_match(html, "Glasbey (32 colours)", fixed = TRUE)
+  expect_match(
+    html,
+    "Many distinct colours (any number)",
+    fixed = TRUE
+  )
+})
+
+test_that("From the data set uses the data set's colours, then Cerebro default", {
+  levels <- c("A", "B", "C", "N/A")
+  brought <- c(A = "#111111", C = "#333333", ignored = "#999999")
+  cerebro <- builder_level_colors(levels, "cerebro")
+
+  colors <- builder_level_colors(levels, "dataset", NULL, brought)
+  expect_identical(
+    unname(colors),
+    unname(c("#111111", cerebro[["B"]], "#333333", "#898989"))
+  )
+  ## a colour picked by hand wins over the data set's
+  picked <- builder_level_colors(
+    levels,
+    "dataset",
+    c(A = "#ABCDEF"),
+    brought
+  )
+  expect_identical(picked[["A"]], "#ABCDEF")
+  ## any other palette ignores them, and so does a data set without them
+  expect_identical(
+    builder_level_colors(levels, "hue", NULL, brought)[["A"]],
+    builder_level_colors(levels, "hue")[["A"]]
+  )
+  expect_identical(
+    builder_level_colors(levels, "dataset"),
+    builder_level_colors(levels, "cerebro")
+  )
 })

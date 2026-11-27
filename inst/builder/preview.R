@@ -966,11 +966,14 @@ builder_alignment_legend_ui <- function(frame, colors = NULL) {
 
 #' The palettes on offer.
 #'
-#' `cerebro` is the Viewer's own, so "leave it alone" is the default and the
-#' preview matches what the app will draw. The rest exist because a lab usually
-#' has a convention to match, and because the Viewer's palette is tuned for
-#' distinctness rather than for being readable by someone with a colour vision
-#' deficiency.
+#' `dataset` takes the colours the data set brought for a Group (see
+#' `builder_dataset_group_colors()`) and gives a level without one its colour
+#' from Cerebro default; it is on offer only for a data set that brought some,
+#' and is then the default. `cerebro` is the Viewer's own, so "leave it alone"
+#' is the default otherwise and the preview matches what the app will draw. The
+#' rest exist because a lab usually has a convention to match, and because the
+#' Viewer's palette is tuned for distinctness rather than for being readable by
+#' someone with a colour vision deficiency.
 #'
 #' `n` is how many distinct colours a palette really has (`Inf` for one that is
 #' generated for any number of levels); past it the colours are interpolated.
@@ -993,11 +996,35 @@ builder_palette <- function(id, label, base, note = NULL, cvd = FALSE) {
 
 builder_palettes <- function() {
   list(
+    list(
+      id = "dataset",
+      label = "From the data set",
+      n = NA_real_,
+      cvd = FALSE,
+      dataset = TRUE,
+      note = "The colours the data set brought; Cerebro default for a level without one",
+      colors = function(n) builder_ramp(builder_viewer_colorset(), n)
+    ),
     builder_palette(
       "cerebro",
       "Cerebro default",
       builder_viewer_colorset(),
       "The Viewer's built-in palette"
+    ),
+    list(
+      id = "hue",
+      label = "Seurat / ggplot2 default",
+      n = Inf,
+      cvd = FALSE,
+      note = "Evenly spaced hues, as DimPlot() and ggplot2 draw a discrete colour scale",
+      colors = function(n) {
+        n <- max(1L, as.integer(n))
+        grDevices::hcl(
+          h = seq(15, 375, length.out = n + 1L)[seq_len(n)],
+          c = 100,
+          l = 65
+        )
+      }
     ),
     builder_palette(
       "okabe_ito",
@@ -1015,283 +1042,147 @@ builder_palettes <- function() {
       "Designed for red–green colour-vision deficiency",
       cvd = TRUE
     ),
-    builder_palette(
-      "tol_bright",
-      "Paul Tol Bright",
-      c(
-        "#4477AA",
-        "#EE6677",
-        "#228833",
-        "#CCBB44",
-        "#66CCEE",
-        "#AA3377",
-        "#BBBBBB"
-      ),
-      "Remains distinct in print and projection",
-      cvd = TRUE
-    ),
-    builder_palette(
-      "brewer_set1",
-      "ColorBrewer Set1",
-      c(
-        "#E41A1C",
-        "#377EB8",
-        "#4DAF4A",
-        "#984EA3",
-        "#FF7F00",
-        "#FFFF33",
-        "#A65628",
-        "#F781BF",
-        "#999999"
-      )
-    ),
-    builder_palette(
-      "brewer_set2",
-      "ColorBrewer Set2",
-      c(
-        "#66C2A5",
-        "#FC8D62",
-        "#8DA0CB",
-        "#E78AC3",
-        "#A6D854",
-        "#FFD92F",
-        "#E5C494",
-        "#B3B3B3"
-      )
-    ),
-    builder_palette(
-      "brewer_dark2",
-      "ColorBrewer Dark2",
-      c(
-        "#1B9E77",
-        "#D95F02",
-        "#7570B3",
-        "#E7298A",
-        "#66A61E",
-        "#E6AB02",
-        "#A6761D",
-        "#666666"
-      )
-    ),
-    builder_palette(
-      "brewer_paired",
-      "ColorBrewer Paired",
-      c(
-        "#A6CEE3",
-        "#1F78B4",
-        "#B2DF8A",
-        "#33A02C",
-        "#FB9A99",
-        "#E31A1C",
-        "#FDBF6F",
-        "#FF7F00",
-        "#CAB2D6",
-        "#6A3D9A",
-        "#FFFF99",
-        "#B15928"
-      ),
-      "Twelve colours in light/dark pairs"
-    ),
-    builder_palette(
-      "tableau10",
-      "Tableau 10",
-      c(
-        "#4E79A7",
-        "#F28E2B",
-        "#E15759",
-        "#76B7B2",
-        "#59A14F",
-        "#EDC948",
-        "#B07AA1",
-        "#FF9DA7",
-        "#9C755F",
-        "#BAB0AC"
-      )
-    ),
-    ## The four below are `pals::cols25()`, `pals::alphabet()`,
-    ## `pals::glasbey()` and `pals::polychrome()` (pals 1.10, MIT), copied here
-    ## so the Builder needs no extra package; a test compares them with pals.
-    builder_palette(
-      "pals_cols25",
-      "Cols25",
-      c(
-        "#1F78C8",
-        "#FF0000",
-        "#33A02C",
-        "#6A33C2",
-        "#FF7F00",
-        "#565656",
-        "#FFD700",
-        "#A6CEE3",
-        "#FB6496",
-        "#B2DF8A",
-        "#CAB2D6",
-        "#FDBF6F",
-        "#999999",
-        "#EEE685",
-        "#C8308C",
-        "#FF83FA",
-        "#C814FA",
-        "#0000FF",
-        "#36648B",
-        "#00E2E5",
-        "#00FF00",
-        "#778B00",
-        "#BEBE00",
-        "#8B3B00",
-        "#A52A3C"
-      ),
-      "pals::cols25(), for many groups"
-    ),
-    builder_palette(
-      "pals_alphabet",
-      "Alphabet",
-      c(
-        "#F0A0FF",
-        "#0075DC",
-        "#993F00",
-        "#4C005C",
-        "#191919",
-        "#005C31",
-        "#2BCE48",
-        "#FFCC99",
-        "#808080",
-        "#94FFB5",
-        "#8F7C00",
-        "#9DCC00",
-        "#C20088",
-        "#003380",
-        "#FFA405",
-        "#FFA8BB",
-        "#426600",
-        "#FF0010",
-        "#5EF1F2",
-        "#00998F",
-        "#E0FF66",
-        "#740AFF",
-        "#990000",
-        "#FFFF80",
-        "#FFE100",
-        "#FF5005"
-      ),
-      "pals::alphabet(), for many groups"
-    ),
-    builder_palette(
-      "pals_glasbey",
-      "Glasbey",
-      c(
-        "#0000FF",
-        "#FF0000",
-        "#00FF00",
-        "#000033",
-        "#FF00B6",
-        "#005300",
-        "#FFD300",
-        "#009FFF",
-        "#9A4D42",
-        "#00FFBE",
-        "#783FC1",
-        "#1F9698",
-        "#FFACFD",
-        "#B1CC71",
-        "#F1085C",
-        "#FE8F42",
-        "#DD00FF",
-        "#201A01",
-        "#720055",
-        "#766C95",
-        "#02AD24",
-        "#C8FF00",
-        "#886C00",
-        "#FFB79F",
-        "#858567",
-        "#A10300",
-        "#14F9FF",
-        "#00479E",
-        "#DC5E93",
-        "#93D4FF",
-        "#004CFF",
-        "#F2F318"
-      ),
-      "pals::glasbey(), for many groups"
-    ),
-    builder_palette(
-      "pals_polychrome",
-      "Polychrome",
-      c(
-        "#5A5156",
-        "#E4E1E3",
-        "#F6222E",
-        "#FE00FA",
-        "#16FF32",
-        "#3283FE",
-        "#FEAF16",
-        "#B00068",
-        "#1CFFCE",
-        "#90AD1C",
-        "#2ED9FF",
-        "#DEA0FD",
-        "#AA0DFE",
-        "#F8A19F",
-        "#325A9B",
-        "#C4451C",
-        "#1C8356",
-        "#85660D",
-        "#B10DA1",
-        "#FBE426",
-        "#1CBE4F",
-        "#FA0087",
-        "#FC1CBF",
-        "#F7E1A0",
-        "#C075A6",
-        "#782AB6",
-        "#AAF400",
-        "#BDCDFF",
-        "#822E1C",
-        "#B5EFB5",
-        "#7ED7D1",
-        "#1C7F93",
-        "#D85FF7",
-        "#683B79",
-        "#66B0FF",
-        "#3B00FB"
-      ),
-      "pals::polychrome(), for many groups"
-    ),
     list(
-      id = "hue",
-      label = "Seurat / ggplot2 default",
+      id = "distinct",
+      label = "Many distinct colours",
       n = Inf,
       cvd = FALSE,
-      note = "Evenly spaced hues, as DimPlot() and ggplot2 draw a discrete colour scale",
-      colors = function(n) {
-        n <- max(1L, as.integer(n))
-        grDevices::hcl(
-          h = seq(15, 375, length.out = n + 1L)[seq_len(n)],
-          c = 100,
-          l = 65
-        )
-      }
-    ),
-    list(
-      id = "grey",
-      label = "Greyscale",
-      n = Inf,
-      cvd = FALSE,
-      note = "Emphasises density without a categorical colour rhythm",
-      colors = function(n) {
-        grDevices::colorRampPalette(c("#1c1c1e", "#c8c8cc"))(max(1L, n))
-      }
+      note = "Glasbey, then as many more well separated colours as there are levels, generated in CIELAB",
+      colors = function(n) builder_distinct_colors(n)
     )
   )
 }
 
+#' `pals::glasbey()` (pals 1.10, MIT), copied here so the Builder needs no extra
+#' package (a test compares it with pals): the colours "Many distinct colours"
+#' starts from, so a Group of up to 32 levels gets a hand-tuned palette.
+builder_distinct_seed <- function() {
+  c(
+    "#0000FF",
+    "#FF0000",
+    "#00FF00",
+    "#000033",
+    "#FF00B6",
+    "#005300",
+    "#FFD300",
+    "#009FFF",
+    "#9A4D42",
+    "#00FFBE",
+    "#783FC1",
+    "#1F9698",
+    "#FFACFD",
+    "#B1CC71",
+    "#F1085C",
+    "#FE8F42",
+    "#DD00FF",
+    "#201A01",
+    "#720055",
+    "#766C95",
+    "#02AD24",
+    "#C8FF00",
+    "#886C00",
+    "#FFB79F",
+    "#858567",
+    "#A10300",
+    "#14F9FF",
+    "#00479E",
+    "#DC5E93",
+    "#93D4FF",
+    "#004CFF",
+    "#F2F318"
+  )
+}
+
+#' sRGB (a matrix of red, green, blue in 0-255) to CIELAB (D65).
+builder_srgb_to_lab <- function(rgb) {
+  linear <- rgb / 255
+  linear <- ifelse(
+    linear <= 0.04045,
+    linear / 12.92,
+    ((linear + 0.055) / 1.055)^2.4
+  )
+  xyz <- linear %*%
+    t(matrix(
+      c(
+        0.4124564,
+        0.3575761,
+        0.1804375,
+        0.2126729,
+        0.7151522,
+        0.0721750,
+        0.0193339,
+        0.1191920,
+        0.9503041
+      ),
+      nrow = 3L,
+      byrow = TRUE
+    ))
+  scaled <- sweep(xyz, 2L, c(0.95047, 1, 1.08883), "/")
+  f <- ifelse(
+    scaled > 216 / 24389,
+    scaled^(1 / 3),
+    (24389 / 27 * scaled + 16) / 116
+  )
+  cbind(
+    L = 116 * f[, 2L] - 16,
+    a = 500 * (f[, 1L] - f[, 2L]),
+    b = 200 * (f[, 2L] - f[, 3L])
+  )
+}
+
+#' `n` colours that stay as far apart as they can in CIELAB.
+#'
+#' The first colours are `builder_distinct_seed()`. Each further colour is the
+#' candidate (a grid over sRGB, without the very dark, very light and grey
+#' ones) whose nearest chosen colour is the farthest, so the closest pair stays
+#' as distant as the grid allows instead of being squeezed between neighbours
+#' the way interpolating a short palette does. The result depends only on `n`.
+builder_distinct_colors <- function(n, seed = builder_distinct_seed()) {
+  n <- max(1L, as.integer(n))
+  if (n <= length(seed)) {
+    return(seed[seq_len(n)])
+  }
+  steps <- seq(0, 255, length.out = 24L)
+  grid <- as.matrix(expand.grid(r = steps, g = steps, b = steps))
+  lab <- builder_srgb_to_lab(grid)
+  keep <- lab[, 1L] >= 25 &
+    lab[, 1L] <= 92 &
+    sqrt(lab[, 2L]^2 + lab[, 3L]^2) >= 20
+  grid <- grid[keep, , drop = FALSE]
+  lab <- lab[keep, , drop = FALSE]
+  distance_to <- function(point) {
+    (lab[, 1L] - point[[1L]])^2 +
+      (lab[, 2L] - point[[2L]])^2 +
+      (lab[, 3L] - point[[3L]])^2
+  }
+  chosen <- builder_srgb_to_lab(t(grDevices::col2rgb(seed)))
+  nearest <- rep(Inf, nrow(lab))
+  for (i in seq_len(nrow(chosen))) {
+    nearest <- pmin(nearest, distance_to(chosen[i, ]))
+  }
+  added <- character(n - length(seed))
+  for (i in seq_along(added)) {
+    best <- which.max(nearest)
+    added[[i]] <- grDevices::rgb(
+      grid[best, 1L],
+      grid[best, 2L],
+      grid[best, 3L],
+      maxColorValue = 255
+    )
+    nearest <- pmin(nearest, distance_to(lab[best, ]))
+  }
+  c(seed, added)
+}
+
 #' The text of a palette in the select: its name and how many colours it has.
 builder_palette_option_label <- function(palette) {
+  if (isTRUE(palette$dataset)) {
+    return(palette$label)
+  }
   detail <- if (is.finite(palette$n)) {
     sprintf("%d colours", palette$n)
   } else {
-    "any number of colours"
+    "any number"
   }
   if (isTRUE(palette$cvd)) {
     detail <- paste0(detail, ", colour-vision friendly")
@@ -1300,19 +1191,27 @@ builder_palette_option_label <- function(palette) {
 }
 
 #' The choices of the Palette select for a Group of `n_levels` levels, in
-#' three blocks: palettes with enough colours (in the order above), palettes
-#' generated for any number of levels, and palettes that would have to
-#' interpolate (the one closest to enough first).
-builder_palette_choices <- function(n_levels, palettes = builder_palettes()) {
+#' blocks: the data set's own colours (only when it brought some), palettes
+#' with enough colours (in the order above), palettes generated for any number
+#' of levels, and palettes that would have to interpolate (the one closest to
+#' enough first).
+builder_palette_choices <- function(
+  n_levels,
+  palettes = builder_palettes(),
+  has_dataset = FALSE
+) {
   n_levels <- max(1L, as.integer(n_levels))
+  from_dataset <- vapply(palettes, function(p) isTRUE(p$dataset), logical(1))
   size <- vapply(palettes, function(p) as.numeric(p$n), numeric(1))
-  short <- palettes[is.finite(size) & size < n_levels]
+  short <- palettes[!from_dataset & is.finite(size) & size < n_levels]
   blocks <- list(
-    palettes[is.finite(size) & size >= n_levels],
-    palettes[is.infinite(size)],
+    if (isTRUE(has_dataset)) palettes[from_dataset] else list(),
+    palettes[!from_dataset & is.finite(size) & size >= n_levels],
+    palettes[!from_dataset & is.infinite(size)],
     short[order(-vapply(short, function(p) p$n, numeric(1)))]
   )
   headings <- c(
+    "Colours of the data set",
     sprintf("Enough colours for %d groups", n_levels),
     "Generated for any number of groups",
     sprintf("Fewer than %d colours (interpolated)", n_levels)
@@ -1430,32 +1329,45 @@ builder_reset_color_overrides <- function(overrides, group) {
 #'
 #' `overrides` are the swatches the user has actually touched; everything else
 #' comes from the chosen palette, so switching palette does not throw away a
-#' hand-picked colour.
+#' hand-picked colour. With the `dataset` palette, a level that has a colour in
+#' `dataset_colors` (what the data set brought for this Group) takes it; the
+#' others come from Cerebro default. An unknown palette is Cerebro default.
 builder_level_colors <- function(
   levels,
   palette_id = "cerebro",
-  overrides = NULL
+  overrides = NULL,
+  dataset_colors = NULL
 ) {
   if (!length(levels)) {
     return(character())
   }
-  pal <- Filter(function(p) identical(p$id, palette_id), builder_palettes())
-  fn <- if (length(pal)) pal[[1]]$colors else builder_palettes()[[1]]$colors
-  out <- toupper(fn(length(levels)))
-  names(out) <- levels
-  ## The viewer forces N/A to grey; matching it keeps the preview honest.
-  if ("N/A" %in% levels) {
-    out[["N/A"]] <- "#898989"
+  palettes <- builder_palettes()
+  pal <- Filter(function(p) identical(p$id, palette_id), palettes)
+  if (!length(pal)) {
+    pal <- Filter(function(p) identical(p$id, "cerebro"), palettes)
   }
-  if (length(overrides)) {
-    shared <- intersect(levels, names(overrides))
+  out <- toupper(pal[[1L]]$colors(length(levels)))
+  names(out) <- levels
+  apply_colors <- function(out, colors) {
+    shared <- intersect(levels, names(colors))
     if (length(shared)) {
-      normalized <- lapply(overrides[shared], builder_normalize_hex_color)
+      normalized <- lapply(colors[shared], builder_normalize_hex_color)
       valid <- !vapply(normalized, is.null, logical(1))
       if (any(valid)) {
         out[shared[valid]] <- unlist(normalized[valid], use.names = FALSE)
       }
     }
+    out
+  }
+  if (isTRUE(pal[[1L]]$dataset) && length(dataset_colors)) {
+    out <- apply_colors(out, dataset_colors)
+  }
+  ## The viewer forces N/A to grey; matching it keeps the preview honest.
+  if ("N/A" %in% levels) {
+    out[["N/A"]] <- "#898989"
+  }
+  if (length(overrides)) {
+    out <- apply_colors(out, overrides)
   }
   out
 }
