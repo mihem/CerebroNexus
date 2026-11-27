@@ -1164,19 +1164,20 @@ readH5adAsSCE <- function(
   ## Stored values of the matrices that become Seurat layers, for the size
   ## estimates the empty matrices cannot give.
   layer_assays <- c(counts_assay, data_assay)
+  encodings <- vapply(
+    stats::setNames(layer_assays, layer_assays),
+    function(assay) .h5adEncoding(ctx, path_of(assay)) %||% "",
+    character(1)
+  )
   stored_values <- vapply(
     stats::setNames(layer_assays, layer_assays),
     function(assay) {
-      path <- path_of(assay)
-      if (.h5adEncoding(ctx, path) %in% c("csr_matrix", "csc_matrix")) {
-        major <- if (identical(.h5adEncoding(ctx, path), "csr_matrix")) {
-          n_cells
-        } else {
-          n_genes
-        }
+      enc <- encodings[[assay]]
+      if (enc %in% c("csr_matrix", "csc_matrix")) {
+        major <- if (identical(enc, "csr_matrix")) n_cells else n_genes
         as.numeric(.h5adRead(
           ctx,
-          paste0(path, "/indptr"),
+          paste0(path_of(assay), "/indptr"),
           start = major + 1,
           count = 1,
           bit64conversion = "double"
@@ -1188,11 +1189,9 @@ readH5adAsSCE <- function(
     numeric(1)
   )
   csr_path <- function(assay) {
-    if (is.null(assay)) {
-      return(NULL)
+    if (!is.null(assay) && identical(encodings[[assay]], "csr_matrix")) {
+      path_of(assay)
     }
-    path <- path_of(assay)
-    if (identical(.h5adEncoding(ctx, path), "csr_matrix")) path else NULL
   }
   list(
     x_is_counts = x_is_counts,
