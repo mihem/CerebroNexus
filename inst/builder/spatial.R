@@ -896,8 +896,12 @@ builder_region_subset_cells <- function(object, sections) {
       total = as.integer(length(inside))
     )
   }
+  kept <- cells[!cells %in% dropped]
+  if (!length(kept)) {
+    stop("The drawn regions leave no cells to keep.", call. = FALSE)
+  }
   list(
-    kept = cells[!cells %in% dropped],
+    kept = kept,
     total = length(cells),
     sections = counts
   )
@@ -936,6 +940,9 @@ builder_region_subset_resolve <- function(object, sections, levels = list()) {
 builder_region_subset_trekker <- function(trekker, keep) {
   barcodes <- as.character(trekker$barcodes)
   index <- which(barcodes %in% keep)
+  if (!length(index)) {
+    stop("The drawn regions leave no Trekker cells to keep.", call. = FALSE)
+  }
   pick <- function(values) values[index]
   for (name in c("barcodes", "x", "y", "ux", "uy", "clusters")) {
     if (!is.null(trekker[[name]])) {
@@ -981,6 +988,18 @@ builder_region_subset_apply <- function(
   }
   trekker <- object@misc$trekker
   object <- subset(object, cells = cut$kept)
+  ## Drop precomputed whole-slide summaries so they are never exported out of
+  ## step with the kept cells; any analyses selected in the Builder run fresh
+  ## on the kept cells after this cut.
+  for (slot in c(
+    "marker_genes",
+    "most_expressed_genes",
+    "enriched_pathways",
+    "mean_expression",
+    "trees"
+  )) {
+    object@misc[[slot]] <- NULL
+  }
   if (is.list(trekker) && length(trekker$barcodes %||% character())) {
     object@misc$trekker <- builder_region_subset_trekker(trekker, cut$kept)
   }

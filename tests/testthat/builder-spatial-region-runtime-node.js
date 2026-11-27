@@ -65,6 +65,7 @@ const buttons = {};
   buttons[action] = button(action);
 });
 const status = {textContent: ""};
+const tooltip = {hidden: false, textContent: "", style: {}};
 const panel = {
   querySelectorAll: function () {
     return Object.keys(buttons).map(function (key) { return buttons[key]; });
@@ -72,6 +73,7 @@ const panel = {
 };
 const elements = {
   "enhance-alignment_spatial_plot": canvas,
+  "enhance-alignment_spatial_plot-tooltip": tooltip,
   "builder-region-panel": panel,
   "builder-region-status": status,
 };
@@ -245,5 +247,44 @@ custom.builder_spatial_canvas_scene(scene({
 render();
 out.drawDisabledInRoi = buttons.draw.disabled;
 out.separateEvents = regionEvents().length - separateBefore;
+
+// 5. Drawing hides the hover tooltip, ignores duplicate double-click vertices,
+//    clarifies replacing a stored region, and Escape discards drafts only.
+custom.builder_spatial_canvas_scene(scene({
+  generation: 6,
+  viewKey: "view-e",
+  regions: [{
+    x: rawPoints.map(function (p) { return p.x; }),
+    y: rawPoints.map(function (p) { return p.y; }),
+  }],
+  regionSummary: {kept: 1250, total: 5020, sectionKept: 1250, sectionTotal: 5020},
+}));
+render();
+tooltip.hidden = false;
+press("draw");
+out.tooltipHiddenWhileDrawing = tooltip.hidden;
+clickCanvas(screenPoints[0], 1);
+clickCanvas(screenPoints[1], 1);
+clickCanvas(screenPoints[2], 1);
+// Double-click at the third vertex: detail=1 repeats the vertex and is ignored,
+// then detail=2 closes a 3-vertex polygon.
+clickCanvas(screenPoints[2], 1);
+clickCanvas(screenPoints[2], 2);
+out.statusReplacingStored = status.textContent;
+const beforeEscape = regionEvents().length;
+nativeHandlers.keydown.forEach(function (handler) {
+  handler({key: "Escape", target: {tagName: "BODY"}});
+});
+out.statusAfterEscape = status.textContent;
+out.eventsAfterEscape = regionEvents().length - beforeEscape;
+press("draw");
+clickCanvas(screenPoints[0], 1);
+clickCanvas(screenPoints[1], 1);
+clickCanvas(screenPoints[2], 1);
+clickCanvas(screenPoints[2], 1);
+clickCanvas(screenPoints[2], 2);
+press("apply");
+const dblApplied = regionEvents();
+out.doubleClickVertexCount = dblApplied[dblApplied.length - 1].polygons[0].x.length;
 
 console.log(JSON.stringify(out));

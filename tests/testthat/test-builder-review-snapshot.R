@@ -1,5 +1,6 @@
 builder_repo_source("review.R")
 builder_repo_source("workflow.R")
+.builder_plan_region_entry <- function(entry) entry
 
 builder_test_review_snapshot <- function(
   revision = 1L,

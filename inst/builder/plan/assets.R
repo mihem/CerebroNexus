@@ -293,8 +293,9 @@
 }
 
 ## A region subset must belong to the snapshot the build will open, and it
-## cannot yet carry trajectories (their per-cell values are not cut).
-.builder_plan_region_error <- function(entry) {
+## cannot yet carry trajectories or immune repertoire tables (their per-cell
+## values are not cut).
+.builder_plan_region_error <- function(entry, manifest = NULL) {
   region_subset <- entry$settings$spatial_region_subset
   if (!length(region_subset$sections %||% list())) {
     return(NULL)
@@ -326,6 +327,28 @@
       ),
       "region_subset_with_trajectories"
     ))
+  }
+  if (is.list(manifest)) {
+    immune_kept <- vapply(
+      c("immune_repertoire", "hla_tcr_motifs"),
+      function(key) {
+        (manifest[[key]]$disposition %||% "") %in%
+          c("preserved", "converted", "attached")
+      },
+      logical(1)
+    )
+    if (any(immune_kept)) {
+      return(builder_plan_error(
+        paste0(
+          "Dataset “",
+          name,
+          "” keeps a region, which cannot be combined with immune repertoire ",
+          "tables yet. Exclude the immune repertoire content or clear the ",
+          "region."
+        ),
+        "region_subset_with_immune_repertoire"
+      ))
+    }
   }
   NULL
 }

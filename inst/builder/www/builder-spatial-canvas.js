@@ -50,6 +50,7 @@
       drawing: false,
       current: [],
       polygons: [],
+      cursor: null,
       savedSignature: "",
     },
   };
@@ -693,16 +694,17 @@
     var drafts = state.region.polygons;
     var current = state.region.current;
     if (!saved.length && !drafts.length && !current.length) return;
+    var replacing = drafts.length > 0 || current.length > 0;
     ctx.save();
     ctx.lineJoin = "round";
     saved.forEach(function (polygon) {
       ctx.beginPath();
       tracePolygon(ctx, polygon, true);
-      ctx.fillStyle = "rgba(22,124,120,.12)";
+      ctx.fillStyle = replacing ? "rgba(22,124,120,.05)" : "rgba(22,124,120,.12)";
       ctx.fill();
-      ctx.strokeStyle = "#167c78";
-      ctx.lineWidth = 2;
-      ctx.setLineDash([]);
+      ctx.strokeStyle = replacing ? "rgba(22,124,120,.45)" : "#167c78";
+      ctx.lineWidth = replacing ? 1.5 : 2;
+      ctx.setLineDash(replacing ? [4, 4] : []);
       ctx.stroke();
     });
     drafts.forEach(function (polygon) {
@@ -722,6 +724,18 @@
       ctx.lineWidth = 2;
       ctx.setLineDash([]);
       ctx.stroke();
+      if (state.region.drawing && state.region.cursor) {
+        var last = regionToScreen(current[current.length - 1]);
+        if (last) {
+          ctx.beginPath();
+          ctx.moveTo(last.x, last.y);
+          ctx.lineTo(state.region.cursor.x, state.region.cursor.y);
+          ctx.strokeStyle = "rgba(201,114,28,.65)";
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([4, 4]);
+          ctx.stroke();
+        }
+      }
       current.forEach(function (vertex, index) {
         var at = regionToScreen(vertex);
         if (!at) return;
@@ -742,6 +756,7 @@
     if (!regionSceneDrawable(scene)) {
       return "Choose \"All ROIs\" to draw a region on this section.";
     }
+    var hasStored = !!(scene.regions && scene.regions.length);
     if (region.drawing) {
       if (region.current.length) {
         return region.current.length + " point" +
@@ -751,12 +766,14 @@
       return region.polygons.length
         ? region.polygons.length + " shape" +
           (region.polygons.length === 1 ? "" : "s") +
-          " drawn. Click to start another, or choose \"Keep cells inside\"."
+          " drawn. Click to start another, or choose \"Keep cells inside\"" +
+          (hasStored ? " to replace the stored region." : ".")
         : "Click on the canvas to place the first point.";
     }
     if (region.polygons.length) {
       return region.polygons.length + " shape" + (region.polygons.length === 1 ? "" : "s") +
-        " drawn. Choose \"Keep cells inside\" to apply.";
+        " drawn. Choose \"Keep cells inside\" to " +
+        (hasStored ? "replace the stored region." : "apply.");
     }
     var summary = scene.regionSummary;
     if (summary) {
@@ -794,17 +811,25 @@
       }
     });
     var node = canvas();
-    if (node) node.style.cursor = region.drawing && drawable ? "crosshair" : "";
+    if (node) {
+      node.style.cursor = region.drawing && drawable ? "crosshair" : "";
+      if (region.drawing && drawable) {
+        var tip = document.getElementById(node.id + "-tooltip");
+        if (tip) tip.hidden = true;
+      }
+    }
   }
   function resetRegionDraft() {
     state.region.drawing = false;
     state.region.current = [];
     state.region.polygons = [];
+    state.region.cursor = null;
   }
   function closeRegionShape() {
     var region = state.region;
     if (region.current.length >= 3) region.polygons.push(region.current);
     region.current = [];
+    region.cursor = null;
   }
   function sendRegionEvent(action, polygons) {
     var scene = state.scene;
@@ -822,6 +847,7 @@
       if (!regionSceneDrawable(scene)) return;
       if (region.drawing) closeRegionShape();
       region.drawing = !region.drawing;
+      if (!region.drawing) region.cursor = null;
     } else if (action === "undo") {
       if (region.current.length) region.current.pop();
       else if (region.polygons.length) region.current = region.polygons.pop();
@@ -835,6 +861,7 @@
         };
       }));
       region.drawing = false;
+      region.cursor = null;
     } else if (action === "clear") {
       var hadDraft = region.current.length || region.polygons.length;
       resetRegionDraft();
@@ -851,6 +878,24 @@
   function setupRegionDrawing(node) {
     if (node.dataset.builderRegionDrawing === "true") return;
     node.dataset.builderRegionDrawing = "true";
+    node.addEventListener("pointermove", function (event) {
+      var region = state.region;
+      if (!region.drawing || !region.current.length || !regionSceneDrawable(state.scene)) {
+        if (region.cursor) {
+          region.cursor = null;
+          schedule();
+        }
+        return;
+      }
+      var rect = node.getBoundingClientRect();
+      region.cursor = {x: event.clientX - rect.left, y: event.clientY - rect.top};
+      schedule();
+    });
+    node.addEventListener("pointerleave", function () {
+      if (!state.region.cursor) return;
+      state.region.cursor = null;
+      schedule();
+    });
     node.addEventListener("click", function (event) {
       var region = state.region;
       if (!region.drawing || !regionSceneDrawable(state.scene)) return;
@@ -860,11 +905,18 @@
         closeRegionShape();
       } else {
         var first = region.current.length ? regionToScreen(region.current[0]) : null;
+        var last = region.current.length
+          ? regionToScreen(region.current[region.current.length - 1])
+          : null;
         if (
           first && region.current.length >= 3 &&
           Math.hypot(first.x - at.x, first.y - at.y) <= 8
         ) {
           closeRegionShape();
+        } else if (last && Math.hypot(last.x - at.x, last.y - at.y) <= 2) {
+          // Ignore a duplicate click on the previous vertex (for example,
+          // the first click of a double-click that closes the shape).
+          return;
         } else {
           var raw = regionToRaw(at);
           if (raw) region.current.push(raw);
@@ -880,13 +932,17 @@
     handleRegionAction(button.getAttribute("data-region-action"));
   });
   document.addEventListener("keydown", function (event) {
-    if (!state.region.drawing) return;
+    if (!state.region.drawing && !state.region.polygons.length) return;
     var tag = event.target && event.target.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
     if (event.key === "Escape") {
-      state.region.current = [];
-      state.region.drawing = false;
-    } else if (event.key === "Enter") {
+      if (state.region.current.length) {
+        state.region.current = [];
+        state.region.cursor = null;
+      } else {
+        resetRegionDraft();
+      }
+    } else if (event.key === "Enter" && state.region.drawing) {
       closeRegionShape();
     } else {
       return;
@@ -1655,6 +1711,10 @@
     ) return;
     var tip = document.getElementById(node.id + "-tooltip");
     if (!tip) return;
+    if (state.region.drawing) {
+      tip.hidden = true;
+      return;
+    }
     var rect = node.getBoundingClientRect(), best = -1, bestDistance = 64;
     var pointerX = point.clientX - rect.left;
     var pointerY = point.clientY - rect.top;

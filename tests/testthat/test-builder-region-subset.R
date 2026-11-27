@@ -560,6 +560,11 @@ test_that("the canvas draws regions in raw coordinates and sends them", {
   expect_true(result$drawDisabledInSeparate)
   expect_true(result$drawDisabledInRoi)
   expect_identical(result$separateEvents, 0L)
+  expect_true(result$tooltipHiddenWhileDrawing)
+  expect_match(result$statusReplacingStored, "replace the stored region")
+  expect_match(result$statusAfterEscape, "Keeping 1,250 of 5,020 cells")
+  expect_identical(result$eventsAfterEscape, 0L)
+  expect_identical(result$doubleClickVertexCount, 3L)
 })
 
 test_that("a cut Trekker payload is still a valid Viewer payload", {
@@ -696,4 +701,218 @@ test_that("the default overview share follows the cells a region keeps", {
     stored(1251L)
   )
   expect_null(bare$settings$overview_percentage_cells_to_show)
+})
+
+test_that("overlapping regions that leave no cells fail with a clear error", {
+  object <- trekker_object()
+  ## slice1 and SPATIAL hold the same cells; keeping T1 in slice1 and T3 in
+  ## SPATIAL leaves zero cells in common.
+  disjoint <- list(
+    slice1 = list(polygons = list(region_of_tissue(object, "T1", "slice1"))),
+    SPATIAL = list(polygons = list(region_of_tissue(object, "T3", "SPATIAL")))
+  )
+  expect_error(
+    builder_region_subset_cells(object, disjoint),
+    "leave no cells to keep"
+  )
+  expect_error(
+    builder_region_subset_trekker(object@misc$trekker, "NOT_A_CELL"),
+    "leave no Trekker cells to keep"
+  )
+})
+
+test_that("preflight blocks combining a region with immune repertoire tables", {
+  object <- trekker_object()
+  record <- list(
+    id = "trekker_region_immune",
+    label = "Trekker immune",
+    make = function() list(object = object, format = "Built-in example")
+  )
+  entry <- builder_e2e_entry(record)
+  entry$snapshot <- list(object_md5 = strrep("e", 32L))
+  sections <- list(
+    slice1 = list(polygons = list(region_of_tissue(object, "T2")))
+  )
+  resolved <- builder_region_subset_resolve(object, sections, entry$levels)
+  resolved$source_md5 <- strrep("e", 32L)
+  entry$settings$spatial_region_subset <- builder_region_subset_normalize(list(
+    sections = sections,
+    resolved = resolved
+  ))
+
+  immune_manifest <- list(
+    immune_repertoire = list(disposition = "preserved")
+  )
+  expect_identical(
+    .builder_plan_region_error(entry, manifest = immune_manifest)$error_code,
+    "region_subset_with_immune_repertoire"
+  )
+  motif_manifest <- list(
+    hla_tcr_motifs = list(disposition = "attached")
+  )
+  expect_identical(
+    .builder_plan_region_error(entry, manifest = motif_manifest)$error_code,
+    "region_subset_with_immune_repertoire"
+  )
+  filtered_manifest <- list(
+    immune_repertoire = list(disposition = "filtered")
+  )
+  expect_null(.builder_plan_region_error(entry, manifest = filtered_manifest))
+})
+
+test_that("a rotated and scaled section keeps its pre-cut pivot after cutting", {
+  object <- trekker_object()
+  record <- list(
+    id = "trekker_region_rotated",
+    label = "Trekker rotated",
+    make = function() list(object = object, format = "Built-in example")
+  )
+  entry <- builder_e2e_entry(record)
+  root <- withr::local_tempdir()
+  entry$snapshot <- builder_snapshot_seurat(
+    object,
+    file.path(root, "snapshot"),
+    available_bytes = 2^40
+  )
+  sections <- list(
+    slice1 = list(polygons = list(region_of_tissue(object, "T2")))
+  )
+  resolved <- builder_region_subset_resolve(object, sections, entry$levels)
+  resolved$source_md5 <- tolower(entry$snapshot$object_md5)
+  entry$settings$spatial_region_subset <- builder_region_subset_normalize(list(
+    sections = sections,
+    resolved = resolved
+  ))
+  entry$settings$spatial_coordinate_transforms <- list(
+    slice1 = list(schema_version = 1L, rotation_degrees = 30, scale = 1.5)
+  )
+
+  raw_full <- builder_region_section_coordinates(object, "slice1")
+  rownames(raw_full) <- raw_full$cell_barcode
+  full_pivot <- c(
+    x = (min(raw_full$x) + max(raw_full$x)) / 2,
+    y = (min(raw_full$y) + max(raw_full$y)) / 2
+  )
+  transformed_full <- .spx_apply_coordinate_transform(
+    raw_full,
+    list(rotation_degrees = 30, scale = 1.5)
+  )
+
+  plan <- builder_freeze_plan(
+    list(entry),
+    file.path(root, "release"),
+    make_app = FALSE
+  )
+  expect_null(plan$error)
+  handle <- builder_coordinator_prepare(plan, entry$id)
+  result <- builder_execute_plan(
+    plan,
+    handle$stage,
+    stats::setNames(list(entry$snapshot), entry$id)
+  )
+  expect_identical(result$state, "success", info = format(result$error))
+  result$build_id <- handle$build_id
+  published <- builder_coordinator_publish(handle, result)
+  expect_true(isTRUE(published$published))
+
+  crb <- readCerebro(published$built[[1L]])
+  spatial <- crb$getSpatialData("slice1")
+  expect_equal(spatial$coordinate_transform$pivot, full_pivot)
+  coords <- spatial$coordinates
+  coords_barcodes <- coords$cell_barcode %||% rownames(coords)
+  matched <- match(coords_barcodes, transformed_full$cell_barcode)
+  expect_identical(length(matched), nrow(coords))
+  expect_false(anyNA(matched))
+  expect_equal(coords$x, transformed_full$x[matched], tolerance = 1e-8)
+  expect_equal(coords$y, transformed_full$y[matched], tolerance = 1e-8)
+
+  inverted <- .spx_invert_coordinate_transform(
+    coords,
+    spatial$coordinate_transform
+  )
+  expect_equal(inverted$x, raw_full$x[matched], tolerance = 1e-8)
+  expect_equal(inverted$y, raw_full$y[matched], tolerance = 1e-8)
+})
+
+test_that("precomputed whole-slide analyses are cleared when a region is kept", {
+  object <- trekker_object()
+  object@misc$marker_genes <- list(
+    cerebro_seurat = list(
+      tissue_id = data.frame(
+        tissue_id = factor(c("T1", "T2")),
+        gene = c("G1", "G2"),
+        stringsAsFactors = FALSE
+      )
+    )
+  )
+  object@misc$most_expressed_genes <- list(
+    tissue_id = data.frame(
+      tissue_id = factor(c("T1", "T2")),
+      gene = c("G1", "G2"),
+      pct = c(10, 20),
+      stringsAsFactors = FALSE
+    )
+  )
+  object@misc$enriched_pathways <- list(
+    cerebro_GSVA = list(tissue_id = data.frame(name = "P1"))
+  )
+  object@misc$mean_expression <- list(tissue_id = data.frame(gene = "G1"))
+  object@misc$trees <- list(tissue_id = list(tip.label = c("T1", "T2")))
+
+  sections <- list(
+    slice1 = list(polygons = list(region_of_tissue(object, "T2")))
+  )
+  cut_obj <- builder_region_subset_apply(object, list(sections = sections))
+  expect_null(cut_obj@misc$marker_genes)
+  expect_null(cut_obj@misc$most_expressed_genes)
+  expect_null(cut_obj@misc$enriched_pathways)
+  expect_null(cut_obj@misc$mean_expression)
+  expect_null(cut_obj@misc$trees)
+
+  ## Fresh analyses selected in the Builder still run on the kept cells, while
+  ## stale whole-slide marker genes are dropped from the built CRB and manifest.
+  record <- list(
+    id = "trekker_region_analyses",
+    label = "Trekker analyses",
+    make = function() list(object = object, format = "Built-in example")
+  )
+  entry <- builder_e2e_entry(record)
+  root <- withr::local_tempdir()
+  entry$snapshot <- builder_snapshot_seurat(
+    object,
+    file.path(root, "snapshot"),
+    available_bytes = 2^40
+  )
+  resolved <- builder_region_subset_resolve(object, sections, entry$levels)
+  resolved$source_md5 <- tolower(entry$snapshot$object_md5)
+  entry$settings$spatial_region_subset <- builder_region_subset_normalize(list(
+    sections = sections,
+    resolved = resolved
+  ))
+  entry$settings$analyses <- "most_expressed"
+
+  state <- builder_dataset_state(entry)
+  expect_identical(state$manifest$marker_genes$status, "not_applicable")
+  expect_identical(state$manifest$most_expressed_genes$disposition, "generated")
+
+  plan <- builder_freeze_plan(
+    list(entry),
+    file.path(root, "release"),
+    make_app = FALSE
+  )
+  expect_null(plan$error)
+  handle <- builder_coordinator_prepare(plan, entry$id)
+  result <- builder_execute_plan(
+    plan,
+    handle$stage,
+    stats::setNames(list(entry$snapshot), entry$id)
+  )
+  expect_identical(result$state, "success", info = format(result$error))
+  result$build_id <- handle$build_id
+  published <- builder_coordinator_publish(handle, result)
+  expect_true(isTRUE(published$published))
+
+  crb <- readCerebro(published$built[[1L]])
+  expect_length(crb$marker_genes, 0L)
+  expect_true(length(crb$most_expressed_genes) > 0L)
 })

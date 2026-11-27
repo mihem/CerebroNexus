@@ -3816,8 +3816,19 @@ commit_region_subset <- function(p, value) {
     )
     return(invisible(FALSE))
   }
+  previous_share <- entry$settings$overview_percentage_cells_to_show
   entry <- builder_region_subset_set(entry, next_subset)
-  replace_entry(entry)
+  changed <- replace_entry(entry)
+  if (
+    isTRUE(changed) &&
+      !identical(
+        previous_share,
+        entry$settings$overview_percentage_cells_to_show
+      ) &&
+      identical(isolate(current()), entry$id)
+  ) {
+    send_projection_state(entry)
+  }
   if (length(next_subset)) {
     kept <- next_subset$resolved$kept
     total <- next_subset$resolved$total

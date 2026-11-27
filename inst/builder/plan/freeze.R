@@ -468,6 +468,15 @@ builder_freeze_plan <- function(
       "attention_capability"
     ))
   }
+  for (index in seq_along(entries)) {
+    region_error <- .builder_plan_region_error(
+      entries[[index]],
+      manifest = states[[index]]$manifest
+    )
+    if (!is.null(region_error)) {
+      return(region_error)
+    }
+  }
 
   labels <- preflight$labels
   included_groups <- preflight$included_groups

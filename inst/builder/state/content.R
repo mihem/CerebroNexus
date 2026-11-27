@@ -29,7 +29,32 @@
   profile
 }
 
+.builder_state_region_cleared_content <- c(
+  "most_expressed_genes",
+  "marker_genes",
+  "enriched_pathways",
+  "mean_expression",
+  "trees"
+)
+
+.builder_state_has_region_subset <- function(entry) {
+  settings <- .subset2(entry, "settings")
+  subset <- if (is.list(settings)) {
+    .subset2(settings, "spatial_region_subset")
+  } else {
+    NULL
+  }
+  sections <- if (is.list(subset)) .subset2(subset, "sections") else NULL
+  is.list(sections) && length(sections) > 0L
+}
+
 .builder_state_content_available <- function(entry, id) {
+  if (
+    .builder_state_has_region_subset(entry) &&
+      id %in% .builder_state_region_cleared_content
+  ) {
+    return(FALSE)
+  }
   profile <- .builder_state_profile(entry)
   if (is.list(profile)) {
     content <- .subset2(profile, "content")
@@ -602,6 +627,18 @@
   evidence <- .builder_state_optional_evidence(fact)
   choice <- .builder_state_content_choice(entry, id)
   generated <- id %in% .builder_state_generated_content(entry)
+  ## Precomputed whole-slide analysis tables do not match a kept region; the
+  ## build clears them before running any selected analyses on the kept cells.
+  region_clears_preserved <- .builder_state_has_region_subset(entry) &&
+    id %in% .builder_state_region_cleared_content
+  if (region_clears_preserved) {
+    evidence$detected <- FALSE
+    evidence$valid <- FALSE
+    evidence$attention <- FALSE
+    if (identical(choice, "preserved")) {
+      choice <- NULL
+    }
+  }
   ## A saved Marker import is attached to the CRB at build time, so the
   ## Marker genes page opens even when the object has no markers.
   imported <- identical(id, "marker_genes") &&

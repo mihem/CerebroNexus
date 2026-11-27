@@ -1794,7 +1794,10 @@ builder_verify_crb <- function(
 ## Cut the object down to the cells inside the frozen regions, before any
 ## analysis or export sees the rest. Per-cell content the cut does not
 ## follow (trajectories, immune repertoire tables) is refused instead of
-## being exported out of step with the cells.
+## being exported out of step with the cells. When a section also carries a
+## coordinate transform (rotation or scale), keep its pre-cut bounds center so
+## the exported points and any aligned histology image stay where the canvas
+## showed them.
 .builder_build_prepare_region_subset <- function(object, item) {
   region_subset <- item$spatial_region_subset
   if (!length(region_subset$sections %||% list())) {
@@ -1818,11 +1821,25 @@ builder_verify_crb <- function(
       call. = FALSE
     )
   }
-  builder_region_subset_apply(
+  transform_pivots <- list()
+  for (section in names(item$spatial_coordinate_transforms %||% list())) {
+    frame <- builder_region_section_coordinates(object, section)
+    if (!is.null(frame) && nrow(frame)) {
+      transform_pivots[[section]] <- c(
+        x = (min(frame$x) + max(frame$x)) / 2,
+        y = (min(frame$y) + max(frame$y)) / 2
+      )
+    }
+  }
+  object <- builder_region_subset_apply(
     object,
     region_subset,
     expected = item$artifact_identity$cells
   )
+  if (length(transform_pivots)) {
+    object@misc$.builder_region_transform_pivots <- transform_pivots
+  }
+  object
 }
 
 .builder_build_prepare <- function(object, item) {
@@ -1899,6 +1916,13 @@ builder_verify_crb <- function(
 
 .builder_build_export <- function(object, item, path, on_progress = NULL) {
   object <- .builder_build_apply_metadata_policy(object, item)
+  transform_pivots <- if (methods::is(object, "Seurat")) {
+    pivots <- object@misc$.builder_region_transform_pivots
+    object@misc$.builder_region_transform_pivots <- NULL
+    pivots
+  } else {
+    NULL
+  }
   coordinate_transforms <- item$spatial_coordinate_transforms %||% NULL
   if (
     is.list(coordinate_transforms) &&
@@ -1906,6 +1930,14 @@ builder_verify_crb <- function(
       !length(coordinate_transforms)
   ) {
     coordinate_transforms <- NULL
+  }
+  if (is.list(coordinate_transforms) && is.list(transform_pivots)) {
+    for (section in intersect(
+      names(coordinate_transforms),
+      names(transform_pivots)
+    )) {
+      coordinate_transforms[[section]]$pivot <- transform_pivots[[section]]
+    }
   }
   exportFromSeurat(
     object = object,
