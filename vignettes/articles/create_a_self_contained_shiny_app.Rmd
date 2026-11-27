@@ -452,8 +452,8 @@ uploads also avoid the getter: they validate the ordinary field at load time.
 A `.crb` in a retired format is rejected during preflight, before anything is
 written, with `uses a retired format ... Convert it once with
 CerebroNexus::convertCerebro()`. See
-[Data integrity contracts](data_integrity_contracts.html) for what counts as
-retired.
+[Older files and retired formats](million_cell_crb_artifacts.html#older-files-and-retired-formats)
+for what counts as retired.
 
 ### Private data and spatial assets
 
