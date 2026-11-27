@@ -224,6 +224,49 @@ builder_alignment_layer_cells <- function(object, assay, layer = NULL) {
 #' All-ROI previews stay raw for live section transforms in the browser; ROI
 #' previews receive the section transform first so the browser only applies the
 #' ROI-local transform, matching the built Viewer.
+## The alignment sections of a dataset depend only on its object, which the
+## worker never changes in place: it is loaded or reopened from one snapshot.
+## Each preview request (every section switch) recomputed them, 1.06 s for 59
+## sections of 4.3 million cells; they are kept per dataset id for the
+## snapshot they came from and recomputed when the snapshot changes.
+builder_alignment_sections_cached <- function(id, object) {
+  snapshots <- get0(".builder_snapshots", envir = globalenv(), inherits = FALSE)
+  snapshot <- if (is.environment(snapshots) && is.character(id)) {
+    get0(id, envir = snapshots, inherits = FALSE)
+  }
+  identity <- tryCatch(
+    .builder_worker_identity(snapshot),
+    error = function(error) NULL
+  )
+  if (is.null(identity)) {
+    return(builder_spatial_alignment_sections(object))
+  }
+  cache <- get0(
+    ".builder_alignment_sections_cache",
+    envir = globalenv(),
+    inherits = FALSE
+  )
+  if (!is.environment(cache)) {
+    cache <- new.env(parent = emptyenv())
+    assign(".builder_alignment_sections_cache", cache, envir = globalenv())
+  }
+  ## Drop entries for datasets that have left the worker's snapshot table.
+  stale <- setdiff(
+    ls(cache, all.names = TRUE),
+    ls(snapshots, all.names = TRUE)
+  )
+  if (length(stale)) {
+    rm(list = stale, envir = cache)
+  }
+  hit <- get0(id, envir = cache, inherits = FALSE)
+  if (is.list(hit) && identical(hit$identity, identity)) {
+    return(hit$sections)
+  }
+  sections <- builder_spatial_alignment_sections(object)
+  assign(id, list(identity = identity, sections = sections), envir = cache)
+  sections
+}
+
 builder_alignment_preview_model <- function(
   object,
   default_projection = NULL,
@@ -233,13 +276,14 @@ builder_alignment_preview_model <- function(
   assay = NULL,
   layer = NULL,
   base_coordinate_transform = NULL,
-  max_cells = BUILDER_PREVIEW_MAX
+  max_cells = BUILDER_PREVIEW_MAX,
+  .sections = NULL
 ) {
   roi <- as.character(roi %||% "")
   if (length(roi) != 1L || is.na(roi)) {
     roi <- ""
   }
-  sections <- builder_spatial_alignment_sections(object)
+  sections <- .sections %||% builder_spatial_alignment_sections(object)
   if (!length(sections)) {
     return(.builder_alignment_unavailable(
       sections,
@@ -648,7 +692,9 @@ builder_preview_frame <- function(
   object,
   reduction,
   group = NULL,
-  max_cells = BUILDER_PREVIEW_MAX
+  max_cells = BUILDER_PREVIEW_MAX,
+  .cells = NULL,
+  .metadata_match = NULL
 ) {
   if (is.null(reduction) || !nzchar(reduction)) {
     return(NULL)
@@ -660,17 +706,21 @@ builder_preview_frame <- function(
   if (is.null(emb) || ncol(emb) < 2) {
     return(NULL)
   }
-  cells <- SeuratObject::Cells(object)
+  cells <- if (is.null(.cells)) SeuratObject::Cells(object) else .cells
   embedding_match <- builder_match_cells(
     rownames(emb),
     cells,
     mode = "exact"
   )
-  metadata_match <- builder_match_cells(
-    rownames(object@meta.data),
-    cells,
-    mode = "exact"
-  )
+  metadata_match <- if (is.null(.metadata_match)) {
+    builder_match_cells(
+      rownames(object@meta.data),
+      cells,
+      mode = "exact"
+    )
+  } else {
+    .metadata_match
+  }
   assert_preview_identity <- function(match, component) {
     if (isTRUE(match$valid)) {
       return(invisible(match))
@@ -697,33 +747,39 @@ builder_preview_frame <- function(
   }
   assert_preview_identity(embedding_match, "Projection")
   assert_preview_identity(metadata_match, "Metadata")
-  emb <- emb[embedding_match$reorder_index, , drop = FALSE]
-  metadata <- object@meta.data[
-    metadata_match$reorder_index,
-    ,
-    drop = FALSE
-  ]
+
+  ## Deterministic downsampling: the same object always previews the same way,
+  ## so a difference on screen means a difference in the data. Sample indices
+  ## first so we only slice the bounded subset of two embedding columns and one
+  ## metadata column instead of copying the full matrix and meta.data.
+  n_cells <- length(cells)
+  keep <- if (n_cells > max_cells) {
+    .builder_seeded_sample(n_cells, max_cells, 42L)
+  } else {
+    seq_len(n_cells)
+  }
+  emb_index <- embedding_match$reorder_index[keep]
 
   df <- data.frame(
-    cell_barcode = cells,
-    x = as.numeric(emb[, 1]),
-    y = as.numeric(emb[, 2]),
+    cell_barcode = cells[keep],
+    x = as.numeric(emb[emb_index, 1L]),
+    y = as.numeric(emb[emb_index, 2L]),
     stringsAsFactors = FALSE
   )
-  if (!is.null(group) && group %in% colnames(metadata)) {
-    df$group <- as.character(metadata[[group]])
+  if (!is.null(group) && group %in% colnames(object@meta.data)) {
+    meta_index <- metadata_match$reorder_index[keep]
+    df$group <- as.character(object@meta.data[[group]][meta_index])
     df$group[is.na(df$group)] <- "N/A"
   } else {
     df$group <- "cells"
   }
 
-  ## Deterministic downsampling: the same object always previews the same way,
-  ## so a difference on screen means a difference in the data.
-  if (nrow(df) > max_cells) {
-    df <- df[.builder_seeded_sample(nrow(df), max_cells, 42L), , drop = FALSE]
+  if (n_cells > max_cells) {
+    ## Same row names as subsetting the full frame, as the preview did before.
+    row.names(df) <- keep
   }
   attr(df, "reduction") <- reduction
-  attr(df, "capped") <- nrow(emb) > max_cells
+  attr(df, "capped") <- n_cells > max_cells
   df
 }
 
@@ -750,12 +806,20 @@ builder_projection_preview_catalog <- function(
   if (is.na(max_cells) || max_cells < 1L) {
     max_cells <- BUILDER_PREVIEW_MAX
   }
+  cells <- SeuratObject::Cells(object)
+  metadata_match <- builder_match_cells(
+    rownames(object@meta.data),
+    cells,
+    mode = "exact"
+  )
   previews <- lapply(projections, function(projection) {
     builder_preview_frame(
       object,
       reduction = projection,
       group = group,
-      max_cells = max_cells
+      max_cells = max_cells,
+      .cells = cells,
+      .metadata_match = metadata_match
     )
   })
   names(previews) <- projections
@@ -921,21 +985,31 @@ builder_alignment_legend_ui <- function(frame, colors = NULL) {
     shared <- intersect(levels, names(colors))
     palette[shared] <- colors[shared]
   }
+  esc_attr <- function(x) {
+    htmltools::htmlEscape(as.character(x), attribute = TRUE)
+  }
+  esc_text <- function(x) {
+    htmltools::htmlEscape(as.character(x), attribute = FALSE)
+  }
+  count_text <- esc_text(trimws(format(
+    unname(as.numeric(counts)),
+    big.mark = ",",
+    scientific = FALSE
+  )))
   htmltools::tags$div(
     class = "spatial-alignment-legend",
     role = "list",
-    lapply(levels, function(level) {
-      htmltools::tags$span(
-        class = "spatial-alignment-legend-item",
-        role = "listitem",
-        htmltools::tags$i(
-          class = "spatial-alignment-legend-swatch",
-          style = paste0("background:", palette[[level]])
-        ),
-        htmltools::tags$span(level),
-        htmltools::tags$small(format(unname(counts[[level]]), big.mark = ","))
-      )
-    })
+    htmltools::HTML(paste0(
+      '<span class="spatial-alignment-legend-item" role="listitem">',
+      '<i class="spatial-alignment-legend-swatch" style="background:',
+      esc_attr(unname(palette[levels])),
+      '"></i><span>',
+      esc_text(levels),
+      "</span><small>",
+      count_text,
+      "</small></span>",
+      collapse = ""
+    ))
   )
 }
 

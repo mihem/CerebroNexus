@@ -570,3 +570,38 @@ test_that("section names, picture keys and library ids agree after conversion", 
     "`library_id` is missing for 1 of 8 cells"
   )
 })
+
+test_that("the Build verifies its Viewer Pack once, not twice", {
+  skip_if_not_installed("qs2")
+  options_before <- get(".builder_viewer_pack_options", envir = globalenv())
+  assign(
+    ".builder_viewer_pack_options",
+    list(mode = "always", threshold = 0L),
+    envir = globalenv()
+  )
+  withr::defer(assign(
+    ".builder_viewer_pack_options",
+    options_before,
+    envir = globalenv()
+  ))
+  seen <- new.env()
+  seen$reused <- logical()
+  trace(
+    ".viewerPackValidatedBefore",
+    where = asNamespace("CerebroNexus"),
+    exit = bquote(assign(
+      "reused",
+      c(get("reused", envir = .(seen)), !is.null(returnValue())),
+      envir = .(seen)
+    )),
+    print = FALSE
+  )
+  withr::defer(untrace(
+    ".viewerPackValidatedBefore",
+    where = asNamespace("CerebroNexus")
+  ))
+  built <- build_through_builder(fixture("small_csr.h5ad"), "h5ad_pack")
+  expect_true(dir.exists(sub("[.]crb$", ".viewer", built$result$built[[1L]])))
+  ## The export validated the pack in full; the Build's check reused it.
+  expect_identical(seen$reused, TRUE)
+})

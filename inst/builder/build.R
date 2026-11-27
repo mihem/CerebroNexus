@@ -862,11 +862,14 @@ builder_build_progress_finish <- function(plan, path, current_note = NULL) {
     )
   }
   check <- tryCatch(
+    ## The export validated this pack in full moments ago in this process;
+    ## that check is reused while the pack's files and the CRB are unchanged.
     .builder_build_runtime_function(".validateViewerPack")(
       path,
       pack,
       full = TRUE,
-      payload = serialized
+      payload = serialized,
+      reuse = TRUE
     ),
     error = function(error) {
       list(valid = FALSE, reason = conditionMessage(error))
@@ -1478,6 +1481,13 @@ builder_verify_crb <- function(
           item$name %||% basename(path)
         ),
         spatial_backend = spatial_backend_descriptor,
+        immune_backend = .builder_build_runtime_function(
+          ".immuneRepertoireBackend"
+        )(
+          object,
+          path
+        ),
+        viewer_pack_valid = is.list(viewer_pack),
         dataset_info = .builder_build_runtime_function(
           ".readBundleDatasetInfo"
         )(
@@ -1983,14 +1993,35 @@ builder_verify_crb <- function(
         stop("A Builder Spatial image asset is missing.", call. = FALSE)
       }
       source <- record[["source", exact = TRUE]]
-      inspected <- builder_read_image(
-        source_path,
-        filename = if (is.list(source)) {
-          source$name %||% source_path
-        } else {
-          source_path
-        }
-      )
+      image_name <- if (is.list(source)) {
+        source$name %||% source_path
+      } else {
+        source_path
+      }
+      ## The image was decoded and checked when it was added, and its bytes'
+      ## MD5 recorded. The same bytes need no second decode (2.13 s for the 44
+      ## EAE images against 0.06 s for their MD5): only the type, the size and
+      ## the MD5 are used below.
+      recorded_md5 <- record$source_content_md5
+      ext <- .builder_file_extension(image_name)
+      inspected <- if (
+        is.character(recorded_md5) &&
+          length(recorded_md5) == 1L &&
+          grepl("^[[:xdigit:]]{32}$", recorded_md5) &&
+          ext %in% c("png", "jpg", "jpeg") &&
+          identical(
+            unname(as.character(tools::md5sum(source_path))),
+            recorded_md5
+          )
+      ) {
+        list(
+          mime = if (identical(ext, "png")) "image/png" else "image/jpeg",
+          bytes = unname(file.size(source_path)),
+          source_content_md5 = recorded_md5
+        )
+      } else {
+        builder_read_image(source_path, filename = image_name)
+      }
       if (!is.null(inspected$error)) {
         stop(inspected$error, call. = FALSE)
       }
@@ -2026,14 +2057,7 @@ builder_verify_crb <- function(
       if (materialized %in% materialized_paths || file.exists(materialized)) {
         stop("Builder Spatial image asset paths must be unique.", call. = FALSE)
       }
-      if (
-        !file.copy(
-          source_path,
-          materialized,
-          overwrite = FALSE,
-          copy.mode = TRUE
-        )
-      ) {
+      if (!.builder_build_copy_file(source_path, materialized)) {
         stop("A Builder Spatial image could not be copied.", call. = FALSE)
       }
       if (
@@ -2086,6 +2110,30 @@ builder_verify_crb <- function(
 ## bad copy still fails publication.
 .builder_build_app_tree_seed <- function(app_dir, request) {
   entries <- list()
+  record_entry <- function(target, size, md5) {
+    if (is.null(target)) {
+      return(invisible(NULL))
+    }
+    fingerprint <- tryCatch(
+      .builder_app_file_fingerprint(fs::file_info(
+        file.path(app_dir, target),
+        fail = TRUE,
+        follow = FALSE
+      )),
+      error = function(error) NULL
+    )
+    if (
+      is.list(fingerprint) &&
+        identical(fingerprint$type, "file") &&
+        identical(fingerprint$size, as.double(size))
+    ) {
+      entries[[target]] <<- c(
+        list(path = target),
+        fingerprint,
+        list(md5 = tolower(md5))
+      )
+    }
+  }
   for (content in request$content_identities %||% list()) {
     expected_files <- Filter(
       function(entry) is.list(entry) && identical(entry$type, "file"),
@@ -2098,26 +2146,33 @@ builder_verify_crb <- function(
       )
     )
     for (expected in expected_files) {
-      fingerprint <- tryCatch(
-        .builder_app_file_fingerprint(fs::file_info(
-          file.path(app_dir, expected$path),
-          fail = TRUE,
-          follow = FALSE
-        )),
-        error = function(error) NULL
-      )
-      if (
-        !is.list(fingerprint) ||
-          !identical(fingerprint$type, "file") ||
-          !identical(fingerprint$size, as.double(expected$size))
-      ) {
-        next
+      record_entry(expected$path, expected$size, expected$md5)
+    }
+  }
+  spatial_images <- request$spatial_images %||% list()
+  spatial_identities <- request$spatial_image_identities %||% list()
+  for (dataset in names(spatial_images)) {
+    sections <- spatial_images[[dataset]] %||% list()
+    for (section in names(sections)) {
+      records <- sections[[section]] %||% list()
+      for (label in names(records)) {
+        record <- records[[label]]
+        identity <- tryCatch(
+          spatial_identities[[dataset]][[section]][[label]],
+          error = function(error) NULL
+        )
+        if (
+          is.list(record) &&
+            is.list(identity) &&
+            identical(identity$type, "file")
+        ) {
+          target <- tryCatch(
+            .builder_app_spatial_target(dataset, section, label, record$path),
+            error = function(error) NULL
+          )
+          record_entry(target, identity$size, identity$md5)
+        }
       }
-      entries[[expected$path]] <- c(
-        list(path = expected$path),
-        fingerprint,
-        list(md5 = tolower(expected$md5))
-      )
     }
   }
   list(entries = entries)
@@ -2733,6 +2788,18 @@ builder_execute_plan <- function(
             function(x) x$bundle_preflight$spatial_backend
           ),
           plan$dataset_order
+        ),
+        immune_backends = stats::setNames(
+          lapply(
+            verified_preflight,
+            function(x) x$bundle_preflight$immune_backend
+          ),
+          plan$dataset_order
+        ),
+        viewer_pack_valid = vapply(
+          verified_preflight,
+          function(x) isTRUE(x$bundle_preflight$viewer_pack_valid),
+          logical(1)
         ),
         spatial_catalogs = stats::setNames(
           lapply(

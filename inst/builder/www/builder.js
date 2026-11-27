@@ -4107,11 +4107,20 @@
   function filterGroupColors(search) {
     var editor = search.closest(".builder-group-colors");
     if (!editor) return;
-    var grid = editor.querySelector(".group-color-grid");
-    var query = search.value.trim().toLowerCase();
-    grid.querySelectorAll(".group-color-item").forEach(function (item) {
-      item.hidden = query.length > 0 &&
-        !item.dataset.search.includes(query);
+    if (editor.__colorFilterRaf) {
+      window.cancelAnimationFrame(editor.__colorFilterRaf);
+    }
+    editor.__colorFilterRaf = window.requestAnimationFrame(function () {
+      editor.__colorFilterRaf = 0;
+      var grid = editor.querySelector(".group-color-grid");
+      if (!grid) return;
+      var query = search.value.trim().toLowerCase();
+      var items = grid.querySelectorAll(".group-color-item");
+      for (var i = 0; i < items.length; i++) {
+        var item = items[i];
+        item.hidden = query.length > 0 &&
+          !item.dataset.search.includes(query);
+      }
     });
   }
 
@@ -4440,9 +4449,16 @@
     if (!Number.isFinite(value)) return;
     var output = root.querySelector(".viewer-point-opacity-value");
     if (output) output.textContent = String(value);
-    root.querySelectorAll(".viewer-scatter-point").forEach(function (point) {
-      point.setAttribute("fill-opacity", String(value));
-    });
+    var svgs = root.querySelectorAll(".viewer-projection-preview");
+    if (svgs.length) {
+      svgs.forEach(function (svg) {
+        svg.style.setProperty("fill-opacity", String(value));
+      });
+    } else {
+      root.querySelectorAll(".viewer-scatter-point").forEach(function (point) {
+        point.setAttribute("fill-opacity", String(value));
+      });
+    }
     if (emit && input.dataset.inputId) send(input.dataset.inputId, value);
   }
 

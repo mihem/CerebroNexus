@@ -976,11 +976,18 @@
       immune_backends[index] <- list(cached$immune_backend)
       spatial_catalogs[[index]] <- cached$spatial_catalog
       dataset_catalog[index] <- list(cached$dataset_info)
-      ## the CRB is not read again, so its Viewer Pack is checked the long way
-      viewer_pack_valid[[index]] <- .bundleViewerPackValid(
-        cerebro_data[[index]],
-        NULL
-      )
+      ## The Builder records `viewer_pack_valid` right after it verified the
+      ## CRB it then packs; the cache is keyed by the CRB file only, so it is
+      ## not a general check of a `.viewer` folder changed since.
+      viewer_pack_valid[[index]] <- if (isTRUE(cached$viewer_pack_known)) {
+        isTRUE(cached$viewer_pack_valid)
+      } else {
+        ## the CRB is not read again, so its Viewer Pack is checked the long way
+        .bundleViewerPackValid(
+          cerebro_data[[index]],
+          NULL
+        )
+      }
       next
     }
     object <- read_object(cerebro_data[[index]])
@@ -1055,6 +1062,9 @@
 }
 
 .bundlePathDigest <- function(bytes) {
+  if (requireNamespace("digest", quietly = TRUE)) {
+    return(unname(digest::digest(bytes, algo = "md5", serialize = FALSE)))
+  }
   path <- tempfile("cerebro-bundle-path-")
   on.exit(unlink(path), add = TRUE)
   writeBin(bytes, path)
@@ -3645,6 +3655,8 @@ createShinyApp <- function(
   ## re-reads datasets that may carry an immune repertoire.
   immune_known <- is.list(preflight_data) &&
     !is.null(preflight_data$immune_backends)
+  viewer_pack_known <- is.list(preflight_data) &&
+    !is.null(preflight_data$viewer_pack_valid)
   core_names <- setdiff(
     names(preflight_data),
     c("immune_backends", "viewer_pack_valid")
@@ -3662,6 +3674,10 @@ createShinyApp <- function(
     length(core_names) == 4L &&
     (!immune_known ||
       identical(names(preflight_data$immune_backends), labels)) &&
+    (!viewer_pack_known ||
+      (is.logical(preflight_data$viewer_pack_valid) &&
+        length(preflight_data$viewer_pack_valid) == length(cerebro_data) &&
+        !anyNA(preflight_data$viewer_pack_valid))) &&
     identical(names(preflight_data$backends), labels) &&
     identical(names(preflight_data$spatial_backends), labels) &&
     identical(names(preflight_data$spatial_catalogs), labels) &&
@@ -3690,6 +3706,12 @@ createShinyApp <- function(
         preflight_data$immune_backends[[index]]
       } else {
         NULL
+      },
+      viewer_pack_known = viewer_pack_known,
+      viewer_pack_valid = if (viewer_pack_known) {
+        isTRUE(preflight_data$viewer_pack_valid[[index]])
+      } else {
+        FALSE
       }
     )
   }

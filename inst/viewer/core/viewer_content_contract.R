@@ -325,7 +325,8 @@ builder_viewer_spatial_scene <- function(
 builder_viewer_spatial_annotation <- function(
   metadata,
   cells,
-  candidates
+  candidates,
+  .row_index = NULL
 ) {
   empty <- list(
     field = NULL,
@@ -346,12 +347,16 @@ builder_viewer_spatial_annotation <- function(
     return(empty)
   }
   field <- colnames(metadata)[[matches[[1L]]]]
-  keys <- if ("cell_barcode" %in% colnames(metadata)) {
-    as.character(metadata[["cell_barcode"]])
+  row_index <- if (!is.null(.row_index)) {
+    .row_index
   } else {
-    rownames(metadata)
+    keys <- if ("cell_barcode" %in% colnames(metadata)) {
+      as.character(metadata[["cell_barcode"]])
+    } else {
+      rownames(metadata)
+    }
+    match(cells, keys)
   }
-  row_index <- match(cells, keys)
   values <- metadata[[field]][row_index[!is.na(row_index)]]
   if (!is.atomic(values) || is.list(values)) {
     return(empty)

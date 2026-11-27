@@ -1018,10 +1018,27 @@
 
 .writeCerebroPayload <- function(object, file, codec) {
   if (identical(codec, "qs2")) {
-    qs2::qs_save(object, file)
+    .cerebroQs2Save(object, file)
   } else {
     saveRDS(object, file)
   }
+}
+
+## Writing uses the threads of reading and the same fallback: a qs2 built
+## without TBB stops (0.1.1-0.1.5) or warns (0.1.6+) on `nthreads > 1` for
+## qs_save() as for qs_read(). .cerebroQs2Read() only hands the file and the
+## thread count to its callback.
+.cerebroQs2Save <- function(
+  object,
+  file,
+  save = qs2::qs_save,
+  threads = .cerebroReadThreads()
+) {
+  invisible(.cerebroQs2Read(
+    file,
+    function(file, nthreads) save(object, file, nthreads = nthreads),
+    threads
+  ))
 }
 
 .cerebroPayloadCodec <- function(file) {

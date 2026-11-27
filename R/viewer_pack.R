@@ -251,7 +251,7 @@
       writeBin(as.numeric(value), target, size = 4L, endian = "little")
     }
   } else {
-    qs2::qs_save(value, target, nthreads = .cerebroReadThreads())
+    .cerebroQs2Save(value, target)
   }
   data.frame(
     path = path,
@@ -1515,17 +1515,13 @@
   }
   modules <- "common"
   projections <- object$availableProjections()
-  load_projection_values <- function() {
-    values <- stats::setNames(
-      vector("list", length(projections)),
-      projections
-    )
-    for (i in seq_along(projections)) {
-      value <- as.matrix(object$getProjection(projections[[i]]))
-      if (!is.numeric(value) || nrow(value) != length(cells)) {
-        stop("Viewer Pack projection is not cell-aligned.", call. = FALSE)
-      }
-      ids <- rownames(value)
+  load_one_projection <- function(nm) {
+    value <- as.matrix(object$getProjection(nm))
+    if (!is.numeric(value) || nrow(value) != length(cells)) {
+      stop("Viewer Pack projection is not cell-aligned.", call. = FALSE)
+    }
+    ids <- rownames(value)
+    if (!identical(ids, cells)) {
       if (
         is.null(ids) ||
           anyNA(ids) ||
@@ -1538,12 +1534,12 @@
           call. = FALSE
         )
       }
-      if (!identical(ids, cells)) {
-        value <- value[match(cells, ids), , drop = FALSE]
-      }
-      values[[i]] <- value
+      value <- value[match(cells, ids), , drop = FALSE]
     }
-    values
+    value
+  }
+  load_projection_values <- function() {
+    stats::setNames(lapply(projections, load_one_projection), projections)
   }
   projection_values <- NULL
   reused_projections <- if (
@@ -1584,29 +1580,6 @@
       item_digests$projections
     } else {
       NULL
-    }
-    load_one_projection <- function(nm) {
-      value <- as.matrix(object$getProjection(nm))
-      if (!is.numeric(value) || nrow(value) != length(cells)) {
-        stop("Viewer Pack projection is not cell-aligned.", call. = FALSE)
-      }
-      ids <- rownames(value)
-      if (
-        is.null(ids) ||
-          anyNA(ids) ||
-          any(!nzchar(ids)) ||
-          anyDuplicated(ids) ||
-          !setequal(ids, cells)
-      ) {
-        stop(
-          "Viewer Pack projection requires unique, matching cell identities.",
-          call. = FALSE
-        )
-      }
-      if (!identical(ids, cells)) {
-        value <- value[match(cells, ids), , drop = FALSE]
-      }
-      value
     }
     for (i in seq_along(projections)) {
       nm <- projections[[i]]
@@ -1774,7 +1747,11 @@
           } else {
             unique(as.character(value[!is.na(value)]))
           }
-          codes <- match(as.character(value), dictionary)
+          codes <- if (is.factor(value) && !anyDuplicated(dictionary)) {
+            as.integer(value)
+          } else {
+            match(as.character(value), dictionary)
+          }
           codes[is.na(codes)] <- 0L
           dtype <- .viewerPackCodeDtype(length(dictionary) + 1L)
           assets <- rbind(
@@ -2148,7 +2125,8 @@ validateViewerPack <- function(
   pack,
   full,
   payload = NULL,
-  crb_md5 = NULL
+  crb_md5 = NULL,
+  reuse = FALSE
 ) {
   if (!file.exists(file) || dir.exists(file)) {
     return(.viewerPackInvalid("CRB is missing"))
@@ -2167,13 +2145,20 @@ validateViewerPack <- function(
   ) {
     return(.viewerPackInvalid("Viewer Pack schema is incompatible"))
   }
+  crb_md5 <- crb_md5 %||% .viewerPackMd5(file)
   if (
     !identical(
       manifest$dataset_fingerprint,
-      paste0("md5-crb-v1:", crb_md5 %||% .viewerPackMd5(file))
+      paste0("md5-crb-v1:", crb_md5)
     )
   ) {
     return(.viewerPackInvalid("Viewer Pack dataset fingerprint mismatch"))
+  }
+  if (isTRUE(full) && isTRUE(reuse)) {
+    reused <- .viewerPackValidatedBefore(pack, crb_md5)
+    if (!is.null(reused)) {
+      return(reused)
+    }
   }
   thin_match <- isTRUE(full) &&
     !is.null(payload) &&
@@ -2240,7 +2225,86 @@ validateViewerPack <- function(
   ) {
     return(.viewerPackInvalid("Viewer Pack asset checksum mismatch"))
   }
-  list(valid = TRUE, reason = NULL, manifest = manifest, path = pack)
+  list(
+    valid = TRUE,
+    reason = NULL,
+    manifest = manifest,
+    path = pack,
+    crb_md5 = crb_md5
+  )
+}
+
+## A full validation reads and checksums every asset (25.7 s for the Allen
+## MERFISH pack). .buildViewerPack() runs one before it publishes a pack, and
+## the Builder runs one again on the published pack in the same process. The
+## passed check is remembered for that pack with the size and modification time
+## of each of its files and the CRB's MD5; a later full validation of the same
+## pack reuses it while all of them are unchanged, and runs in full otherwise.
+## Only a caller that asks (`reuse = TRUE`) gets it: one whose payload is the
+## object of that same CRB. validateViewerPack() and other callers always run
+## in full.
+.viewerPackValidated <- new.env(parent = emptyenv())
+
+.viewerPackTreeState <- function(pack) {
+  files <- sort(list.files(
+    pack,
+    recursive = TRUE,
+    all.files = TRUE,
+    no.. = TRUE
+  ))
+  info <- file.info(file.path(pack, files), extra_cols = FALSE)
+  list(
+    files = files,
+    size = unname(as.numeric(info$size)),
+    modified = unname(as.numeric(info$mtime))
+  )
+}
+
+.viewerPackValidatedLimit <- 16L
+
+.viewerPackRememberValidated <- function(pack, check) {
+  key <- normalizePath(pack, winslash = "/", mustWork = TRUE)
+  existing <- ls(.viewerPackValidated, all.names = TRUE)
+  if (!key %in% existing && length(existing) >= .viewerPackValidatedLimit) {
+    stamps <- vapply(
+      existing,
+      function(k) {
+        rec <- get0(k, envir = .viewerPackValidated, inherits = FALSE)
+        if (is.list(rec) && is.numeric(rec$recorded_at)) rec$recorded_at else 0
+      },
+      numeric(1)
+    )
+    drop <- existing[order(stamps)][seq_len(
+      length(existing) - .viewerPackValidatedLimit + 1L
+    )]
+    rm(list = drop, envir = .viewerPackValidated)
+  }
+  assign(
+    key,
+    list(
+      crb_md5 = check$crb_md5,
+      state = .viewerPackTreeState(pack),
+      check = check,
+      recorded_at = as.numeric(Sys.time())
+    ),
+    envir = .viewerPackValidated
+  )
+  invisible(check)
+}
+
+.viewerPackValidatedBefore <- function(pack, crb_md5) {
+  key <- normalizePath(pack, winslash = "/", mustWork = FALSE)
+  record <- get0(key, envir = .viewerPackValidated, inherits = FALSE)
+  if (
+    !is.list(record) ||
+      !identical(record$crb_md5, crb_md5) ||
+      !identical(record$state, .viewerPackTreeState(pack))
+  ) {
+    return(NULL)
+  }
+  check <- record$check
+  check$path <- pack
+  check
 }
 
 #' Read a valid Viewer Pack descriptor
@@ -2469,6 +2533,7 @@ buildViewerPack <- function(
     stop("Could not publish the Viewer Pack.", call. = FALSE)
   }
   published <- TRUE
+  .viewerPackRememberValidated(pack, check)
   if (!is.null(backup) && dir.exists(backup)) {
     unlink(backup, recursive = TRUE, force = TRUE)
   }

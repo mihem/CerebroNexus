@@ -1,3 +1,24 @@
+# CerebroNexus 8.5.6
+
+- **Faster Builder on large and multi-section datasets.** Switching sections
+  in the alignment workbench no longer recomputes all sections (59 sections,
+  4.3 million cells: 1.06 s per switch before); the spatial profile matches
+  metadata once across sections and counts each section's barcodes with one
+  lookup; metadata levels are counted without building a factor first.
+- **Changing colours no longer rebuilds a CRB** of a dataset without Trekker
+  data within a Builder session; a reused Project artifact refreshes all its
+  colour fields.
+- **Faster staging and saving.** External images that were already checked
+  are not decoded again (44 EAE images: 2.5 s to 0.4 s), a Project save no
+  longer walks an unchanged backup manifest, and a Build reuses the export's
+  full Viewer Pack check.
+- **CRBs are written on up to eight threads**, and both CRB and Viewer Pack
+  writes share the one-thread fallback when qs2 is built without TBB.
+- **The colour picker and alignment legend render faster** with many groups,
+  and whole counts are no longer shown as "1e+05".
+- **Faster release verification.** Checking a release directory fingerprints
+  its entries in one batch while keeping the same safety checks.
+
 # CerebroNexus 8.5.3
 
 - **The Builder no longer stops with "nthreads > 1 requires TBB".** A CRB is

@@ -238,11 +238,12 @@ builder_release_control_path <- function(target) {
   )
 }
 
-.builder_release_file_fingerprint <- function(info) {
-  if (is.null(info) || nrow(info) != 1L) {
-    stop("A release entry could not be fingerprinted safely.", call. = FALSE)
+.builder_release_file_fingerprints <- function(info) {
+  n <- if (is.null(info)) 0L else nrow(info)
+  if (!n) {
+    return(list())
   }
-  fingerprint <- list(
+  cols <- list(
     type = as.character(info$type),
     size = as.double(info$size),
     permissions = as.character(info$permissions),
@@ -252,9 +253,7 @@ builder_release_control_path <- function(target) {
     modification_time = as.double(info$modification_time),
     change_time = as.double(info$change_time)
   )
-  scalar <- vapply(fingerprint, length, integer(1)) == 1L
-  missing <- vapply(fingerprint, function(value) anyNA(value), logical(1))
-  numeric_fields <- c(
+  num_cols <- c(
     "size",
     "device_id",
     "inode",
@@ -262,26 +261,26 @@ builder_release_control_path <- function(target) {
     "modification_time",
     "change_time"
   )
-  finite <- vapply(
-    fingerprint[numeric_fields],
-    function(value) is.finite(value),
-    logical(1)
-  )
   if (
-    !all(scalar) ||
-      any(missing) ||
-      !all(finite) ||
-      !nzchar(fingerprint$type) ||
-      !nzchar(fingerprint$permissions) ||
-      fingerprint$size < 0 ||
-      fingerprint$size != floor(fingerprint$size) ||
-      fingerprint$device_id < 0 ||
-      fingerprint$inode < 0 ||
-      fingerprint$hard_links < 1
+    any(lengths(cols) != n) ||
+      anyNA(cols$type) ||
+      anyNA(cols$permissions) ||
+      any(!nzchar(cols$type)) ||
+      any(!nzchar(cols$permissions)) ||
+      any(vapply(cols[num_cols], function(v) any(!is.finite(v)), logical(1))) ||
+      any(cols$size < 0 | cols$size != floor(cols$size)) ||
+      any(cols$device_id < 0 | cols$inode < 0 | cols$hard_links < 1)
   ) {
     stop("A release entry could not be fingerprinted safely.", call. = FALSE)
   }
-  fingerprint
+  lapply(seq_len(n), function(i) lapply(cols, `[[`, i))
+}
+
+.builder_release_file_fingerprint <- function(info) {
+  if (is.null(info) || nrow(info) != 1L) {
+    stop("A release entry could not be fingerprinted safely.", call. = FALSE)
+  }
+  .builder_release_file_fingerprints(info)[[1L]]
 }
 
 .builder_release_normalized_paths <- function(paths) {
@@ -383,14 +382,7 @@ builder_release_control_path <- function(target) {
         listed,
         "Release entries changed during enumeration."
       )
-      listed_fingerprints <- lapply(
-        seq_len(nrow(listed_info)),
-        function(index) {
-          .builder_release_file_fingerprint(
-            listed_info[index, , drop = FALSE]
-          )
-        }
-      )
+      listed_fingerprints <- .builder_release_file_fingerprints(listed_info)
       directories <- as.character(listed_info$type) %in% "directory"
       queue <- c(queue, listed[directories])
       entries <- c(entries, listed)
@@ -414,14 +406,7 @@ builder_release_control_path <- function(target) {
       "Release entries changed after enumeration."
     )
     entry_paths <- .builder_release_normalized_paths(entries)
-    confirmed_fingerprints <- lapply(
-      seq_len(nrow(confirmed_info)),
-      function(index) {
-        .builder_release_file_fingerprint(
-          confirmed_info[index, , drop = FALSE]
-        )
-      }
-    )
+    confirmed_fingerprints <- .builder_release_file_fingerprints(confirmed_info)
     stable <- mapply(
       identical,
       entry_fingerprints,
@@ -682,6 +667,9 @@ builder_release_identity <- function(
 }
 
 .builder_release_raw_md5 <- function(bytes) {
+  if (requireNamespace("digest", quietly = TRUE)) {
+    return(unname(digest::digest(bytes, algo = "md5", serialize = FALSE)))
+  }
   path <- tempfile("cerebro-builder-record-")
   connection <- .builder_release_open_owner_only(path)
   on.exit(

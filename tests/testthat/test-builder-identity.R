@@ -221,6 +221,40 @@ test_that("projection preview rejects duplicate component identities", {
   )
 })
 
+test_that("projection downsampling keeps the cells of the full-frame sample", {
+  skip_if_not_installed("SeuratObject")
+  fixture <- builder_preview_shuffled_object()
+  n <- length(fixture$cells)
+  sampled <- builder_preview_frame(
+    fixture$object,
+    reduction = "pca",
+    group = "groups",
+    max_cells = 17L
+  )
+  ## The same seeded indices into the cell order that sampling the full,
+  ## reordered frame used before the preview stopped copying it.
+  keep <- .builder_seeded_sample(n, 17L, 42L)
+  expect_identical(sampled$cell_barcode, fixture$cells[keep])
+  expect_identical(
+    sampled$x,
+    as.numeric(fixture$embeddings[fixture$cells[keep], 1L])
+  )
+  expect_true(attr(sampled, "capped"))
+  expect_false(attr(
+    builder_preview_frame(fixture$object, "pca", "groups", max_cells = n),
+    "capped"
+  ))
+  expect_identical(
+    builder_preview_frame(
+      fixture$object,
+      "pca",
+      "missing",
+      max_cells = 17L
+    )$group,
+    rep("cells", 17L)
+  )
+})
+
 test_that("projection downsampling preserves matched barcode identity", {
   skip_if_not_installed("SeuratObject")
   fixture <- builder_preview_shuffled_object()
