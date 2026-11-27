@@ -364,6 +364,17 @@ builder_capabilities <- reactive({
 })
 
 builder_operation_allowed <- function(operation, notify = TRUE) {
+  ## An examples-only Builder saves and opens no Project (see access.R).
+  if (
+    operation %in%
+      c("create_project", "save_project", "open_project") &&
+      builder_examples_only()
+  ) {
+    if (isTRUE(notify)) {
+      builder_examples_only_refused()
+    }
+    return(FALSE)
+  }
   activity <- isolate(builder_activity())
   activity$project_phase <- isolate(builder_current_project_phase())
   allowed <- isTRUE(builder_activity_capabilities(activity)[[operation]])

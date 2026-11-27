@@ -427,7 +427,8 @@ builder_empty_workbench_ui <- function(
   dataset_count = 0L,
   formats = get0("builder_formats", inherits = TRUE),
   examples = builder_example_directory(),
-  loading_count = 0L
+  loading_count = 0L,
+  examples_only = FALSE
 ) {
   format_records <- if (
     is.list(formats) &&
@@ -449,9 +450,19 @@ builder_empty_workbench_ui <- function(
     format_records
   )
   format_labels <- builder_advertised_format_labels(available_formats)
-  shiny::tags$section(
-    class = "builder-stage builder-empty-state",
-    `aria-labelledby` = "builder-dropzone-title",
+  ## An examples-only Builder (see access.R) offers the examples and says
+  ## why there is nothing to upload.
+  dropzone <- if (isTRUE(examples_only)) {
+    shiny::tags$div(
+      class = "builder-examples-only-intro",
+      shiny::h2(id = "builder-dropzone-title", "Start with an example"),
+      shiny::p(
+        id = "builder-empty-description",
+        class = "builder-examples-only-note",
+        builder_examples_only_message
+      )
+    )
+  } else {
     shiny::tags$button(
       type = "button",
       class = "builder-dataset-dropzone builder-add-datasets",
@@ -476,20 +487,30 @@ builder_empty_workbench_ui <- function(
         ),
         builder_deprecated_format_note_ui(available_formats)
       )
+    )
+  }
+  shiny::tags$section(
+    class = paste(
+      "builder-stage builder-empty-state",
+      if (isTRUE(examples_only)) "builder-examples-only"
     ),
+    `aria-labelledby` = "builder-dropzone-title",
+    dropzone,
     if (isTRUE(loading_count > 0L)) {
       builder_import_loading_note_ui()
     },
     shiny::tags$div(
       class = "builder-data-sources",
-      shiny::tags$p(
-        class = "builder-data-sources-label",
-        "Or start with an example"
-      ),
+      if (!isTRUE(examples_only)) {
+        shiny::tags$p(
+          class = "builder-data-sources-label",
+          "Or start with an example"
+        )
+      },
       builder_example_buttons_ui(examples),
       shiny::uiOutput("add_error")
     ),
-    if (isTRUE(project_active)) {
+    if (isTRUE(project_active) && !isTRUE(examples_only)) {
       shiny::tags$div(
         class = "builder-empty-project-action",
         shiny::actionButton(

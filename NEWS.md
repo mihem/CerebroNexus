@@ -1,3 +1,21 @@
+# CerebroNexus 8.5.8
+
+- **An examples-only Builder for public demonstrations (#272).**
+  `launchCerebroBuilder(examples_only = TRUE)` starts a Builder in which
+  visitors can only load the bundled examples, configure and build them, and
+  download the result as a `.zip` file; a server that runs the Builder's app
+  directly sets the option `CerebroNexus.builder.examples_only` instead. The
+  page offers no upload, server folder, Project or **Open App**, and the
+  server refuses such requests too. Each session builds into its own
+  temporary folder, keeps only its latest build there, and removes the folder
+  when it ends. One R process serves at most 4 sessions at a time and tells
+  further visitors to try again later
+  (`CerebroNexus.builder.examples_only_max_sessions`), and it closes a session
+  that has had no click, key press or scroll for 15 minutes while no build or
+  import runs (`CerebroNexus.builder.examples_only_idle_minutes`). Shiny's
+  upload limit trusts the size a page declares, so a public demonstration
+  should also limit request sizes in the proxy in front of it.
+
 # CerebroNexus 8.5.3
 
 - **The Builder no longer stops with "nthreads > 1 requires TBB".** A CRB is

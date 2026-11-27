@@ -8,7 +8,8 @@ launchCerebroBuilder(
   host = "127.0.0.1",
   port = NULL,
   launch_browser = TRUE,
-  max_file_size = Inf
+  max_file_size = Inf,
+  examples_only = FALSE
 )
 }
 \arguments{
@@ -24,7 +25,11 @@ token; defaults to \code{TRUE}. The address is printed either way.}
 \item{max_file_size}{Optional maximum size in MB for each local upload;
 defaults to \code{Inf}, so the local Builder does not impose an upload-size
 limit. The corresponding Shiny process option is restored when the Builder
-stops.}
+stops. Ignored when \code{examples_only = TRUE}.}
+
+\item{examples_only}{Run the Builder as a demonstration that works with the
+bundled examples only; defaults to \code{FALSE}. See the section
+"Examples-only mode".}
 }
 \value{
 Does not return; runs until the app is stopped.
@@ -56,9 +61,41 @@ page is refused and no session starts, so neither a web page you visit nor
 another user of a shared machine can drive the Builder.
 }
 
+\section{Examples-only mode}{
+
+With \code{examples_only = TRUE} the Builder is a demonstration: visitors
+load the bundled examples, configure and build them, and download the result
+as a \code{.zip} file. It offers no upload, no server folder and no Project,
+starts no App on the server, and refuses such requests on the server as
+well; Shiny accepts no file larger than one byte. Each session builds into a
+private folder below \code{tempdir()} that is removed when the session ends.
+
+A server that runs the Builder's \code{app.R} directly (for example Shiny
+Server) sets the option before the app starts:
+\preformatted{
+options(CerebroNexus.builder.examples_only = TRUE)
+shiny::shinyAppDir(system.file("builder", package = "CerebroNexus"))
+}
+Run this way the Builder has no access token, so anyone who can reach it can
+use it. Each session starts background R processes; limit request sizes in
+the server or proxy in front of a public demonstration (Shiny checks the
+size a page declares, not the bytes it sends).
+
+Two options, read when the app starts, keep a demonstration server from
+running out of memory: \code{CerebroNexus.builder.examples_only_max_sessions}
+(default 4) is the number of sessions one R process serves at a time, and a
+visitor beyond it is told the demonstration is busy;
+\code{CerebroNexus.builder.examples_only_idle_minutes} (default 15) closes a
+session that has seen no click, key press or scroll for that long while no
+build or import runs. \code{Inf} turns either limit off. A server that runs
+several R processes for the app allows that many sessions in each.
+}
+
 \examples{
 if (interactive()) {
   launchCerebroBuilder()
+  ## A demonstration with the bundled examples only:
+  launchCerebroBuilder(examples_only = TRUE)
 }
 
 }

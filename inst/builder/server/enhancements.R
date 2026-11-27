@@ -46,7 +46,10 @@ output[["enhance-marker_dialog_body"]] <- renderUI({
       draft = marker_import_draft_of(id)
     )
   } else {
-    builder_marker_source_choice_ui("enhance")
+    builder_marker_source_choice_ui(
+      "enhance",
+      examples_only = builder_examples_only()
+    )
   }
 })
 
@@ -146,6 +149,9 @@ observeEvent(
     if (!marker_dialog_is_current()) {
       return()
     }
+    if (builder_examples_only_refused()) {
+      return()
+    }
     replace_marker_import_draft(id, NULL)
     builder_show_marker_dialog("import")
   },
@@ -167,6 +173,13 @@ builder_marker_existing_methods <- function(entry) {
 }
 
 observeEvent(input[["enhance-marker_import_files"]], {
+  if (
+    builder_examples_only_refused(
+      upload = input[["enhance-marker_import_files"]]
+    )
+  ) {
+    return()
+  }
   id <- current()
   req(id)
   if (!marker_dialog_is_current()) {
@@ -530,6 +543,9 @@ schedule_enhance_table_files <- function(
 }
 
 observeEvent(input[["enhance-table_files"]], {
+  if (builder_examples_only_refused(upload = input[["enhance-table_files"]])) {
+    return()
+  }
   schedule_enhance_table_files(
     input[["enhance-table_files"]],
     id = current()
@@ -728,11 +744,19 @@ alignment_server <- builder_spatial_alignment_server(
   },
   alignment_preview = alignment_preview,
   spatial_previews = spatial_previews,
-  spatial_coords = spatial_coords
+  spatial_coords = spatial_coords,
+  refuse_upload = function(upload) {
+    builder_examples_only_refused(upload = upload)
+  }
 )
 active_slice <- alignment_server$active_section
 
 run_result_action <- function(action) {
+  ## An examples-only Builder starts no App and opens no folder on the
+  ## server; its result is downloaded instead (server/build.R).
+  if (builder_examples_only_refused(target = "build")) {
+    return(invisible(FALSE))
+  }
   current_result <- isolate(result())
   req(inherits(current_result, "builder_result"))
   outcome <- try(action(current_result), silent = TRUE)

@@ -38,6 +38,15 @@ start_load <- function(
   if (isTRUE(replay_existing_client_import(client_id))) {
     return(invisible(FALSE))
   }
+  ## An examples-only Builder loads nothing but its examples (see access.R).
+  if (!identical(kind, "example") && builder_examples_only_refused()) {
+    release_client_import(
+      client_id,
+      outcome = "rejected",
+      message = builder_examples_only_message
+    )
+    return(invisible(FALSE))
+  }
   source_name <- if (identical(kind, "file")) {
     file_meta$name %||% retained_path %||% arg
   } else {
@@ -595,6 +604,14 @@ observeEvent(input$builder_client_import_dispatch, {
     pending_client_import_dispatch(NULL)
     return()
   }
+  if (builder_examples_only_refused()) {
+    release_client_import(
+      event$client_id %||% NULL,
+      outcome = "rejected",
+      message = builder_examples_only_message
+    )
+    return()
+  }
   too_large <- builder_upload_limit_message(event$name, event$size)
   if (!is.null(too_large)) {
     release_client_import(
@@ -642,6 +659,9 @@ observeEvent(input$builder_client_import_dispatch, {
 })
 
 observeEvent(input$dataset_files, {
+  if (builder_examples_only_refused(upload = input$dataset_files)) {
+    return()
+  }
   token <- isolate(pending_client_upload_sequence()) + 1L
   pending_client_upload_sequence(token)
   pending_client_upload(list(

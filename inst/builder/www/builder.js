@@ -1393,6 +1393,46 @@
     });
   }
 
+  // An examples-only Builder (inst/builder/access.R) takes no file from the
+  // page: no picker, no drop, no upload. The server refuses them as well.
+  // A dropped file still reaches enqueueClientFiles(), which returns early;
+  // app.R hides the drop overlay.
+  var builderExamplesOnly = (function () {
+    var meta = document.querySelector('meta[name="cerebro-builder-mode"]');
+    return Boolean(meta && meta.getAttribute("content") === "examples-only");
+  })();
+  // Why the server ended an examples-only session (busy or idle); shown in
+  // place of the generic disconnected notice.
+  var examplesOnlyClosedText = null;
+
+  // An examples-only server closes idle sessions (access.R). Report clicks,
+  // key presses and scrolls, at most every 30 seconds, and learn why a session
+  // was closed.
+  function setupExamplesOnlySession() {
+    if (!builderExamplesOnly) return;
+    if (window.Shiny) {
+      window.Shiny.addCustomMessageHandler(
+        "builder_examples_only_closed",
+        function (message) {
+          examplesOnlyClosedText = (message && message.text) || null;
+        }
+      );
+    }
+    // send() reports nothing until Shiny is there; the next action retries.
+    var lastReport = 0;
+    function reportActivity() {
+      var now = Date.now();
+      if (now - lastReport < 30000) return;
+      if (send("builder_examples_only_activity", now)) lastReport = now;
+    }
+    ["pointerdown", "keydown", "wheel", "touchstart"].forEach(function (type) {
+      document.addEventListener(type, reportActivity, {
+        capture: true,
+        passive: true,
+      });
+    });
+  }
+
   function activityCapability(name) {
     var importSensitive = [
       "save_project",
@@ -2405,6 +2445,7 @@
   }
 
   function openDatasetPicker(message) {
+    if (builderExamplesOnly) return;
     if (datasetMutationsLocked || !activityCapability("add_dataset")) return;
     var picker = document.createElement("input");
     picker.type = "file";
@@ -2445,6 +2486,7 @@
   }
 
   function addDatasetFiles() {
+    if (builderExamplesOnly) return;
     if (datasetMutationsLocked || datasetPickerOpening) return;
     if (!activityCapability("add_dataset")) return;
     setDatasetPickerOpening(true);
@@ -2453,6 +2495,7 @@
   }
 
   function addTableFiles() {
+    if (builderExamplesOnly) return;
     if (datasetMutationsLocked || !activityCapability("edit_dataset")) return;
     var picker = document.getElementById("enhance-table_files");
     if (!picker) return;
@@ -2846,6 +2889,7 @@
   }
 
   function enqueueClientFiles(fileList) {
+    if (builderExamplesOnly) return;
     if (!activityCapability("add_dataset")) return;
     var files = Array.from(fileList || []);
     files.forEach(function (file) {
@@ -6233,7 +6277,8 @@
     showGlobalNotice({
       id: "builder-disconnected",
       type: "error",
-      text: "The Builder lost its connection to R. Reload the page to " +
+      text: examplesOnlyClosedText ||
+        "The Builder lost its connection to R. Reload the page to " +
         "continue; if it does not load, start the Builder again in R.",
       action: {
         label: "Reload",
@@ -6260,6 +6305,7 @@
     registerClientImportHandlers();
     observeClientUploadProgress();
     setupWindowFileDrop();
+    setupExamplesOnlySession();
     setupUploadSizeProbe();
     registerViewerGroupHandler();
     registerViewerContentHandlers();
