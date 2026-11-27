@@ -87,7 +87,7 @@ createShinyApp(
 ```
 
 No Python is needed to read AnnData or SpatialData; see the vignette
-[From your analysis to an interactive Viewer](vignettes/import_your_analysis.Rmd).
+[From your analysis to an interactive Viewer](https://www.mheming.com/CerebroNexus/articles/import_your_analysis.html).
 
 ## License
 

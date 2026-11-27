@@ -33,12 +33,18 @@ Let's look at some details. Overall, the object is organized as such:
 │   └── <gene_list_name> (vector of genes)
 ├── expression (matrix-like; attached from the H5 file when an H5-backed .crb is read)
 ├── expression_backend (list: type "embedded" or "h5", location)
+├── crb_schema (list; set for an H5-backed .crb)
+├── spatial_molecule_backend (list; set when molecule tables sit in a sibling file)
+├── immune_repertoire_backend (list; set when the repertoire sits in a sibling file)
+├── cell_fingerprint (identity of the cells, used by saved views)
 ├── meta_data (data.frame)
 ├── projections (named list)
 │   └── <projection_name> (data.frame)
 ├── trees (named list)
 │   └── <grouping_variable> (phylo)
 ├── most_expressed_genes (named list)
+│   └── <grouping_variable> (data.frame)
+├── mean_expression (named list)
 │   └── <grouping_variable> (data.frame)
 ├── marker_genes (named list)
 │   └── <method> (named list)
@@ -51,6 +57,10 @@ Let's look at some details. Overall, the object is organized as such:
 │       └── <trajectory_name> (depends on method, most likely a list or data frame)
 ├── immune_repertoire (named list)
 │   └── <sample> (data.frame, one row per cell with a receptor)
+├── hla_typing (data.frame, one row per sample, locus and copy)
+├── spatial (named list)
+│   └── <section> (list: coordinates, expression, histology_images)
+├── trekker (list; Trekker spatial mapping)
 └── extra_material (named list)
     ├── tables (named list)
     │   └── <name> (data.frame)    
@@ -62,35 +72,20 @@ Interaction with the Cerebro object will be done through internal methods, provi
 
 The expression matrix is either embedded in the `.crb` or kept in an H5 file next to it; `expression_backend` records which (`setExpressionBackend()` accepts only `"embedded"` and `"h5"`), and `saveCerebro()` / `readCerebro()` take care of the rest. T-cell and B-cell receptors live together in `immune_repertoire`; there are no separate `tcr_data` / `bcr_data` fields, and `getTCR()` / `getBCR()` return the TCR or BCR rows of that repertoire. A very large repertoire can sit in a sibling `<stem>.immune.qs2` file that `getImmuneRepertoire()` loads on demand. A `.crb` written by an older release that does not follow this layout is rejected with a pointer to `convertCerebro()`.
 
-As long as you follow the described scheme, you can export and visualize any data frame that is stored in the `marker_genes` or `enriched_pathways` slots. I have prepared a vignette with some more details that you can find [here](https://www.mheming.com/CerebroNexus/articles/export_and_visualize_custom_tables_and_plots.html).
+As long as you follow the described scheme, you can export and visualize any data frame that is stored in the `marker_genes` or `enriched_pathways` slots. I have prepared a vignette with some more details that you can find [here](https://www.mheming.com/CerebroNexus/articles/tables_and_plots.html).
 
 Please make sure to use names for items in lists, otherwise it will likely result in an error.
 
-Information stored in the `technical_info` and `parameters` slots will be presented in the "Analysis info" tab. Here you can add strings, numbers, and lists that with you think are relevant to share.
+The `technical_info` and `parameters` slots hold information about the analysis, such as strings, numbers, and lists that you think are relevant to share; read them with `getTechnicalInfo()` and `getParameters()`. The Viewer uses a few of these entries itself, for example the starting colours of groups (`technical_info$group_colors`) and the grouping variable that projections are coloured by when the data set opens (`parameters$main_group`).
 
-Calling the Cerebro object will give an overview of the information it currently contains:
+Calling the Cerebro object will give an overview of the information it currently contains, here for the example data set that comes with CerebroNexus:
 
-```
-class: Cerebro
-exporter package version: 4.3.0
-experiment name: pbmc_Seurat
-organism: hg
-date of analysis: 2020-02-19
-date of export: 2020-09-08
-number of cells: 5,697
-number of genes: 15,907
-grouping variables (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main
-cell cycle variables (1): cell_cycle_seurat
-projections (2): UMAP, UMAP_3D
-trees (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main
-most expressed genes: sample, seurat_clusters, cell_type_singler_blueprintencode_main
-marker genes:
-  - cerebro_seurat (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main
-enriched pathways:
-  - cerebro_seurat_enrichr (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main, 
-  - cerebro_GSVA (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main
-trajectories:
-  - monocle2 (1): highly_variable_genes
+```{r print-example}
+library(CerebroNexus)
+crb <- readCerebro(
+  system.file("extdata", "examples", "example.crb", package = "CerebroNexus")
+)
+crb
 ```
 
 For more details, please check the `Cerebro` reference page.
