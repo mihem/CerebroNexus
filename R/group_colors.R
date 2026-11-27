@@ -7,6 +7,31 @@
 ## could not be told apart by, and moved every level's colour whenever a level
 ## was added.
 
+#' The usable part of a data set's colours for one Group, or NULL.
+#'
+#' One rule for the exporter (which writes the colours into the CRB) and the
+#' Builder (which offers them as "From the data set"): a named character vector
+#' level -> "#RRGGBB". Colours that are not all valid hex colours make the whole
+#' vector unusable; an entry without a level name is dropped, and when a level
+#' name repeats the first colour is kept.
+#' @noRd
+.cerebroValidGroupColors <- function(colors) {
+  if (
+    !is.character(colors) ||
+      is.null(names(colors)) ||
+      !length(colors) ||
+      anyNA(colors) ||
+      !all(grepl("^#[0-9A-Fa-f]{6}$", colors))
+  ) {
+    return(NULL)
+  }
+  keep <- !is.na(names(colors)) &
+    nzchar(names(colors)) &
+    !duplicated(names(colors))
+  colors <- colors[keep]
+  if (length(colors)) colors else NULL
+}
+
 #' sRGB (a matrix of red, green, blue in 0-255) to CIELAB (D65).
 #' @noRd
 .cerebroSrgbToLab <- function(rgb) {
@@ -47,6 +72,8 @@
 
 .cerebro_palette_cache <- new.env(parent = emptyenv())
 
+.cerebro_palette_max_distinct <- 2000L
+
 #' `n` colours: the first `n` of `base`, then as many more as needed, each the
 #' candidate farthest from all the colours chosen so far.
 #'
@@ -60,6 +87,14 @@
   base <- as.character(base)
   if (n <= length(base)) {
     return(base[seq_len(n)])
+  }
+  ## Past a couple of thousand levels more colours do not help the eye, and the
+  ## candidate grid (about 12,000 colours) would run out: cycle instead.
+  if (n > .cerebro_palette_max_distinct) {
+    return(rep_len(
+      .cerebroExtendPalette(base, .cerebro_palette_max_distinct),
+      n
+    ))
   }
   key <- paste(c(base, n), collapse = " ")
   cached <- .cerebro_palette_cache[[key]]

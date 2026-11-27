@@ -918,18 +918,20 @@ test_that("a data set's own Group colours are read and checked", {
     RNA_snn_res.1 = c(`0` = "#111111", `1` = "#222222", `2` = "#333333"),
     ## not a Group the Builder offers
     not_a_group = c(a = "#444444"),
-    ## incomplete, malformed, unnamed or duplicated: ignored
+    ## malformed or unnamed: ignored
     groups = c(`0` = "red", `1` = "#222222"),
     letter.idents = c("#111111", "#222222"),
-    other = c(a = "#111111", a = "#222222")
+    ## a repeated level keeps its first colour, as in the exporter
+    other = c(a = "#111111", a = "#222222", b = "#333333")
   )
   groups <- c("RNA_snn_res.1", "groups", "letter.idents", "other")
   found <- builder_dataset_group_colors(object, groups)
-  expect_identical(names(found), "RNA_snn_res.1")
+  expect_identical(names(found), c("RNA_snn_res.1", "other"))
   expect_identical(
     found$RNA_snn_res.1,
     c(`0` = "#111111", `1` = "#222222", `2` = "#333333")
   )
+  expect_identical(found$other, c(a = "#111111", b = "#333333"))
   expect_identical(
     builder_dataset_group_colors(SeuratObject::pbmc_small, groups),
     list()

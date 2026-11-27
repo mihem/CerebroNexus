@@ -24,6 +24,9 @@
   chosen ones in CIELAB (closest pair about 11 at 338 levels). In the Viewer
   this changes only the levels past the 40th of a Group without colours of its
   own. "Many distinct colours" starts from `pals::cols25()` (25 colours, MIT).
+  Past 2,000 levels the colours repeat in a cycle instead of being searched
+  for (more colours do not help the eye there, and the first draw of such a
+  Group took over a second).
 - **The Builder's default colours are the Viewer's.** "Cerebro default" was a
   separate set of 20 low-saturation colours, so an App built by the Builder
   drew a Group in different colours than the Viewer does for a data set

@@ -500,8 +500,8 @@ builder_source_image_payload <- function(object) {
 #' (kept in `@misc` by convertSCEToSeurat()) and scanpy's `uns[<column>_colors]`
 #' (read into the same slot) all arrive as a list named by Group, each a named
 #' vector level -> "#RRGGBB". Only the Groups the Builder offers
-#' (`groups`) and only complete, valid vectors are kept; the exporter applies
-#' the same rule (`export_core.R`).
+#' (`groups`) and only valid vectors are kept; the exporter applies the same
+#' rule (`.cerebroValidGroupColors()`).
 #'
 #' @return `list(group = c(level = "#RRGGBB"))`, empty when there are none.
 builder_dataset_group_colors <- function(object, groups) {
@@ -512,14 +512,8 @@ builder_dataset_group_colors <- function(object, groups) {
   out <- list()
   for (group in intersect(names(colors), groups)) {
     value <- colors[[group]]
-    valid <- is.character(value) &&
-      !is.null(names(value)) &&
-      length(value) > 0L &&
-      !anyNA(value) &&
-      !anyNA(names(value)) &&
-      !anyDuplicated(names(value)) &&
-      all(grepl("^#[0-9A-Fa-f]{6}$", value))
-    if (valid) {
+    value <- CerebroNexus:::.cerebroValidGroupColors(value)
+    if (!is.null(value)) {
       out[[group]] <- stats::setNames(toupper(unname(value)), names(value))
     }
   }
