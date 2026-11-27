@@ -9,22 +9,33 @@
 spatial_projection_roi_context_memo <- viewerMemoOne()
 spatial_projection_roi_context <- function(spatial_name, rotation_angle) {
   sample_value <- spatial_projection_selected_sample()
-  spatial_projection_roi_context_memo(
-    list(data_set(), spatial_name, sample_value, rotation_angle),
-    function() {
-      coordinates <- viewerSpatialCoordinates(spatial_name)
-      metadata <- viewerProjectionFirstFrameMetadata()
-      spatial_roi_section_context(
-        coordinates,
-        spatial_section_scope(
-          spatial_name,
-          sample_value,
-          metadata,
-          function() rownames(coordinates) %||% character()
-        ),
-        metadata,
+  ds <- data_set()
+  compute <- function() {
+    coordinates <- viewerSpatialCoordinates(spatial_name)
+    metadata <- viewerProjectionFirstFrameMetadata()
+    spatial_roi_section_context(
+      coordinates,
+      spatial_section_scope(
+        spatial_name,
         sample_value,
-        rotation_angle
+        metadata,
+        function() rownames(coordinates) %||% character()
+      ),
+      metadata,
+      sample_value,
+      rotation_angle
+    )
+  }
+  viewerSharedMemo(
+    "spatial_roi_context",
+    16L,
+    viewerProcessDatasetKey(ds),
+    list(spatial_name, sample_value, rotation_angle),
+    compute,
+    function() {
+      spatial_projection_roi_context_memo(
+        list(ds, spatial_name, sample_value, rotation_angle),
+        compute
       )
     }
   )
@@ -80,9 +91,11 @@ spatial_projection_full_ranges <- reactive({
 })
 
 spatial_projection_group_hulls <- reactive({
+  ## A grid draws no region outlines: they belong to one section's plane.
   if (
     !isTRUE(spatial_projection_region_outlines()) ||
-      !identical(input[["spatial_projection_plot_type"]], "ImageDimPlot")
+      !identical(input[["spatial_projection_plot_type"]], "ImageDimPlot") ||
+      length(spatial_projection_controls()$grid_sections)
   ) {
     return(list())
   }
@@ -124,6 +137,166 @@ spatial_projection_group_hulls <- reactive({
   )
 })
 
+## The data of a grid frame (func_spatial_helpers.R): the cells of every section
+## of the sample, coloured as one frame so that all panels share one colour
+## scale, and the slice, extent and image of each section's panel. It is the
+## same shape as a single-section frame without a geometry resource.
+## The expression of each RGB channel's gene as the metadata columns
+## coexpr_r/g/b (NA for an empty channel), for the given cells.
+spatial_projection_coexpression_columns <- function(
+  metadata,
+  plot_parameters,
+  cells
+) {
+  ## Use a list, not c(): an empty channel is NULL, and c() would DROP it and
+  ## shift the remaining names, misaligning genes to channels.
+  coexpr_genes <- list(
+    coexpr_r = plot_parameters$coexpr_r,
+    coexpr_g = plot_parameters$coexpr_g,
+    coexpr_b = plot_parameters$coexpr_b
+  )
+  requested_genes <- unique(unlist(coexpr_genes, use.names = FALSE))
+  requested_genes <- requested_genes[
+    !is.na(requested_genes) &
+      nzchar(requested_genes) &
+      requested_genes %in% getGeneNames()
+  ]
+  expression_values <- if (length(requested_genes)) {
+    viewerExpressionValues(data_set(), c(cells), requested_genes)
+  } else {
+    list()
+  }
+  for (channel in names(coexpr_genes)) {
+    gene <- coexpr_genes[[channel]]
+    metadata[[channel]] <- NA_real_
+    if (!is.null(gene) && gene %in% names(expression_values)) {
+      metadata[[channel]] <- expression_values[[gene]]
+    }
+  }
+  metadata
+}
+
+## The Viewer Pack files of a large grid's sections, for
+## spatial_grid_coordinates(): a grid that streams (spatial_grid_stream_split())
+## takes each whole, unrotated section's positions from its file
+## (viewerSpatialGeometryAsset()), which the browser fetches and keeps, so
+## neither R nor the websocket carries them (31 MB for the Allen atlas). A
+## section with a background image keeps its positions in the frame, where they
+## place the image. Once the browser could not read such a file, the session's
+## grids send their positions again.
+spatial_grid_geometry_files <- function(plot_parameters, cells, rotation_of) {
+  none <- function(section, rows) NULL
+  failed <- input[["spatial_projection_projection_resource_failed"]]
+  grid <- spatial_grid_of(cells)
+  n_sections <- if (is.list(grid)) length(grid$sections) else 0L
+  if (
+    !spatial_grid_should_stream(length(cells), n_sections) ||
+      identical(plot_parameters[["plot_type"]], "Co-expression (RGB)") ||
+      (length(failed) == 1L && !is.na(failed) && nzchar(failed)) ||
+      !exists("viewerSpatialGeometryAsset", mode = "function")
+  ) {
+    return(none)
+  }
+  backgrounds <- plot_parameters[["grid_backgrounds"]] %||% list()
+  function(section, rows) {
+    if (!is.null(backgrounds[[section]])) {
+      return(NULL)
+    }
+    tryCatch(
+      viewerSpatialGeometryAsset(section, rows, rotation_of(section)),
+      error = function(error) NULL
+    )
+  }
+}
+
+spatial_projection_grid_data <- function(
+  dataset_context,
+  plot_parameters,
+  cells_to_extract
+) {
+  dataset <- dataset_context$dataset_key
+  options <- if (exists("Cerebro.options")) Cerebro.options else NULL
+  rotation_of <- function(section) {
+    spatialPlotRotation(options, dataset, section)
+  }
+  layout <- spatial_grid_coordinates(
+    cells_to_extract,
+    spatial_grid_section_xy,
+    spatial_grid_section_index,
+    rotation_of,
+    spatial_grid_geometry_files(plot_parameters, cells_to_extract, rotation_of)
+  )
+  cells <- c(cells_to_extract)
+  columns <- spatial_projection_metadata_columns(plot_parameters)
+  full_metadata <- viewerProjectionFirstFrameMetadata()
+  req(all(columns %in% colnames(full_metadata)))
+  metadata <- spatial_grid_metadata(full_metadata, cells, columns)
+  if (
+    identical(plot_parameters$plot_type, "ImageFeaturePlot") &&
+      !is.null(plot_parameters$feature_to_display)
+  ) {
+    gene <- plot_parameters$feature_to_display
+    expression <- if (gene %in% getGeneNames()) {
+      viewerExpressionRow(data_set(), cells, gene)
+    }
+    req(!is.null(expression))
+    metadata[[gene]] <- expression
+  }
+  if (identical(plot_parameters$plot_type, "Co-expression (RGB)")) {
+    metadata <- spatial_projection_coexpression_columns(
+      metadata,
+      plot_parameters,
+      cells
+    )
+  }
+  color_variable <- plot_parameters[["color_variable"]]
+  metadata <- spatial_with_no_gene_column(metadata, color_variable)
+  numeric_color <- is.numeric(metadata[[color_variable]])
+  ## One assignment over every section: a group has the same colour in each.
+  color_assignments <- if (numeric_color) {
+    NULL
+  } else if (identical(color_variable, spatial_no_gene_variable)) {
+    stats::setNames(spatial_no_gene_color, spatial_no_gene_label)
+  } else {
+    assignColorsToGroups(metadata, color_variable)
+  }
+  plot_parameters[["grid"]] <- layout[setdiff(names(layout), "coordinates")]
+  ## The embedding panel draws the same cells, in frame order.
+  projection_name <- plot_parameters[["grid_projection"]] %||% ""
+  if (nzchar(projection_name)) {
+    embedding <- getProjection(projection_name)
+    req(is.data.frame(embedding) || is.matrix(embedding))
+    plot_parameters[["grid"]][["projection"]] <- list(
+      label = projection_name,
+      x = as.numeric(embedding[cells, 1L]),
+      y = as.numeric(embedding[cells, 2L])
+    )
+  }
+  ## With positions read from files the frame has none of theirs: its
+  ## extent is that of its sections.
+  from_files <- any(!vapply(layout$geometry, is.null, logical(1)))
+  plot_parameters[["x_range"]] <- spatial_grid_range(
+    if (from_files) unlist(layout$x_ranges) else layout$coordinates$x
+  )
+  plot_parameters[["y_range"]] <- spatial_grid_range(
+    if (from_files) unlist(layout$y_ranges) else layout$coordinates$y
+  )
+  list(
+    dataset_context = dataset_context,
+    cells_df = metadata,
+    coordinates = layout$coordinates,
+    reset_axes = FALSE,
+    plot_parameters = plot_parameters,
+    color_assignments = color_assignments,
+    group_hulls = list(),
+    geometry_resource = NULL,
+    categorical_resource = NULL,
+    resource_first = FALSE,
+    cell_count = length(cells),
+    cell_indices = cells
+  )
+}
+
 spatial_projection_data_to_plot_raw <- reactive({
   dataset_context <- viewer_loaded_dataset_context()
   req(
@@ -132,6 +305,13 @@ spatial_projection_data_to_plot_raw <- reactive({
   )
   plot_parameters <- spatial_projection_parameters_plot()
   cells_to_extract <- spatial_projection_cells_to_show()
+  if (identical(plot_parameters[["layout"]], "grid")) {
+    return(spatial_projection_grid_data(
+      dataset_context,
+      plot_parameters,
+      cells_to_extract
+    ))
+  }
 
   ## Resolve the canonical geometry contract before materializing the displayed
   ## metadata and coordinates. The common full, unrotated ImageDimPlot frame can
@@ -214,7 +394,8 @@ spatial_projection_data_to_plot_raw <- reactive({
     (isTRUE(full_canonical_frame) || isTRUE(section_frame)) &&
     !is.numeric(full_color) &&
     isTRUE(background_geometry_ready) &&
-    !roi_rotation_needed
+    !roi_rotation_needed &&
+    !identical(color_variable, spatial_no_gene_variable)
   ## Only the resource-first path uses these; the others assign colours from
   ## the plotted frame below.
   color_assignments <- if (!resource_first_candidate) {
@@ -249,6 +430,10 @@ spatial_projection_data_to_plot_raw <- reactive({
       as.integer(codes_cells)
     )
   metadata <- if (resource_first) NULL else spatial_projection_metadata()
+  metadata <- spatial_with_no_gene_column(
+    metadata,
+    plot_parameters[["color_variable"]]
+  )
 
   ## Handle ImageFeaturePlot (add gene expression data)
   if (
@@ -271,36 +456,24 @@ spatial_projection_data_to_plot_raw <- reactive({
   ## Co-expression: pull each channel's gene expression into metadata columns
   ## keyed by a stable channel name, so the renderer can blend them onto RGB.
   if (plot_parameters$plot_type == "Co-expression (RGB)") {
-    ## Use a list, not c(): an empty channel is NULL, and c() would DROP it and
-    ## shift the remaining names, misaligning genes to channels.
-    coexpr_genes <- list(
-      coexpr_r = plot_parameters$coexpr_r,
-      coexpr_g = plot_parameters$coexpr_g,
-      coexpr_b = plot_parameters$coexpr_b
+    metadata <- spatial_projection_coexpression_columns(
+      metadata,
+      plot_parameters,
+      cells_to_extract
     )
-    requested_genes <- unique(unlist(coexpr_genes, use.names = FALSE))
-    requested_genes <- requested_genes[
-      !is.na(requested_genes) &
-        nzchar(requested_genes) &
-        requested_genes %in% getGeneNames()
-    ]
-    expression_values <- viewerExpressionValues(
-      data_set(),
-      cells_to_extract,
-      requested_genes
-    )
-    for (channel in names(coexpr_genes)) {
-      gene <- coexpr_genes[[channel]]
-      metadata[[channel]] <- NA_real_
-      if (!is.null(gene) && gene %in% names(expression_values)) {
-        metadata[[channel]] <- expression_values[[gene]]
-      }
-    }
   }
 
   ## get colors for groups (if applicable)
   ## Filtered and feature frames retain their existing per-frame palette.
-  if (!resource_first) {
+  if (
+    !resource_first &&
+      identical(plot_parameters[["color_variable"]], spatial_no_gene_variable)
+  ) {
+    color_assignments <- stats::setNames(
+      spatial_no_gene_color,
+      spatial_no_gene_label
+    )
+  } else if (!resource_first) {
     color_assignments <- if (
       plot_parameters[['color_variable']] %in%
         colnames(metadata) &&
@@ -362,7 +535,7 @@ spatial_projection_data_to_plot_raw <- reactive({
     )
   }
   ## Pin the axes to the FULL cell extent, not the currently displayed subset.
-  ## Otherwise, changing "Show % of observations" rescales the axes to whatever subset
+  ## Otherwise, changing "Show % of cells" rescales the axes to whatever subset
   ## is plotted and the plot visibly jitters. We compute the range over ALL cells
   ## (in the same rotated frame) and pass it as an explicit x/y range. A small
   ## margin keeps edge points off the frame.

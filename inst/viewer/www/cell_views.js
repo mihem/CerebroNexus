@@ -50,6 +50,11 @@
   // delivered one names it in data.aux_reuse, so it is not downloaded again.
   var singleAuxCache = {};
   var singleSpaceIds = [];      // one space, or one per gene in multi-panel mode
+  // Every section panel of a Spatial grid frame, in frame order; empty for
+  // any other view. singleSpaceIds holds the ones shown, in the order shown.
+  var singleGridSpaces = [];
+  var singleGridExtras = [];    // the grid frame's other panels (its embedding)
+  var gridSyncing = false;      // a synced zoom is being copied to the others
   var singleSpaceModes = {};    // space id -> categorical/continuous colour mode
   var singleColorCache = new Map();
   var SINGLE_COLOR_CACHE_LIMIT = 4;
@@ -97,6 +102,16 @@
   // was never made for. Keyed `section|imageId`; cleared with the data set, since
   // the ids belong to the object that produced them.
   var imgStates = {};
+  // The background-image editor is one piece of markup mounted once per page
+  // that has one, its element ids carrying the page's prefix. The engine drives
+  // whichever editor belongs to the page on screen.
+  function imgPrefix() { return singleActive === 'spatial_projection' ? 'sp' : 'cv'; }
+  var IMG_ID_PATTERN = /^(cv|sp)-img-/;
+  function imgId(name) { return imgPrefix() + '-img-' + name; }
+  function bgId(name) { return imgPrefix() + '-bg-' + name; }
+  function imageBarEl() {
+    return $(imgPrefix() === 'sp' ? 'spatial_projection_image_ui' : 'coordviews_image_ui');
+  }
   // Which background each section was last showing, so returning to a section
   // returns the view of it the user left, not merely its alignment. Keyed by
   // section name; cleared with the data set.
@@ -126,9 +141,11 @@
   var nicheRadius = 250;        // µm radius for the picked-nucleus niche readout
   var nicheSet = null;          // cell indices inside the picked nucleus's niche
   var colorBy = null;           // group name
-  var ps = 5;                   // point diameter in CSS pixels
+  var DEFAULT_POINT_SIZE = 4;   // the size a view starts with when nothing configures one
+  var ps = DEFAULT_POINT_SIZE;  // point diameter in CSS pixels
   var pointOpacity = 1;         // base draw opacity (no-selection view)
   var bordersOn = false;        // outline cell points in the active view
+  var pictureOutlineOn = true;  // light outline on points over a dark picture
   var keepPlotsSquare = false;  // fluid rectangles use the workspace by default
   // A live user edit overrides Builder's per-spatial-section starting values.
   var pointSizeEdited = false;
@@ -137,7 +154,15 @@
   // Every selected embedding is an independent panel. Colour/filter/selection
   // state remains global, while viewport and 3-D rotation live on the panel.
   var selectedProjections = [];
+  // The panels a page may show at once: 2 in a browser with no GPU until the
+  // reader lifts the limit (CerebroPanelCap, cell_points_gpu.js); 0 for no limit.
+  function panelCap() {
+    return window.CerebroPanelCap ? window.CerebroPanelCap.cap() : 0;
+  }
   var pctShow = 100;            // % of cells to render
+  // The reader set "% of cells": every panel shows it, a section with an
+  // author's own percentage too (panelPctMask()).
+  var pctEdited = false;
   var sharedScatter = null;
   var scatterUserEdit = null;
   var scatterControlFields = {
@@ -180,6 +205,7 @@
     if ((!singleActive || singleClientPercentage()) &&
         pctShow !== values.percentage_cells_to_show) {
       pctShow = values.percentage_cells_to_show;
+      pctEdited = true;
       rebuildPctMask();
     }
   }
@@ -197,8 +223,15 @@
     var tab = inputs ? inputs.ir_tabs : null;
     return !tab || tab === 'Clonal UMAP';
   }
+  var lastScatterEdit = 0, lastScatterEditContext = null;
+  // The data set in which the reader moved a point-size slider: from then on
+  // the size is theirs, also when it is the default's value.
+  var pointSizeUserContext = null;
   function publishScatterEdit(field, value) {
     if (!field || !currentDatasetContext()) return;
+    lastScatterEdit = Date.now();
+    lastScatterEditContext = currentDatasetContext();
+    if (field === 'point_size') pointSizeUserContext = lastScatterEditContext;
     var known = sharedScatterValues();
     var values = Object.assign({}, known || {});
     values[field] = value;
@@ -550,6 +583,15 @@
   // Every 2-D layout fills its fluid canvas by normalising x/y independently.
   // Spatial views recover one physical screen scale when project() letterboxes
   // their unit box; only rotatable 3-D embeddings keep one shared axis scale here.
+  // The sections of a grid (cell_views.js, sharedSliceGeometry()) name
+  // different cells of one frame: their unit positions share one pair of
+  // arrays, each section writing only its own cells. `ok` stays the space's
+  // own, and every reader of a position asks it first. A pair per section was
+  // 35 MB each: 2 GB for the 59 sections of the Allen atlas.
+  function unitArraysOf(space, n) {
+    var shared = space._unitArrays;
+    return shared && shared.nx.length === n ? shared : null;
+  }
   function deferredUnitOf(space) {
     var xr = space.xRange, yr = space.yRange;
     if (space._fitToData || space.z || !Array.isArray(xr) || xr.length !== 2 ||
@@ -560,8 +602,10 @@
     var y1 = Math.max(Number(yr[0]), Number(yr[1]));
     if (![x0, x1, y0, y1].every(isFinite) || x0 === x1 || y0 === y1) return null;
     var n = space.x.length, dw = x1 - x0, dh = y1 - y0;
+    var shared = unitArraysOf(space, n);
     return {
-      nx: new Float32Array(n), ny: new Float32Array(n), nz: null,
+      nx: shared ? shared.nx : new Float32Array(n),
+      ny: shared ? shared.ny : new Float32Array(n), nz: null,
       ok: new Uint8Array(n), x0: x0, y0: y0, k: 1 / dw, ky: 1 / dh,
       ox: 0, oy: 0, aspect: dw / dh,
       bx: { x0: 0, x1: 1, y0: 0, y1: 1 },
@@ -606,7 +650,9 @@
       var k = 1 / Math.max(dw, dh);
       kx = k; ky = k; ox = (1 - dw * k) / 2; oy = (1 - dh * k) / 2;
     }
-    var nx = new Float32Array(n), ny = new Float32Array(n), ok = new Uint8Array(n);
+    var shared = zs ? null : unitArraysOf(space, n);
+    var nx = shared ? shared.nx : new Float32Array(n);
+    var ny = shared ? shared.ny : new Float32Array(n), ok = new Uint8Array(n);
     // ---- third dimension, when the embedding has one ----------------------
     // Normalised on the SAME scale as x/y (an embedding's axes are comparable,
     // so stretching one would misrepresent the shape), then the whole cloud is
@@ -815,7 +861,45 @@
   // in ascending index order and the scatter is stable, so ties never need a
   // comparison; a range of one value is already in its final order.
   var RAW_ORDER_BUCKETS = 1024, RAW_ORDER_SMALL = 32, RAW_ORDER_DEPTH = 4;
+  // A Float32Array of some thousand cells or more goes through a radix sort
+  // on the float's bits instead: three stable passes of 11 bits each, ties
+  // keeping index order by construction (a pass that every key agrees on is
+  // skipped, so a mostly-zero gene costs fewer).
+  var RAW_RADIX_MIN = 4096;
+  function radixPaintOrder(raw) {
+    var n = raw.length, order = new Uint32Array(n), missing = 0, i, v;
+    for (i = 0; i < n; i++) if (raw[i] !== raw[i]) missing++;
+    var m = n - missing, rest = 0, idx = new Uint32Array(m), keys = new Uint32Array(m);
+    var bits = new Uint32Array(raw.buffer, raw.byteOffset, n), u;
+    var h0 = new Uint32Array(2048), h1 = new Uint32Array(2048), h2 = new Uint32Array(2048);
+    missing = 0;
+    for (i = 0; i < n; i++) {
+      v = raw[i];
+      if (v !== v) { order[missing++] = i; continue; }
+      // +0 and -0 are one value; a negative float sorts by its bits reversed.
+      u = v === 0 ? 0x80000000 : (bits[i] >>> 31 ? ~bits[i] : bits[i] | 0x80000000) >>> 0;
+      idx[rest] = i; keys[rest++] = u;
+      h0[u & 2047]++; h1[(u >>> 11) & 2047]++; h2[u >>> 22]++;
+    }
+    var hists = [h0, h1, h2], src = idx, srcKeys = keys;
+    var dst = new Uint32Array(m), dstKeys = new Uint32Array(m), pass, h, shift, total, j, c, k;
+    for (pass = 0; pass < 3; pass++) {
+      h = hists[pass]; shift = pass * 11;
+      if (m === 0 || h[(srcKeys[0] >>> shift) & 2047] === m) continue;  // nothing moves
+      for (j = 0, total = 0; j < 2048; j++) { c = h[j]; h[j] = total; total += c; }
+      for (j = 0; j < m; j++) {
+        k = (srcKeys[j] >>> shift) & 2047;
+        dst[h[k]] = src[j]; dstKeys[h[k]++] = srcKeys[j];
+      }
+      v = src; src = dst; dst = v; v = srcKeys; srcKeys = dstKeys; dstKeys = v;
+    }
+    order.set(src, missing);
+    return order;
+  }
   function rawPaintOrder(raw) {
+    if (raw instanceof Float32Array && raw.length >= RAW_RADIX_MIN) {
+      return radixPaintOrder(raw);
+    }
     var n = raw.length, order = new Uint32Array(n), missing = 0, rest, i, v;
     for (i = 0; i < n; i++) {
       v = raw[i];
@@ -1000,7 +1084,7 @@
   // Overview page's group-filter + "show % of cells" behaviour.
   function panelPctMask(p) {
     var space = p && spaceById[p.spaceId];
-    if (singleActive || !isSpatialSpace(space)) return pctMask;
+    if (singleActive || pctEdited || !isSpatialSpace(space)) return pctMask;
     var percentage = Number(space.builder_percentage_cells);
     if (!isFinite(percentage) || percentage >= 100) return null;
     if (!space._pctMask || space._pctMask.length !== D.n) {
@@ -1058,6 +1142,62 @@
   function rebuildPctMask() {
     pctMask = (!D || pctShow >= 100) ? null : percentageMask(D.n, pctShow);
   }
+  // A slider held with the mouse sends a value per step. Drawing each on a
+  // million cells stalls the drag, so while one is held a point size or
+  // opacity draws once per frame with the latest value, or, when a draw takes
+  // longer than a frame or three (no GPU), once the slider rests for a moment
+  // or is let go; "% of cells", which filters every panel's cells again,
+  // always waits for that. Keys and code still apply at once.
+  var sliderHeld = false, drawFrame = null, drawTimer = null, pctTimer = null;
+  var heldDrawCost = 0;
+  function timedDrawAll() {
+    var started = performance.now();
+    drawAll();
+    heldDrawCost = performance.now() - started;
+  }
+  function drawAllNow() {
+    if (drawTimer != null) { clearTimeout(drawTimer); drawTimer = null; }
+    timedDrawAll();
+  }
+  function drawAllSoon() {
+    if (!sliderHeld || typeof window.requestAnimationFrame !== 'function') {
+      drawAll();
+      return;
+    }
+    if (heldDrawCost > 50) {
+      if (drawTimer != null) clearTimeout(drawTimer);
+      drawTimer = setTimeout(drawAllNow, 250);
+      return;
+    }
+    if (drawFrame != null) return;
+    drawFrame = window.requestAnimationFrame(function () {
+      drawFrame = null;
+      timedDrawAll();
+    });
+  }
+  function applyPctNow() {
+    if (pctTimer != null) { clearTimeout(pctTimer); pctTimer = null; }
+    rebuildPctMask(); applyActiveChange();
+  }
+  function applyPctSoon() {
+    if (!sliderHeld) { applyPctNow(); return; }
+    if (pctTimer != null) clearTimeout(pctTimer);
+    pctTimer = setTimeout(applyPctNow, 250);
+  }
+  if (typeof document !== 'undefined' && document.addEventListener) {
+    document.addEventListener('pointerdown', function (event) {
+      if (event.target && event.target.closest && event.target.closest('.irs')) sliderHeld = true;
+    }, true);
+    ['pointerup', 'pointercancel'].forEach(function (name) {
+      document.addEventListener(name, function () {
+        if (!sliderHeld) return;
+        sliderHeld = false;
+        heldDrawCost = 0;
+        if (pctTimer != null) applyPctNow();
+        if (drawTimer != null) drawAllNow();
+      }, true);
+    });
+  }
   // After a filter / subsample change: drop now-inactive cells from the current
   // selection, then redraw. Keeps the coordinated selection consistent.
   function applyActiveChange() {
@@ -1090,6 +1230,16 @@
     var SX = Math.max(1, p.W - padL - padR);
     var SY = Math.max(1, p.H - padT - padB);
     var ox = padL, oy = padT;
+    // Square draws the plot in the largest centred square of a canvas that
+    // keeps the panel's size; drawSquareFrame() outlines that square.
+    p._squareFrame = null;
+    if (keepPlotsSquare && !axed && SX !== SY) {
+      var squareSide = Math.min(SX, SY);
+      ox += (SX - squareSide) / 2;
+      oy += (SY - squareSide) / 2;
+      SX = SY = squareSide;
+    }
+    if (keepPlotsSquare && !axed) p._squareFrame = { x: ox, y: oy, size: SX };
     if (isSpatialSpace(sp) && !u.nz) {
       var aspect = Number(u.aspect), panelAspect = SX / SY;
       if (isFinite(aspect) && aspect > 0) {
@@ -1197,7 +1347,9 @@
   }
 
   function ensureScreenProjection(p) {
-    if (p.gpuTransformOnly) project(p, true);
+    // Also a panel whose GPU renderer went away after it was projected for the
+    // GPU alone: it has no screen positions yet.
+    if (p.gpuTransformOnly || !p.sx) project(p, true);
   }
 
   // The panel's data rectangle on screen, as CBGeom and the GPU renderers take it.
@@ -1287,9 +1439,196 @@
   }
   // Size one panel to the rectangle assigned by resizeAll. Below 420px it is
   // narrow, which shrinks the minimap.
+  // A pane the enlarged view's strip does not show (display: none).
+  function offStrip(p) {
+    return !!(p.pane && p.pane.classList.contains('cv-strip-off'));
+  }
+  // A panel that is not on stage is neither sized nor drawn: one off the
+  // enlarged view's strip, or, in a grid of OFFSTAGE_MIN_PANELS panels or
+  // more, one more than STAGE_MARGIN_PX above or below the window. It is sized
+  // and drawn when it comes near (the strip placing it, or drawNearPanels() as
+  // the page scrolls). Opening a 52-59 section grid then draws only the cards
+  // visible in the viewport plus a narrow 250px scroll buffer. Without a layout
+  // (hidden tab, no geometry) every panel counts as on stage.
+  var OFFSTAGE_MIN_PANELS = 8, STAGE_MARGIN_PX = 250, stagePanels = 0, stageObserver = null;
+  function observeStagePanels(list) {
+    if (typeof window.IntersectionObserver !== 'function') return false;
+    if (!stageObserver) {
+      stageObserver = new window.IntersectionObserver(function (entries) {
+        var wake = false;
+        entries.forEach(function (entry) {
+          var p = entry.target && entry.target._cvStagePanel;
+          if (!p) return;
+          p._stageNear = !!entry.isIntersecting;
+          if (p._stageNear && p.spaceId && (p._pendingSize || p._resizedUndrawn)) {
+            wake = true;
+          }
+        });
+        if (wake) onStageScroll();
+      }, { root: null, rootMargin: STAGE_MARGIN_PX + 'px 0px' });
+    }
+    list.forEach(function (p) {
+      if (!p.pane || p._stageObserved) return;
+      p.pane._cvStagePanel = p;
+      p._stageObserved = true;
+      stageObserver.observe(p.pane);
+    });
+    return true;
+  }
+  function offStage(p) {
+    if (offStrip(p)) return true;
+    if (focusPanel || stagePanels < OFFSTAGE_MIN_PANELS || !p.pane ||
+        typeof p.pane.getBoundingClientRect !== 'function') return false;
+    if (stageObserver && typeof p._stageNear === 'boolean') return !p._stageNear;
+    var r = p.pane.getBoundingClientRect(), h = window.innerHeight || 0;
+    if (!(r.width > 0) || !(h > 0)) return false;
+    return r.bottom < -STAGE_MARGIN_PX || r.top > h + STAGE_MARGIN_PX;
+  }
+  var stageFrame = 0;
+  function onStageScroll() {
+    if (stageFrame || typeof window.requestAnimationFrame !== 'function') return;
+    stageFrame = window.requestAnimationFrame(function () {
+      stageFrame = 0;
+      drawNearPanels();
+    });
+  }
+  // Time-sliced rAF draw queue for multi-panel grids: draws visible-in-viewport
+  // cards first, then the 250px prefetch buffer, in <= DRAW_SLICE_MS slices so
+  // initial paint is progressive and scrolling/recolouring stays at 60 fps.
+  // A newer drawAll() / drawNearPanels() supersedes any pending slice via jobId.
+  var DRAW_SLICE_MS = 10;
+  var drawQueueJob = 0;
+  var drawQueueFrame = 0;
+  function cancelDrawQueue() {
+    drawQueueJob++;
+    if (drawQueueFrame && typeof window.cancelAnimationFrame === 'function') {
+      window.cancelAnimationFrame(drawQueueFrame);
+    }
+    drawQueueFrame = 0;
+  }
+  var TIME_SLICE_POINTS_THRESHOLD = 500000;
+  function totalQueuePoints(list) {
+    var total = 0, fallback = (D && D.n) || 0;
+    for (var i = 0; i < list.length; i++) {
+      var p = list[i];
+      var space = p && D && D.spaces && D.spaces[p.spaceId];
+      var n = (space && space.n) || fallback;
+      if (n > 0) total += n;
+    }
+    return total;
+  }
+  function shouldTimeSlicePanels(list) {
+    var count = list.length;
+    return !focusPanel &&
+      count > 1 &&
+      typeof window.requestAnimationFrame === 'function' &&
+      (stagePanels >= OFFSTAGE_MIN_PANELS ||
+        totalQueuePoints(list) >= TIME_SLICE_POINTS_THRESHOLD);
+  }
+  function orderPanelsByViewport(list) {
+    if (list.length <= 1) return list.slice();
+    var h = window.innerHeight || 0;
+    var ranked = list.map(function (p, index) {
+      var r = p && p.pane && typeof p.pane.getBoundingClientRect === 'function'
+        ? p.pane.getBoundingClientRect() : null;
+      var inView = !!(r && r.width > 0 && h > 0 && r.bottom > 0 && r.top < h);
+      return {
+        panel: p,
+        tier: inView ? 0 : 1,
+        top: r && isFinite(r.top) ? r.top : index,
+        index: index
+      };
+    });
+    ranked.sort(function (a, b) {
+      return (a.tier - b.tier) || (a.top - b.top) || (a.index - b.index);
+    });
+    return ranked.map(function (entry) { return entry.panel; });
+  }
+  function runDrawQueue(list, options) {
+    cancelDrawQueue();
+    if (!list.length) {
+      if (options && options.onComplete) options.onComplete(false);
+      return;
+    }
+    var queue = orderPanelsByViewport(list);
+    var job = drawQueueJob;
+    var idx = 0;
+    var drewAny = false;
+    var firstShown = null;
+    // Opening or recolouring a grid draws in slices; panels that scroll near are
+    // drawn at once, since slicing them stretched one stall into many slow frames.
+    var timed = !(options && options.slice === false) &&
+      shouldTimeSlicePanels(queue);
+    function step() {
+      drawQueueFrame = 0;
+      if (job !== drawQueueJob || drawAllDeferred ||
+          (awaitingSupplement && awaitingSupplement === D)) return;
+      var start = timed && typeof performance !== 'undefined' && performance.now
+        ? performance.now() : 0;
+      var drawnInSlice = 0;
+      while (idx < queue.length) {
+        var p = queue[idx++];
+        if (!p || !p.spaceId) continue;
+        if (options && options.prepare) options.prepare(p);
+        var state = shownState(p);
+        if (!firstShown) {
+          firstShown = state;
+          if (options && options.onFirstShown) options.onFirstShown(state);
+        }
+        draw(p, state.mask, state.count);
+        drewAny = true;
+        drawnInSlice++;
+        if (timed && idx < queue.length && drawnInSlice >= 1 &&
+            (performance.now() - start) >= DRAW_SLICE_MS) {
+          drawQueueFrame = window.requestAnimationFrame(step);
+          return;
+        }
+      }
+      if (options && options.onComplete) options.onComplete(drewAny);
+    }
+    step();
+  }
+  // A panel that was off stage, now near: sized as the layout meanwhile
+  // asked, then drawn without re-reading layout (avoids forced reflow).
+  function drawOnStage(p) {
+    if (p._pendingSize) {
+      var size = p._pendingSize;
+      resizePanel(p, size[0], size[1]);
+    }
+    if (drawAllDeferred || !p || !p.spaceId ||
+        (awaitingSupplement && awaitingSupplement === D)) return false;
+    var state = shownState(p);
+    draw(p, state.mask, state.count);
+    return true;
+  }
+  function drawNearPanels() {
+    var waiting = panels.filter(function (p) {
+      return p.spaceId && (p._pendingSize || p._resizedUndrawn);
+    });
+    if (!waiting.length) return;
+    var off = waiting.map(offStage);
+    var near = [];
+    waiting.forEach(function (p, i) {
+      if (!off[i]) near.push(p);
+    });
+    if (!near.length) return;
+    runDrawQueue(near, {
+      slice: false,
+      prepare: function (p) {
+        if (p._pendingSize) {
+          var size = p._pendingSize;
+          resizePanel(p, size[0], size[1]);
+        }
+      },
+      onComplete: function (drewAny) {
+        if (drewAny) updateResetButtons();
+      }
+    });
+  }
   function resizePanel(p, width, height) {
     var dpr = window.devicePixelRatio || 1;
     p.W = width; p.H = height; p._dpr = dpr; p._resizedUndrawn = true;
+    p._pendingSize = null;
     resizePanelLayers(p, width, height, dpr);
     if (p.pane) {
       p.pane.classList.toggle('cv-narrow', width < 420);
@@ -1344,6 +1683,52 @@
   // Draw the histology image behind the points of the spatial panel. The image's
   // data-space corners (alignment applied, see CerebroBackgroundModel.corners)
   // are mapped to screen with the SAME transform as the cells, so it aligns.
+  // Over a dark picture (a fluorescence image) coloured points get lost: they
+  // are drawn with a light outline. Dark is the picture's mean brightness
+  // under DARK_PICTURE_LUMA, read once from a 16 x 16 copy and kept with it;
+  // transparent pixels count as the white page behind them.
+  var DARK_PICTURE_LUMA = 0.35;
+  function pictureIsDark(im) {
+    if (!im) return false;
+    if (im._dark !== undefined) return im._dark;
+    var w = im.naturalWidth || im.width, h = im.naturalHeight || im.height;
+    if (!(w > 0 && h > 0)) return false;
+    var dark = false;
+    try {
+      var c = document.createElement('canvas');
+      c.width = 16; c.height = 16;
+      c.setAttribute('data-cv-probe', 'brightness');   // not a panel's canvas
+      var x = c.getContext('2d', { willReadFrequently: true });
+      x.drawImage(im, 0, 0, 16, 16);
+      var d = x.getImageData(0, 0, 16, 16).data, sum = 0;
+      for (var k = 0; k < d.length; k += 4) {
+        var a = d[k + 3] / 255;
+        sum += a * (0.2126 * d[k] + 0.7152 * d[k + 1] + 0.0722 * d[k + 2]) / 255 + (1 - a);
+      }
+      dark = sum / (d.length / 4) < DARK_PICTURE_LUMA;
+    } catch (e) { dark = false; }
+    im._dark = dark;
+    return dark;
+  }
+  // The outline of a panel's points: light, when the picture drawn under them
+  // is dark and the outline is on; else none. Faint (alpha .35), so the
+  // outlines of overlapping points do not add up to white. It also grows with
+  // the point: on a point of 4 pixels a ring 0.8 wide is more than half of its
+  // area, and the 130,000 cells of a Xenium section overlap so much that their
+  // rings whitened the whole tissue; from 2 pixels it fades in, and a point of
+  // 8 pixels has all of it.
+  function pictureOutline(p) {
+    if (!pictureOutlineOn || (!singleActive && !linkedBackgroundsOn)) return null;
+    var sp = spaceById[p.spaceId];
+    var state = sp && sp._imgState;
+    if (!sp || !currentImage(sp) || !sp._imgEl || !sp._imgReady || !state || !state.show) return null;
+    if (!pictureIsDark(sp._imgEl)) return null;
+    var size = p._renderPointSize == null ? pointSizeOf(p) : p._renderPointSize;
+    var grow = Math.round(Math.max(0, Math.min(1, (size - 2) / 6)) * 20) / 20;
+    if (!grow) return null;
+    return { color: 'rgba(255,255,255,' + (0.35 * grow).toFixed(3) + ')', width: 0.8 * grow };
+  }
+
   function drawImage(p, context) {
     if (!singleActive && !linkedBackgroundsOn) return;
     var sp = spaceById[p.spaceId];
@@ -1717,11 +2102,19 @@
     return off;
   }
   function drawMinimap(p) {
-    if (!p.mini || !p.mctx) return;
+    if (!p.mini) return;
     var sp = spaceById[p.spaceId], u = sp && sp._unit;
     var on = !!(p.view && D && p.ok && u);
     p.mini.classList.toggle('is-on', on);
     if (!on) return;
+    if (!p.mctx) {
+      var dpr = window.devicePixelRatio || 1;
+      p.mini.width = MINI * dpr;
+      p.mini.height = MINI * dpr;
+      p.mctx = p.mini.getContext('2d');
+      if (!p.mctx) return;
+      p.mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
     if (!p.miniBg || p.miniUnit !== u) p.miniBg = buildMiniBg(p, u);
     var c = p.mctx, S = MINI - MINI_PAD * 2, v = p.view;
     c.clearRect(0, 0, MINI, MINI);
@@ -1746,17 +2139,95 @@
   // exactly where it matters most.
   function pointSizeOf(p) {
     var sp = spaceById[p.spaceId];
-    if ((!pointSizeEdited || !singleActive) && sp && sp.builder_point_size != null) {
+    if (autoPointSizeOn(sp)) return hintedPointSize(p, sp);
+    if (!pointSizeEdited && sp && sp.builder_point_size != null) {
       return Math.max(1, Math.min(20, Number(sp.builder_point_size)));
     }
     return ps;
   }
+  // "Auto": a spatial section draws the size that suits it (the server sends
+  // a hint only for sections nobody set a size for) while the "Auto" switch of
+  // the page's point size slider is on. It starts on, so it counts as on until
+  // the switch is drawn.
+  var POINT_SIZE_AUTO = {
+    spatial: { box: 'spatial_projection_point_size_auto', slider: 'spatial_projection_point_size' },
+    linked: { box: 'cv-ps-auto', slider: 'cv-ps' }
+  };
+  function pointSizeAutoIds() {
+    return singleActive === 'spatial_projection' ? POINT_SIZE_AUTO.spatial
+      : !singleActive ? POINT_SIZE_AUTO.linked : null;
+  }
+  function autoPointSizeOn(sp) {
+    if (!sp || sp._pointSizeHint == null) return false;
+    var ids = pointSizeAutoIds(), box = ids && document.getElementById(ids.box);
+    return !box || box.checked;
+  }
+  // With "Auto" on the slider has no say, so it is shown disabled; where no
+  // section has a size of its own (an author set one) the switch is.
+  var autoSizeFrame = 0;
+  function scheduleAutoSizeSync() {
+    if (autoSizeFrame || typeof window.requestAnimationFrame !== 'function') return;
+    autoSizeFrame = window.requestAnimationFrame(function () {
+      autoSizeFrame = 0;
+      syncAutoSizeSlider();
+    });
+  }
+  function syncAutoSizeSlider() {
+    var ids = pointSizeAutoIds(), box = ids && document.getElementById(ids.box);
+    var slider = box && window.jQuery && window.jQuery('#' + ids.slider).data('ionRangeSlider');
+    if (!slider) return;
+    var possible = panels.some(function (p) {
+      var sp = p.spaceId && spaceById[p.spaceId];
+      return !!(sp && isSpatialSpace(sp) && sp._pointSizeHint != null);
+    });
+    box.disabled = !possible;
+    box.parentNode.classList.toggle('is-unavailable', !possible);
+    var off = possible && box.checked;
+    if (!!slider.options.disable !== off) slider.update({ disable: off });
+  }
+  document.addEventListener('change', function (event) {
+    var id = event.target && event.target.id;
+    if (id !== POINT_SIZE_AUTO.spatial.box && id !== POINT_SIZE_AUTO.linked.box) return;
+    syncAutoSizeSlider();
+    drawAllSoon();
+  });
+  // The reference panel of the hint (.viewerPackSpatialPointSize() in R): 300 x
+  // 250 pixels less 20 of padding, the section fitted into it by its aspect.
+  var HINT_PANEL_W = 280, HINT_PANEL_H = 230;
+  // The hint sizes the points to cover the tissue (1.3 times their spacing).
+  // Over a picture they are 0.6 times that, so the picture shows between them
+  // (a Kukanja EAE section in a grid: about 3.2 without, 2 with).
+  var PICTURE_POINT_SCALE = 0.6;
+  function hintedPointSize(p, sp) {
+    var picture = showsPicture(p);
+    var scale = picture ? PICTURE_POINT_SCALE : 1;
+    // An enlarged panel reaches the default's 4 with a picture too.
+    var most = DEFAULT_POINT_SIZE;
+    var u = sp._unit, aspect = u && Number(u.aspect);
+    if (!(aspect > 0) || !(p._SX > 0) || !(p._SY > 0)) {
+      return Math.max(1, Math.min(most, Number(sp._pointSizeHint) * scale));
+    }
+    var refW = HINT_PANEL_W / HINT_PANEL_H > aspect ? HINT_PANEL_H * aspect : HINT_PANEL_W;
+    var refH = HINT_PANEL_W / HINT_PANEL_H > aspect ? HINT_PANEL_H : HINT_PANEL_W / aspect;
+    var size = Number(sp._pointSizeHint) * scale * Math.sqrt((p._SX * p._SY) / (refW * refH));
+    return Math.max(1, Math.min(most, Math.round(size * 10) / 10));
+  }
+  // Whether the panel draws its section's picture under the points (the
+  // conditions of drawImage(), without waiting for the picture to load, so
+  // the size does not change when it arrives).
+  function showsPicture(p) {
+    if (!singleActive && !linkedBackgroundsOn) return false;
+    var sp = spaceById[p.spaceId];
+    var state = sp && sp._imgState;
+    return !!(sp && currentImage(sp) && state && state.show);
+  }
   function pointOpacityOf(p) {
     var sp = spaceById[p.spaceId];
-    if ((!pointOpacityEdited || !singleActive) && sp && sp.builder_point_opacity != null) {
-      return Math.max(0, Math.min(1, Number(sp.builder_point_opacity)));
+    var opacity = pointOpacity;
+    if (!pointOpacityEdited && sp && sp.builder_point_opacity != null) {
+      opacity = Math.max(0, Math.min(1, Number(sp.builder_point_opacity)));
     }
-    return pointOpacity;
+    return opacity;
   }
   // Per-view factor on a frame's own point sizes (HLA node size), so a size
   // slider redraws without a new frame. Set by cerebroCellViews.scalePointSizes
@@ -1947,7 +2418,8 @@
       selection: sel,
       niche: nicheSet,
       opacity: pointOpacityOf(p),
-      clip: colorClip
+      clip: colorClip,
+      renderer: p.gpu
     };
   }
 
@@ -1956,8 +2428,12 @@
     return Object.keys(a).every(function (key) { return a[key] === b[key]; });
   }
 
+  function gpuAvailable(p) {
+    return !!(p.gpu || (!p._gpuDisabled &&
+      window.CerebroPointRenderer && window.CerebroPointRenderer.create));
+  }
   function gpuCandidate(p) {
-    if (!gpuAcceleration || !p.gpu || !D || D.n < GPU_MIN_CELLS) return false;
+    if (!gpuAcceleration || !gpuAvailable(p) || !D || D.n < GPU_MIN_CELLS) return false;
     var space = spaceById[p.spaceId], unit = space && space._unit;
     // Images, hulls and trajectories live on the CPU underlay; axes, labels and
     // interaction marks live on the CPU overlay. Only features that change the
@@ -1965,7 +2441,7 @@
     return !!(space && unit && !unit.nz && !space.pointSizes);
   }
   function gpuEligible(p) {
-    return gpuCandidate(p) && p.gpu.isReady();
+    return gpuCandidate(p) && !!(p.gpu && p.gpu.isReady());
   }
 
   function hideGpu(p) {
@@ -1975,27 +2451,37 @@
   }
 
   function disableGpu(p) {
+    var previous = p.gpu;
     hideGpu(p);
     p.gpu = null;
+    p._gpuDisabled = true;
+    if (previous && previous.release) {
+      try { previous.release(); } catch (error) { /* already gone */ }
+    }
     p.gpuTransformOnly = false;
     p.gpuData = null;
     p.gpuDataState = null;
     if (D && p.spaceId) project(p, true);
   }
 
-  function replaceGpuWithWebGl(p, renderer) {
-    if (!p.gpuCanvas || p.gpu !== renderer ||
-        !window.CerebroPointRenderer ||
-        !window.CerebroPointRenderer.createWebGl) return false;
+  // `again`: the renderer is a WebGL2 one whose shared context was lost; the
+  // next one made takes a new context.
+  function replaceGpuWithWebGl(p, renderer, again) {
+    var api = window.CerebroPointRenderer;
+    var make = api && (api.createSharedWebGl || api.createWebGl);
+    if (!p.gpuCanvas || p.gpu !== renderer || !make) return false;
     var stats = renderer.stats ? renderer.stats() : {};
-    if (stats.backend === 'webgl2') return false;
+    if (stats.backend === 'webgl2' && !again) return false;
     var previous = p.gpuCanvas;
     if (!previous.parentNode) return false;
+    if (renderer.release) {
+      try { renderer.release(); } catch (error) { /* already gone */ }
+    }
     var canvas = createLayerCanvas(null, 'cv-gpu-layer');
     previous.parentNode.replaceChild(canvas, previous);
     try {
       p.gpuCanvas = canvas;
-      p.gpu = window.CerebroPointRenderer.createWebGl(canvas);
+      p.gpu = make(canvas);
       canvas._cerebroPointRenderer = p.gpu;
       p.gpu.resize(p.W || canvas.clientWidth || 1,
         p.H || canvas.clientHeight || 1, window.devicePixelRatio || 1);
@@ -2010,7 +2496,12 @@
   // Swaps the panel's failed renderer for WebGL2, or drops it to Canvas.
   // Returns whether a GPU renderer is still attached.
   function failOver(p) {
-    if (replaceGpuWithWebGl(p, p.gpu)) { watchGpu(p, p.gpu); return true; }
+    // A lost shared WebGL2 context fails every panel's renderer at once; each
+    // takes a new one, a few times, then drops to Canvas.
+    var stats = p.gpu && p.gpu.stats ? p.gpu.stats() : {};
+    var lost = stats.backend === 'webgl2' && stats.shared &&
+      (p._webglLosses = (p._webglLosses || 0) + 1) <= 3;
+    if (replaceGpuWithWebGl(p, p.gpu, lost)) { watchGpu(p, p.gpu); return true; }
     disableGpu(p);
     return false;
   }
@@ -2019,22 +2510,31 @@
     function failed() {
       if (p.gpu !== renderer) return;
       failOver(p);
-      if (D && p.spaceId) draw(p);
+      if (D && p.spaceId) drawPanel(p);
     }
     renderer.failed.then(failed);
+    if (typeof renderer.isReady === 'function' && renderer.isReady()) return;
     renderer.ready.then(function () {
       if (p.gpu === renderer && D && p.spaceId) draw(p);
     }).catch(failed);
   }
 
   function attachGpu(p) {
-    if (!gpuAcceleration || p.gpu) return;
+    if (!gpuAcceleration || p.gpu || p._gpuDisabled) return;
     if (!window.CerebroPointRenderer || !window.CerebroPointRenderer.create) return;
     if (p.gpuCanvas) p.gpuCanvas.remove();
     var canvas = createLayerCanvas(p, 'cv-gpu-layer');
     try {
       p.gpuCanvas = canvas;
-      p.gpu = window.CerebroPointRenderer.create(canvas);
+      // Without WebGPU (or when it gave no adapter) the panels share one hidden
+      // WebGL2 context. With it, every panel is drawn through WebGPU, in a grid
+      // too: on the large Spatial demos a grid on the shared WebGL2 context
+      // opened and scrolled as fast as one on WebGPU, so it is not worth a
+      // second path.
+      var api = window.CerebroPointRenderer;
+      var noWebGpu = !navigator.gpu || (api.webGpuFailed && api.webGpuFailed());
+      p.gpu = noWebGpu && api.createSharedWebGl
+        ? api.createSharedWebGl(canvas) : api.create(canvas);
       canvas._cerebroPointRenderer = p.gpu;
       if (p.W && p.H) p.gpu.resize(p.W, p.H, window.devicePixelRatio || 1);
       var renderer = p.gpu;
@@ -2042,6 +2542,7 @@
     } catch (error) {
       canvas.remove();
       p.gpuCanvas = null;
+      p._gpuDisabled = true;
     }
   }
 
@@ -2050,9 +2551,9 @@
     if (gpuAcceleration === enabled) { reportRendererStatus(); return; }
     gpuAcceleration = enabled;
     panels.forEach(function (p) {
-      // Keep a working renderer available for a later toggle. Redrawing the
-      // same panel preserves the camera, filters, brush and cell identities.
-      if (enabled) attachGpu(p); else hideGpu(p);
+      // Keep a working renderer available for a later toggle, and let off-stage
+      // panels attach lazily when they scroll near the window.
+      if (enabled) p._gpuDisabled = false; else hideGpu(p);
       p.cloneBase = null;
       if (D && p.spaceId) project(p, !enabled);
     });
@@ -2060,8 +2561,8 @@
     reportRendererStatus();
   }
 
-  // The active backends are appended to the GPU acceleration tooltip so the
-  // switch explains what is currently drawing without a separate badge.
+  // The active backends are appended to the GPU acceleration help bubble so
+  // the switch explains what is currently drawing without a separate badge.
   function reportRendererStatus() {
     var checkbox = document.getElementById('webgl_checkbox');
     var row = checkbox && checkbox.closest('.cerebro-preference');
@@ -2090,7 +2591,6 @@
     }
     var title = (row.dataset.help || '') + (backends.length
       ? ' Current plots: ' + backends.join(', ') + '.' : '');
-    if (row.title !== title) row.title = title;
     var help = document.getElementById('webgl_checkbox_help');
     if (help && help.textContent !== title) help.textContent = title;
   }
@@ -2144,6 +2644,104 @@
       (space.hulls && space.hulls.length)));
   }
 
+  // A panel of some of the cells (a section) keeps its vertex map over its own
+  // cells, in the order of `_cells` (canonical order): slot `k` is the cell
+  // `_cells[k]`. A map over every cell was 15.6 MB a panel for the 3.9 million
+  // cells of the Allen atlas, 0.9 GB for its 59 sections.
+  function sortedIndexOf(sorted, value) {
+    var lo = 0, hi = sorted.length - 1;
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1, at = sorted[mid];
+      if (at === value) return mid;
+      if (at < value) lo = mid + 1; else hi = mid - 1;
+    }
+    return -1;
+  }
+  // Calls fn(slot, cell) for each cell of `selection` the panel holds.
+  function forEachHeldCell(selection, cells, fn) {
+    if (!cells) { selection.forEach(function (cell) { fn(cell, cell); }); return; }
+    // Few selected cells: look each up; many: walk the panel's own cells.
+    if (selection.size * 16 < cells.length) {
+      selection.forEach(function (cell) {
+        var slot = sortedIndexOf(cells, cell);
+        if (slot >= 0) fn(slot, cell);
+      });
+      return;
+    }
+    for (var slot = 0; slot < cells.length; slot++) {
+      if (selection.has(cells[slot])) fn(slot, cells[slot]);
+    }
+  }
+  // The order a panel of some cells draws them in under a paint order (the
+  // highest values last): positions into its `_cells`, by their rank in the
+  // order of every cell. Visiting every cell of the data set in each panel
+  // took 59 x 3.9 million steps to colour the Allen sections by a gene.
+  var paintRank = { order: null, rank: null };
+  var paintSequences = typeof WeakMap === 'function' ? new WeakMap() : null;
+  function panelPaintSequence(cells, order) {
+    var cached = paintSequences && paintSequences.get(cells);
+    if (cached && cached.order === order) return cached.seq;
+    if (paintRank.order !== order) {
+      var rank = new Int32Array(D.n);
+      for (var r = 0; r < order.length; r++) rank[order[r]] = r;
+      paintRank = { order: order, rank: rank };
+    }
+    var ranks = paintRank.rank, k = cells.length, pos;
+    // The positions by their cells' ranks, ascending, ties by position: a
+    // radix sort in 11-bit digits (sorting 66,000 float keys took 3 to 4 ms a
+    // panel, 60 to 85 ms for the 20 panels near the window on the Allen atlas).
+    var keys = new Uint32Array(k), seq = new Int32Array(k);
+    for (pos = 0; pos < k; pos++) { keys[pos] = ranks[cells[pos]]; seq[pos] = pos; }
+    var keysOut = new Uint32Array(k), seqOut = new Int32Array(k);
+    var digits = new Uint32Array(2048), highest = Math.max(1, order.length - 1);
+    for (var shift = 0; shift < 32 && (highest >>> shift) > 0; shift += 11) {
+      digits.fill(0);
+      for (pos = 0; pos < k; pos++) digits[(keys[pos] >>> shift) & 2047]++;
+      for (var digit = 0, before = 0; digit < 2048; digit++) {
+        var inDigit = digits[digit]; digits[digit] = before; before += inDigit;
+      }
+      for (pos = 0; pos < k; pos++) {
+        var key = keys[pos], slot = digits[(key >>> shift) & 2047]++;
+        keysOut[slot] = key; seqOut[slot] = seq[pos];
+      }
+      var swapKeys = keys; keys = keysOut; keysOut = swapKeys;
+      var swapSeq = seq; seq = seqOut; seqOut = swapSeq;
+    }
+    if (paintSequences) paintSequences.set(cells, { order: order, seq: seq });
+    return seq;
+  }
+
+  // A paint order the GPU can follow: the panel's points then stay in cell
+  // order (built in one pass over its cells, colour-only changes keep them)
+  // and the renderer draws them through gpuDrawOrder(). Without it, the
+  // points themselves are laid out in paint order.
+  function gpuPaintOrder(p, order, count) {
+    return order && count > 0 && p.gpu && p.gpu.drawsInOrder &&
+      p.gpu.drawsInOrder(count) ? order : null;
+  }
+  // The points of a panel in paint order: drawOrder[k] is the vertex drawn
+  // k-th. vertexIndex maps a slot (a position in `cells`, else a cell) to
+  // its vertex + 1, 0 for a cell not drawn.
+  function gpuDrawOrder(order, cells, vertexIndex, count, useScratch) {
+    if (!cells && count === order.length) return order;
+    var seq = cells ? panelPaintSequence(cells, order) : order;
+    var drawOrder = useScratch && typeof gpuScratchOrder === 'function'
+      ? gpuScratchOrder(count) : new Uint32Array(count);
+    var k = 0, vertex;
+    for (var r = 0; r < seq.length; r++) {
+      vertex = vertexIndex[seq[r]];
+      if (vertex > 0) drawOrder[k++] = vertex - 1;
+    }
+    return drawOrder;
+  }
+
+  function gpuUsesUniformAlpha(p) {
+    return !!(p.gpu && p.gpu.supportsUniformAlpha && p.gpu.supportsUniformAlpha());
+  }
+  function gpuUsesBufferIds(p) {
+    return !!(p.gpu && p.gpu.supportsBufferIds && p.gpu.supportsBufferIds());
+  }
+
   function updateGpuSelection(p, state, hiSet) {
     var previous = p.gpuData, oldState = p.gpuDataState;
     if (!previous || !oldState || !previous.opaque || !previous.vertexIndex ||
@@ -2151,23 +2749,55 @@
           return key !== 'selection' && key !== 'niche' && key !== 'opacity' &&
             state[key] !== oldState[key];
         })) return null;
-    // Selection only changes alpha and foreground layers. Keep the sorted
-    // positions and RGB bytes; the vertex map preserves filtered/invalid cells.
-    // Translucent palettes and RGB retain the general colour preparation path.
-    var colors = previous.colors.slice(), layers = new Uint32Array(previous.layers.length);
+    if (gpuUsesUniformAlpha(p)) {
+      // Opaque points take their opacity and selection fade from shader uniforms
+      // (drawGpuPoints passes options.alpha), so changing opacity alone uploads
+      // nothing and changing selection updates only the compact 1-byte layer mask.
+      var sameSelection = state.selection === oldState.selection &&
+        state.niche === oldState.niche;
+      if (sameSelection) {
+        p.gpuDataState = state;
+        return previous;
+      }
+      var layers = null, layersId = 0, foreground = false;
+      if (hiSet) {
+        layers = gpuScratchLayers(previous.count);
+        forEachHeldCell(hiSet, previous.vertexCells, function (slot) {
+          var vertex = previous.vertexIndex[slot] - 1;
+          if (!(vertex >= 0)) return;
+          layers[vertex] = 1; foreground = true;
+        });
+        if (foreground) layersId = ++gpuBufferSeq; else layers = null;
+      }
+      p.gpuDataState = state;
+      p.gpuData = {positions: previous.positions, positionsId: previous.positionsId,
+        colors: previous.colors, colorsId: previous.colorsId,
+        layers: layers, layersId: layersId,
+        count: previous.count, foreground: foreground, opaque: true,
+        vertexIndex: previous.vertexIndex, vertexCells: previous.vertexCells,
+        ordered: previous.ordered, drawOrder: previous.drawOrder,
+        drawOrderId: previous.drawOrderId, drawOrderOf: previous.drawOrderOf,
+        shownMask: previous.shownMask, okRef: previous.okRef};
+      return p.gpuData;
+    }
+    // Fallback for custom/mock renderers without shader alpha override.
+    var colors = previous.colors.slice(), fallbackLayers = new Uint32Array(previous.count);
     var alpha = Math.round(255 * (hiSet ? 0.05 : pointOpacityOf(p)));
     for (var i = 0; i < previous.count; i++) colors[i * 4 + 3] = alpha;
-    var foreground = false;
-    if (hiSet) hiSet.forEach(function (cell) {
-      var vertex = previous.vertexIndex[cell] - 1;
+    var fallbackFg = false;
+    if (hiSet) forEachHeldCell(hiSet, previous.vertexCells, function (slot) {
+      var vertex = previous.vertexIndex[slot] - 1;
       if (!(vertex >= 0)) return;
       colors[vertex * 4 + 3] = Math.round(255 * 0.95);
-      layers[vertex] = 1; foreground = true;
+      fallbackLayers[vertex] = 1; fallbackFg = true;
     });
     p.gpuDataState = state;
-    p.gpuData = {positions: previous.positions, colors: colors, layers: layers,
-      count: previous.count, foreground: foreground, opaque: true,
-      vertexIndex: previous.vertexIndex, ordered: previous.ordered};
+    p.gpuData = {positions: previous.positions, colors: colors, layers: fallbackLayers,
+      count: previous.count, foreground: fallbackFg, opaque: true,
+      vertexIndex: previous.vertexIndex, vertexCells: previous.vertexCells,
+      ordered: previous.ordered, drawOrder: previous.drawOrder,
+      drawOrderOf: previous.drawOrderOf,
+      shownMask: previous.shownMask, okRef: previous.okRef};
     return p.gpuData;
   }
 
@@ -2175,31 +2805,75 @@
   // selection) of a panel that still draws the same cells in the same order
   // keeps its positions: only colour and layer bytes are rebuilt, and the
   // renderer uploads no new geometry.
+  var GPU_LITTLE_ENDIAN = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
+  // Reusable upload scratch buffers: both WebGL2 bufferData/bufferSubData and
+  // WebGPU queue.writeBuffer copy synchronously, so panels upload from shared
+  // scratch views and keep only monotonic buffer IDs instead of pinning
+  // redundant per-panel TypedArrays on the JS heap.
+  var gpuBufferSeq = 0;
+  var gpuScratch = { positions: null, colors: null, layers: null, order: null };
+  function gpuScratchPositions(len) {
+    if (!gpuScratch.positions || gpuScratch.positions.length < len) {
+      gpuScratch.positions = new Float32Array(len);
+    }
+    return gpuScratch.positions.subarray(0, len);
+  }
+  function gpuScratchColors(len) {
+    if (!gpuScratch.colors || gpuScratch.colors.length < len) {
+      gpuScratch.colors = new Uint8Array(len);
+    }
+    return gpuScratch.colors.subarray(0, len);
+  }
+  function gpuScratchLayers(len) {
+    if (!gpuScratch.layers || gpuScratch.layers.length < len) {
+      gpuScratch.layers = new Uint8Array(len);
+    }
+    var view = gpuScratch.layers.subarray(0, len);
+    view.fill(0);
+    return view;
+  }
+  function gpuScratchOrder(len) {
+    if (!gpuScratch.order || gpuScratch.order.length < len) {
+      gpuScratch.order = new Uint32Array(len);
+    }
+    return gpuScratch.order.subarray(0, len);
+  }
   var GPU_COLOUR_KEYS = ['mode', 'gene', 'fieldValues', 'fieldColors', 'fieldPalette',
     'fieldConstantColor', 'groupValues', 'groupColors', 'clip', 'opacity', 'selection', 'niche'];
   function updateGpuColors(p, state, hiSet, shownMask) {
     var previous = p.gpuData, oldState = p.gpuDataState, unit = state.unit;
+    var order = previous && paintOrder(p);
     if (!previous || !oldState || !previous.vertexIndex || previous.ordered ||
-        !unit || unit._pending || panelColorMode(p) === RGB_MODE || paintOrder(p) ||
+        !unit || unit._pending || panelColorMode(p) === RGB_MODE ||
+        (order && !gpuPaintOrder(p, order, previous.count)) ||
         Object.keys(state).some(function (key) {
           return GPU_COLOUR_KEYS.indexOf(key) < 0 && state[key] !== oldState[key];
         })) return null;
     var n = D.n, vertexIndex = previous.vertexIndex, space = spaceById[p.spaceId];
     var cells = space && space._cells && space._cells.length <= n ? space._cells : null;
+    if ((previous.vertexCells || null) !== cells) return null;
     var visits = cells ? cells.length : n, drawn = 0, at, i;
-    for (at = 0; at < visits; at++) {
-      i = cells ? cells[at] : at;
-      var shown = !!(unit.ok[i] && shownMask[i]);
-      if (shown !== (vertexIndex[i] > 0)) return null;
-      if (shown) drawn++;
+    // The vertices were laid out from a mask and positions: with the very same
+    // ones (a colour change keeps both) they still fit, and the cells need not
+    // be visited again to find out.
+    if (previous.shownMask !== shownMask || previous.okRef !== unit.ok) {
+      for (at = 0; at < visits; at++) {
+        i = cells ? cells[at] : at;
+        var shown = !!(unit.ok[i] && shownMask[i]);
+        if (shown !== (vertexIndex[at] > 0)) return null;
+        if (shown) drawn++;
+      }
+      if (drawn !== previous.count) return null;
     }
-    if (drawn !== previous.count) return null;
-    var colors = new Uint8Array(previous.colors.length);
+    var count = previous.count;
+    var useScratch = typeof gpuUsesBufferIds === 'function' && gpuUsesBufferIds(p);
+    var colors = useScratch ? gpuScratchColors(count * 4) : new Uint8Array(count * 4);
     // Layers follow only the selection/niche: keep them, and their upload,
     // when only the colours change.
     var sameLayers = state.selection === oldState.selection &&
       state.niche === oldState.niche;
-    var layers = sameLayers ? previous.layers : new Uint32Array(previous.layers.length);
+    var layers = sameLayers ? previous.layers
+      : (useScratch ? (hiSet ? gpuScratchLayers(count) : null) : new Uint32Array(count));
     var group = catOf(panelColorMode(p));
     var palette = group ? group.levels.map(function (_level, index) {
       return gpuColor((group.colors && group.colors[index]) || PAL[index % PAL.length]);
@@ -2209,9 +2883,70 @@
     // buildGpuData(); a value off the scale (NaN) takes colorOf().
     var scale = group ? null : continuousColours(p), stepRgba = scale ? [] : null;
     var opacity = pointOpacityOf(p), opaque = true, foreground = false;
-    for (at = 0; at < visits; at++) {
+    var vertex, fastColoured = false;
+    if (!hiSet && GPU_LITTLE_ENDIAN && (group || scale)) {
+      // No selection: every colour is one of a few (a level's or a step's),
+      // written as one 32-bit word, red in the lowest byte.
+      var colors32 = new Uint32Array(colors.buffer, colors.byteOffset, count);
+      var word = function (rgba) {
+        return ((rgba[0] & 255) | ((rgba[1] & 255) << 8) | ((rgba[2] & 255) << 16) |
+          ((Math.round(rgba[3] * opacity) & 255) << 24)) >>> 0;
+      };
+      if (group) {
+        var levels = palette.length, levelWords = palette.map(word), missingWord = word(missing);
+        var levelSeen = new Uint8Array(levels + 1), levelValues = group.values;
+        for (at = 0; at < visits; at++) {
+          vertex = vertexIndex[at] - 1;
+          if (vertex < 0) continue;
+          var level = levelValues[cells ? cells[at] : at];
+          if (level == null || level < 0 || level >= levels) {
+            levelSeen[levels] = 1; colors32[vertex] = missingWord;
+          } else {
+            levelSeen[level] = 1; colors32[vertex] = levelWords[level];
+          }
+        }
+        if (levelSeen[levels] && missing[3] !== 255) opaque = false;
+        for (var seenLevel = 0; seenLevel < levels; seenLevel++) {
+          if (levelSeen[seenLevel] && palette[seenLevel][3] !== 255) opaque = false;
+        }
+      } else {
+        var stepWords = new Uint32Array(256), stepKnown = new Uint8Array(256);
+        var scaleValues = scale.values, scaleRange = scale.range || _clipVal, scaleSpan = scale.span;
+        var scaleMissing = scale.missing, fullRange = scaleRange && scaleRange.hi > scaleRange.lo;
+        var rangeLow = scaleRange ? scaleRange.lo : 0;
+        var rangeWidth = scaleRange ? scaleRange.hi - scaleRange.lo : 1;
+        for (at = 0; at < visits; at++) {
+          vertex = vertexIndex[at] - 1;
+          if (vertex < 0) continue;
+          i = cells ? cells[at] : at;
+          var cellValue = scaleValues[i], colourStep = -1, colourWord;
+          if (!(scaleMissing && (cellValue == null || isNaN(cellValue)))) {
+            // clipT(), inlined.
+            colourStep = Math.round((!scaleRange ? cellValue / scaleSpan
+              : !fullRange ? 0
+              : Math.max(0, Math.min(1, (cellValue - rangeLow) / rangeWidth))) * 255);
+          }
+          if (colourStep >= 0 && colourStep <= 255) {
+            if (!stepKnown[colourStep]) {
+              var stepRgbaNow = gpuColor(scale.colour(colourStep));
+              stepWords[colourStep] = word(stepRgbaNow);
+              stepKnown[colourStep] = 1;
+              if (stepRgbaNow[3] !== 255) opaque = false;
+            }
+            colourWord = stepWords[colourStep];
+          } else {
+            var offScale = gpuColor(colorOf(i, p));
+            if (offScale[3] !== 255) opaque = false;
+            colourWord = word(offScale);
+          }
+          colors32[vertex] = colourWord;
+        }
+      }
+      fastColoured = true;
+    }
+    for (at = 0; !fastColoured && at < visits; at++) {
       i = cells ? cells[at] : at;
-      var vertex = vertexIndex[i] - 1;
+      vertex = vertexIndex[at] - 1;
       if (vertex < 0) continue;
       var fg = !!(hiSet && hiSet.has(i));
       var alpha = hiSet ? (fg ? 0.95 : 0.05) : opacity;
@@ -2234,13 +2969,30 @@
       colors[vertex * 4 + 1] = rgba[1];
       colors[vertex * 4 + 2] = rgba[2];
       colors[vertex * 4 + 3] = Math.round(rgba[3] * alpha);
-      if (!sameLayers) layers[vertex] = fg ? 1 : 0;
+      if (!sameLayers && layers) layers[vertex] = fg ? 1 : 0;
       foreground = foreground || fg;
     }
+    var nextLayers = sameLayers ? previous.layers
+      : (useScratch ? (foreground ? layers : null) : layers);
+    var nextLayersId = !useScratch ? null
+      : (sameLayers ? previous.layersId : (foreground ? ++gpuBufferSeq : 0));
+    var sameOrder = !!(order && previous.drawOrderOf === order &&
+      (previous.drawOrder || previous.drawOrderId > 0));
+    var nextDrawOrder = !order ? null
+      : (sameOrder ? previous.drawOrder : gpuDrawOrder(order, cells, vertexIndex, count, useScratch));
+    var nextDrawOrderId = !useScratch ? null
+      : (!order ? 0 : (sameOrder ? previous.drawOrderId : ++gpuBufferSeq));
     p.gpuDataState = state;
-    p.gpuData = {positions: previous.positions, colors: colors, layers: layers,
-      count: previous.count, foreground: foreground, opaque: opaque,
-      vertexIndex: vertexIndex, ordered: false};
+    p.gpuData = {positions: previous.positions,
+      positionsId: useScratch ? previous.positionsId : null,
+      colors: colors, colorsId: useScratch ? ++gpuBufferSeq : null,
+      layers: nextLayers, layersId: nextLayersId,
+      count: count, foreground: foreground,
+      opaque: opaque,
+      vertexIndex: vertexIndex, vertexCells: cells, ordered: false,
+      drawOrder: nextDrawOrder, drawOrderId: nextDrawOrderId,
+      drawOrderOf: order || null,
+      shownMask: shownMask, okRef: unit.ok};
     return p.gpuData;
   }
 
@@ -2253,16 +3005,22 @@
     if (selectionData) return selectionData;
     var colourData = updateGpuColors(p, state, hiSet, shownMask);
     if (colourData) return colourData;
+    var useScratch = gpuUsesBufferIds(p);
     var unit = state.unit, order = paintOrder(p), n = D.n;
+    var gpuOrder = rgb ? null : gpuPaintOrder(p, order, shownCount);
+    if (gpuOrder) order = null;
     var shared = window.CerebroSharedDatasetState;
     var sharedName = null;
     var currentSpace = spaceById[p.spaceId];
-    // A spatial scene's panel visits and uploads only the scene's cells.
-    var cells = !order && currentSpace && currentSpace._cells &&
+    // A spatial scene's panel visits and uploads only the scene's cells, in
+    // a paint order through its own list (panelPaintSequence()). A vertex
+    // slot is a position in that list, else the cell itself.
+    var cells = currentSpace && currentSpace._cells &&
       currentSpace._cells.length <= n ? currentSpace._cells : null;
-    var visits = cells ? cells.length : n;
+    var seq = cells && order ? panelPaintSequence(cells, order) : null;
+    var visits = cells ? cells.length : n, slot;
     var capacity = cells ? Math.min(shownCount, cells.length) : shownCount;
-    if (shared && shownCount === n && !order && currentSpace) {
+    if (shared && shownCount === n && !order && !cells && currentSpace) {
       Object.keys(shared.projections || {}).some(function (name) {
         var projection = shared.projections[name];
         if (projection.x !== currentSpace.x || projection.y !== currentSpace.y) return false;
@@ -2275,12 +3033,16 @@
       positions.length === capacity * 2 && projectionCache &&
       Number.isInteger(projectionCache.gpuPositionCount));
     if (!positions || positions.length !== capacity * 2) {
-      positions = new Float32Array(capacity * 2);
-      if (sharedName) shared.gpuPositions[sharedName] = positions;
+      if (sharedName) {
+        positions = new Float32Array(capacity * 2);
+        shared.gpuPositions[sharedName] = positions;
+      } else {
+        positions = useScratch ? gpuScratchPositions(capacity * 2) : new Float32Array(capacity * 2);
+      }
       sharedPositionsReady = false;
     }
-    var colors = new Uint8Array(capacity * 4);
-    var layers = new Uint32Array(capacity);
+    var colors = useScratch ? gpuScratchColors(capacity * 4) : new Uint8Array(capacity * 4);
+    var layers = useScratch ? null : new Uint32Array(capacity);
     var categoricalGroup = rgb ? null : catOf(panelColorMode(p));
     var categoricalRgba = categoricalGroup
       ? categoricalGroup.levels.map(function (_level, index) {
@@ -2288,7 +3050,7 @@
           PAL[index % PAL.length]);
       }) : null;
     var missingCategoricalRgba = categoricalGroup ? gpuColor('#cccccc') : null;
-    var vertexIndex = rgb ? null : new Int32Array(n), opaque = true;
+    var vertexIndex = rgb ? null : new Int32Array(cells ? cells.length : n), opaque = true;
     var foreground = false, out = 0;
     var pending = unit._pending, cmx = 0, cmy = 0, validCount = 0;
     var singleGroup = !order && !hiSet && !rgb && shownCount === n &&
@@ -2307,6 +3069,7 @@
       } else {
         for (var visit = 0; visit < visits; visit++) {
           var i = cells ? cells[visit] : visit;
+          slot = visit;
           if (pending) {
             var x = pending.x[i], y = pending.y[i];
             if (x != null && y != null && isFinite(x) && isFinite(y)) {
@@ -2318,7 +3081,7 @@
             }
           }
           if (!unit.ok[i]) continue;
-          if (vertexIndex) vertexIndex[i] = out + 1;
+          if (vertexIndex) vertexIndex[slot] = out + 1;
           positions[out * 2] = unit.nx[i];
           positions[out * 2 + 1] = unit.ny[i];
           out++;
@@ -2329,7 +3092,7 @@
       var flatAlpha = Math.round(flatRgba[3] * pointOpacityOf(p));
       var packedRgba = (flatRgba[0] | (flatRgba[1] << 8) |
         (flatRgba[2] << 16) | (flatAlpha << 24)) >>> 0;
-      new Uint32Array(colors.buffer).fill(packedRgba);
+      new Uint32Array(colors.buffer, colors.byteOffset, out).fill(packedRgba);
     } else if (categoricalGroup && !hiSet) {
       // Colour by group, nothing highlighted: one packed RGBA per level, with
       // the panel's opacity, written as one 32-bit word per cell (1.3 million
@@ -2343,10 +3106,12 @@
       var levelOpaque = categoricalRgba.map(function (rgba) { return rgba[3] === 255; });
       var missingWord = packLevel(missingCategoricalRgba);
       var missingOpaque = missingCategoricalRgba[3] === 255;
-      var levelCount = levelWords.length, words = new Uint32Array(colors.buffer);
+      var levelCount = levelWords.length;
+      var words = new Uint32Array(colors.buffer, colors.byteOffset, capacity);
       var levelValues = categoricalGroup.values;
       for (var cat_at = 0; cat_at < visits; cat_at++) {
-        i = order ? order[cat_at] : cells ? cells[cat_at] : cat_at;
+        slot = cells ? (seq ? seq[cat_at] : cat_at) : (order ? order[cat_at] : cat_at);
+        i = cells ? cells[slot] : slot;
         if (pending) {
           x = pending.x[i]; y = pending.y[i];
           if (x != null && y != null && isFinite(x) && isFinite(y)) {
@@ -2358,7 +3123,7 @@
           }
         }
         if (!unit.ok[i] || !shownMask[i]) continue;
-        vertexIndex[i] = out + 1;
+        vertexIndex[slot] = out + 1;
         positions[out * 2] = unit.nx[i];
         positions[out * 2 + 1] = unit.ny[i];
         var level = levelValues[i];
@@ -2377,13 +3142,15 @@
       // the scale (NaN) takes colorOf() as before.
       var scale = continuousColours(p), stepAlpha = pointOpacityOf(p);
       var stepWords = new Uint32Array(256), stepOpaque = new Uint8Array(256);
-      var stepDone = new Uint8Array(256), stepWordsOut = new Uint32Array(colors.buffer);
+      var stepDone = new Uint8Array(256);
+      var stepWordsOut = new Uint32Array(colors.buffer, colors.byteOffset, capacity);
       var stepWord = function (rgba) {
         return (rgba[0] | (rgba[1] << 8) | (rgba[2] << 16) |
           (Math.round(rgba[3] * stepAlpha) << 24)) >>> 0;
       };
       for (var step_at = 0; step_at < visits; step_at++) {
-        i = order ? order[step_at] : cells ? cells[step_at] : step_at;
+        slot = cells ? (seq ? seq[step_at] : step_at) : (order ? order[step_at] : step_at);
+        i = cells ? cells[slot] : slot;
         if (pending) {
           x = pending.x[i]; y = pending.y[i];
           if (x != null && y != null && isFinite(x) && isFinite(y)) {
@@ -2395,7 +3162,7 @@
           }
         }
         if (!unit.ok[i] || !shownMask[i]) continue;
-        vertexIndex[i] = out + 1;
+        vertexIndex[slot] = out + 1;
         positions[out * 2] = unit.nx[i];
         positions[out * 2 + 1] = unit.ny[i];
         var value = scale.values[i];
@@ -2418,8 +3185,10 @@
         out++;
       }
     } else {
+      if (useScratch) layers = rgb || hiSet ? gpuScratchLayers(capacity) : null;
       for (var at = 0; at < visits; at++) {
-        i = order ? order[at] : cells ? cells[at] : at;
+        slot = cells ? (seq ? seq[at] : at) : (order ? order[at] : at);
+        i = cells ? cells[slot] : slot;
         if (pending) {
           x = pending.x[i]; y = pending.y[i];
           if (x != null && y != null && isFinite(x) && isFinite(y)) {
@@ -2431,11 +3200,14 @@
           }
         }
         if (!unit.ok[i] || !shownMask[i]) continue;
-        if (vertexIndex) vertexIndex[i] = out + 1;
+        if (vertexIndex) vertexIndex[slot] = out + 1;
         positions[out * 2] = unit.nx[i];
         positions[out * 2 + 1] = unit.ny[i];
+        // A channel with no gene yet has no values (as rgbAt() reads it).
         var packedRgb = rgb
-          ? rgbGpuColor(D.rgb.r[i], D.rgb.g[i], D.rgb.b[i]) : 0;
+          ? rgbGpuColor(D.rgb && D.rgb.r ? D.rgb.r[i] : 0,
+            D.rgb && D.rgb.g ? D.rgb.g[i] : 0,
+            D.rgb && D.rgb.b ? D.rgb.b[i] : 0) : 0;
         var fg = rgb ? !!(packedRgb & 0x1000000) : !!(hiSet && hiSet.has(i));
         var alpha = hiSet ? (fg ? 0.95 : 0.05)
           : rgb ? (fg ? 1 : 0.5 * pointOpacityOf(p)) : pointOpacityOf(p);
@@ -2456,7 +3228,7 @@
           colors[out * 4 + 2] = rgba[2];
           colors[out * 4 + 3] = Math.round(rgba[3] * alpha);
         }
-        layers[out] = fg ? 1 : 0;
+        if (layers) layers[out] = fg ? 1 : 0;
         foreground = foreground || fg;
         out++;
       }
@@ -2471,31 +3243,62 @@
       projectionCache.unit = unit;
       projectionCache.gpuPositionCount = out;
     }
+    var drawOrder = gpuOrder && out ? gpuDrawOrder(gpuOrder, cells, vertexIndex, out, useScratch) : null;
+    var finalPositions = useScratch && out < positions.length / 2
+      ? positions.subarray(0, out * 2) : positions;
+    var finalColors = useScratch && out < colors.length / 4
+      ? colors.subarray(0, out * 4) : colors;
+    var finalLayers = !useScratch ? layers
+      : (foreground && layers ? (out < layers.length ? layers.subarray(0, out) : layers) : null);
     p.gpuDataState = state;
     p.gpuData = {
-      positions: positions,
-      colors: colors,
-      layers: layers,
+      positions: finalPositions,
+      positionsId: useScratch ? ++gpuBufferSeq : null,
+      colors: finalColors,
+      colorsId: useScratch ? ++gpuBufferSeq : null,
+      layers: finalLayers,
+      layersId: useScratch ? (finalLayers ? ++gpuBufferSeq : 0) : null,
       count: out,
       opaque: !rgb && opaque,
       vertexIndex: vertexIndex,
+      vertexCells: cells,
       foreground: foreground,
-      ordered: !!order
+      ordered: !!order,
+      drawOrder: drawOrder,
+      drawOrderId: useScratch ? (drawOrder ? ++gpuBufferSeq : 0) : null,
+      drawOrderOf: gpuOrder && out ? gpuOrder : null,
+      shownMask: shownMask,
+      okRef: unit.ok
     };
     return p.gpuData;
   }
 
   function drawGpuPoints(p, shownMask, shownCount, border) {
+    if (gpuCandidate(p) && !p.gpu) attachGpu(p);
     if (!gpuEligible(p)) { hideGpu(p); return false; }
     var data, ok;
     try {
       data = buildGpuData(p, shownMask, shownCount);
       p.gpu.setData(data);
+      if (gpuUsesBufferIds(p)) {
+        // Both WebGL2 and WebGPU copy uploaded bytes synchronously, so release
+        // temporary scratch views immediately after upload; the renderer tracks
+        // unchanged buffers via `*Id` tokens.
+        data.positions = null;
+        data.colors = null;
+        data.layers = null;
+        data.drawOrder = null;
+      }
+      var hiSet = (sel && sel.size) ? sel : nicheSet;
+      var alpha = gpuUsesUniformAlpha(p) && data.opaque && panelColorMode(p) !== RGB_MODE
+        ? { background: hiSet ? 0.05 : pointOpacityOf(p), foreground: 0.95 }
+        : null;
       ok = p.gpu.draw({
         view: p.view || { cx: 0.5, cy: 0.5, span: 1 },
         rect: panelRect(p),
         pointSize: p._renderPointSize,
-        border: border ? { color: gpuColor(border.color), width: border.width } : null
+        border: border ? { color: gpuColor(border.color), width: border.width } : null,
+        alpha: alpha
       });
     } catch (error) {
       return failOver(p) && drawGpuPoints(p, shownMask, shownCount, border);
@@ -2540,7 +3343,7 @@
       p.cloneBase = null;
       return null;
     }
-    var state = gpuDataState(p), border = space.pointBorder;
+    var state = gpuDataState(p), border = space.pointBorder || pictureOutline(p);
     if (!border && bordersOn) border = {color:'rgba(90,90,90,.42)',width:0.7};
     state.axes = space._axisSpec;
     state.width = p.canvas.width; state.height = p.canvas.height;
@@ -2577,8 +3380,24 @@
       fill:p.ctx.fillStyle,stroke:p.ctx.strokeStyle,lineWidth:p.ctx.lineWidth};
   }
 
+  // Square mode's frame: a light grey line just outside the plot's square,
+  // in the padding the projection leaves around it.
+  function drawSquareFrame(p, c) {
+    var frame = p._squareFrame;
+    if (!frame || !c) return;
+    var inset = 6;
+    var x = Math.round(frame.x - inset) + 0.5, y = Math.round(frame.y - inset) + 0.5;
+    var side = Math.round(frame.size + 2 * inset) - 1;
+    c.save();
+    c.strokeStyle = 'rgba(203, 213, 225, 0.6)';
+    c.lineWidth = 1;
+    c.strokeRect(x, y, side, side);
+    c.restore();
+  }
   function draw(p, shownMask, shownCount) {
     p._resizedUndrawn = false;
+    scheduleAutoSizeSync();
+    markGridPending(p);
     var c = p.ctx; clearPanelLayers(p);
     if (needsUnderlay(p)) attachUnderlay(p);
     var underlay = p.underlayCtx || c;
@@ -2588,6 +3407,7 @@
     var panelPointOpacity = pointOpacityOf(p);
     var cloneState = cloneBaseState(p), cachedBase = restoreCloneBase(p, cloneState);
     if (!cachedBase) {
+      drawSquareFrame(p, underlay);
       drawImage(p, underlay);
       drawHulls(p, underlay);
       drawTrajectory(p, underlay);
@@ -2602,6 +3422,7 @@
     // niche. Cells in it stay solid; everything else fades.
     var n = D.n, i, rgb = panelColorMode(p) === RGB_MODE;
     var space = spaceById[p.spaceId], border = space && space.pointBorder;
+    if (!border) border = pictureOutline(p);
     if (!border && bordersOn) {
       border = { color: 'rgba(90,90,90,.42)', width: 0.7 };
     }
@@ -2746,13 +3567,23 @@
 
   // The interaction layer: the hover ring, and a lasso or box while it is being
   // dragged, so a drag frame redraws neither the points nor the decorations.
+  // Attached lazily on first hover/drag so multi-panel grids do not allocate
+  // dozens of unused overlay canvases up front.
   function drawHoverOverlay(p) {
+    var dragging = !!(p.drag && p.moved);
+    var hovering = hoverCell != null && hoverCell !== pick &&
+      !!(p.ok && p.ok[hoverCell]) &&
+      (singleActive || linkedHoverOn || p === hoverPanel);
+    if (!dragging && !hovering) {
+      if (p.interactionCtx) p.interactionCtx.clearRect(0, 0, p.W, p.H);
+      return;
+    }
+    if (!p.interactionCtx) attachInteractionLayer(p);
     var c = p.interactionCtx;
     if (!c) return;
     c.clearRect(0, 0, p.W, p.H);
-    if (p.drag && p.moved) strokeOutline(c, p.lasso);
-    if (hoverCell == null || hoverCell === pick || !p.ok || !p.ok[hoverCell]) return;
-    if (!singleActive && !linkedHoverOn && p !== hoverPanel) return;
+    if (dragging) strokeOutline(c, p.lasso);
+    if (!hovering) return;
     // Thinner and cooler than the pick ring so hover and selection never read
     // as the same state.
     c.globalAlpha = 1; c.strokeStyle = '#0f172a'; c.lineWidth = 1.6;
@@ -2785,42 +3616,70 @@
   var drawAllDeferred = false;
   function drawAll() {
     if (drawAllDeferred || (awaitingSupplement && awaitingSupplement === D)) return;
-    var first = null;
-    panels.forEach(function (p) {
+    // Read every panel's place before any is drawn (drawing can dirty layout).
+    var off = panels.map(function (p) { return p.spaceId ? offStage(p) : false; });
+    var onStage = [];
+    panels.forEach(function (p, index) {
       if (!p.spaceId) { p.cloneBase = null; return; }
-      var state = shownState(p);
-      if (!first) first = state;
-      draw(p, state.mask, state.count);
+      // A panel not on stage is drawn when it comes near (offStage()).
+      if (off[index]) { p._resizedUndrawn = true; return; }
+      onStage.push(p);
     });
-    if (first) renderShownCount(first.count);
-    updateResetButtons();
+    runDrawQueue(onStage, {
+      prepare: function (p) {
+        if (p._pendingSize) {
+          var size = p._pendingSize;
+          resizePanel(p, size[0], size[1]);
+        }
+      },
+      onFirstShown: function (state) {
+        renderShownCount(state.count);
+      },
+      onComplete: function () {
+        updateResetButtons();
+      }
+    });
   }
   // One panel whose own view changed (zoom, reset): the others are unchanged.
   function drawPanel(p) {
     if (drawAllDeferred || !p || !p.spaceId ||
         (awaitingSupplement && awaitingSupplement === D)) return;
+    // A panel not on stage (offStage()) is drawn when it comes near, also
+    // when its cells arrive.
+    if (offStage(p)) { p._resizedUndrawn = true; return; }
     var state = shownState(p);
     draw(p, state.mask, state.count);
     updateResetButtons();
+  }
+  // A section of a streaming grid whose cells are still on their way shimmers;
+  // it fades in when they come.
+  function markGridPending(p) {
+    if (!p.pane) return;
+    var space = spaceById[p.spaceId];
+    var pending = !!(space && space._gridPending);
+    var was = p.pane.classList.contains('cv-pane-pending');
+    if (pending === was) return;
+    p.pane.classList.toggle('cv-pane-pending', pending);
+    if (!pending) {
+      p.pane.classList.add('cv-pane-arrived');
+      clearTimeout(p._arrivedTimer);
+      p._arrivedTimer = setTimeout(function () {
+        p.pane.classList.remove('cv-pane-arrived');
+      }, 400);
+    }
   }
   // Drop any committed lasso outlines when an interaction deliberately changes
   // what the region means (for example a new selection or selection zoom).
   // Returns true if anything was cleared.
   // Seed the dataset-level point size once, then leave user changes alone.
   var psSeeded = false;
-  function autoPointSize(side) {
+  function autoPointSize() {
     if (!D) return;
     psSeeded = true;
     var configured = D.default_point_size == null
       ? NaN : Number(D.default_point_size);
     var v;
-    if (isFinite(configured)) {
-      v = Math.max(0, Math.min(20, configured));
-    } else {
-      var base = 6.5 - Math.log10(Math.max(1, D.n));
-      var scale = Math.max(0.75, Math.min(1.35, (side || 520) / 520));
-      v = Math.max(0.8, Math.min(7, base * scale));
-    }
+    v = isFinite(configured) ? Math.max(0, Math.min(20, configured)) : DEFAULT_POINT_SIZE;
     ps = Math.round(v * 5) / 5;                    // slider step is 0.2
     setLinkedSliderValue('cv-ps', ps);
   }
@@ -2931,6 +3790,8 @@
     if (!source) return '';
     if (typeof source === 'string') return source;
     var sp = source.spaceId && spaceById[source.spaceId];
+    // A Spatial grid panel is named by its section.
+    if (sp && sp._gridSection != null) return sp._gridSection;
     return (sp && sp.label) || source.spaceId || '';
   }
   // `options.keepPending`: a change the data or the controls make (a filter, a
@@ -3075,18 +3936,20 @@
         btn.setAttribute('aria-label', tip);
         var label = btn.querySelector('.cv-focus-label');
         if (label) label.textContent = primary ? 'Restore' : 'Enlarge';
+        // Restore shrinks the panel back: its icon points inwards.
+        var glyph = btn.querySelector('.fa-expand, .fa-compress');
+        if (glyph) {
+          glyph.classList.toggle('fa-compress', primary);
+          glyph.classList.toggle('fa-expand', !primary);
+        }
       }
+      // The enlarged panel says so by its size, its frame and its Restore
+      // button, and a thumbnail by its place in the strip: no role badge.
       var role = p.pane.querySelector('.cv-role-badge');
       if (role) {
         role.classList.remove('is-focus', 'is-context');
-        if (focusPanel && p.spaceId) {
-          role.style.display = '';
-          role.textContent = primary ? 'ENLARGED' : 'CONTEXT';
-          role.classList.add(primary ? 'is-focus' : 'is-context');
-        } else {
-          role.style.display = 'none';
-          role.textContent = '';
-        }
+        role.style.display = 'none';
+        role.textContent = '';
       }
     });
     var host = panels[0] && panels[0].pane && panels[0].pane.parentElement;
@@ -3096,9 +3959,13 @@
   // grows; every other pane remains visible as context and keeps its viewport.
   function setFocusPanel(key) {
     var host = panels[0] && panels[0].pane && panels[0].pane.parentElement;
-    // A second click during the motion starts from the visible layout rather
-    // than inheriting a half-finished transform from the first transition.
+    // A second click during the motion starts from where the panes are seen
+    // (their rectangles are read with the motion's transform), then stops it.
     clearTimeout(focusResizeTimer);
+    var before = {};
+    panels.forEach(function (p) {
+      if (p.pane && p.spaceId) before[p.key] = p.pane.getBoundingClientRect();
+    });
     if (host) host.classList.remove('cv-focus-transitioning');
     panels.forEach(function (p) {
       if (!p.pane) return;
@@ -3106,13 +3973,11 @@
       p.pane.style.transform = '';
       p.pane.style.transformOrigin = '';
       p.pane.style.opacity = '';
-    });
-    var before = {};
-    panels.forEach(function (p) {
-      if (p.pane && p.spaceId) before[p.key] = p.pane.getBoundingClientRect();
+      clearFocusFlip(p);
     });
     focusAnimating = true;
     if (host) host.classList.add('cv-focus-transitioning');
+    var previousFocus = focusPanel;
     focusPanel = (focusPanel === key) ? null : key;
     paintEnlarged();
     updateFocusButtons();
@@ -3123,24 +3988,75 @@
     // then every pane animates from its old rectangle into that geometry. This is
     // symmetric for enter/exit and avoids ResizeObserver repeatedly redrawing a
     // canvas while its CSS box is still moving.
+    // Every new rectangle is read before any style is written: a written frame
+    // changes layout, and reading after it would lay the page out once a pane.
+    var after = {};
     panels.forEach(function (p) {
-      if (!p.pane || !p.spaceId || !before[p.key]) return;
-      var from = before[p.key], to = p.pane.getBoundingClientRect();
-      if (!(to.width > 0 && to.height > 0)) return;
-      var dx = from.left - to.left, dy = from.top - to.top;
-      var sx = from.width / to.width, sy = from.height / to.height;
-      p.pane.style.transition = 'none';
-      p.pane.style.transformOrigin = 'top left';
-      p.pane.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(' + sx + ',' + sy + ')';
-      p.pane.style.opacity = focusPanel && p.key !== focusPanel ? '.88' : '.96';
+      if (p.pane && p.spaceId && before[p.key]) after[p.key] = p.pane.getBoundingClientRect();
     });
-    if (host) void host.offsetWidth; // commit the inverse transforms before release
+    var hostBox = host && host.getBoundingClientRect();
+    // The pane taking the focus, or giving it up, moves above the others: the
+    // thumbnails pass behind it rather than across it.
+    var lead = focusPanel || previousFocus;
+    // Panes the enlarged view hides (thumbnails off the strip) that were in
+    // sight fade out where they were instead of vanishing: shown again for the
+    // motion, out of the grid's flow, at their old place.
+    var ghosts = !hostBox ? [] : panels.filter(function (p) {
+      var from = before[p.key], to = after[p.key];
+      return from && to && from.width > 0 && from.height > 0 && !(to.width > 0) &&
+        p.pane.classList.contains('cv-strip-off') &&
+        from.bottom > 0 && from.top < (window.innerHeight || 0);
+    }).slice(0, FOCUS_FLIP_GHOSTS);
+    ghosts.forEach(function (p) {
+      var from = before[p.key];
+      p.pane.classList.remove('cv-strip-off');
+      p.pane.classList.add('cv-flip-ghost');
+      p.pane.style.position = 'absolute';
+      p.pane.style.left = (from.left - hostBox.left - host.clientLeft) + 'px';
+      p.pane.style.top = (from.top - hostBox.top - host.clientTop) + 'px';
+      p.pane.style.translate = p.pane.style.clipPath = '';
+    });
+    // Read where they now stand (one layout for all of them) before writing on.
+    var ghostBox = {};
+    ghosts.forEach(function (p) { ghostBox[p.key] = p.pane.getBoundingClientRect(); });
+    ghosts.forEach(function (p) {
+      var from = before[p.key], box = ghostBox[p.key];
+      // Shrinking a little towards its centre as it fades.
+      var end = { left: from.left + from.width * 0.04, top: from.top + from.height * 0.04,
+        width: from.width * 0.92, height: from.height * 0.92 };
+      var keys = focusFlipKeyframes(from, end, 1, box, 0);
+      if (!keys) return;
+      p.pane.style.transformOrigin = 'top left';
+      if (keys.framed) p.pane.classList.add('cv-flip-frame');
+      p._focusFlip = p.pane.animate(keys.frames,
+        { duration: FOCUS_FLIP_FADE_MS, easing: 'ease-out', fill: 'forwards' });
+    });
+    panels.forEach(function (p) {
+      if (!after[p.key]) return;
+      var from = before[p.key], to = after[p.key];
+      if (!(to.width > 0 && to.height > 0)) return;
+      if (p.key === lead) p.pane.classList.add('cv-flip-lead');
+      // A pane that was hidden (a thumbnail off its strip's page) has no place
+      // to come from: it fades in where it is.
+      if (!(from.width > 0 && from.height > 0)) {
+        p._focusFlip = p.pane.animate([{ opacity: 0 }, { opacity: 1 }],
+          { duration: FOCUS_FLIP_MS, easing: 'ease' });
+        return;
+      }
+      var keys = focusFlipKeyframes(from, to,
+        focusPanel && p.key !== focusPanel ? 0.88 : 0.96);
+      if (!keys) return;
+      p.pane.style.transformOrigin = 'top left';
+      if (keys.framed) p.pane.classList.add('cv-flip-frame');
+      // Title and buttons drawn at another size on the way (much larger when
+      // the pane shrinks into place) wait until it is nearly there.
+      if (keys.scale > 1.25 || keys.scale < 0.8) p.pane.classList.add('cv-flip-head-later');
+      p._focusFlip = p.pane.animate(keys.frames,
+        { duration: FOCUS_FLIP_MS, easing: 'cubic-bezier(.2, 0, 0, 1)' });
+    });
     requestAnimationFrame(function () {
       panels.forEach(function (p) {
-        if (!p.pane || !p.spaceId) return;
-        p.pane.style.transition = '';
-        p.pane.style.transform = '';
-        p.pane.style.opacity = '';
+        if (p.pane) p.pane.classList.remove('cv-flip-head-later');
       });
     });
     focusResizeTimer = setTimeout(function () {
@@ -3150,9 +4066,75 @@
       panels.forEach(function (p) {
         if (!p.pane) return;
         p.pane.style.transformOrigin = '';
+        clearFocusFlip(p);
       });
-      resizeAll();
-    }, 460);
+      // The panes reached their size before the motion: resize only a pane
+      // whose header wrapped meanwhile, rather than drawing every plot again.
+      resizeAll(true);
+    }, 400);
+  }
+  // A pane moving into place (setFocusPanel()), as keyframes: at each step
+  // its frame is the straight blend of the rectangle it leaves and the one it
+  // takes, and the pane inside the largest copy of itself that fits that
+  // frame whole, centred (one scale for both axes, so the plot keeps its
+  // proportions). The frame is drawn behind the pane (the ::before of
+  // .cv-flip-frame): its sides reach --cv-flip-x/y past the scaled pane, in
+  // the pane's own pixels, its corners as round as the pane's 10px. A pane of
+  // about the old shape needs no frame: its own outline matches. Blending the
+  // pane's scale and the frame's reach separately would bend the frame's path
+  // past both rectangles.
+  // `box` is where the pane is laid out (by default where it goes), and the
+  // opacity runs from `opacity` to `opacityEnd` (by default 1). A pane fading
+  // out (FOCUS_FLIP_GHOSTS of them at most) takes FOCUS_FLIP_FADE_MS.
+  var FOCUS_FLIP_MS = 340, FOCUS_FLIP_STEPS = 12;
+  var FOCUS_FLIP_FADE_MS = 220, FOCUS_FLIP_GHOSTS = 24;
+  function focusFlipKeyframes(from, to, opacity, box, opacityEnd) {
+    box = box || to;
+    var fade = opacityEnd == null ? 1 : opacityEnd;
+    var at = function (q) {
+      var mix = function (a, b) { return a + (b - a) * q; };
+      var left = mix(from.left, to.left), top = mix(from.top, to.top);
+      var width = mix(from.width, to.width), height = mix(from.height, to.height);
+      var scale = Math.min(width / box.width, height / box.height);
+      return {
+        scale: scale,
+        dx: left + width / 2 - (box.left + box.width * scale / 2),
+        dy: top + height / 2 - (box.top + box.height * scale / 2),
+        fx: Math.max(0, (width / scale - box.width) / 2),
+        fy: Math.max(0, (height / scale - box.height) / 2)
+      };
+    };
+    var start = at(0);
+    if (!(start.scale > 0 && isFinite(start.scale))) return null;
+    var framed = (start.fx * start.scale > 2 || start.fy * start.scale > 2);
+    var frames = [];
+    for (var i = 0; i <= FOCUS_FLIP_STEPS; i++) {
+      var q = i / FOCUS_FLIP_STEPS, step = at(q);
+      var frame = {
+        offset: q,
+        transform: 'translate(' + step.dx.toFixed(2) + 'px,' + step.dy.toFixed(2) + 'px) scale(' +
+          step.scale.toFixed(5) + ')',
+        opacity: opacity + (fade - opacity) * q
+      };
+      if (framed) {
+        frame['--cv-flip-x'] = (-step.fx).toFixed(2) + 'px';
+        frame['--cv-flip-y'] = (-step.fy).toFixed(2) + 'px';
+        frame['--cv-flip-r'] = (10 / step.scale).toFixed(2) + 'px';
+      }
+      frames.push(frame);
+    }
+    return { frames: frames, framed: framed, scale: start.scale };
+  }
+  function clearFocusFlip(p) {
+    if (p._focusFlip) p._focusFlip.cancel();
+    p._focusFlip = null;
+    p.pane.classList.remove('cv-flip-frame', 'cv-flip-head-later', 'cv-flip-lead');
+    // A faded pane goes back off the strip (placeFocusStrip() keeps it so).
+    if (p.pane.classList.contains('cv-flip-ghost')) {
+      p.pane.classList.remove('cv-flip-ghost');
+      p.pane.classList.add('cv-strip-off');
+      p.pane.style.position = p.pane.style.left = p.pane.style.top = '';
+    }
   }
   // The per-panel "zoom to selection" is only an action while there IS one, and
   // only on a panel that lays cells out in a plane -- a rotated cloud has no
@@ -3309,6 +4291,7 @@
       project(p);
     }
     drawPanel(p);
+    syncGridView(p);
   }
   function zoomStep(p, factor) {
     if (!p._SX || !p._SY) return;
@@ -3640,8 +4623,17 @@
     var context = view ? view.dataset_context : D && D.dataset_context;
     var identity = view ? view.datasetIdentity : D && linkedBundleResourceIdentity(D);
     if (message.unavailable || !context || !sameDatasetContext(context, message.dataset_context)) return;
+    var waits = 0;
     var prefetch = function () {
       if (selectionSpec !== message) return;
+      // Linked views asks the same server for its second message (its
+      // sections and other projections) at the same time: reading these
+      // columns first held it back (three numeric columns of the Allen atlas,
+      // 47 MB). They wait for it, up to 30 s.
+      if (!singleActive && D && D.progressive && waits++ < 60) {
+        setTimeout(function () { whenIdle(prefetch); }, 500);
+        return;
+      }
       (message.metadata_columns || []).forEach(function (name) {
         clientColumn(message, name, identity).catch(function () {});
       });
@@ -3849,8 +4841,9 @@
         '"></i><span>' + esc(item.label) + '</span></span>' +
         '<span class="cerebro-selection-composition-track"><i style="width:' +
         percent.toFixed(1) + '%;background:' + color + '"></i></span>' +
-        '<span class="cerebro-selection-composition-value">' + fmt(item.count) +
-        ' · ' + Math.round(percent) + '%</span></div>';
+        '<span class="cerebro-selection-composition-value">' +
+        '<span class="cerebro-selection-composition-count">' + fmt(item.count) +
+        ' · </span>' + Math.round(percent) + '%</span></div>';
     }).join('');
     el.innerHTML = '<div class="cerebro-selection-composition-card" role="status" aria-live="polite">' +
       '<div class="cerebro-selection-composition-head">' +
@@ -3858,9 +4851,98 @@
       'aria-label="Move composition card; use arrow keys" title="Drag to move">' +
       '<span aria-hidden="true">&#10247;</span></button>' +
       '<strong>Composition</strong><span>' + fmt(rows.length) + ' / ' + fmt(spec.total) +
-      '</span></div><div class="cerebro-selection-composition-sub">Selected ' +
+      '</span><button type="button" class="cerebro-selection-composition-toggle" ' +
+      'aria-label="Collapse or expand the composition card" title="Collapse / expand">' +
+      '</button></div><div class="cerebro-selection-composition-sub">Selected ' +
       esc(spec.unit || 'cells') + ' · by ' + esc(column.name) +
       '</div><div class="cerebro-selection-composition-rows">' + rowsHtml + '</div></div>';
+  }
+  // ---- where the Composition card sits ------------------------------------
+  // With several panels the card sits at the bottom left of the panel the
+  // cells were selected in, not of the whole workspace. It moves with a new
+  // selection in another panel; a card dragged keeps its place until then.
+  function compositionSourcePane() {
+    if (!selectionSourceSpace) return null;
+    var shown = panels.filter(function (p) {
+      return p.spaceId && p.pane && !p.pane.classList.contains('cv-hidden') &&
+        p.pane.getClientRects().length;
+    });
+    if (shown.length < 2) return null;
+    var hit = shown.filter(function (p) { return p.spaceId === selectionSourceSpace; })[0];
+    return hit ? hit.pane : null;
+  }
+  function anchorCompositionSlot(slot, pane) {
+    if (!slot || !slot.parentElement) return;
+    var key = pane ? String(selectionSourceSpace) : '';
+    if (slot.dataset.anchor !== key) {
+      slot.dataset.anchor = key;
+      delete slot.dataset.dragged;
+      slot.style.left = slot.style.top = slot.style.bottom = slot.style.maxWidth = '';
+    }
+    if (!pane || slot.dataset.dragged === 'true' ||
+        window.matchMedia('(max-width: 700px)').matches) return;
+    var frame = slot.parentElement.getBoundingClientRect(), r = pane.getBoundingClientRect();
+    slot.style.left = Math.round(r.left - frame.left + 12) + 'px';
+    slot.style.top = 'auto';
+    slot.style.bottom = Math.round(frame.bottom - r.bottom + 12) + 'px';
+    slot.style.maxWidth = Math.max(120, Math.round(r.width - 24)) + 'px';
+  }
+  function anchorComposition(id) {
+    var pane = compositionSourcePane();
+    if (!id) { anchorCompositionSlot(linkedCompositionSlot(false), pane); return; }
+    var output = $(id + '_composition');
+    if (!output) return;
+    anchorCompositionSlot(output, pane);
+    var twin = output.nextElementSibling;
+    if (twin && twin.getAttribute('data-client-twin') === output.id) {
+      anchorCompositionSlot(twin, pane);
+    }
+  }
+  // Linked views' card: the same floating card, over its panels.
+  function linkedCompositionSlot(create) {
+    var panes = document.querySelector('#shiny-tab-coordinated_views .cv-panes');
+    var frame = panes && panes.parentElement;
+    if (!frame) return null;
+    var slot = frame.querySelector('.cerebro-selection-composition-slot[data-linked]');
+    if (!slot && create) {
+      slot = document.createElement('div');
+      slot.className = 'cerebro-selection-composition-slot';
+      slot.setAttribute('data-linked', 'true');
+      if (getComputedStyle(frame).position === 'static') frame.style.position = 'relative';
+      frame.appendChild(slot);
+    }
+    return slot;
+  }
+  function renderLinkedComposition() {
+    var groupName = compGroupName(), g = catOf(groupName);
+    var slot = linkedCompositionSlot(!singleActive && !!(sel && sel.size && g));
+    if (!slot) return;
+    if (singleActive || !sel || !sel.size || !g) {
+      slot.innerHTML = '';
+      slot.style.display = 'none';
+      return;
+    }
+    slot.style.display = '';
+    var rows = [];
+    sel.forEach(function (i) { rows.push(i); });
+    renderClientComposition(slot, { total: D.n, unit: 'cells' }, rows, {
+      name: groupLabel(groupName),
+      levels: g.levels,
+      values: g.values,
+      colors: g.levels.map(function (level, k) {
+        return (g.colors && g.colors[k]) || PAL[k % PAL.length];
+      })
+    });
+    anchorCompositionSlot(slot, compositionSourcePane());
+  }
+  if (window.jQuery) {
+    window.jQuery(document).on('shiny:value', function (event) {
+      var id = event.target && event.target.id;
+      if (!id || !/_composition$/.test(id)) return;
+      window.requestAnimationFrame(function () {
+        anchorComposition(id.replace(/_composition$/, ''));
+      });
+    });
   }
   function updateClientSelectionSummary(id) {
     var view = singleView(id), spec = clientSummarySpec(id, view);
@@ -3874,7 +4956,11 @@
       'cerebro-selection-composition-slot');
     var serial = ++clientSummarySerial, rows = clientSelectedRows();
     var summaryConfig = CLIENT_SUMMARY_VIEWS[id];
-    var source = summaryConfig.source || (view.meta && view.meta.space_label);
+    // A grid names the panel the cells were selected in: a section or its
+    // embedding, not the frame.
+    var source = summaryConfig.source ||
+      (singleActive === id && singleGridSpaces.length && selectionSource) ||
+      (view.meta && view.meta.space_label);
     renderClientCount(countEl, spec, rows, null, source);
     // The groups the server summarised by (cerebroSelectionSummary()).
     var groups = spec.groups || [];
@@ -3895,6 +4981,7 @@
       names.forEach(function (name, k) { byName[name] = columns[k]; });
       renderClientCount(countEl, spec, rows, byName[profileName], source);
       renderClientComposition(compositionEl, spec, rows, byName[compositionName]);
+      anchorComposition(id);
     }).catch(function () { clientSummaryFailed(id); });
     renderClientSelectionPlot(id);
   }
@@ -4352,11 +5439,14 @@
         client_summary: clientSummary,
         client_table: clientTable,
         client_expression: clientExpression,
+        source: selectionSource || null,
         dataset_context: activeView && activeView.dataset_context
       } : {
         x: pendingStableSelection || !arr ? [] : x,
         y: pendingStableSelection || !arr ? [] : y,
         ids: pendingStableSelection || !arr ? [] : arr,
+        // The panel the cells were selected in (a Spatial grid's section).
+        source: selectionSource || null,
         dataset_context: activeView && activeView.dataset_context
       });
       if (eventKind === 'primary' && renderKey != null) {
@@ -4454,9 +5544,53 @@
     return label;
   }
 
+  // How many of the selected cells each lens maps: a chip per panel, counted
+  // a slice of the main thread at a time and filled in as the counts come
+  // (tens of thousands of cells in the 60 sections of the Allen atlas took
+  // 0.2 s in the task that draws the selection).
+  var coverageTimer = 0;
+  function renderSelectionCoverage(sourceBaseId) {
+    clearTimeout(coverageTimer);
+    var coverage = $('cv-selcoverage');
+    if (!coverage) return;
+    var cohort = sel, total = sel.size, seenSpaces = {};
+    var queue = panels.filter(function (p) { return p.spaceId && p.ok; });
+    coverage.textContent = '';
+    coverage.hidden = true;
+    var step = function () {
+      var began = performance.now();
+      while (queue.length) {
+        if (sel !== cohort) return;
+        var p = queue.shift();
+        var space = spaceById[p.spaceId];
+        var baseId = (space && space._baseSpaceId) || p.spaceId;
+        if (baseId === sourceBaseId || seenSpaces[baseId]) continue;
+        seenSpaces[baseId] = true;
+        var n = 0; cohort.forEach(function (i) { if (p.ok[i]) n++; });
+        var baseSpace = spaceById[baseId] || space;
+        var label = baseSpace ? baseSpace.label : baseId;
+        var child = document.createElement('span');
+        var description = label + ': ' + fmt(n) + ' of ' + fmt(total) +
+          ' selected cells mapped';
+        child.className = 'cv-coverage-item';
+        child.textContent = compactSpaceLabel(baseSpace, label) + ' ' + fmt(n);
+        child.title = description;
+        child.setAttribute('aria-label', description);
+        coverage.appendChild(child);
+        coverage.hidden = false;
+        if (queue.length && performance.now() - began > 12) {
+          coverageTimer = setTimeout(step, 0);
+          return;
+        }
+      }
+    };
+    step();
+  }
+
   function renderSelbar() {
     var bar = $('cv-selbar');
     if (!bar) return;
+    clearTimeout(coverageTimer);
     if (sel && sel.size) {
       var kicker = $('cv-sel-kicker');
       if (kicker) {
@@ -4508,37 +5642,7 @@
 
       // A cohort remains the same set even when one lens cannot place every
       // member. Report that coverage rather than silently making it look smaller.
-      var mapped = [], seenSpaces = {};
-      panels.forEach(function (p) {
-        if (!p.spaceId || !p.ok) return;
-        var space = spaceById[p.spaceId];
-        var baseId = (space && space._baseSpaceId) || p.spaceId;
-        if (baseId === sourceBaseId || seenSpaces[baseId]) return;
-        seenSpaces[baseId] = true;
-        var n = 0; sel.forEach(function (i) { if (p.ok[i]) n++; });
-        var baseSpace = spaceById[baseId] || space;
-        mapped.push({
-          space: baseSpace,
-          label: baseSpace ? baseSpace.label : baseId,
-          count: n
-        });
-      });
-      var coverage = $('cv-selcoverage');
-      if (coverage) {
-        coverage.textContent = '';
-        coverage.hidden = !mapped.length;
-        mapped.forEach(function (item) {
-          var child = document.createElement('span');
-          var description = item.label + ': ' + fmt(item.count) + ' of ' +
-            fmt(sel.size) + ' selected cells mapped';
-          child.className = 'cv-coverage-item';
-          child.textContent = compactSpaceLabel(item.space, item.label) + ' ' +
-            fmt(item.count);
-          child.title = description;
-          child.setAttribute('aria-label', description);
-          coverage.appendChild(child);
-        });
-      }
+      renderSelectionCoverage(sourceBaseId);
     } else if (pick != null && nicheSet) {
       // A picked Trekker nucleus is the single-cell counterpart of an active
       // cohort. Keep it in the same shared-state surface so its identity,
@@ -4720,6 +5824,7 @@
     }, { priority: 'event' });
   }
   function renderReadout() {
+    renderLinkedComposition();
     var host = $('cv-readout'); if (!host) return;
     host.style.display = '';
     updateNicheEnabled();
@@ -4738,17 +5843,9 @@
     // (only numeric meta) has no composition to show — the clonotype readout and
     // the selected-cell panels below still work, so we simply omit this column
     // instead of throwing on g.values.
-    var compGroup = compGroupName();
-    var g = catOf(compGroup);
+    // The composition is the floating card over the panels
+    // (renderLinkedComposition()).
     var compHtml = '';
-    if (g) {
-      var comp = {};
-      idxs.forEach(function (i) { var lv = g.values[i]; comp[lv] = (comp[lv] || 0) + 1; });
-      // Same rise as the server-rendered plot/table below, first in the stagger.
-      compHtml = '<div class="cv-readcol cv-rise"><h4 class="cv-read-h">Composition ' +
-        '<span class="cv-read-sub">by ' + esc(groupLabel(compGroup)) + '</span></h4>' +
-        '<div class="cv-bars">' + compBars(comp, g) + '</div></div>';
-    }
 
     // top clonotypes among the selection (the immune axis in the loop)
     var cloneHtml = '';
@@ -4791,6 +5888,7 @@
     }
 
     host.innerHTML = fieldSummaryHtml() + compHtml + cloneHtml;
+    if (!host.innerHTML) host.style.display = 'none';
 
     // wire clonotype-row -> select its cells (repertoire selection into the loop)
     Array.prototype.forEach.call(host.querySelectorAll('.cv-crow'), function (tr) {
@@ -4885,6 +5983,7 @@
     var L = $('cv-legend'); if (!L) return;
     var singlePayload = singleActive && singleView(singleActive);
     L.innerHTML = '';
+    L.classList.remove('cv-legend-long');
     if (singlePayload && singlePayload.meta && singlePayload.meta.show_color_scale === false) {
       renderColorbar(false);
       renderPanelScales(false);
@@ -4924,13 +6023,16 @@
     if (fld && fld.rgbChannel) {
       renderColorbar(false);
       renderPanelScales(true);
+      // One entry per channel: the Spatial grid draws each channel once per
+      // section, all on that channel's one range.
+      var listed = {};
       panels.forEach(function (panel) {
         var field = fieldOf(panel);
-        if (!panel.spaceId || !field || !field.rgbChannel) return;
-        var range = document.createElement('span');
-        range.className = 'cv-lg';
-        range.textContent = field.label + ': 0–' + Number(field.max).toPrecision(3);
-        L.appendChild(range);
+        if (!panel.spaceId || !field || !field.rgbChannel || listed[field.rgbChannel]) return;
+        listed[field.rgbChannel] = true;
+        item('cv-lg cv-rgb-lg', '<span class="cv-dot" style="background:' +
+          RGB_CHANNELS[field.rgbChannel] + '"></span>' + esc(field.label) +
+          ' <span class="cv-rgb-range">0–' + esc(Number(field.max).toPrecision(3)) + '</span>');
       });
       return;
     }
@@ -5005,14 +6107,36 @@
       var col = cssColor((g.colors && g.colors[li]) || PAL[li % PAL.length]);
       item('cv-lg' + (hidden.has(li) ? ' off' : ''),
         '<span class="cv-dot" style="background:' + col + '"></span>' +
-        esc(nm) + ' <span class="cv-lg-ct">(' + (counts[li] || 0) + ')</span>'
+        // A single group (such as "No gene selected") is every cell: no count.
+        esc(nm) + (g.levels.length > 1
+          ? ' <span class="cv-lg-ct">(' + (counts[li] || 0) + ')</span>' : '')
       ).onclick = function () {
         if (hidden.has(li)) hidden.delete(li); else hidden.add(li);
         reportSingleHiddenGroups(); renderLegend(); drawAll();
       };
     });
     appendEvidenceLegend();
+    // Hundreds of groups (the Allen atlas's 338 subclasses) would push the
+    // plots off the page: a long legend keeps three rows, scrolls, and opens
+    // in full on request.
+    if (g.levels.length > LEGEND_LONG) {
+      L.classList.add('cv-legend-long');
+      L.classList.toggle('cv-legend-open', legendOpen);
+      var more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'cv-legend-more';
+      more.textContent = legendOpen ? 'Show less' : 'Show all ' + g.levels.length;
+      more.setAttribute('aria-expanded', legendOpen ? 'true' : 'false');
+      more.onclick = function (event) {
+        event.stopPropagation();
+        legendOpen = !legendOpen;
+        renderLegend();
+        _layoutKey = null; resizeAll();
+      };
+      L.appendChild(more);
+    }
   }
+  var LEGEND_LONG = 24, legendOpen = false;
 
   // ---- hover tooltip -------------------------------------------------------
   // Three depths, and each is reached deliberately from the one before:
@@ -5230,7 +6354,10 @@
     orderedSpaces().forEach(function (id) {
       var sp = spaceById[id];
       if (!sp) return;
-      var x = sp.x[cardCell], y = sp.y[cardCell];
+      // Sections share their position arrays: a cell of another section has
+      // a position in them but none in this one.
+      var held = !sp._cells || sortedIndexOf(sp._cells, cardCell) >= 0;
+      var x = held ? sp.x[cardCell] : NaN, y = held ? sp.y[cardCell] : NaN;
       rows.push([sp.label, (x == null || isNaN(x)) ? 'not positioned'
         : (fmtVal(x) + ',  ' + fmtVal(y))]);
     });
@@ -5720,7 +6847,7 @@
     });
     brushTarget.addEventListener('mousedown', function (e) {
       if (Date.now() < (p.ignoreMouseUntil || 0)) return;
-      if (interactionIsStatic()) return;
+      if (interactionIsStatic() || isFocusThumbnail(p)) return;
       if (e.target.closest && e.target.closest('button, select, input, a, .cv-tip')) return;
       clearTransientHover();
       requestSingleAux();
@@ -5784,6 +6911,7 @@
         // not the points. Pan and orbit move the points.
         if (p.panning || p.orbiting || !p.interactionCtx) draw(p);
         else drawHoverOverlay(p);
+        if (p.panning) syncGridView(p);
       });
     };
     var settleDragFrame = function () {
@@ -5820,6 +6948,9 @@
         return;
       }
       if (!p.drag) return;
+      // A frame that lands mid-drag (a late section, a new colouring) clears
+      // the outline under the pointer: the drag ends there.
+      if (!p.lasso) { p.drag = false; p.moved = false; return; }
       var q = pos(e);
       if (selectMode === 'box') {
         // rectangle from the drag origin to the cursor; inPoly treats it as a
@@ -5922,6 +7053,14 @@
     }
   }
 
+  // A panel shown as a thumbnail in the strip of an enlarged view: it takes no
+  // hover, selection or zoom (coordviews.css), only a click that enlarges it.
+  function isFocusThumbnail(p) {
+    var pane = p && p.pane;
+    return !!(focusPanel && pane && p.key !== focusPanel &&
+      pane.classList.contains('cv-focus-context') &&
+      pane.parentElement && pane.parentElement.classList.contains('cv-focus-grid'));
+  }
   // Pane-level gestures: any press in a spatial pane makes its section the
   // active one; its title (click) or plot (double-click) focuses the panel.
   function wirePane(p) {
@@ -5929,7 +7068,14 @@
       if (isSpatialSpace(spaceById[p.spaceId])) activateSpatial(p.spaceId);
     });
     p.pane.addEventListener('click', function (e) {
-      if (e.target.closest('.cv-ptitle') && canFocusPanel() && p.spaceId) {
+      if (!p.spaceId) return;
+      // With a panel enlarged, a thumbnail only leads to its panel: a click
+      // anywhere on it enlarges it (its Enlarge button acts by itself).
+      if (isFocusThumbnail(p)) {
+        if (!e.target.closest('.cv-focus-btn')) setFocusPanel(p.key);
+        return;
+      }
+      if (e.target.closest('.cv-ptitle') && canFocusPanel()) {
         setFocusPanel(p.key);
       }
     });
@@ -5949,7 +7095,6 @@
   // per-dataset arrays.
   function buildPanels() {
     var paneEls = document.querySelectorAll('.coordviews-page .cv-panes > .cv-pane');
-    var dpr = window.devicePixelRatio || 1;
     for (var index = panels.length; index < paneEls.length; index++) {
       var key = panelKey(index), low = key.toLowerCase();
       var cv = $('cv-cv-' + low); if (!cv) continue;
@@ -5962,17 +7107,11 @@
         underlayCanvas: null, underlayCtx: null,
         interactionCanvas: null, interactionCtx: null,
         gpu: null, gpuCanvas: null, gpuData: null, gpuDataState: null,
-        gpuTransformOnly: false };
-      attachGpu(p);
-      attachInteractionLayer(p);
+        gpuTransformOnly: false, _gpuDisabled: false };
       prepareCanvasSemantics(p);
-      // The minimap is a FIXED size, so its backing store is set once here
-      // rather than on every re-fit.
-      if (mini) {
-        mini.width = MINI * dpr; mini.height = MINI * dpr;
-        p.mctx = mini.getContext('2d');
-        p.mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      }
+      // Interaction and minimap canvases allocate lazily on first hover/drag or
+      // zoom (drawHoverOverlay() / drawMinimap()), keeping multi-section grids
+      // down to a single 2D canvas per card until interacted with.
       panels.push(p);
       wireHover(p); wireBrush(p);
       if (p.pane) wirePane(p);
@@ -6377,7 +7516,7 @@
     var sp = activeSpatial();
     var hasImg = !!(sp && currentImage(sp));
     revealEl($('cv-clone-layout-ctl'), hasClone);
-    revealEl($('coordviews_image_ui'), hasImg);
+    revealEl(imageBarEl(), hasImg);
   }
 
   // ---- clonal-panel layout (client-side, instant) -------------------------
@@ -6496,9 +7635,69 @@
       ? { label: fld.label || 'Continuous value', values: fld.raw || fld.v }
       : null;
   }
+  // The six nearest other points of each point, nearest first and, at one
+  // distance, the lower index first: what comparing every pair gives, found
+  // through a grid of buckets instead (a section's 1,000 sampled cells: about
+  // 30 candidates a point instead of 1,000, 25 ms to 2 ms).
+  function sixNearest(px, py) {
+    var n = px.length, K = Math.min(6, n - 1), i, out = new Array(n);
+    var x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (i = 0; i < n; i++) {
+      if (px[i] < x0) x0 = px[i]; if (px[i] > x1) x1 = px[i];
+      if (py[i] < y0) y0 = py[i]; if (py[i] > y1) y1 = py[i];
+    }
+    var side = Math.max(1, Math.floor(Math.sqrt(n / 3)));
+    var size = Math.max(x1 - x0, y1 - y0) / side || 1;
+    var gx = Math.floor((x1 - x0) / size) + 1, gy = Math.floor((y1 - y0) / size) + 1;
+    var head = new Int32Array(gx * gy).fill(-1), next = new Int32Array(n);
+    var cx = new Int32Array(n), cy = new Int32Array(n);
+    for (i = 0; i < n; i++) {
+      cx[i] = Math.min(gx - 1, Math.floor((px[i] - x0) / size));
+      cy[i] = Math.min(gy - 1, Math.floor((py[i] - y0) / size));
+      var cell = cy[i] * gx + cx[i];
+      next[i] = head[cell]; head[cell] = i;
+    }
+    var maxRing = Math.max(gx, gy);
+    for (i = 0; i < n; i++) {
+      var best = [], xi = px[i], yi = py[i];
+      for (var r = 0; r <= maxRing; r++) {
+        for (var by = cy[i] - r; by <= cy[i] + r; by++) {
+          if (by < 0 || by >= gy) continue;
+          // Only the ring's border: its first and last rows whole, the others
+          // at their two ends.
+          var edge = by === cy[i] - r || by === cy[i] + r;
+          for (var bx = cx[i] - r; bx <= cx[i] + r; bx += edge || r === 0 ? 1 : 2 * r) {
+            if (bx < 0 || bx >= gx) continue;
+            for (var j = head[by * gx + bx]; j >= 0; j = next[j]) {
+              if (j === i) continue;
+              var dx = xi - px[j], dy = yi - py[j], d = dx * dx + dy * dy;
+              if (best.length === K && (d > best[K - 1].d ||
+                  (d === best[K - 1].d && j > best[K - 1].j))) continue;
+              var at = best.length;
+              while (at > 0 && (best[at - 1].d > d ||
+                  (best[at - 1].d === d && best[at - 1].j > j))) at--;
+              best.splice(at, 0, { j: j, d: d });
+              if (best.length > K) best.pop();
+            }
+          }
+        }
+        // A point beyond this ring is at least (r - 1) buckets away, kept
+        // one bucket short of the bound for points on a bucket's edge.
+        var reach = (r - 1) * size;
+        if (best.length === K && r >= 1 && best[K - 1].d < reach * reach) break;
+      }
+      out[i] = best;
+    }
+    return out;
+  }
   function spatialMoran(space, values) {
     var valid = [], i;
-    for (i = 0; i < D.n; i++) {
+    // A section of a grid shares its position arrays with the others and
+    // names its own cells.
+    var cells = space._cells && space._cells.length <= D.n ? space._cells : null;
+    var visits = cells ? cells.length : D.n;
+    for (var at = 0; at < visits; at++) {
+      i = cells ? cells[at] : at;
       var x = space.x[i], y = space.y[i], v = values[i];
       if (x == null || y == null || v == null || isNaN(x) || isNaN(y) || isNaN(v)) continue;
       valid.push(i);
@@ -6519,18 +7718,11 @@
     if (!denom) return 0;
     var adj = new Array(n);
     for (i = 0; i < n; i++) adj[i] = new Set();
+    var px = new Float64Array(n), py = new Float64Array(n);
+    for (i = 0; i < n; i++) { px[i] = +space.x[idx[i]]; py[i] = +space.y[idx[i]]; }
+    var neighbours = sixNearest(px, py);
     for (i = 0; i < n; i++) {
-      var nearest = [], ii = idx[i], xi = +space.x[ii], yi = +space.y[ii];
-      for (var j = 0; j < n; j++) {
-        if (j === i) continue;
-        var jj = idx[j], dx = xi - +space.x[jj], dy = yi - +space.y[jj];
-        var d = dx * dx + dy * dy;
-        var at = nearest.length;
-        while (at > 0 && nearest[at - 1].d > d) at--;
-        nearest.splice(at, 0, { j: j, d: d });
-        if (nearest.length > 6) nearest.pop();
-      }
-      nearest.forEach(function (q) { adj[i].add(q.j); adj[q.j].add(i); });
+      neighbours[i].forEach(function (q) { adj[i].add(q.j); adj[q.j].add(i); });
     }
     var num = 0, weight = 0;
     for (i = 0; i < n; i++) {
@@ -6543,34 +7735,66 @@
     }
     return weight ? (n / weight) * num / denom : null;
   }
-  function updateMoranBadges() {
-    var continuous = continuousValues();
-    panels.forEach(function (p) {
-      var badge = $('cv-moran-' + p.key.toLowerCase());
-      if (!badge) return;
-      var sp = spaceById[p.spaceId];
-      if (!isSpatialSpace(sp)) {
-        badge.style.display = 'none'; badge.textContent = '';
-        delete badge.dataset.value; delete badge.dataset.field;
-        return;
+  // Moran's I of each spatial panel, for the continuous values drawn. A score
+  // is kept per values array and space, and the panels are scored a slice of
+  // the main thread at a time: the 59 sections of the Allen atlas took 1.7 s
+  // in one task each time a gene was chosen. `only` (spaces by id) adds those
+  // panels alone, such as the sections a streaming grid has just received.
+  var moranScores = typeof WeakMap === 'function' ? new WeakMap() : null;
+  var moranQueue = [], moranTimer = 0, MORAN_SLICE_MS = 16;
+  // Kept while the space keeps its unit positions: cells that arrive later
+  // (a streaming grid) give it new ones. A panel without enough cells yet
+  // (no score) is scored again.
+  function moranScore(sp, values) {
+    var byValues = moranScores && moranScores.get(values);
+    var kept = byValues && byValues.get(sp);
+    if (kept && kept.unit === sp._unit) return kept.score;
+    var score = spatialMoran(sp, values);
+    if (moranScores && score != null) {
+      if (!byValues) { byValues = new Map(); moranScores.set(values, byValues); }
+      byValues.set(sp, { unit: sp._unit, score: score });
+    }
+    return score;
+  }
+  function hideMoranBadge(badge) {
+    badge.style.display = 'none'; badge.textContent = '';
+    delete badge.dataset.value; delete badge.dataset.field;
+  }
+  function scoreMoranPanel(p, continuous) {
+    var badge = $('cv-moran-' + p.key.toLowerCase());
+    if (!badge) return;
+    var sp = spaceById[p.spaceId];
+    if (!isSpatialSpace(sp) || !continuous) { hideMoranBadge(badge); return; }
+    var score = moranScore(sp, continuous.values);
+    if (score == null || !isFinite(score)) {
+      badge.style.display = 'none'; return;
+    }
+    var value = Math.max(-1, Math.min(1, score));
+    badge.dataset.value = value.toFixed(6);
+    badge.dataset.field = continuous.label;
+    badge.textContent = "Moran's I " + value.toFixed(3);
+    badge.title = continuous.label +
+      " · each cell's six nearest spatial neighbours · click for details";
+    badge.style.display = '';
+  }
+  function updateMoranBadges(only) {
+    var add = panels.filter(function (p) { return !only || only[p.spaceId]; });
+    moranQueue = only ? moranQueue.concat(add.filter(function (p) {
+      return moranQueue.indexOf(p) < 0;
+    })) : add;
+    clearTimeout(moranTimer);
+    var run = function () {
+      moranTimer = 0;
+      var continuous = continuousValues(), began = performance.now();
+      while (moranQueue.length) {
+        scoreMoranPanel(moranQueue.shift(), continuous);
+        if (moranQueue.length && performance.now() - began > MORAN_SLICE_MS) {
+          moranTimer = setTimeout(run, 0);
+          return;
+        }
       }
-      if (!continuous) {
-        badge.style.display = 'none'; badge.textContent = '';
-        delete badge.dataset.value; delete badge.dataset.field;
-        return;
-      }
-      var score = spatialMoran(sp, continuous.values);
-      if (score == null || !isFinite(score)) {
-        badge.style.display = 'none'; return;
-      }
-      var value = Math.max(-1, Math.min(1, score));
-      badge.dataset.value = value.toFixed(6);
-      badge.dataset.field = continuous.label;
-      badge.textContent = "Moran's I " + value.toFixed(3);
-      badge.title = continuous.label +
-        " · each cell's six nearest spatial neighbours · click for details";
-      badge.style.display = '';
-    });
+    };
+    run();
   }
   function openMoranDialog(badge) {
     if (!badge || !badge.dataset.value) return;
@@ -6622,9 +7846,10 @@
       optsOf(Object.keys(D.fields || {}), FIELD_PREFIX, function (k) {
         return D.fields[k].label || k;
       }));
-    html += grp('Expression',
-      '<option value="' + GENE_MODE + '">Mean gene expression</option>' +
-      '<option value="' + GENE_PANELS_MODE + '">Per-gene expression panels</option>' +
+    // Named as Gene expression's Display mode names them.
+    html += grp('Gene expression',
+      '<option value="' + GENE_MODE + '">Mean expression</option>' +
+      '<option value="' + GENE_PANELS_MODE + '">Separate panels</option>' +
       '<option value="' + RGB_MODE + '">RGB co-expression</option>');
     destroyPicker(sel);
     sel.innerHTML = html;
@@ -6775,11 +8000,44 @@
       persist: false,
       closeAfterSelect: false,
       onChange: function (values) {
-        setSelectedProjections(values == null ? [] : [].concat(values));
+        values = values == null ? [] : [].concat(values);
+        var kept = values.slice(0, capRoom('proj'));
+        if (kept.length < values.length) this.setValue(kept, true);
+        setSelectedProjections(kept);
       }
     });
     selEl.selectize.setValue(selectedProjections, true);
   }
+  // How many more panels a picker may take under the panel limit: the limit
+  // less what the other picker shows.
+  function capRoom(kind) {
+    var cap = panelCap();
+    if (!cap) return Infinity;
+    return Math.max(0, cap - (kind === 'proj' ? selectedSpatial : selectedProjections).length);
+  }
+  // At most the limit of panels, the embeddings first; whether it cut anything.
+  function trimSelectionToCap() {
+    var cap = panelCap();
+    if (!cap || selectedProjections.length + selectedSpatial.length <= cap) return false;
+    selectedProjections = selectedProjections.slice(0, cap);
+    selectedSpatial = selectedSpatial.slice(0, cap - selectedProjections.length);
+    return true;
+  }
+  // The limit came or went (cell_points_gpu.js): Linked views shows what it may,
+  // the Spatial grid is arranged again, the Columns field is fixed or freed.
+  function applyPanelCap() {
+    if (!D) return;
+    if (trimSelectionToCap()) {
+      setSelectedProjections(selectedProjections);
+      setSelectedSpatial(selectedSpatial);
+      fillProjPicker();
+      fillSpatialPicker();
+    }
+    lockColumns(document.getElementById('coordviews_columns'));
+    lockColumns(document.getElementById('spatial_projection_grid_columns'));
+    if (sectionGridActive()) applySectionGrid(); else if (!singleActive) { _layoutKey = null; resizeAll(); drawAll(); }
+  }
+  if (window.CerebroPanelCap) window.CerebroPanelCap.onChange(applyPanelCap);
   function setSelectedProjections(names) {
     var available = D && D.projections ? Object.keys(D.projections) : [];
     names = names.filter(function (name, index) {
@@ -6808,6 +8066,11 @@
     return !!(sp && (sp._spatialSample || sp.background_scope));
   }
   function backgroundSpaces() {
+    // Spatial shows its own sections, one panel each; not Linked views' picks.
+    if (singleActive) {
+      return singleSpaceIds.map(function (spaceId) { return spaceById[spaceId]; })
+        .filter(isSpatialSpace);
+    }
     var out = selectedSpatial.map(function (name) {
       return spaceById[spatialId(name)];
     }).filter(Boolean);
@@ -6843,6 +8106,49 @@
     window.dispatchEvent(new CustomEvent('cerebro:view-operation', {
       detail: { id: id, text: text, dataset_context: currentDatasetContext() }
     }));
+  }
+  // Decoded pictures by file MD5, least recently used first, up to a total
+  // pixel count (about 400 MB decoded): enough for several data sets' sections.
+  var decodedImages = new Map();
+  var DECODED_IMAGE_PIXELS = 1e8;
+  function decodedImageKey(uri) {
+    var match = /cerebro-image-([0-9a-f]{32})/.exec(String(uri || ''));
+    return match ? match[1] : null;
+  }
+  function rememberDecodedImage(key, im) {
+    var pixels = function (el) { return (el.naturalWidth || 0) * (el.naturalHeight || 0); };
+    if (pixels(im) > DECODED_IMAGE_PIXELS) return;
+    decodedImages.delete(key);
+    decodedImages.set(key, im);
+    var total = 0;
+    decodedImages.forEach(function (el) { total += pixels(el); });
+    while (total > DECODED_IMAGE_PIXELS && decodedImages.size > 1) {
+      var oldest = decodedImages.keys().next().value;
+      total -= pixels(decodedImages.get(oldest));
+      decodedImages.delete(oldest);
+    }
+  }
+
+  // In a grid of many panels a picture that is ready paints the panels showing
+  // its space, in the next frame, together with the pictures that arrive
+  // meanwhile. Drawing every panel for every picture was 52 x 52 draws for the
+  // 52 sections of a Kukanja data set in Linked views.
+  var imageRedraw = null;
+  function redrawForImage(space) {
+    // Few panels: draw them all at once, as before.
+    if (stagePanels < OFFSTAGE_MIN_PANELS ||
+        typeof window.requestAnimationFrame !== 'function') { drawAll(); return; }
+    if (!imageRedraw) {
+      imageRedraw = [];
+      window.requestAnimationFrame(function () {
+        var spaces = imageRedraw;
+        imageRedraw = null;
+        panels.forEach(function (p) {
+          if (p.spaceId && spaces.indexOf(spaceById[p.spaceId]) >= 0) drawPanel(p);
+        });
+      });
+    }
+    if (imageRedraw.indexOf(space) < 0) imageRedraw.push(space);
   }
   function loadSpaceImage(space) {
     if (!space) return;
@@ -6886,10 +8192,24 @@
         datasetContextApi().phase() === 'ready' &&
         canonicalIdentity(activeImage && (activeImage.id || activeImage.uri)) === imageIdentity;
     };
+    // A picture already decoded (the same file, by its MD5) paints at once:
+    // switching back to a data set fetched and decoded every picture again.
+    var cacheKey = decodedImageKey(img.uri);
+    var cached = cacheKey && decodedImages.get(cacheKey);
+    if (cached) {
+      decodedImages.delete(cacheKey);
+      decodedImages.set(cacheKey, cached);
+      space._imgEl = cached;
+      space._imgReady = true; redrawForImage(space);
+      viewOperation(feedbackId, feedbackId === 'linked' && !linkedBackgroundsOn
+        ? 'Background images hidden' : 'Background loaded: ' + (space.label || space.id));
+      return;
+    }
     var im = new Image();
     im.onload = function () {
+      if (cacheKey) rememberDecodedImage(cacheKey, im);
       if (!stillCurrent()) return;
-      space._imgReady = true; drawAll();
+      space._imgReady = true; redrawForImage(space);
       viewOperation(feedbackId, feedbackId === 'linked' && !linkedBackgroundsOn
         ? 'Background images hidden' : 'Background loaded: ' + (space.label || space.id));
     };
@@ -6987,8 +8307,8 @@
   // Only sections carrying images are editable. Scope adjustments by stable
   // section/image identities; never modify the bundle's saved presets.
   function renderImagePicker() {
-    var ctl = $('cv-img-pick-ctl'), select = $('cv-bg-image-select');
-    var tabs = $('cv-bg-space-tabs');
+    var ctl = $(imgId('pick-ctl')), select = $(bgId('image-select'));
+    var tabs = $(bgId('space-tabs'));
     if (!ctl || !select) return;
     var allSpaces = backgroundSpaces().filter(function (sp) { return spatialImages(sp).length > 0; });
     var active = activeSpatial();
@@ -6998,11 +8318,11 @@
     if (section) section.style.display = active ? '' : 'none';
     ctl.style.display = active ? '' : 'none';
     if (tabs) {
-      var scope = $('cv-bg-space-select');
+      var scope = $(bgId('space-select'));
       if (!scope) {
-        tabs.innerHTML = '<label for="cv-bg-space-select">Adjust background</label>' +
-          '<select id="cv-bg-space-select" class="form-control"></select>';
-        scope = $('cv-bg-space-select');
+        tabs.innerHTML = '<label for="' + bgId('space-select') + '">Adjust background</label>' +
+          '<select id="' + bgId('space-select') + '" class="form-control"></select>';
+        scope = $(bgId('space-select'));
       }
       var scopeOptions = allSpaces.map(function (sp) {
         return { value: sp.id, text: (sp.label || sp._sampleName || sp.id).replace(/ \(spatial\)$/, '') };
@@ -7026,7 +8346,7 @@
         backgroundScopePulse = false;
       }
     }
-    var note = $('cv-bg-session-note');
+    var note = $(bgId('session-note'));
     if (note) note.textContent = !singleActive && !linkedBackgroundsOn
       ? 'Background images are hidden. Enable Background images to preview changes.'
       : 'Changes apply only to this session.';
@@ -7068,6 +8388,7 @@
       seedImgControls();
     }
     renderImagePicker();
+    fillBackgroundPicker();
     updateSpaceScopedControls();
     drawAll();
   }
@@ -7091,6 +8412,29 @@
   // Back to the alignment the data set shipped with. Alignment is fiddly and
   // easy to lose, and the preset is the only reference point in the bar; without
   // this the way back was reloading the page.
+  // The extent of a section's coordinates, for the Move ranges, when its image
+  // does not carry it (Spatial's do not). Computed once per space.
+  function coordinateSpan(sp) {
+    if (!sp) return null;
+    if (sp._coordSpan) return sp._coordSpan;
+    var range = function (values, bounds) {
+      if (Array.isArray(bounds) && bounds.length >= 2 && isFinite(bounds[1] - bounds[0])) {
+        return Math.abs(bounds[1] - bounds[0]);
+      }
+      var lo = Infinity, hi = -Infinity;
+      for (var i = 0; values && i < values.length; i++) {
+        var v = values[i];
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+      }
+      return hi > lo ? hi - lo : 0;
+    };
+    var x = range(sp.x, sp.xRange), y = range(sp.y, sp.yRange);
+    if (!(x > 0) || !(y > 0)) return null;
+    sp._coordSpan = [x, y];
+    return sp._coordSpan;
+  }
+
   // Write a state object into the bar's controls, including the ranges: the Move
   // sliders are in DATA units, ranged to the section's coordinate span, so
   // carrying the previous section's range over can put the target's own offset
@@ -7103,7 +8447,7 @@
     var v = st || sp._imgState || presetState(cur);
     var set = function (id, x) { syncImgRangeValue($(id), x); };
     var tick = function (id, on) { var el = $(id); if (el) el.checked = !!on; };
-    var span = (cur && cur.coord_span) || null;
+    var span = (cur && cur.coord_span) || coordinateSpan(sp);
     if (span && span.length >= 2) {
       // Ranged on the section's coordinate span, but never tighter than the
       // value being written: a range that excludes its own value clamps it, and
@@ -7114,28 +8458,28 @@
         el.min = String(-lim); el.max = String(lim);
         el.step = 'any';
       };
-      rerange('cv-img-offx', span[0], v.offsetX);
-      rerange('cv-img-offy', span[1], v.offsetY);
+      rerange(imgId('offx'), span[0], v.offsetX);
+      rerange(imgId('offy'), span[1], v.offsetY);
     }
     var sLo = Math.min(0.3, v.scaleX * 0.9, v.scaleY * 0.9);
     var sHi = Math.max(3, v.scaleX * 1.1, v.scaleY * 1.1);
-    ['cv-img-scalex', 'cv-img-scaley'].forEach(function (id) {
+    [imgId('scalex'), imgId('scaley')].forEach(function (id) {
       var el = $(id); if (!el) return;
       el.min = String(sLo); el.max = String(sHi);
       el.step = 'any';
     });
-    var opacity = $('cv-img-opacity'); if (opacity) opacity.step = 'any';
-    var rotation = $('cv-img-rotate'); if (rotation) rotation.step = 'any';
-    set('cv-img-opacity', v.opacity);
-    set('cv-img-offx', v.offsetX);
-    set('cv-img-offy', v.offsetY);
-    set('cv-img-scalex', v.scaleX);
-    set('cv-img-scaley', v.scaleY);
-    tick('cv-img-lock', v.lock != null ? v.lock : (v.scaleX === v.scaleY));
-    set('cv-img-rotate', v.rotate || 0);
-    tick('cv-img-flipx', v.flipX);
-    tick('cv-img-flipy', v.flipY);
-    tick('cv-img-show', v.show !== false);
+    var opacity = $(imgId('opacity')); if (opacity) opacity.step = 'any';
+    var rotation = $(imgId('rotate')); if (rotation) rotation.step = 'any';
+    set(imgId('opacity'), v.opacity);
+    set(imgId('offx'), v.offsetX);
+    set(imgId('offy'), v.offsetY);
+    set(imgId('scalex'), v.scaleX);
+    set(imgId('scaley'), v.scaleY);
+    tick(imgId('lock'), v.lock != null ? v.lock : (v.scaleX === v.scaleY));
+    set(imgId('rotate'), v.rotate || 0);
+    tick(imgId('flipx'), v.flipX);
+    tick(imgId('flipy'), v.flipY);
+    tick(imgId('show'), v.show !== false);
   }
 
   // Back to the alignment THIS (section, image) shipped with -- and only this
@@ -7150,6 +8494,50 @@
     if (k) delete imgStates[k];   // forget the adjustments, for this pair only
     seedImgControls(sp._imgState);
     drawAll();
+  }
+
+  // Spatial's "Copy alignment as preset": R writes the code for the image on
+  // screen, from the alignment the bar holds and the image's identity.
+  function requestPresetCode() {
+    var sp = activeSpatial(), img = sp && currentImage(sp);
+    if (!img || !sp._imgState || typeof Shiny === 'undefined' || !Shiny.setInputValue) return;
+    var identity = null;
+    try { identity = JSON.parse(img.id); } catch (ignore) { /* not an identity */ }
+    if (!identity || typeof identity !== 'object') return;
+    syncImgControls();
+    Shiny.setInputValue('spatial_projection_background_copy', {
+      identity: identity,
+      state: Object.assign({}, sp._imgState),
+      nonce: Date.now()
+    }, { priority: 'event' });
+  }
+  function showPresetCode(message) {
+    if (!message || !message.text) return;
+    var box = $(message.prefix + '-img-code'), button = $(message.prefix + '-img-copy');
+    if (box) { box.textContent = message.text; box.hidden = false; }
+    var done = function (label) {
+      if (!button) return;
+      var previous = button.getAttribute('data-label') || button.textContent;
+      button.setAttribute('data-label', previous);
+      button.textContent = label;
+      window.setTimeout(function () { button.textContent = previous; }, 1200);
+    };
+    var area;
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(message.text)
+        .then(function () { done('Copied'); }, function () { done('Copy failed'); });
+      return;
+    }
+    // Local HTTP sessions have no secure Clipboard API.
+    area = document.createElement('textarea');
+    area.value = message.text;
+    area.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(area);
+    area.select();
+    var copied = false;
+    try { copied = document.execCommand('copy'); } catch (ignore) { /* refused */ }
+    area.remove();
+    done(copied ? 'Copied' : 'Copy failed');
   }
 
   function spatialId(name) { return 'spatial::' + name; }
@@ -7169,6 +8557,7 @@
       y_range: spatialTemplate.y_range,
       builder_point_opacity: spatialTemplate.builder_point_opacity,
       builder_point_size: spatialTemplate.builder_point_size,
+      point_size_hint: spatialTemplate.point_size_hint,
       builder_percentage_cells: spatialTemplate.builder_percentage_cells,
       images: spatialTemplate.images || []
     }];
@@ -7197,10 +8586,13 @@
         yRange: sample.y_range || null,
         builder_point_opacity: sample.builder_point_opacity,
         builder_point_size: sample.builder_point_size,
+        _pointSizeHint: sample.point_size_hint,
         builder_percentage_cells: sample.builder_percentage_cells,
         images: images,
         _sampleName: sample.name,
         _cells: sample._cells || null,
+        // Read after x and y, which place the scene in its pool.
+        _unitArrays: sample._cells ? sample._unitArrays || null : null,
         _spatialSample: true,
         _fitToData: true,
         _customImageId: custom,
@@ -7233,10 +8625,88 @@
       persist: false,
       closeAfterSelect: false,
       onChange: function (values) {
-        setSelectedSpatial(values == null ? [] : [].concat(values));
+        values = values == null ? [] : [].concat(values);
+        var kept = values.slice(0, capRoom('spatial'));
+        if (kept.length < values.length) this.setValue(kept, true);
+        setSelectedSpatial(kept);
       }
     });
     selEl.selectize.setValue(selectedSpatial, true);
+  }
+  // The pictures behind the shown sections, one item per section ("Section:
+  // picture"), as on Spatial's grid; shown when a section has pictures. An item
+  // is a section's choice (None when it has no item); All and None are
+  // multiselect.js's.
+  function backgroundItemOf(sp, index) {
+    var images = spatialImages(sp);
+    var id = sp._customImageId;
+    if (id === IMG_NONE || !images.length) return null;
+    var image = id ? images.filter(function (im) { return im.id === id; })[0] : images[0];
+    return image ? index + '|' + image.id : null;
+  }
+  function pictureSections() {
+    return selectedSpatial.map(function (name) { return spaceById[spatialId(name)]; })
+      .filter(function (sp) { return sp && spatialImages(sp).length; });
+  }
+  function fillBackgroundPicker() {
+    var selEl = $('cv-pick-bg'), ctl = $('cv-bg-pick-ctl');
+    if (!selEl || !ctl) return;
+    destroyPicker(selEl);
+    var spaces = pictureSections();
+    if (!spaces.length) { ctl.style.display = 'none'; selEl.innerHTML = ''; return; }
+    ctl.style.display = '';
+    selEl.innerHTML = spaces.map(function (sp, i) {
+      var label = (sp.label || sp._sampleName || sp.id).replace(/ \(spatial\)$/, '');
+      return '<optgroup label="' + esc(label) + '">' + spatialImages(sp).map(function (im) {
+        return '<option value="' + esc(i + '|' + im.id) + '">' + esc(im.label || im.id) + '</option>';
+      }).join('') + '</optgroup>';
+    }).join('');
+    window.jQuery(selEl).selectize({
+      plugins: ['remove_button'],
+      persist: false,
+      closeAfterSelect: false,
+      onItemAdd: function (value) {
+        // One picture a section: choosing another replaces it.
+        var group = value.slice(0, value.indexOf('|'));
+        this.items.slice().forEach(function (item) {
+          if (item !== value && item.slice(0, item.indexOf('|')) === group) this.removeItem(item, true);
+        }, this);
+        this.refreshItems();
+      },
+      render: {
+        item: function (item, escape) {
+          return '<div class="item">' + escape(item.optgroup || '') + ': ' + escape(item.text) + '</div>';
+        }
+      },
+      onChange: function (values) { setSectionBackgrounds(pictureSections(), values == null ? [] : [].concat(values)); }
+    });
+    selEl.selectize.setValue(spaces.map(backgroundItemOf).filter(Boolean), true);
+  }
+  // Each section shows the picture its item names, or none.
+  function setSectionBackgrounds(spaces, values) {
+    var chosen = {};
+    values.forEach(function (value) {
+      var cut = value.indexOf('|');
+      chosen[value.slice(0, cut)] = value.slice(cut + 1);
+    });
+    var changed = false;
+    spaces.forEach(function (sp, i) {
+      var id = chosen[i] != null ? chosen[i] : IMG_NONE;
+      var images = spatialImages(sp);
+      if (id !== IMG_NONE && !images.some(function (im) { return im.id === id; })) return;
+      var current = sp._customImageId || (images[0] && images[0].id);
+      if (current === id) return;
+      stashImgState(sp);
+      sp._customImageId = id;
+      imgChoice[backgroundStateKey(sp)] = id;
+      loadSpaceImage(sp);
+      changed = true;
+    });
+    if (!changed) return;
+    renderImagePicker();
+    seedImgControls();
+    updateSpaceScopedControls();
+    drawAll();
   }
   function setSelectedSpatial(names) {
     var available = spatialSamples().map(function (s) { return s.name; });
@@ -7248,6 +8718,7 @@
     });
     selectedSpatial = names;
     rebuildSpatialInstances();
+    fillBackgroundPicker();
     ensurePanelSlots(orderedSpaces().length);
     buildPanels();
     layoutPanels();
@@ -7403,31 +8874,31 @@
     var imgState = sp._imgState;
     var num = function (id, cur) { var el = $(id); return el ? parseFloat(el.value) : cur; };
     var chk = function (id, cur) { var el = $(id); return el ? el.checked : cur; };
-    imgState.show = chk('cv-img-show', imgState.show);
-    imgState.opacity = num('cv-img-opacity', imgState.opacity);
-    imgState.offsetX = num('cv-img-offx', imgState.offsetX);   // data units
-    imgState.offsetY = num('cv-img-offy', imgState.offsetY);   // data units
+    imgState.show = chk(imgId('show'), imgState.show);
+    imgState.opacity = num(imgId('opacity'), imgState.opacity);
+    imgState.offsetX = num(imgId('offx'), imgState.offsetX);   // data units
+    imgState.offsetY = num(imgId('offy'), imgState.offsetY);   // data units
     // Two axes, read separately. One slider driving both meant that touching
     // ANY control in this bar rewrote the other axis from it, so a preset whose
     // calibration was genuinely non-uniform was squared up by a nudge to the
     // opacity. `changed` is the control the user just moved; with the aspect
     // locked the other follows it, and nothing else in the bar disturbs either.
-    var lock = chk('cv-img-lock', true);
+    var lock = chk(imgId('lock'), true);
     imgState.lock = lock;
-    var sxEl = $('cv-img-scalex'), syEl = $('cv-img-scaley');
-    var sxv = num('cv-img-scalex', imgState.scaleX);
-    var syv = num('cv-img-scaley', imgState.scaleY);
-    if (lock && changed === 'cv-img-scalex') {
+    var sxEl = $(imgId('scalex')), syEl = $(imgId('scaley'));
+    var sxv = num(imgId('scalex'), imgState.scaleX);
+    var syv = num(imgId('scaley'), imgState.scaleY);
+    if (lock && changed === imgId('scalex')) {
       syv = sxv; syncImgRangeValue(syEl, sxv);
-    } else if (lock && changed === 'cv-img-scaley') {
+    } else if (lock && changed === imgId('scaley')) {
       sxv = syv; syncImgRangeValue(sxEl, syv);
-    } else if (lock && changed === 'cv-img-lock') {
+    } else if (lock && changed === imgId('lock')) {
       syv = sxv; syncImgRangeValue(syEl, sxv);
     }
     imgState.scaleX = sxv; imgState.scaleY = syv;
-    imgState.rotate = num('cv-img-rotate', imgState.rotate);
-    imgState.flipX = chk('cv-img-flipx', imgState.flipX);
-    imgState.flipY = chk('cv-img-flipy', imgState.flipY);
+    imgState.rotate = num(imgId('rotate'), imgState.rotate);
+    imgState.flipX = chk(imgId('flipx'), imgState.flipX);
+    imgState.flipY = chk(imgId('flipy'), imgState.flipY);
     // Write through to the per-image store on every adjustment, so it is always
     // the authority. Recording only on a switch left the work in flight: a
     // bundle re-sent while the user was still adjusting reloaded from the preset
@@ -7471,7 +8942,7 @@
       return out;
     }
     genePanelBaseCount = Math.max(1, out.length);
-    var maxGenes = Math.max(1, Math.floor(12 / Math.max(1, out.length)));
+    var maxGenes = Math.max(1, Math.floor((panelCap() || 12) / Math.max(1, out.length)));
     var genes = D.genePanels.slice(0, maxGenes), expanded = [];
     var distinct = $('cv-gene-panel-color') &&
       $('cv-gene-panel-color').value === 'distinct';
@@ -7524,11 +8995,11 @@
         clearPanelView(p);
         if (p.pane) {
           p.pane.classList.remove('cv-hidden');
-          if (reappearing && !singleActive) fadeInPane(p.pane);
+          if (reappearing && (!singleActive || singleGridSpaces.length)) fadeInPane(p.pane);
         }
         var title = $('cv-title-' + p.key.toLowerCase());
         shownSpace = spaceById[p.spaceId];
-        if (title) title.textContent = shownSpace ? shownSpace.label : p.spaceId;
+        setPaneTitle(title, shownSpace, p.spaceId);
       } else {
         p.spaceId = null;
         p.colorBy = null;
@@ -7553,10 +9024,11 @@
     // unchanged. Force the next resize pass to project the new coordinates.
     _layoutKey = null;
   }
-  // Size visible panels from the available width. Each canvas remains at least
-  // 300px wide when possible and extra spaces flow onto later rows.
-  var MIN_SIDE = 300;
-  var MIN_SIDE_HARD = 240;
+  // The smallest plot side of a panel on every page (Linked views, the Spatial
+  // grid, Gene expression's panels, an enlarged view's context): below it the
+  // page scrolls rather than shrinking the panels further. Thumbnails of an
+  // enlarged view are not panels (FOCUS_THUMB_MIN).
+  var PANEL_MIN_SIDE = 250;
   // Width a classic scrollbar will take from `host` once it shows. Overlay
   // scrollbars (and one already showing, which clientWidth excludes) reserve 0.
   // The probe forces a layout, and the width only changes with the zoom level
@@ -7593,10 +9065,6 @@
   // largest available panel size. This prevents sparse final rows without
   // forcing plots into a materially smaller layout.
   var BALANCED_SIZE_TOLERANCE = 0.85;
-  // Context is a persistent orientation aid, not the place for close reading.
-  // Let it become slightly smaller while a primary lens is present so a common
-  // 1280px workspace can keep both roles in the same visual field.
-  var FOCUS_CONTEXT_SIDE = 260;
   // The fitted size is computed from the pane header's height, and the header
   // grows when the pane is narrow enough for its toolbar to wrap. That is a
   // positive feedback loop: a smaller plot makes a taller header makes a
@@ -7647,7 +9115,8 @@
       Math.round(window.innerHeight),
       panels.filter(function (p) { return p.spaceId; }).length,
       focusPanel || '',
-      keepPlotsSquare ? 'square' : 'fluid'
+      keepPlotsSquare ? 'square' : 'fluid',
+      gridColumnsChoice() || ''
     ].join('|');
   }
 
@@ -7655,9 +9124,11 @@
   // close to the largest feasible panel size, then prefer complete rows, fewer
   // rows, and no one-panel orphan row. This remains independent of panel order:
   // adding a linked space changes only the packing, never visual geometry.
-  function bestOverviewGrid(panelCount, availW, availH, chromeX, chromeY, gap) {
+  function bestOverviewGrid(panelCount, availW, availH, chromeX, chromeY, gap,
+                            minSide, fixedCols) {
+    minSide = minSide || PANEL_MIN_SIDE;
     var candidates = [];
-    for (var cols = 1; cols <= panelCount; cols++) {
+    for (var cols = fixedCols || 1; cols <= (fixedCols || panelCount); cols++) {
       var rows = Math.ceil(panelCount / cols);
       var widthSide = Math.floor(
         (availW - (cols - 1) * gap) / cols - chromeX
@@ -7676,7 +9147,7 @@
       });
     }
     var feasible = candidates.filter(function (candidate) {
-      return candidate.side >= MIN_SIDE;
+      return candidate.side >= minSide;
     });
     var pool = feasible.length ? feasible : candidates;
     var maxSide = pool.reduce(function (largest, candidate) {
@@ -7696,6 +9167,363 @@
       return b.side - a.side;
     });
     return balanced[0];
+  }
+
+  // The shape (width / height) of the shown sections of a Spatial grid: the
+  // median of their extents, which the server sends with each panel.
+  function sectionGridAspect() {
+    var ratios = singleSpaceIds.map(function (spaceId) {
+      var space = spaceById[spaceId], xr = space && space.xRange, yr = space && space.yRange;
+      if (!space || space._gridSection == null || !xr || !yr) return null;
+      var w = Math.abs(Number(xr[1]) - Number(xr[0])), h = Math.abs(Number(yr[1]) - Number(yr[0]));
+      return w > 0 && h > 0 ? w / h : null;
+    }).filter(Boolean).sort(function (a, b) { return a - b; });
+    return ratios.length ? Math.max(0.25, Math.min(4, ratios[Math.floor(ratios.length / 2)])) : 1;
+  }
+  // The shape of each shown panel of Linked views: a section's extent, and
+  // 1 for an embedding, which fills any shape but reads best near square.
+  function panelsAspect(vis) {
+    return vis.map(function (p) {
+      var space = spaceById[p.spaceId];
+      var ratio = null;
+      if (isSpatialSpace(space)) {
+        var xr = space.xRange, yr = space.yRange;
+        if (xr && yr) {
+          var w = Math.abs(Number(xr[1]) - Number(xr[0])), h = Math.abs(Number(yr[1]) - Number(yr[0]));
+          if (w > 0 && h > 0) ratio = w / h;
+        }
+        var unit = space._unit;
+        if (!ratio && unit && unit.aspect > 0 && isFinite(unit.aspect)) ratio = unit.aspect;
+      }
+      return ratio ? Math.max(0.25, Math.min(4, ratio)) : 1;
+    });
+  }
+  // Every panel of a grid has the same size, so sections side by side are
+  // drawn at one scale (5 sections are 3 + 2 with an empty slot, not a last
+  // row of wider panels). Panels are as tall as their sections are wide for
+  // their width, and the rows share the window's height. Every column count
+  // is tried and the one that draws the most kept; a window too small for
+  // readable panels lets the page scroll instead. `fixedCols` (the user's
+  // Columns) fixes the columns. `aspect` is one width/height for every panel
+  // or one per panel (Linked views); a row is as tall as its tallest drawing
+  // needs. `fill` (Linked views) gives every row the same share of the
+  // window's height, so the panels end at its bottom edge. `square` (Panel
+  // shape: Square) makes every panel a square; `aspect` is then still the
+  // shape of what is drawn in it, so the columns that draw the most win.
+  function sectionGridPacking(k, availW, availH, chromeX, chromeY, gap, aspect, fixedCols, fill, minSide, square) {
+    // The smallest drawn side that still reads.
+    var floor = minSide || PANEL_MIN_SIDE;
+    var aspectAt = function (i) {
+      return typeof aspect === 'number' ? aspect : (aspect && aspect[i]) || 1;
+    };
+    var widthOf = function (cols) {
+      return Math.floor((availW - (cols - 1) * gap) / cols - chromeX);
+    };
+    // Rows of `counts` panels and their sizes. The rows share the window's
+    // height evenly; a row that needs less keeps what it needs and the rest
+    // is shared again among the others.
+    var layout = function (counts, uniformWidth) {
+      var start = 0;
+      var rows = counts.map(function (count) {
+        var width = uniformWidth || widthOf(count), cap = square ? width : 0;
+        if (!square) {
+          for (var i = start; i < start + count; i++) cap = Math.max(cap, width / aspectAt(i));
+        }
+        var row = { count: count, width: width, cap: cap, start: start, height: 0 };
+        start += count;
+        return row;
+      });
+      // One height for every row: its share of the window, and no more than
+      // the tallest drawing needs unless the panels fill the window.
+      var room = availH - rows.length * chromeY - (rows.length - 1) * gap;
+      var height = room / rows.length;
+      if (!fill) height = Math.min(height, Math.max.apply(null, rows.map(function (row) { return row.cap; })));
+      var area = 0, smallest = Infinity;
+      rows.forEach(function (row) {
+        row.height = Math.floor(height);
+        if (square) row.width = row.height = Math.min(row.width, row.height);
+        for (var i = row.start; i < row.start + row.count; i++) {
+          var a = aspectAt(i);
+          var drawnW = Math.min(row.width, row.height * a), drawnH = Math.min(row.height, row.width / a);
+          smallest = Math.min(smallest, fill ? Math.min(row.width, row.height) : Math.min(drawnW, drawnH));
+          area += drawnW * drawnH;
+        }
+        delete row.cap; delete row.start;
+      });
+      return { rows: rows, area: area, fits: smallest >= floor };
+    };
+    var finish = function (choice) {
+      var rows = choice.rows;
+      return {
+        cols: Math.max.apply(null, rows.map(function (row) { return row.count; })),
+        rows: rows.length,
+        width: rows[0].width,
+        height: rows[0].height,
+        rowSizes: rows
+      };
+    };
+    // Natural heights and a scrolling page, when nothing fits the window.
+    var scrolling = function (cols) {
+      var counts = [];
+      for (var left = k; left > 0; left -= cols) counts.push(Math.min(cols, left));
+      var width = widthOf(cols);
+      return finish({ rows: counts.map(function (count) {
+        return { count: count, width: width,
+          height: square ? width : Math.max(floor, Math.round(width / aspectAt(0))) };
+      }) });
+    };
+    if (fixedCols) {
+      var cols = Math.max(1, Math.min(fixedCols, k)), counts = [];
+      for (var left = k; left > 0; left -= cols) counts.push(Math.min(cols, left));
+      var fixed = layout(counts, widthOf(cols));
+      return fixed.fits ? finish(fixed) : scrolling(cols);
+    }
+    var best = null;
+    for (var colsCount = k; colsCount >= 1; colsCount--) {
+      // Only the fewest columns for a row count: 5 panels in 2 rows are 3 + 2.
+      if (colsCount > 1 && Math.ceil(k / colsCount) === Math.ceil(k / (colsCount - 1))) continue;
+      if (widthOf(colsCount) < 60) continue;
+      var split = [];
+      for (var rest = k; rest > 0; rest -= colsCount) split.push(Math.min(colsCount, rest));
+      var extra = k % colsCount;
+      var candidate = layout(split, widthOf(colsCount));
+      if (!candidate.fits) continue;
+      // Within a few percent, full rows read better than an empty slot.
+      if (!best || candidate.area > best.area * 1.04 ||
+          (candidate.area > best.area * 0.96 && !extra && best.extra)) {
+        best = candidate; best.extra = extra;
+      }
+    }
+    if (best) return finish(best);
+    // Scrolling: the widest panels that still put two sections side by side.
+    var scrollCols = 1;
+    for (var c = 1; c <= k; c++) if (widthOf(c) >= Math.max(260, floor)) scrollCols = c;
+    return scrolling(scrollCols);
+  }
+  // An enlarged panel reads like a photo viewer: the n others are a strip of
+  // equal square thumbnails (FOCUS_THUMB_MIN to FOCUS_THUMB_MAX, about a
+  // quarter of the height), either one row below the enlarged panel or one
+  // column to its left, whichever draws the enlarged panel's content larger
+  // (`aspect`, its width / height): a wide window and a square plot put them
+  // to the left, a very wide section below. The strip is as long as the
+  // enlarged panel (its width below it, its height beside it). Thumbnails that
+  // do not fit scroll along it, between two arrows at its ends, so many
+  // sections never shrink the enlarged panel. Null without room for both.
+  var FOCUS_THUMB_MIN = 96, FOCUS_THUMB_MAX = 200, FOCUS_STRIP_SHARE = 0.24;
+  var FOCUS_ARROW = 36;
+  function focusStripPacking(place, n, availW, availH, chromeX, chromeY, gap) {
+    var side = Math.floor(Math.max(FOCUS_THUMB_MIN,
+      Math.min(FOCUS_THUMB_MAX, availH * FOCUS_STRIP_SHARE - chromeY)));
+    var left = place === 'left';
+    var mainW = Math.floor(left ? availW - (side + chromeX) - gap - chromeX : availW - chromeX);
+    var mainH = Math.floor(left ? availH - chromeY : availH - (side + chromeY) - gap - chromeY);
+    if (mainH < side * 1.5 || mainW < side * 1.5) return null;
+    // A thumbnail's length along the strip, and the strip's: the enlarged
+    // panel's height beside it, the whole width below it.
+    var thumb = left ? side + chromeY : side + chromeX;
+    var length = left ? mainH + chromeY : availW;
+    var content = n * (thumb + gap) - gap;
+    var scroll = content > length;
+    // The part of the strip that shows thumbnails: all of it, or what the
+    // arrows at its ends leave.
+    var view = scroll ? length - 2 * (FOCUS_ARROW + gap) : length;
+    if (view < thumb) return null;
+    return { place: place, side: side, ctxW: side, n: n, mainW: mainW, mainH: mainH,
+      thumb: thumb, step: thumb + gap, length: length, view: view, content: content,
+      scroll: scroll };
+  }
+  // The area the enlarged panel's content is drawn at in a pack.
+  function focusContentArea(pack, aspect) {
+    if (!pack) return -1;
+    var a = aspect > 0 && isFinite(aspect) ? aspect : 1;
+    var w = Math.min(pack.mainW, pack.mainH * a);
+    return w * (w / a);
+  }
+  function focusGridPacking(n, availW, availH, chromeX, chromeY, gap, aspect) {
+    var below = focusStripPacking('below', n, availW, availH, chromeX, chromeY, gap);
+    var left = focusStripPacking('left', n, availW, availH, chromeX, chromeY, gap);
+    // Below wins a tie: it was the layout before.
+    return focusContentArea(left, aspect) > focusContentArea(below, aspect) ? left : below;
+  }
+  // The strip's arrows, and how far it is scrolled: `focusStripOffset` is
+  // drawn, `focusStripTarget` is where it is heading.
+  var focusStripKey = null, focusStripArrows = null;
+  var focusStripOffset = 0, focusStripTarget = 0, focusStripFrame = 0;
+  function focusStripArrowsOf(panes) {
+    if (focusStripArrows && focusStripArrows.prev.parentElement === panes) return focusStripArrows;
+    var make = function (direction) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'cv-strip-arrow cv-strip-' + direction;
+      button.setAttribute('aria-label', direction === 'prev' ? 'Scroll to earlier views' : 'Scroll to later views');
+      button.innerHTML = '<span class="cv-strip-glyph" aria-hidden="true">' +
+        (direction === 'prev' ? '&#8249;' : '&#8250;') + '</span>';
+      button.addEventListener('click', function () {
+        var pack = lastFocusGrid && lastFocusGrid.pack;
+        if (pack) scrollFocusStrip((direction === 'prev' ? -1 : 1) * pack.step);
+      });
+      panes.appendChild(button);
+      return button;
+    };
+    focusStripArrows = { prev: make('prev'), next: make('next') };
+    return focusStripArrows;
+  }
+  var lastFocusGrid = null;
+  function focusStripMax(pack) {
+    return pack && pack.scroll ? Math.max(0, pack.content - pack.view) : 0;
+  }
+  // Scrolls the strip by `delta` pixels, smoothly: each frame covers part of
+  // the way left, so clicks in a row add up and the motion eases out.
+  function scrollFocusStrip(delta) {
+    var pack = lastFocusGrid && lastFocusGrid.pack;
+    if (!pack || !pack.scroll) return;
+    focusStripTarget = Math.max(0, Math.min(focusStripMax(pack), focusStripTarget + delta));
+    var reduced = window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced || typeof requestAnimationFrame !== 'function') {
+      focusStripOffset = focusStripTarget;
+      placeFocusStrip();
+      return;
+    }
+    if (!focusStripFrame) focusStripFrame = requestAnimationFrame(stepFocusStrip);
+  }
+  function stepFocusStrip() {
+    focusStripFrame = 0;
+    var left = focusStripTarget - focusStripOffset;
+    focusStripOffset = Math.abs(left) < 0.5 ? focusStripTarget : focusStripOffset + left * 0.22;
+    placeFocusStrip();
+    if (focusStripOffset !== focusStripTarget) {
+      focusStripFrame = requestAnimationFrame(stepFocusStrip);
+    } else {
+      anchorComposition(singleActive);
+    }
+  }
+  // Puts the thumbnails where the scroll has them. They share the strip's
+  // grid cell; each is moved along it (the `translate` property, which leaves
+  // `transform` to Enlarge's motion) and cut where it leaves the cell, so a
+  // thumbnail at either end shows in part. Thumbnails a step or more outside
+  // are not shown at all.
+  function placeFocusStrip() {
+    var last = lastFocusGrid, pack = last && last.pack;
+    if (!pack) return;
+    var left = pack.place === 'left';
+    var lead = pack.scroll ? 0 : Math.floor((pack.view - pack.content) / 2);
+    var index = 0;
+    last.vis.forEach(function (p) {
+      if (!p.pane || p.key === last.primaryKey) return;
+      var at = lead + index++ * pack.step - focusStripOffset;
+      var near = at + pack.thumb > -pack.step && at < pack.view + pack.step;
+      var wasOff = p.pane.classList.contains('cv-strip-off');
+      p.pane.classList.toggle('cv-strip-off', !near);
+      if (!near) return;
+      var pos = Math.round(at);
+      p.pane.style.translate = left ? '0 ' + pos + 'px' : pos + 'px 0';
+      var head = Math.max(0, -pos), tail = Math.max(0, pos + pack.thumb - pack.view);
+      p.pane.style.clipPath = !head && !tail ? ''
+        : left ? 'inset(' + head + 'px 0 ' + tail + 'px 0)'
+          : 'inset(0 ' + tail + 'px 0 ' + head + 'px)';
+      // A thumbnail hidden while its plot was last drawn shows it now.
+      if (wasOff && (p._pendingSize || p._resizedUndrawn)) drawOnStage(p);
+    });
+    var arrows = focusStripArrows;
+    if (arrows && arrows.prev.parentElement === last.panes && pack.scroll) {
+      arrows.prev.disabled = focusStripTarget <= 0;
+      arrows.next.disabled = focusStripTarget >= focusStripMax(pack);
+    }
+  }
+  // The arrow keys scroll the strip of an enlarged view: left and right either
+  // strip, up and down the one on the left.
+  if (typeof document !== 'undefined' && document.addEventListener) {
+    document.addEventListener('keydown', function (event) {
+      if (!focusPanel || !lastFocusGrid || !lastFocusGrid.pack) return;
+      var keys = lastFocusGrid.pack.place === 'left'
+        ? { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }
+        : { ArrowLeft: -1, ArrowRight: 1 };
+      var step = keys[event.key];
+      if (!step) return;
+      var target = event.target;
+      if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+      if (!lastFocusGrid.pack.scroll || !lastFocusGrid.panes.getClientRects().length) return;
+      event.preventDefault();
+      scrollFocusStrip(step * lastFocusGrid.pack.step);
+    });
+  }
+  // The panes' grid for an enlarged panel, or the ordinary flow without one.
+  function applyFocusGrid(panes, vis, primaryKey, pack, chromeX, chromeY, gap) {
+    lastFocusGrid = { panes: panes, vis: vis, primaryKey: primaryKey, pack: pack,
+      chromeX: chromeX, chromeY: chromeY, gap: gap };
+    var arrows = pack && pack.scroll ? focusStripArrowsOf(panes)
+      : (focusStripArrows && focusStripArrows.prev.parentElement === panes ? focusStripArrows : null);
+    if (arrows) {
+      arrows.prev.hidden = arrows.next.hidden = !(pack && pack.scroll);
+    }
+    if (!pack) {
+      vis.forEach(function (p) {
+        if (!p.pane) return;
+        p.pane.style.gridColumn = p.pane.style.gridRow = '';
+        p.pane.style.translate = p.pane.style.clipPath = '';
+        p.pane.classList.remove('cv-strip-off');
+      });
+      panes.style.display = panes.style.gridTemplateColumns = panes.style.gridTemplateRows = '';
+      panes.classList.remove('cv-focus-grid', 'cv-focus-left');
+      if (focusStripFrame) cancelAnimationFrame(focusStripFrame);
+      focusStripFrame = 0;
+      focusStripKey = null;
+      focusStripOffset = focusStripTarget = 0;
+      return;
+    }
+    // A new enlarged view starts at the beginning of its strip; enlarging a
+    // thumbnail of it keeps the strip where it is.
+    if (focusStripKey === null) {
+      focusStripOffset = focusStripTarget = 0;
+    }
+    focusStripKey = primaryKey;
+    var max = focusStripMax(pack);
+    focusStripTarget = Math.min(focusStripTarget, max);
+    focusStripOffset = Math.min(focusStripOffset, max);
+    var left = pack.place === 'left';
+    // The strip: the thumbnails' cell, between the arrows when it scrolls.
+    var strip = pack.scroll
+      ? FOCUS_ARROW + 'px ' + pack.view + 'px ' + FOCUS_ARROW + 'px'
+      : pack.view + 'px';
+    var cell = pack.scroll ? '2' : '1';
+    panes.classList.add('cv-focus-grid');
+    panes.classList.toggle('cv-focus-left', left);
+    panes.style.display = 'grid';
+    panes.style.gridTemplateColumns = left
+      ? (pack.ctxW + chromeX) + 'px ' + (pack.mainW + chromeX) + 'px'
+      : strip;
+    panes.style.gridTemplateRows = left
+      ? strip
+      : (pack.mainH + chromeY) + 'px ' + (pack.side + chromeY) + 'px';
+    vis.forEach(function (p) {
+      if (!p.pane) return;
+      if (p.key === primaryKey) {
+        p.pane.style.gridColumn = left ? '2' : '1 / -1';
+        p.pane.style.gridRow = left ? '1 / -1' : '1';
+        p.pane.style.translate = p.pane.style.clipPath = '';
+        p.pane.classList.remove('cv-strip-off');
+        return;
+      }
+      p.pane.style.gridColumn = left ? '1' : cell;
+      p.pane.style.gridRow = left ? cell : '2';
+    });
+    if (arrows && pack.scroll) {
+      var along = left ? 'gridRow' : 'gridColumn', across = left ? 'gridColumn' : 'gridRow';
+      arrows.prev.style[along] = '1';
+      arrows.next.style[along] = '3';
+      arrows.prev.style[across] = arrows.next.style[across] = left ? '1' : '2';
+    }
+    placeFocusStrip();
+  }
+  function sectionGridRowOf(pack, index) {
+    var rows = pack && pack.rowSizes;
+    if (!rows) return null;
+    for (var r = 0, seen = 0; r < rows.length; r++) {
+      seen += rows[r].count;
+      if (index < seen) return rows[r];
+    }
+    return rows[rows.length - 1];
   }
 
   // `ifChanged` (the ResizeObserver): leave canvases untouched, and do not
@@ -7757,22 +9585,27 @@
 
     // Overview is a genuine two-dimensional fit: try every possible column
     // count and choose the one that maximises a balanced cell. If there are so
-    // many panels that the result would be unreadable, retain the 300px floor
+    // many panels that the result would be unreadable, retain the 250px floor
     // and let the workspace scroll instead of reducing plots to thumbnails.
+    var minSide = PANEL_MIN_SIDE;
     var overview = !focusPanel
-      ? bestOverviewGrid(k, usableW, Math.max(1, availH), chromeX, overhead, gap)
+      ? bestOverviewGrid(k, usableW, Math.max(1, availH), chromeX, overhead, gap,
+        minSide, gridColumnsChoice(k))
       : null;
-    // When even the best grid is below the usual floor, take its columns down
-    // to a hard floor instead of splitting the panels over rows the page has
-    // no height for: a third plot below the fold is worse than a narrow one.
-    var columnFloor = focusPanel ? FOCUS_CONTEXT_SIDE
-      : (overview && overview.side < MIN_SIDE
-        ? Math.max(MIN_SIDE_HARD, overview.side) : MIN_SIDE);
     var availableCols = Math.max(1,
-      Math.floor((usableW + gap) / (columnFloor + chromeX + gap)));
+      Math.floor((usableW + gap) / (minSide + chromeX + gap)));
     var cols = focusPanel
       ? Math.max(1, Math.min(k + 1, availableCols))
       : Math.max(1, Math.min(overview ? overview.cols : 1, availableCols));
+    // Several panels without a primary one (the Spatial grid, Linked views,
+    // Gene expression's separate panels and channels) fill the window by rows
+    // (sectionGridPacking()); in Square they are squares.
+    var gridPack = !focusPanel && k > 1
+      ? sectionGridPacking(k, usableW, Math.max(1, availH), chromeX, overhead, gap,
+        sectionGridActive() ? sectionGridAspect() : panelsAspect(vis),
+        gridColumnsChoice(k), !sectionGridActive(), minSide, keepPlotsSquare)
+      : null;
+    if (gridPack) cols = gridPack.cols;
     var single = cols === 1;
     // Whole pixels that never add up to more than the container: a row filled
     // to the last fraction of a pixel wraps its final pane when the container
@@ -7782,14 +9615,14 @@
     var colW = Math.floor(rowW / cols);
     var colExtra = rowW - colW * cols;
     var side = focusPanel
-      ? Math.max(FOCUS_CONTEXT_SIDE, Math.floor(colW - chromeX))
-      : Math.max(MIN_SIDE, overview ? overview.side : 0);
+      ? Math.max(PANEL_MIN_SIDE, Math.floor(colW - chromeX))
+      : Math.max(minSide, overview ? overview.side : 0);
     if (single && side + chromeX > usableW) {
       side = Math.max(150, usableW - chromeX);
     }
     // A lone/focused card should use the available HEIGHT as well as width.
     // Without this cap a wide monitor produced a 1200px square that continued
-    // far below the viewport. Multi-card grids deliberately keep the 300px
+    // far below the viewport. Multi-card grids deliberately keep the 250px
     // width floor and may scroll vertically; a focused lens is still capped
     // unless that would make it smaller than its persistent context lenses.
     var focusSide = side;
@@ -7811,7 +9644,7 @@
       );
       if (availH > 0) {
         if (focusPanel) {
-          focusSide = Math.min(focusSide, Math.max(MIN_SIDE, availH - overhead));
+          focusSide = Math.min(focusSide, Math.max(PANEL_MIN_SIDE, availH - overhead));
           // Focus hierarchy wins over one-viewport packing. When the controls
           // and cohort bar leave little height, squeezing the primary below its
           // context reverses the meaning of the layout; let the page scroll.
@@ -7821,16 +9654,26 @@
               Math.round(side * 1.4))
           );
         } else {
-          side = Math.min(side, Math.max(MIN_SIDE, availH - overhead));
+          side = Math.min(side, Math.max(minSide, availH - overhead));
         }
       }
     }
+    var focusPack = null;
+    if (focusPanel && k > 1 && availH > 0) {
+      var focusAspect = 1;
+      if (!keepPlotsSquare) {
+        focusAspect = sectionGridActive() ? sectionGridAspect()
+          : (panelsAspect(vis.filter(function (p) { return p.key === focusPanel; }))[0] || 1);
+      }
+      focusPack = focusGridPacking(k - 1, usableW, availH, chromeX, overhead, gap, focusAspect);
+    }
+    applyFocusGrid(panes, vis, focusPanel, focusPack, chromeX, overhead, gap);
     // Explicit tracks consume all available width. In the default fluid mode,
     // canvases also consume their row's share of available height. Square mode
     // constrains both dimensions to the shorter side.
     var rows = Math.ceil(k / cols);
-    var panelHeight = Math.max(
-      MIN_SIDE,
+    var panelHeight = gridPack ? gridPack.height : Math.max(
+      minSide,
       Math.floor((availH - (rows - 1) * gap) / rows - overhead)
     );
     var panelWidth = Math.max(150, Math.floor(colW - chromeX));
@@ -7838,16 +9681,30 @@
       ? Math.max(panelWidth, Math.floor(colW * 2 + gap - chromeX))
       : panelWidth;
     var resized = false;
+    stagePanels = k;
+    var stageOff = vis.map(function (p) { return offStage(p); });
+    if (!observeStagePanels(vis) && scrollHost && !scrollHost._cvStageWired &&
+        scrollHost.addEventListener) {
+      scrollHost._cvStageWired = true;
+      scrollHost.addEventListener('scroll', onStageScroll, { passive: true });
+    }
     vis.forEach(function (p, index) {
       var primary = !!focusPanel && p.key === focusPanel;
       var extra = !focusPanel && cols > 1 && index % cols < colExtra ? 1 : 0;
       var width = primary ? primaryWidth : panelWidth + extra;
       var height = primary ? focusSide : (focusPanel ? side : panelHeight);
       var paneWidth = primary ? primaryWidth + chromeX : colW + extra;
-      if (keepPlotsSquare) {
-        var squareSide = Math.min(width, height);
-        width = squareSide;
-        height = squareSide;
+      // A Spatial grid row sizes its own panels (sectionGridPacking()).
+      var gridRow = !primary && sectionGridRowOf(gridPack, index);
+      if (gridRow) {
+        width = gridRow.width; height = gridRow.height;
+        paneWidth = gridRow.width + chromeX;
+      }
+      // An enlarged view's grid sizes its panels (focusGridPacking()).
+      if (focusPack) {
+        width = primary ? focusPack.mainW : focusPack.ctxW;
+        height = primary ? focusPack.mainH : focusPack.side;
+        paneWidth = width + chromeX;
       }
       if (p.pane) {
         p.pane.style.flexBasis = paneWidth + 'px';
@@ -7860,19 +9717,31 @@
       if (ifChanged && p.W === width && Math.abs(p.H - height) <= 2 &&
           p._dpr === (window.devicePixelRatio || 1)) return;
       resized = true;
+      // Not on stage: sized and drawn when it comes near.
+      if (stageOff[index]) {
+        p._pendingSize = [width, height];
+        p._resizedUndrawn = true;
+        return;
+      }
       resizePanel(p, width, height);
     });
     // A panel resized while drawing was deferred is blank: draw it now.
-    if (ifChanged && !resized && !vis.some(function (p) { return p._resizedUndrawn; })) {
+    if (ifChanged && !resized && !vis.some(function (p, index) {
+      return p._resizedUndrawn && !stageOff[index];
+    })) {
       // Nothing was redrawn, so this check does not use up a layout pass.
       _layoutKey = passKey; _layoutPass = pass; _layoutHeader = passHeader;
       return false;
     }
-    if (!psSeeded) autoPointSize(side);
+    if (!psSeeded) autoPointSize();
     // Visibility of focus affordances depends on how many linked lenses remain.
     updateFocusButtons();
     drawAll();
+    // The panels were told apart before the layout settled: draw, next frame,
+    // those that turn out to be near.
+    onStageScroll();
     if ((sel && sel.size) || (pick != null && nicheSet)) renderSelbar();
+    anchorComposition(singleActive);
     // Layout advice uses canvas CSS dimensions, never the spread of the cells.
     var hintView = singleActive && singleView(singleActive);
     var hintId = singleActive || 'linked';
@@ -7880,6 +9749,7 @@
       var space = spaceById[p.spaceId];
       var name = hintView ? hintView.meta && hintView.meta.space_label : space && space._projectionName;
       return space && !space.z && (hintId === 'trajectory_projection' ||
+          (hintId === 'spatial_projection' && isSpatialSpace(space)) ||
           /umap/i.test(String(name || '')));
     });
     window.dispatchEvent(new CustomEvent('cerebro:plot-layout', { detail: {
@@ -8021,11 +9891,20 @@
     return isFinite(threshold) && threshold >= 0
       ? { threshold: threshold } : null;
   }
+  // The number of points of a payload or view, without naming them:
+  // singlePayloadCells() makes a string of every key (a second for the 3.9
+  // million cells of the Allen atlas).
+  function singlePayloadCount(payload) {
+    var count = Number(payload && payload.data && payload.data.n);
+    if (isFinite(count)) return count;
+    var keys = payload && payload.data && payload.data.selection_key;
+    if (!Array.isArray(keys) || !keys.length) return 0;
+    if (!Array.isArray(keys[0])) return keys.length;
+    return keys.reduce(function (total, group) { return total + (group ? group.length : 0); }, 0);
+  }
   function singleInteractionRecommendedStatic(view) {
     var config = singleInteractionConfig(view);
-    var count = Number(view && view.data && view.data.n);
-    if (!isFinite(count)) count = singlePayloadCells(view).length;
-    return !!config && count > config.threshold;
+    return !!config && singlePayloadCount(view) > config.threshold;
   }
   function singleInteractionIsStatic() {
     var view = singleActive && singleView(singleActive);
@@ -8038,8 +9917,7 @@
     if (!view || !host) return;
     var recommended = singleInteractionRecommendedStatic(view);
     var isStatic = recommended && view.interactionEnabled !== true;
-    var count = Number(view.data && view.data.n);
-    if (!isFinite(count)) count = singlePayloadCells(view).length;
+    var count = recommended ? singlePayloadCount(view) : 0;
     host.classList.toggle('cv-static-performance', isStatic);
     var notice = host.querySelector('.cv-performance-mode');
     if (notice) {
@@ -8086,7 +9964,7 @@
     });
     singleViews = {}; singleActive = null;
     singleRequests.clear();
-    singleSpaceIds = []; singleSpaceModes = {};
+    singleSpaceIds = []; singleSpaceModes = {}; singleGridSpaces = []; singleGridExtras = [];
     singleIndexCells = null; singleIndexMap = null;
     linkedState = null;
     singleTiming = Object.create(null);
@@ -8218,7 +10096,14 @@
   function singlePayloadCells(payload) {
     var keys = payload && payload.data && payload.data.selection_key;
     if (!Array.isArray(keys)) return [];
-    if (!keys.length || !Array.isArray(keys[0])) return keys.map(String);
+    if (!keys.length || !Array.isArray(keys[0])) {
+      // Names read from a cell-name resource are strings already: copying
+      // the 3.9 million of the Allen atlas took 0.3 s. Nothing writes D.cells.
+      for (var at = 0; at < keys.length; at++) {
+        if (typeof keys[at] !== 'string') return keys.map(String);
+      }
+      return keys;
+    }
     return keys.reduce(function (cells, group) {
       return cells.concat((group || []).map(String));
     }, []);
@@ -8347,9 +10232,12 @@
         ).arrayBuffer() : response.arrayBuffer();
       }).then(function (buffer) {
         var downloadedAt = performance.now();
-        return Object.assign(decode(buffer), {
-          downloadMs: downloadedAt - downloadStarted,
-          decodeMs: performance.now() - downloadedAt
+        // `decode` may answer later (cell names are decoded a slice at a time).
+        return Promise.resolve(decode(buffer)).then(function (decoded) {
+          return Object.assign(decoded, {
+            downloadMs: downloadedAt - downloadStarted,
+            decodeMs: performance.now() - downloadedAt
+          });
         });
       });
       cache.set(key, pending);
@@ -8370,6 +10258,42 @@
   // strings in canonical order, downloaded once and shared by every view of
   // the data set. A view's aux message then carries canonical indices.
   var cellNamesResourceCache = new Map();
+  // The names of a NUL-terminated UTF-8 buffer, decoded a few milliseconds at a
+  // time in slices cut after a NUL (a name never straddles two): the 3.9
+  // million names of the Allen atlas took 0.6 to 0.77 s in one task, the longest
+  // frame of opening the grid.
+  function decodeCellNames(buffer) {
+    var bytes = new Uint8Array(buffer), names = [], at = 0, SLICE = 1 << 20;
+    var first = new TextDecoder('utf-8');
+    // Only the start of the file may hold a byte-order mark.
+    var later = new TextDecoder('utf-8', {ignoreBOM: true});
+    return new Promise(function (resolve, reject) {
+      function step() {
+        var began = performance.now();
+        try {
+          while (at < bytes.length) {
+            var end = Math.min(bytes.length, at + SLICE);
+            if (end < bytes.length) {
+              end = bytes.indexOf(0, end);
+              end = end < 0 ? bytes.length : end + 1;
+            }
+            var part = (at === 0 ? first : later).decode(bytes.subarray(at, end)).split('\0');
+            part.pop();
+            for (var i = 0; i < part.length; i++) names.push(part[i]);
+            at = end;
+            if (at < bytes.length && performance.now() - began > 8) {
+              setTimeout(step, 0);
+              return;
+            }
+          }
+          resolve(names);
+        } catch (error) {
+          reject(error);
+        }
+      }
+      step();
+    });
+  }
   function fetchCellNames(resource, identity) {
     if (!resource || resource.protocol !== 'canonical-cell-names-v1' ||
         !resource.url || !canonicalResourceIdentityMatches(resource, identity)) {
@@ -8382,10 +10306,10 @@
         if (Number(resource.bytes) && buffer.byteLength !== Number(resource.bytes)) {
           throw new Error('Cell names byte count mismatch');
         }
-        var names = new TextDecoder('utf-8').decode(buffer).split('\0');
-        names.pop();
-        if (names.length !== n) throw new Error('Cell names length mismatch');
-        return {names: names};
+        return decodeCellNames(buffer).then(function (names) {
+          if (names.length !== n) throw new Error('Cell names length mismatch');
+          return {names: names};
+        });
       },
       resource.encoding === 'gzip'
     );
@@ -8400,8 +10324,20 @@
     }
     return keys;
   }
-  // Contiguous canonical rows travel as {kind: 'range', start, length}.
+  // Contiguous canonical rows travel as {kind: 'range', start, length}, a few
+  // runs of them as {kind: 'ranges', start: [...], length: [...]}.
   function expandRowRange(rows) {
+    if (rows && String(rows.kind) === 'ranges') {
+      var starts = [].concat(rows.start), lengths = [].concat(rows.length), total = 0;
+      for (var r = 0; r < lengths.length; r++) total += Number(lengths[r]);
+      var runs = new Int32Array(total);
+      for (var run = 0, at = 0; run < starts.length; run++) {
+        for (var k = 0, first = Number(starts[run]); k < Number(lengths[run]); k++) {
+          runs[at++] = first + k;
+        }
+      }
+      return runs;
+    }
     if (!rows || String(rows.kind) !== 'range') return rows;
     var start = Number(rows.start), out = new Int32Array(Number(rows.length));
     for (var i = 0; i < out.length; i++) out[i] = start + i;
@@ -8489,6 +10425,8 @@
           : namesAt(entry.names, rows),
         selection_rows: rows
       });
+      // A streaming grid names the cells of its later batches from them.
+      if (data.grid_stream) data.grid_stream.names = entry.names;
       delete resolved.selection_index;
       delete resolved.cell_names_resource;
       return Object.assign({}, message, {data: resolved});
@@ -9444,23 +11382,806 @@
       return at == null ? null : at;
     });
   }
+  // True when `keys` are the frame's own keys, which name the view's cells in
+  // order (singlePayloadCells() builds the cells from them): a key's position
+  // is then its cell, and the barcode Map (a second of work for a million
+  // cells) is not needed. Ends are compared, not every key.
+  function keysArePositional(keys) {
+    var cells = D && D.cells, n = keys ? keys.length : 0;
+    return !!(n && Array.isArray(cells) && cells.length === n && D.n === n &&
+      String(keys[0]) === cells[0] && String(keys[n - 1]) === cells[n - 1]);
+  }
+  // Slice panels whose slices name different cells (the sections of the
+  // Spatial grid) share ONE pair of position arrays over the view's cells:
+  // each panel draws only its own `_cells`, so the positions of the others
+  // are never read through it. A panel with positions of its own (the grid's
+  // embedding) keeps them; `cells` is null for it. Null when fewer than two
+  // panels are slices, or when two slices name the same cell; each panel then
+  // keeps arrays of its own.
+  function sharedSliceGeometry(data, keys) {
+    var panels = data.panels || [], n = D && D.n || 0;
+    var isSlice = function (panel) { return panel.start != null && panel.count != null; };
+    if (panels.filter(isSlice).length < 2 || !data.x || !data.y || !n) return null;
+    var rows = keysArePositional(keys) ? null : alignedRows(keys);
+    var Vector = data.x instanceof Float32Array ? Float32Array : Float64Array;
+    var x = new Vector(n).fill(NaN), y = new Vector(n).fill(NaN);
+    var seen = new Uint8Array(n), cells = [];
+    for (var p = 0; p < panels.length; p++) {
+      if (!isSlice(panels[p])) { cells.push(null); continue; }
+      var start = Number(panels[p].start), count = Number(panels[p].count);
+      var own = new Int32Array(count), found = 0;
+      for (var j = start; j < start + count; j++) {
+        var at = rows ? rows[j] : j;
+        if (at == null || at < 0 || at >= n) continue;
+        if (seen[at]) return null;
+        seen[at] = 1; own[found++] = at;
+        x[at] = data.x[j]; y[at] = data.y[j];
+      }
+      // Canonical order, as unitOf() and buildGpuData() visit them.
+      cells.push(own.subarray(0, found).sort());
+    }
+    return { x: x, y: y, cells: cells };
+  }
+  // ---- Spatial section grid ------------------------------------------------
+  // The server sends every section of the sample as one frame with a panel per
+  // section (spatial_grid_panels() in R). Which sections are shown, in what
+  // order and in how many columns is the browser's: changing them arranges
+  // the panels already drawn and asks the server for nothing.
+  function sectionGridActive() {
+    return singleActive === 'spatial_projection' && singleGridSpaces.length > 0;
+  }
+  function gridSectionChoice() {
+    var el = document.getElementById('spatial_projection_sections');
+    if (!el) return null;
+    if (el.selectize) return el.selectize.items.slice();
+    return Array.prototype.map.call(el.selectedOptions || [], function (option) {
+      return option.value;
+    });
+  }
+  // The panels to show: the frame's embedding, if it has one, then the
+  // sections in the order chosen. No choice (the control is not bound yet, or
+  // every section was removed) shows them all, in frame order: a grid without
+  // sections would leave the page blank.
+  function gridShownSpaces() {
+    // A section is one panel, or one per RGB channel.
+    var bySection = {};
+    singleGridSpaces.forEach(function (spaceId) {
+      var name = spaceById[spaceId]._gridSection;
+      (bySection[name] = bySection[name] || []).push(spaceId);
+    });
+    var out = [], cap = panelCap();
+    var chosen = gridSectionChoice() || [];
+    // A browser without a GPU shows the first sections it may, however many
+    // are chosen (or none: the first sections of the frame).
+    if (cap) chosen = (chosen.length ? chosen : Object.keys(bySection)).slice(0, cap);
+    chosen.forEach(function (name) {
+      (bySection[name] || []).forEach(function (spaceId) {
+        if (out.indexOf(spaceId) < 0) out.push(spaceId);
+      });
+    });
+    return singleGridExtras.concat(out.length ? out : singleGridSpaces);
+  }
+  // Whether the grid's frame holds every section of `names`. A data set of
+  // many cells sends a frame of only some sections (the server's cell budget,
+  // spatial_grid_frame_sections()): a section beyond them waits for a frame.
+  function gridFrameHolds(names) {
+    var held = {};
+    singleGridSpaces.forEach(function (spaceId) {
+      var space = spaceById[spaceId];
+      if (space && space._gridSection != null) held[space._gridSection] = true;
+    });
+    return (Array.isArray(names) ? names : [names]).every(function (name) {
+      return held[String(name)];
+    });
+  }
+  // ---- A streaming grid ----------------------------------------------------
+  // A grid of many cells comes in parts (spatial_grid_stream_split() in R): a
+  // first frame with every panel and the cells' names, but the positions and
+  // colours of the first sections shown only, then a cell_view_grid_rows
+  // message per batch of sections. The first frame is padded here to the
+  // frame's length (no position, no colour); a batch writes its rows into the
+  // stored frame and, when its frame is the one on screen, into the drawn
+  // panels, which then draw again. A batch that comes before its frame is
+  // drawn waits for it.
+  var GRID_ROW_FIELDS = { x: NaN, y: NaN, color: NaN, group_code: -1 };
+  var gridRowsWaiting = [];
+  var gridLive = null;
+  function gridStreamProjection(data) {
+    return (data.panels || []).filter(function (panel) {
+      return panel && panel.projection;
+    })[0] || null;
+  }
+  function gridStreamArray(values, n, fill, field) {
+    var Vector = fill === -1 ? Int32Array
+      : field === 'x' || field === 'y' || values instanceof Float32Array
+        ? Float32Array : Float64Array;
+    return new Vector(n).fill(fill);
+  }
+  // Writes the rows of `part` (its sections' starts and counts, and their
+  // values in that order) into the frame `data`.
+  function gridStreamWrite(data, part) {
+    var stream = data.grid_stream;
+    var sections = [].concat(part.section), starts = [].concat(part.start),
+      counts = [].concat(part.count);
+    var projection = gridStreamProjection(data);
+    var write = function (target, values) {
+      if (!target || !values) return;
+      for (var s = 0, offset = 0; s < starts.length; s++) {
+        var start = Number(starts[s]), count = Number(counts[s]);
+        for (var k = 0; k < count; k++) target[start + k] = values[offset + k];
+        offset += count;
+      }
+    };
+    // A batch carries no positions for the sections read from files.
+    var writeXY = part.fromFile ? write : function (target, values) {
+      if (!target || !values) return;
+      for (var s = 0, offset = 0; s < starts.length; s++) {
+        if (gridStreamFromFile(stream, sections[s])) continue;
+        var start = Number(starts[s]), count = Number(counts[s]);
+        for (var k = 0; k < count; k++) target[start + k] = values[offset + k];
+        offset += count;
+      }
+    };
+    Object.keys(GRID_ROW_FIELDS).forEach(function (field) {
+      if (part[field] == null) return;
+      (field === 'x' || field === 'y' ? writeXY : write)(data[field], part[field]);
+    });
+    if (projection && part.projection) {
+      write(projection.x, part.projection.x);
+      write(projection.y, part.projection.y);
+    }
+    // A batch names its cells by canonical row (the names come from the
+    // cell-name resource the first frame was read with) or by name.
+    var rows = part.selection_index != null ? expandRowRange(part.selection_index)
+      : part.selection_rows;
+    if (rows != null) {
+      write(data.selection_rows, rows);
+      var names = stream.names, keys = data.selection_key;
+      if (names && Array.isArray(keys)) {
+        for (var s = 0, offset = 0; s < starts.length; s++) {
+          var start = Number(starts[s]), count = Number(counts[s]);
+          for (var k = 0; k < count; k++) keys[start + k] = names[rows[offset + k]];
+          offset += count;
+        }
+      }
+    }
+    if (part.selection_key != null) write(data.selection_key, part.selection_key);
+    var arrived = part.fromFile ? stream.filesLoaded : stream.loaded;
+    sections.forEach(function (section) { arrived[String(section)] = true; });
+    if (part.done) stream.done = true;
+  }
+  // Sections whose positions a Viewer Pack file holds (the panel names it):
+  // the browser fetches them, the batches carry none.
+  function gridStreamFromFile(stream, section) {
+    return !!(stream && stream.files && stream.files[String(section)]);
+  }
+  // Every batch in and every file read.
+  function gridStreamComplete(stream) {
+    return !!stream && !!stream.done &&
+      Object.keys(stream.files || {}).every(function (section) {
+        return stream.filesLoaded[section];
+      });
+  }
+  // The positions of the sections in files: all fetched at once, in parallel
+  // (the browser keeps them), and written in as they come, the panels drawing
+  // again once an animation frame. A file that cannot be read tells the
+  // server, which sends this session's grids with their positions again.
+  var gridFileParts = [], gridFileFrame = 0;
+  // A few files at a time, in panel order (the order the batches come in):
+  // all at once they fill the connection and hold back the batches that bring
+  // the panels' colours. On a 50 Mbit/s link the first screen of the Allen
+  // atlas waited until 6.6 s for its second batch, which came at 2.0 s once
+  // the files were cached.
+  var GRID_FILES_AT_ONCE = 3;
+  function gridStreamFetchFiles(id, view, message) {
+    var data = view && view.data, stream = data && data.grid_stream;
+    if (!stream || !stream.files || stream.fetching) return;
+    stream.fetching = true;
+    var queue = (data.panels || []).filter(function (panel) {
+      return panel && panel.section != null && stream.files[String(panel.section)];
+    }).map(function (panel) { return String(panel.section); });
+    function current() {
+      var latest = singleView(id, view.dataset_context);
+      return latest && latest.data && latest.data.grid_stream === stream ? latest : null;
+    }
+    function next() {
+      if (stream.failed || !queue.length || !current()) return;
+      var section = queue.shift();
+      var panel = stream.files[section], count = Number(panel.count);
+      fetchValidatedSingleGeometryResource(panel.geometry_resource, message, count)
+        .then(function (result) {
+          var coordinates = result && result.coordinates;
+          if (!coordinates || coordinates.x.length !== count) {
+            throw new Error('Spatial geometry length mismatch');
+          }
+          var latest = current();
+          if (!latest) return;
+          var part = { id: id, fromFile: true, section: [section],
+            start: [Number(panel.start)], count: [count],
+            x: coordinates.x, y: coordinates.y };
+          gridStreamWrite(latest.data, part);
+          gridFileParts.push(part);
+          if (!gridFileFrame) {
+            gridFileFrame = requestAnimationFrame(function () {
+              gridFileFrame = 0;
+              var parts = gridFileParts;
+              gridFileParts = [];
+              parts.forEach(gridStreamPaint);
+              gridStreamSettle();
+            });
+          }
+        })
+        .catch(function () {
+          if (stream.failed) return;
+          stream.failed = true;
+          if (typeof Shiny !== 'undefined' && Shiny.setInputValue) {
+            Shiny.setInputValue(id + '_projection_resource_failed',
+              String(panel.geometry_resource.url || ''), { priority: 'event' });
+          }
+        })
+        .then(next);
+    }
+    for (var k = 0; k < GRID_FILES_AT_ONCE; k++) next();
+  }
+  // The first frame of a stream, at full length: its own rows in place.
+  function gridStreamExpand(data) {
+    var stream = data && data.grid_stream;
+    if (!stream || stream.loaded) return;
+    var n = Number(stream.rows);
+    var projection = gridStreamProjection(data);
+    var part = { section: stream.section, start: stream.start, count: stream.count };
+    Object.keys(GRID_ROW_FIELDS).forEach(function (field) {
+      if (data[field] == null) return;
+      part[field] = data[field];
+      data[field] = gridStreamArray(data[field], n, GRID_ROW_FIELDS[field], field);
+    });
+    if (projection) {
+      part.projection = { x: projection.x, y: projection.y };
+      projection.x = gridStreamArray(projection.x, n, NaN);
+      projection.y = gridStreamArray(projection.y, n, NaN);
+    }
+    // The cells' keys of the first batch: names, and canonical rows when
+    // they come from the cell-name resource. A cell still to come is ''.
+    if (Array.isArray(data.selection_key) && data.selection_key.length < n) {
+      part.selection_key = data.selection_key;
+      data.selection_key = new Array(n).fill('');
+    }
+    if (data.selection_rows != null && data.selection_rows.length < n) {
+      part.selection_rows = data.selection_rows;
+      data.selection_rows = new Int32Array(n).fill(-1);
+    }
+    stream.loaded = {};
+    stream.files = {};
+    stream.filesLoaded = {};
+    (data.panels || []).forEach(function (panel) {
+      if (panel && panel.section != null && panel.geometry_resource) {
+        stream.files[String(panel.section)] = panel;
+      }
+    });
+    stream.done = Number(stream.batches) <= 1;
+    gridStreamWrite(data, part);
+  }
+  // A section waits for its batch and, when its positions are in a file, for
+  // the file.
+  function gridStreamPending(data, section) {
+    var stream = data && data.grid_stream, key = String(section);
+    if (!stream || !stream.loaded) return false;
+    return (!stream.done && !stream.loaded[key]) ||
+      (gridStreamFromFile(stream, key) && !stream.filesLoaded[key]);
+  }
+  // Batches waiting for the frame `view` now holds go into it; those of
+  // older frames are dropped.
+  function drainGridRows(id, view) {
+    var token = Number(view.render_token);
+    gridRowsWaiting = gridRowsWaiting.filter(function (part) {
+      if (part.id !== id) return true;
+      var partToken = Number(part.render_token);
+      if (partToken === token && view.data && view.data.grid_stream) {
+        gridStreamWrite(view.data, part);
+        return false;
+      }
+      return partToken > token;
+    });
+  }
+  // The drawn panels of the batch's sections take its rows and draw again.
+  function gridStreamPaint(part) {
+    var live = gridLive;
+    if (!live || live.D !== D || singleActive !== part.id) return;
+    var group = catOf(live.mode), field = fieldForMode(live.mode);
+    var levels = group ? group.levels.length : 0;
+    var starts = [].concat(part.start), counts = [].concat(part.count);
+    var map = live.rows, touched = {};
+    // The view's cells (D.cells, D.rows) are the frame's key arrays, which
+    // gridStreamWrite() has filled: the name index is built anew when asked.
+    singleIndexMap = null;
+    // Each value of the batch at its cell of the view.
+    var copy = function (target, values) {
+      if (!target || !values) return;
+      for (var s = 0, offset = 0; s < starts.length; s++) {
+        var start = Number(starts[s]), count = Number(counts[s]), k, at;
+        if (!map) {
+          for (k = 0; k < count; k++) target[start + k] = values[offset + k];
+        } else {
+          for (k = 0; k < count; k++) {
+            at = map[start + k];
+            if (at != null) target[at] = values[offset + k];
+          }
+        }
+        offset += count;
+      }
+    };
+    var stream = live.data.grid_stream;
+    // A batch's positions skip the sections read from files.
+    var copyXY = part.fromFile ? copy : function (target, values) {
+      if (!target || !values) return;
+      var sections = [].concat(part.section);
+      for (var s = 0, offset = 0; s < starts.length; s++) {
+        if (gridStreamFromFile(stream, sections[s])) continue;
+        var start = Number(starts[s]), count = Number(counts[s]), k, at;
+        for (k = 0; k < count; k++) {
+          at = map ? map[start + k] : start + k;
+          if (at != null) target[at] = values[offset + k];
+        }
+        offset += count;
+      }
+    };
+    var written = [];
+    [].concat(part.section).forEach(function (section) {
+      (live.spaces[String(section)] || []).forEach(function (spaceId) {
+        var space = spaceById[spaceId];
+        if (!space) return;
+        // Sections share one pair of arrays (sharedSliceGeometry()).
+        if (part.x && space.x !== live.data.x && written.indexOf(space.x) < 0) {
+          written.push(space.x);
+          copyXY(space.x, part.x);
+          copyXY(space.y, part.y);
+        }
+        space._gridPending = gridStreamPending(live.data, section);
+        space._unit = null;
+        // A section still waiting for its batch or its file draws once both
+        // are in: drawing it from half its data was done twice.
+        if (!space._gridPending) touched[spaceId] = true;
+      });
+    });
+    if (group && part.group_code) {
+      var codes = part.group_code;
+      if (ArrayBuffer.isView(codes)) {
+        // Codes out of range read as no group (-1), as the frame's do.
+        var clean = new Int32Array(codes.length);
+        for (var c = 0; c < codes.length; c++) {
+          var code = codes[c];
+          clean[c] = code >= 0 && code < levels ? code : -1;
+        }
+        codes = clean;
+      } else {
+        codes = Array.prototype.map.call(codes, function (value) {
+          var code = Number(value);
+          return code >= 0 && code < levels ? code : -1;
+        });
+      }
+      copy(group.values, codes);
+    }
+    if (field && part.color && field.v) {
+      var span = (field.max - field.min) || 1, scale = field.scale || 1000;
+      var quantised = new Array(part.color.length);
+      for (var q = 0; q < part.color.length; q++) {
+        var value = Number(part.color[q]);
+        quantised[q] = isFinite(value)
+          ? Math.round(Math.max(0, Math.min(1, (value - field.min) / span)) * scale)
+          : null;
+      }
+      if (field.raw && field.raw !== live.data.color) copy(field.raw, part.color);
+      copy(field.v, quantised);
+    }
+    var projection = live.projection && spaceById[live.projection];
+    if (projection && part.projection) {
+      if (projection.x !== gridStreamProjection(live.data).x) {
+        copy(projection.x, part.projection.x);
+        copy(projection.y, part.projection.y);
+      }
+      // Every cell is in the embedding: it draws again only now and then.
+      live.projectionRows = (live.projectionRows || 0) + 1;
+      if (part.done || live.projectionRows % 4 === 0) {
+        projection._unit = null;
+        touched[live.projection] = true;
+      }
+    }
+    if (part.done && group) legendCounts.delete(group.values);
+    panels.forEach(function (p) {
+      if (!p.spaceId || !touched[p.spaceId]) return;
+      p.gpuDataState = null; p.miniBg = null;
+      project(p);
+      drawPanel(p);
+    });
+    updateMoranBadges(touched);
+    if (part.done) renderLegend();
+  }
+  // The stream is over once every batch and file is in and drawn: a file read
+  // waits for an animation frame to be drawn, and the last batch can come
+  // before it (its section stayed pending).
+  function gridStreamSettle() {
+    if (gridLive && !gridFileParts.length && !gridFileFrame &&
+        gridStreamComplete(gridLive.data.grid_stream)) gridLive = null;
+  }
+  function onGridRows(buffer) {
+    var part = window.CBViewWire.unpack(buffer);
+    if (!part || !part.id || !datasetMessageFresh(part)) return;
+    var view = singleView(part.id, part.dataset_context);
+    var token = Number(part.render_token);
+    if (!view || !view.data || Number(view.render_token) < token ||
+        !view.data.grid_stream) {
+      gridRowsWaiting.push(part);
+      return;
+    }
+    if (Number(view.render_token) !== token) return;
+    gridStreamWrite(view.data, part);
+    gridStreamPaint(part);
+    gridStreamSettle();
+  }
+  // Columns asked for, or null for the automatic packing.
+  // The columns a Columns field (cerebroColumnsInput()) asks for, at most
+  // `count`; null for Auto or without the field.
+  function columnsFrom(el, count) {
+    var cols = el ? parseInt(el.value, 10) : NaN;
+    return cols > 0 ? Math.max(1, Math.min(cols, count || cols)) : null;
+  }
+  // The Columns field of the panels being laid out: Spatial's grid, or Linked
+  // views (no single view active); other pages have none.
+  function gridColumnsChoice(count) {
+    var id = sectionGridActive() ? 'spatial_projection_grid_columns'
+      : (singleActive ? null : 'coordviews_columns');
+    var el = id && document.getElementById(id);
+    lockColumns(el);
+    var cap = panelCap();
+    return cap && el ? Math.max(1, Math.min(cap, count || cap)) : columnsFrom(el, count);
+  }
+  // Under the panel limit the Columns field is fixed at the limit and cannot be
+  // changed; lifting the limit gives it back as it was.
+  function lockColumns(el) {
+    var instance = el && el.selectize;
+    if (!instance) return;
+    var cap = panelCap();
+    if (cap && !instance.isLocked) {
+      el._columnsBefore = instance.getValue();
+      instance.setValue(String(cap), true);
+      instance.lock();
+    } else if (!cap && instance.isLocked) {
+      instance.unlock();
+      instance.setValue(el._columnsBefore || 'auto', true);
+    }
+  }
+  function gridSyncZoom() {
+    var el = document.getElementById('spatial_projection_grid_sync_zoom');
+    return sectionGridActive() && !!(el && el.checked);
+  }
+  // Where each shown section's panel is, by section: the panels are slots
+  // that change sections when the grid changes.
+  function gridPaneRects() {
+    var out = {};
+    panels.forEach(function (p) {
+      if (!p.spaceId || !p.pane || p.pane.classList.contains('cv-hidden')) return;
+      var r = p.pane.getBoundingClientRect();
+      if (r.width && r.height) out[p.spaceId] = r;
+    });
+    return out;
+  }
+  // A section added, removed or moved: each panel glides from where its section
+  // was, and a section new to the grid fades in (FLIP: the panels are laid out
+  // in place first, then moved back and released). Transforms only, on the
+  // compositor; past 36 panels, or with reduced motion, they just appear.
+  var GRID_MOVE_MAX = 36;
+  function animateGridChange(before) {
+    if (!before || typeof window === 'undefined' || (window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+    var shown = panels.filter(function (p) {
+      return p.spaceId && p.pane && !p.pane.classList.contains('cv-hidden');
+    });
+    if (!shown.length || shown.length > GRID_MOVE_MAX) return;
+    var viewH = window.innerHeight || 1000;
+    shown.forEach(function (p) {
+      var pane = p.pane, to = pane.getBoundingClientRect();
+      if (!to.width || to.bottom < -viewH || to.top > 2 * viewH) return;
+      var from = before[p.spaceId];
+      pane.style.transition = 'none';
+      if (from) {
+        var dx = from.left - to.left, dy = from.top - to.top;
+        var scale = Math.min(from.width / to.width, from.height / to.height);
+        if (Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(scale - 1) < 0.01) {
+          pane.style.transition = '';
+          return;
+        }
+        pane.style.transformOrigin = 'top left';
+        pane.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(' + scale + ')';
+      } else {
+        pane.style.transformOrigin = 'center';
+        pane.style.opacity = '0';
+        pane.style.transform = 'scale(.96)';
+      }
+      void pane.offsetWidth;
+      pane.style.transition = 'transform .3s cubic-bezier(.2, .8, .2, 1), opacity .24s ease';
+      pane.style.transform = '';
+      pane.style.opacity = '';
+      clearTimeout(pane._gridMoveTimer);
+      pane._gridMoveTimer = setTimeout(function () {
+        pane.style.transition = '';
+        pane.style.transformOrigin = '';
+      }, 340);
+    });
+  }
+  function applySectionGrid() {
+    if (!sectionGridActive() || !D) return;
+    var next = gridShownSpaces();
+    if (next.join('|') !== singleSpaceIds.join('|')) {
+      var before = focusPanel ? null : gridPaneRects();
+      singleSpaceIds = next;
+      // A section shown for the first time loads its own image now.
+      next.forEach(function (spaceId) {
+        var space = spaceById[spaceId];
+        if (space && space._imgToken == null && isSpatialSpace(space)) {
+          loadSpaceImage(space);
+        }
+      });
+      ensurePanelSlots(next.length); buildPanels(); layoutPanels();
+    }
+    _layoutKey = null;
+    resizeAll();
+    drawAll();
+    if (before) animateGridChange(before);
+    if (gridSyncZoom()) {
+      var first = panels.filter(function (p) {
+        return singleGridSpaces.indexOf(p.spaceId) >= 0;
+      })[0];
+      if (first) syncGridView(first);
+    }
+  }
+  // With Sync zoom on, the other sections follow a panel's camera. A view is
+  // a fraction of the panel's own section, so each section shows the same
+  // relative region at the same magnification.
+  function syncGridView(source) {
+    if (gridSyncing || !source || !gridSyncZoom() ||
+        singleGridSpaces.indexOf(source.spaceId) < 0 ||
+        singleSpaceIds.indexOf(source.spaceId) < 0) return;
+    gridSyncing = true;
+    try {
+      panels.forEach(function (p) {
+        if (p === source || singleGridSpaces.indexOf(p.spaceId) < 0 ||
+            singleSpaceIds.indexOf(p.spaceId) < 0) return;
+        p.view = source.view ? clampView(p, {
+          cx: source.view.cx, cy: source.view.cy, span: source.view.span
+        }) : null;
+        project(p);
+        drawPanel(p);
+      });
+    } finally {
+      gridSyncing = false;
+    }
+  }
+  // Switching between one section and the grid needs a new frame from the
+  // server. Until it is drawn, a skeleton of the coming layout (one card per
+  // panel, titled) covers the old panels at once, so the click is answered
+  // where it was made; the drawn frame then fades in under it.
+  var gridSkeleton = null, gridSkeletonTimer = 0, lastGridAspect = 1.3;
+  var gridSkeletonLayout = null;
+  function selectLabels(id) {
+    var el = document.getElementById(id);
+    if (!el) return [];
+    if (el.selectize) {
+      return el.selectize.items.map(function (value) {
+        var option = el.selectize.options[value];
+        return option ? String(option.label || option.text || value) : String(value);
+      });
+    }
+    return Array.prototype.map.call(el.selectedOptions || [], function (option) {
+      return option.text || option.value;
+    });
+  }
+  function hideGridSkeleton() {
+    clearTimeout(gridSkeletonTimer);
+    var skeleton = gridSkeleton;
+    gridSkeleton = null;
+    gridSkeletonLayout = null;
+    var host = document.querySelector('.coordviews-page .cv-panes');
+    if (host && host.classList.contains('cv-panes-pending')) {
+      host.classList.remove('cv-panes-pending');
+      host.classList.add('cv-panes-enter');
+      setTimeout(function () { host.classList.remove('cv-panes-enter'); }, 300);
+    }
+    if (!skeleton) return;
+    skeleton.classList.add('cv-grid-skeleton-out');
+    setTimeout(function () { if (skeleton.parentNode) skeleton.parentNode.removeChild(skeleton); }, 260);
+  }
+  function showGridSkeleton(layout) {
+    var host = document.querySelector('.coordviews-page .cv-panes');
+    var page = host && host.closest('.tab-pane');
+    if (!host || !page || !page.classList.contains('active')) return;
+    var labels;
+    if (layout === 'grid') {
+      labels = selectLabels('spatial_projection_sections');
+      if (panelCap()) labels = labels.slice(0, panelCap());
+      var embedding = document.getElementById('spatial_projection_grid_projection');
+      if (embedding && embedding.value && embedding.value !== '__none__') {
+        labels = [embedding.value].concat(labels);
+      }
+    } else {
+      labels = selectLabels('spatial_projection_sections').slice(0, 1);
+    }
+    if (!labels.length) return;
+    hideGridSkeleton();
+    var rect = host.getBoundingClientRect();
+    var gap = parseFloat(getComputedStyle(host).columnGap) || 8;
+    var scrollHost = host.closest('.content-wrapper');
+    var availH = Math.max(240, visibleHeight(scrollHost) - Math.max(0, rect.top) - 2 * VIEWPORT_GUTTER);
+    var pack = layout === 'grid'
+      ? sectionGridPacking(labels.length, rect.width, availH, 18, 58, gap, lastGridAspect,
+        columnsFrom(document.getElementById('spatial_projection_grid_columns'), labels.length))
+      : { cols: 1, height: Math.max(240, availH - 58) };
+    var skeleton = document.createElement('div');
+    skeleton.className = 'cv-grid-skeleton';
+    // Over the panels, which keep their size underneath (the engine measures
+    // them), cut to the window.
+    var parent = host.parentNode;
+    if (getComputedStyle(parent).position === 'static') parent.style.position = 'relative';
+    skeleton.style.top = host.offsetTop + 'px';
+    skeleton.style.left = host.offsetLeft + 'px';
+    skeleton.style.width = host.offsetWidth + 'px';
+    skeleton.style.maxHeight = Math.round(availH) + 'px';
+    skeleton.setAttribute('aria-hidden', 'true');
+    skeleton.style.gridTemplateColumns = 'repeat(' + pack.cols + ', minmax(0, 1fr))';
+    skeleton.style.gap = gap + 'px';
+    skeleton.innerHTML = labels.map(function (label) {
+      return '<div class="cv-grid-skeleton-card"><div class="cv-grid-skeleton-title">' +
+        esc(label) + '</div><div class="cv-grid-skeleton-plot" style="height:' +
+        Math.round(pack.height) + 'px"></div></div>';
+    }).join('') +
+      // A turning ring, which a busy page keeps turning (a transform
+      // animation runs off the main thread) while the sections load.
+      '<div class="cv-grid-spinner" role="status" aria-label="Loading sections"></div>';
+    host.parentNode.insertBefore(skeleton, host);
+    host.classList.add('cv-panes-pending');
+    gridSkeleton = skeleton;
+    gridSkeletonLayout = layout;
+    // A frame that never comes (an error, a data set switch) must not leave
+    // the page covered.
+    gridSkeletonTimer = setTimeout(hideGridSkeleton, 30000);
+  }
+  function wireSectionGrid() {
+    if (!window.jQuery) return;
+    // A grid panel's title shows only its section (the single view). With a
+    // panel enlarged, a thumbnail's title enlarges it instead, as a photo
+    // viewer's thumbnails do.
+    document.addEventListener('click', function (event) {
+      var title = event.target.closest && event.target.closest('.cv-ptitle');
+      if (!title || !sectionGridActive()) return;
+      var pane = title.closest('.cv-pane');
+      var panel = panels.filter(function (p) { return p.pane === pane; })[0];
+      if (focusPanel) {
+        if (panel && panel.key !== focusPanel) setFocusPanel(panel.key);
+        return;
+      }
+      var space = panel && spaceById[panel.spaceId];
+      var el = document.getElementById('spatial_projection_sections');
+      if (!space || space._gridSection == null || !el || !el.selectize) return;
+      el.selectize.setValue([space._gridSection]);
+    });
+    document.addEventListener('mouseover', function (event) {
+      var title = event.target.closest && event.target.closest('.cv-ptitle');
+      if (!title) return;
+      title.title = !sectionGridActive() ? ''
+        : (focusPanel ? 'Enlarge this section' : 'Show only this section');
+      title.classList.toggle('cv-ptitle-link', sectionGridActive());
+    });
+    window.addEventListener('cerebro:cell-view-ready', function (event) {
+      if (!gridSkeleton || !event.detail || event.detail.id !== 'spatial_projection') return;
+      // Only the frame of the layout asked for ends the wait.
+      if (sectionGridActive() !== (gridSkeletonLayout === 'grid')) return;
+      if (sectionGridActive()) lastGridAspect = sectionGridAspect();
+      hideGridSkeleton();
+    });
+    window.jQuery(document).on('shiny:inputchanged.cerebroSectionGrid', function (event) {
+      // Sections: one is the single view, several the grid. Only a change
+      // between the two waits for a frame (the input also fires when its
+      // control binds with what is on screen); a change among several only
+      // rearranges the drawn panels.
+      if (event.name === 'spatial_projection_sections' && singleActive === 'spatial_projection') {
+        var count = Array.isArray(event.value) ? event.value.length : (event.value ? 1 : 0);
+        if (!count) return;
+        var wanted = count > 1 ? 'grid' : 'single';
+        if ((wanted === 'grid') !== sectionGridActive() ||
+            (wanted === 'grid' && !gridFrameHolds(event.value))) {
+          setTimeout(function () { showGridSkeleton(wanted); }, 0);
+        } else if (wanted === 'grid') {
+          setTimeout(applySectionGrid, 0);
+        }
+        return;
+      }
+      if (event.name === 'spatial_projection_grid_columns' ||
+          event.name === 'spatial_projection_grid_sync_zoom') {
+        // The input's new value is in the DOM once the event has run.
+        setTimeout(applySectionGrid, 0);
+      }
+      if (event.name === 'coordviews_columns') {
+        setTimeout(function () {
+          if (!D || singleActive) return;
+          _layoutKey = null;
+          resizeAll();
+          drawAll();
+        }, 0);
+      }
+    });
+  }
+
+  // One RGB channel drawn on its own: the same 8-bit intensities and
+  // low-expression threshold as the composite, with only this channel
+  // enabled. Raw values stay for hover and selection summaries. Returns the
+  // field's colour mode; D.rgb is the frame's (singleRgbData()).
+  var RGB_CHANNEL_NAMES = ['Red', 'Green', 'Blue'];
+  // A panel's title; an RGB channel's panel gets its channel's colour dot.
+  function setPaneTitle(title, space, fallback) {
+    if (!title) return;
+    title.textContent = space ? space.label : fallback;
+    var channel = space && space._rgbChannel;
+    if (channel && RGB_CHANNELS[channel]) {
+      var dot = document.createElement('span');
+      dot.className = 'cv-title-dot';
+      dot.style.background = RGB_CHANNELS[channel];
+      dot.setAttribute('aria-hidden', 'true');
+      title.insertBefore(dot, title.firstChild);
+    }
+  }
+  function rgbChannelMode(id, channel, index, data, aligned) {
+    var gene = D.rgb.genes[index], maximum = D.rgb.maxima[channel];
+    var field = quantisedField(gene, data.rgb[channel] || [],
+      data.selection_key || [], {color_range: [0, maximum], paint_order: data.paint_order},
+      null, aligned);
+    field.v = D.rgb[channel]; field.scale = 255;
+    field.min = 0; field.max = maximum; field.rgbChannel = channel;
+    field.palette = Array.from({length: 256}, function (_, value) {
+      var color = rgbGpuColor(channel === 'r' ? value : 0,
+        channel === 'g' ? value : 0, channel === 'b' ? value : 0);
+      return 'rgb(' + (color & 255) + ',' + ((color >> 8) & 255) + ',' + ((color >> 16) & 255) + ')';
+    });
+    var fieldName = 'single:' + id + ':rgb:' + channel;
+    D.fields[fieldName] = field;
+    return FIELD_PREFIX + fieldName;
+  }
   function buildSpecialistPanels(id, payload) {
     var meta = payload.meta || {}, data = payload.data || {},
       extra = payload.extra || {};
     if (!Array.isArray(data.panels) || !data.panels.length) return null;
     var keys = Array.isArray(data.selection_key) ? data.selection_key : [];
+    var positional = keysArePositional(keys);
     var cellBoundaries = singleCellBoundaries(extra);
     var spaces = [], modes = {}, mode;
-    if (meta.color_type === 'categorical') {
+    var channelModes = null;
+    if (meta.color_type === 'rgb') {
+      // The blend of up to three genes, as a single view draws it (the
+      // Spatial grid's co-expression): grey where none is expressed. With
+      // separate channels each section becomes one panel per channel.
+      D.rgb = singleRgbData(data, positional);
+      mode = RGB_MODE;
+      if (meta.rgb_layout === 'separate' && D.rgb.genes.some(Boolean)) {
+        channelModes = [];
+        ['r', 'g', 'b'].forEach(function (channel, index) {
+          if (!D.rgb.genes[index]) return;
+          channelModes.push({ channel: channel, name: RGB_CHANNEL_NAMES[index],
+            mode: rgbChannelMode(id, channel, index, data, positional) });
+        });
+      }
+    } else if (meta.color_type === 'categorical') {
       var levels = Array.isArray(meta.traces) ? meta.traces.map(String) : [];
       var groups;
       if (data.group_code != null) {
         // Codes index the traces directly, in the frame's cell order.
         groups = emptyVector(-1);
-        alignedRows(keys).forEach(function (at, i) {
+        var codeAt = function (at, i) {
           var code = Number(data.group_code[i]);
           if (at != null) groups[at] = code >= 0 && code < levels.length ? code : -1;
-        });
+        };
+        if (positional) {
+          for (var codeRow = 0; codeRow < keys.length; codeRow++) codeAt(codeRow, codeRow);
+        } else {
+          alignedRows(keys).forEach(codeAt);
+        }
       } else {
         var rawGroups = alignFlatValues(keys, data.group || [], null);
         groups = rawGroups.map(function (value) {
@@ -9482,15 +12203,32 @@
         (Array.isArray(data.color) || ArrayBuffer.isView(data.color))
           ? data.color : [],
         keys,
-        data
+        data,
+        null,
+        positional
       );
       mode = FIELD_PREFIX + fieldName;
     }
     var frameRows = null;
+    // A panel that draws every row of the frame in its order (the grid's
+    // embedding) takes its positions as they are.
+    var ownValues = function (panelKeys, values, fallback) {
+      if (positional && panelKeys === keys && values && values.length === keys.length) {
+        return ArrayBuffer.isView(values) ? values : Float64Array.from(values, function (value) {
+          return value == null ? NaN : Number(value);
+        });
+      }
+      return alignFlatValues(panelKeys, values, fallback);
+    };
+    var shared = sharedSliceGeometry(data, keys);
+    var unitArrays = shared ? {
+      nx: new Float32Array(shared.x.length), ny: new Float32Array(shared.x.length)
+    } : null;
     data.panels.forEach(function (panel, panelIndex) {
       // A slice panel draws rows [start, start + count) of the frame's x, y
       // and keys instead of carrying its own copies.
       var slice = panel.start != null && panel.count != null;
+      var sharedSlice = slice && shared ? shared.cells[panelIndex] : null;
       var start = slice ? Number(panel.start) : 0, count = slice ? Number(panel.count) : 0;
       var panelKeys = slice ? keys.slice(start, start + count)
         : Array.isArray(panel.selection_key) ? panel.selection_key : keys;
@@ -9536,13 +12274,21 @@
         id: spaceId,
         _role: panel.id || null,
         label: panel.label || panel.id || id,
-        x: slice ? sliceValues(data.x) : alignFlatValues(panelKeys, xs, null),
-        y: slice ? sliceValues(data.y) : alignFlatValues(panelKeys, ys, null),
-        _hover: slice ? null : alignFlatValues(panelKeys, panel.hover || [], ''),
+        x: sharedSlice ? shared.x
+          : slice ? sliceValues(data.x) : ownValues(panelKeys, xs, null),
+        y: sharedSlice ? shared.y
+          : slice ? sliceValues(data.y) : ownValues(panelKeys, ys, null),
+        _hover: slice || !panel.hover ? null : alignFlatValues(panelKeys, panel.hover, ''),
         _hoverEnabled: true,
         _hoverMask: null
       };
-      if (slice) space._cells = sliceCells();
+      if (slice) space._cells = sharedSlice || sliceCells();
+      if (sharedSlice) space._unitArrays = unitArrays;
+      // A section of the Spatial grid: the browser orders and hides these.
+      if (panel.section != null) {
+        space._gridSection = String(panel.section);
+        if (gridStreamPending(data, panel.section)) space._gridPending = true;
+      }
       if (cellBoundaries.length) {
         var panelCells = new Set(panelKeys.map(String));
         space.cellBoundaries = cellBoundaries.filter(function (boundary) {
@@ -9570,6 +12316,7 @@
         space._preserveAspect = !!panel.preserve_aspect;
       }
       space.builder_point_size = panel.builder_point_size;
+      space._pointSizeHint = panel.point_size_hint;
       space.builder_point_opacity = panel.builder_point_opacity;
       space.xRange = panel.x_range;
       space.yRange = panel.y_range;
@@ -9599,10 +12346,38 @@
         }];
         space._customImageId = space.images[0].id;
       }
+      if (channelModes && panel.section != null) {
+        // "Section01 Red", "Section01 Green", ...: copies over the same cells.
+        channelModes.forEach(function (channel) {
+          var copy = Object.assign({}, space, {
+            id: spaceId + ':' + channel.channel,
+            label: space.label + ' ' + channel.name,
+            _rgbChannel: channel.channel
+          });
+          spaceById[copy.id] = copy;
+          spaces.push(copy.id);
+          modes[copy.id] = channel.mode;
+        });
+        return;
+      }
       spaceById[spaceId] = space;
       spaces.push(spaceId);
       modes[spaceId] = mode;
     });
+    gridLive = null;
+    if (data.grid_stream && !gridStreamComplete(data.grid_stream) && !channelModes) {
+      gridLive = { data: data, D: D, mode: mode, spaces: {}, projection: null,
+        rows: positional ? null : (frameRows || alignedRows(keys)) };
+      spaces.forEach(function (spaceId) {
+        var space = spaceById[spaceId];
+        if (space._gridSection != null) {
+          (gridLive.spaces[space._gridSection] =
+            gridLive.spaces[space._gridSection] || []).push(spaceId);
+        } else if (space._projectionName) {
+          gridLive.projection = spaceId;
+        }
+      });
+    }
     return { spaces: spaces, modes: modes };
   }
   function buildSingleSpaces(id, payload) {
@@ -9668,6 +12443,8 @@
       if (meta.is_spatial) {
         space.background_scope = id;
         space._sampleName = meta.image_label || 'Spatial';
+        // The section's own size ("Auto"), when the server sent one.
+        if (Number(data.point_size_hint) > 0) space._pointSizeHint = Number(data.point_size_hint);
         var bounds = meta.image_bounds || null;
         if (meta.background_image && bounds) {
           var imageId = meta.background_identity
@@ -9707,24 +12484,10 @@
         ['r', 'g', 'b'].forEach(function (channel, index) {
           var gene = D.rgb.genes[index];
           if (!gene) return;
-          var label = channel.toUpperCase() + ' · ' + gene;
-          var maximum = D.rgb.maxima[channel];
-          var field = quantisedField(label, data.rgb[channel] || [], data.selection_key || [],
-            {color_range: [0, maximum], paint_order: data.paint_order});
-          // Use the same 8-bit intensities and low-expression threshold as
-          // the composite, with only this channel enabled. Keep raw values
-          // for hover and selection summaries.
-          field.v = D.rgb[channel]; field.scale = 255;
-          field.min = 0; field.max = maximum; field.rgbChannel = channel;
-          field.palette = Array.from({length: 256}, function (_, value) {
-            var color = rgbGpuColor(channel === 'r' ? value : 0,
-              channel === 'g' ? value : 0, channel === 'b' ? value : 0);
-            return 'rgb(' + (color & 255) + ',' + ((color >> 8) & 255) + ',' + ((color >> 16) & 255) + ')';
-          });
-          var fieldName = 'single:' + id + ':rgb:' + channel;
           var spaceId = baseId + ':rgb:' + channel;
-          D.fields[fieldName] = field;
-          makeSpace(spaceId, label); modes[spaceId] = FIELD_PREFIX + fieldName;
+          makeSpace(spaceId, gene);
+          spaceById[spaceId]._rgbChannel = channel;
+          modes[spaceId] = rgbChannelMode(id, channel, index, data, false);
         });
       } else {
         makeSpace(baseId, meta.space_label || id);
@@ -9878,7 +12641,7 @@
     var previousSpaces = reuseSurface ? spaceById : null;
     var previousFocus = reuseSurface ? focusPanel : null;
     if (!reuseSurface) restoreLinkedSurface();
-    singleActive = id; singleSpaceIds = []; singleSpaceModes = {};
+    singleActive = id; singleSpaceIds = []; singleSpaceModes = {}; singleGridSpaces = []; singleGridExtras = [];
     if (!reuseSurface && !mountSingleSurface(id)) { singleActive = null; return false; }
     var base = singlePayloadBundle(id, payload);
     D = Object.assign({}, base, {
@@ -9899,6 +12662,15 @@
     }
     payload.data.reset_axes = false;
     singleSpaceIds = built.spaces; singleSpaceModes = built.modes;
+    singleGridSpaces = id === 'spatial_projection'
+      ? built.spaces.filter(function (spaceId) {
+        return spaceById[spaceId] && spaceById[spaceId]._gridSection != null;
+      }) : [];
+    singleGridExtras = singleGridSpaces.length
+      ? built.spaces.filter(function (spaceId) {
+        return singleGridSpaces.indexOf(spaceId) < 0;
+      }) : [];
+    if (singleGridSpaces.length) singleSpaceIds = gridShownSpaces();
     sanitiseColors(D);
     singleSpaceIds.forEach(function (spaceId) {
       var space = spaceById[spaceId], old = previousSpaces && previousSpaces[spaceId];
@@ -9913,17 +12685,6 @@
       }
       loadSpaceImage(space);
     });
-    if (payload.backgroundState) updateSingleBackground({
-      id: id,
-      dataset_context: payload.dataset_context,
-      background_identity: payload.background_identity_value,
-      values: payload.backgroundState
-    });
-    Object.keys(payload.backgroundEdits || {}).forEach(function (key) {
-      var edit = payload.backgroundEdits[key];
-      updateSingleBackground({ id: id, dataset_context: payload.dataset_context,
-        background_identity: edit.identity, values: edit.values });
-    });
     colorBy = singleSpaceModes[singleSpaceIds[0]] || colorBy;
     hidden = new Set(); groupFilter = {}; deferredColorRequest = null;
     applySingleClientFilters(id);
@@ -9935,11 +12696,14 @@
     if (appearance) {
       labelsOn = appearance.group_labels === true;
       bordersOn = !!appearance.draw_border;
+      pictureOutlineOn = appearance.picture_outline !== false;
       keepPlotsSquare = !!appearance.keep_square;
     } else {
       var labelsControl = $('cv-labels');
       var bordersControl = $('cv-borders');
       var squareControl = $('cv-square-plots');
+      var outlineControl = $('cv-picture-outline');
+      if (outlineControl) pictureOutlineOn = !!outlineControl.checked;
       if (labelsControl) labelsOn = !!labelsControl.checked;
       if (bordersControl) bordersOn = !!bordersControl.checked;
       if (squareControl) keepPlotsSquare = !!squareControl.checked;
@@ -10000,6 +12764,11 @@
     updateSingleInteractionMode();
     if (!reuseSurface || refreshFilters) {
       renderGroupFilters();
+      updateSpaceScopedControls();
+    }
+    // The Spatial page's own background editor follows the sections on screen.
+    if (id === 'spatial_projection') {
+      renderImagePicker();
       updateSpaceScopedControls();
     }
     setTrekkerSettingsVisible(!!D.trekker);
@@ -10066,7 +12835,7 @@
   // Hands the shared surface back to Linked views, keeping the specialist state.
   function leaveSingle() {
     stashSingleState(); restoreLinkedSurface();
-    singleActive = null; singleSpaceIds = []; singleSpaceModes = {};
+    singleActive = null; singleSpaceIds = []; singleSpaceModes = {}; singleGridSpaces = []; singleGridExtras = [];
   }
 
   function activateLinked() {
@@ -10153,16 +12922,13 @@
     var hover = message.hover || {};
     var extra = message.extra || {};
     meta = meta || {}; data = data || {};
+    gridStreamExpand(data);
     var host = singleHost(id), keys = data.selection_key || [];
     var pointCount = data.n != null ? Number(data.n) : (Array.isArray(keys[0])
       ? keys.reduce(function (total, values) { return total + values.length; }, 0)
       : keys.length);
-    var backgroundIdentityValue = message.background_identity != null
-      ? message.background_identity : meta.background_identity;
-    var backgroundIdentity = canonicalIdentity(backgroundIdentityValue);
-    if (previous.background_identity !== backgroundIdentity) {
-      previous.backgroundState = null;
-    }
+    var backgroundIdentity = canonicalIdentity(message.background_identity != null
+      ? message.background_identity : meta.background_identity);
     if (host) {
       host.dataset.datasetEpoch = String(context.epoch);
       host.dataset.datasetKey = String(context.dataset_key);
@@ -10183,10 +12949,11 @@
       extra: extra || {}, dataset_context: context,
       render_token: renderToken, aux_render_token: renderToken,
       datasetIdentity: message.dataset_identity || {},
-      background_identity: backgroundIdentity,
-      background_identity_value: backgroundIdentityValue
+      background_identity: backgroundIdentity
     });
     singleViews[cacheKey].unrequested = unrequested;
+    drainGridRows(id, singleViews[cacheKey]);
+    gridStreamFetchFiles(id, singleViews[cacheKey], message);
     if (changedGroup) singleViews[cacheKey].hiddenGroups = [];
     if (data.reset_axes) singleViews[cacheKey].lenses = [];
     var pending = singleViews[cacheKey].pendingSavedState;
@@ -10199,10 +12966,12 @@
     return true;
   }
   // The data fields a cell_view_recolor_binary message may replace.
+  // A Spatial grid coloured by a group carries its colours as group codes.
   var SINGLE_COLOR_FIELDS = [
     'color', 'rgb', 'rgb_genes', 'colorscale', 'panel_colorscales',
     'color_range', 'reversescale', 'paint_order', 'render_key', 'sparse_color',
-    'color_cache_key', 'packed_rgb', 'packed_rgb_cache_keys', 'zero_color'
+    'color_cache_key', 'packed_rgb', 'packed_rgb_cache_keys', 'zero_color',
+    'group_code', 'canonical_group'
   ];
   function updateSingleExpression(id, previousMeta, previousData, message) {
     var view = singleView(id), data = view.data, meta = view.meta;
@@ -10269,7 +13038,7 @@
     activePanels.forEach(function (p) {
       p.colorBy = mode; p.miniBg = null;
       var title = $('cv-title-' + p.key.toLowerCase());
-      if (title) title.textContent = space.label;
+      setPaneTitle(title, space, p.spaceId);
 
     });
     pick = null; unpinTip(); closeCard(); cardMeta = null;
@@ -10303,9 +13072,62 @@
     hydrateColorPacketMap(view.data, 'packed_rgb', 'packed_rgb_cache_keys', 'rgb');
     view.hiddenGroups = [];
     if (visibleSingleId() === message.id &&
-        !updateSingleExpression(message.id, previousMeta, previousData, message)) {
+        !updateSingleExpression(message.id, previousMeta, previousData, message) &&
+        !updateGridColors(message.id, previousMeta, message)) {
       activateSingle(message.id, false, false, 'primary');
     }
+    return true;
+  }
+
+  // A Spatial grid coloured anew by the same kind of colouring keeps its
+  // panels, their unit positions and the cells' GPU positions: only the
+  // frame's colouring is replaced, and the panels draw again through
+  // updateGpuColors(). Rebuilding the whole view took 0.6 s for the 59
+  // sections of the Allen atlas. A switch between groups and values, or a
+  // frame whose keys are not its cells in order, is activated anew.
+  function updateGridColors(id, previousMeta, message) {
+    var view = singleView(id), data = view && view.data, meta = view && view.meta;
+    if (id !== 'spatial_projection' || singleActive !== id || !D || rebuildingBase ||
+        !sectionGridActive() || !data || !Array.isArray(data.panels) || !meta ||
+        meta.color_type !== previousMeta.color_type ||
+        (meta.color_type !== 'categorical' && meta.color_type !== 'continuous') ||
+        Object.keys(message.data || {}).some(function (key) {
+          return SINGLE_COLOR_FIELDS.indexOf(key) < 0;
+        })) return false;
+    var keys = Array.isArray(data.selection_key) ? data.selection_key : [];
+    if (!keysArePositional(keys)) return false;
+    var mode = singleSpaceModes[singleGridSpaces[0]];
+    if (meta.color_type === 'categorical') {
+      var groupName = '__single_group__' + id;
+      if (mode !== groupName || data.group_code == null) return false;
+      var levels = Array.isArray(meta.traces) ? meta.traces.map(String) : [];
+      var codes = data.group_code, values = emptyVector(-1);
+      for (var row = 0; row < keys.length; row++) {
+        var code = Number(codes[row]);
+        values[row] = code >= 0 && code < levels.length ? code : -1;
+      }
+      (meta.shared_filters ? D.groups : D.cat_extra)[groupName] = {
+        values: values,
+        levels: levels,
+        colors: Array.isArray(meta.group_colors) ? meta.group_colors : []
+      };
+    } else {
+      var fieldName = 'single:' + id + ':value';
+      if (mode !== FIELD_PREFIX + fieldName) return false;
+      D.fields[fieldName] = quantisedField(
+        meta.color_variable || 'Value',
+        (Array.isArray(data.color) || ArrayBuffer.isView(data.color)) ? data.color : [],
+        keys, data, null, true
+      );
+    }
+    hidden = new Set();
+    _ordD = null; _clipD = null; _fldCacheD = null; _fldCacheVal = null;
+    panels.forEach(function (p) { p.miniBg = null; });
+    pick = null; unpinTip(); closeCard(); cardMeta = null;
+    renderLegend(); renderSelbar();
+    _layoutKey = null; if (!resizeAll()) drawAll();
+    updateMoranBadges();
+    reportSinglePainted(id, view, D);
     return true;
   }
 
@@ -10348,11 +13170,28 @@
     };
   }
 
+  // A frame's arrays do not change: their extent is kept per array, since
+  // the summary is asked for often (tests poll it) and walking 3.9 million
+  // positions took a third of a second each time.
+  var numericExtentCache = typeof WeakMap === 'function' ? new WeakMap() : null;
   function numericExtent(value) {
+    var cacheable = numericExtentCache && value && typeof value === 'object';
+    if (cacheable && numericExtentCache.has(value)) return numericExtentCache.get(value);
     var min = Infinity, max = -Infinity, count = 0;
     function visit(entry) {
-      if (Array.isArray(entry) || ArrayBuffer.isView(entry)) {
-        Array.prototype.forEach.call(entry, visit);
+      if (ArrayBuffer.isView(entry) && !(entry instanceof DataView)) {
+        for (var i = 0, n = entry.length; i < n; i++) {
+          var v = entry[i];
+          if (v === v && v !== Infinity && v !== -Infinity) {
+            if (v < min) min = v;
+            if (v > max) max = v;
+            count++;
+          }
+        }
+        return;
+      }
+      if (Array.isArray(entry)) {
+        for (var j = 0; j < entry.length; j++) visit(entry[j]);
         return;
       }
       var number = Number(entry);
@@ -10360,7 +13199,9 @@
       min = Math.min(min, number); max = Math.max(max, number); count++;
     }
     visit(value);
-    return count ? Object.freeze({ min: min, max: max, count: count }) : null;
+    var result = count ? Object.freeze({ min: min, max: max, count: count }) : null;
+    if (cacheable) numericExtentCache.set(value, result);
+    return result;
   }
 
   function singleSummary(id) {
@@ -10384,6 +13225,7 @@
       pointCount: isFinite(pointCount) ? pointCount : 0,
       pointSize: ready ? (singleActive === id ? ps : view.data.point_size) : null,
       pointOpacity: ready ? (singleActive === id ? pointOpacity : view.data.point_opacity) : null,
+      panels: ready && singleActive === id ? panelAppearance() : [],
       xExtent: ready ? numericExtent(view.data.x) : null,
       yExtent: ready ? numericExtent(view.data.y) : null,
       backgroundIdentity: ready ? view.background_identity || null : null,
@@ -10391,7 +13233,90 @@
         return canonicalIdentity(panel.image_identity);
       }).filter(Boolean) : [],
       wireToken: ready && view.data.wire_token != null
-        ? view.data.wire_token : null
+        ? view.data.wire_token : null,
+      grid: ready && singleActive === id ? gridSummary() : null
+    });
+  }
+  // The section grid as drawn: the sections and their order, each shown
+  // panel's cell count and whether its image is on screen.
+  function gridSummary() {
+    if (!sectionGridActive()) return null;
+    var label = function (spaceId) {
+      var space = spaceById[spaceId];
+      return space ? (space._gridSection != null ? space._gridSection : space.label) : null;
+    };
+    var first = spaceById[singleGridSpaces[0]];
+    return Object.freeze({
+      sections: singleGridSpaces.map(label),
+      shown: singleSpaceIds.map(label),
+      // Shown sections whose cells a streaming grid has still to send.
+      pending: singleSpaceIds.filter(function (spaceId) {
+        return !!(spaceById[spaceId] && spaceById[spaceId]._gridPending);
+      }).map(label),
+      cells: singleSpaceIds.map(function (spaceId) {
+        var space = spaceById[spaceId];
+        return space && space._cells ? space._cells.length : D.n;
+      }),
+      images: singleSpaceIds.map(function (spaceId) {
+        var space = spaceById[spaceId];
+        return !!(space && space._imgReady && currentImage(space));
+      }),
+      // Points each shown panel put on screen (the GPU's count, else the
+      // panel's positioned cells): a panel left blank reads 0.
+      drawn: singleSpaceIds.map(function (spaceId) {
+        var panel = panels.filter(function (p) { return p.spaceId === spaceId; })[0];
+        if (!panel) return 0;
+        if (panel.gpuCanvas && panel.gpuCanvas.style.display !== 'none' &&
+            panel.gpuCanvas.dataset.pointCount != null) {
+          return Number(panel.gpuCanvas.dataset.pointCount);
+        }
+        var space = spaceById[spaceId], unit = space && space._unit, count = 0;
+        if (!unit || !unit.ok) return 0;
+        var cells = space._cells;
+        if (!cells) { for (var i = 0; i < unit.ok.length; i++) count += unit.ok[i]; return count; }
+        for (var at = 0; at < cells.length; at++) count += unit.ok[cells[at]];
+        return count;
+      }),
+      sharedGeometry: singleGridSpaces.every(function (spaceId) {
+        return spaceById[spaceId].x === first.x;
+      }),
+      columns: gridColumnsChoice(singleSpaceIds.length),
+      syncZoom: gridSyncZoom(),
+      // Selected cells in each shown panel: a selection spans the sections.
+      selected: singleSpaceIds.map(function (spaceId) {
+        var space = spaceById[spaceId], count = 0;
+        if (!sel || !space) return 0;
+        if (!space._cells) return sel.size;
+        for (var at = 0; at < space._cells.length; at++) {
+          if (sel.has(space._cells[at])) count++;
+        }
+        return count;
+      }),
+      // The colour scale every panel reads, and the values each panel holds.
+      colorRange: (function () {
+        var shown = panels.filter(function (p) { return p.spaceId; })[0];
+        var field = shown && fieldOf(shown);
+        return field ? [field.min, field.max] : null;
+      })(),
+      valueRanges: singleSpaceIds.map(function (spaceId) {
+        var space = spaceById[spaceId], panel = panels.filter(function (p) {
+          return p.spaceId === spaceId;
+        })[0];
+        var field = panel && fieldOf(panel), values = field && field.raw;
+        if (!values || !space || !space._cells) return null;
+        var low = Infinity, high = -Infinity;
+        for (var at = 0; at < space._cells.length; at++) {
+          var value = values[space._cells[at]];
+          if (value == null || !isFinite(value)) continue;
+          if (value < low) low = value;
+          if (value > high) high = value;
+        }
+        return isFinite(low) ? [low, high] : null;
+      }),
+      views: singleSpaceIds.map(function (spaceId) {
+        var panel = panels.filter(function (p) { return p.spaceId === spaceId; })[0];
+        return panel && panel.view ? Object.assign({}, panel.view) : null;
+      })
     });
   }
 
@@ -10441,38 +13366,6 @@
   function dropPendingSingleState(id) {
     var view = id && singleView(id);
     if (view) view.pendingSavedState = null;
-  }
-
-  function updateSingleBackground(message) {
-    if (!message || !message.id || !datasetMessageFresh(message)) return false;
-    var id = message.id;
-    var view = singleView(id); if (!view) return false;
-    var incomingIdentity = canonicalIdentity(message.background_identity);
-    var panelMatch = (view.data && view.data.panels || []).some(function (panel) {
-      return canonicalIdentity(panel.image_identity) === incomingIdentity;
-    });
-    if (!incomingIdentity || (incomingIdentity !== view.background_identity && !panelMatch)) return false;
-    var values = message.values || {};
-    var names = ['opacity', 'offsetX', 'offsetY', 'scaleX', 'scaleY', 'flipX', 'flipY', 'rotate'];
-    view.backgroundEdits = view.backgroundEdits || {};
-    var oldEdit = view.backgroundEdits[incomingIdentity];
-    view.backgroundEdits[incomingIdentity] = { identity: message.background_identity,
-      values: Object.assign({}, oldEdit && oldEdit.values || {}, values) };
-    if (!panelMatch) view.backgroundState = Object.assign({}, view.backgroundState || {}, values);
-    if (singleActive !== id) return true;
-    var changed = false;
-    singleSpaceIds.forEach(function (spaceId) {
-      var space = spaceById[spaceId]; if (!space || !space._imgState) return;
-      if (panelMatch && space._backgroundIdentity !== incomingIdentity) return;
-      names.forEach(function (name) {
-        if (values[name] == null || space._imgState[name] === values[name]) return;
-        space._imgState[name] = values[name]; changed = true;
-      });
-      stashImgState(space);
-    });
-    // R's reply to a snapshot already drawn changes nothing.
-    if (changed) drawAll();
-    return true;
   }
 
   function onData(bundle) {
@@ -10603,6 +13496,36 @@
     });
     return scenes;
   }
+  // Scenes of different cells (the sections of a data set) share one pair of
+  // position arrays over every cell, and one pair of unit positions, each
+  // scene writing its own cells only (as the sections of the Spatial grid
+  // do, sharedSliceGeometry()). A scene that shares a cell with every pool so
+  // far (an ROI inside its section) starts a pool of its own. A pair per scene
+  // was 31 MB for the Allen atlas, 3.6 GB with its unit positions for its 59
+  // sections.
+  function scenePool(rows, n) {
+    // The pools of the current data set (D), kept on the function.
+    var pools = scenePool.pools;
+    if (!pools || pools.data !== D) pools = scenePool.pools = { data: D, list: [] };
+    var pool = null;
+    for (var p = 0; p < pools.list.length && !pool; p++) {
+      var candidate = pools.list[p], free = true;
+      for (var j = 0; j < rows.length; j++) {
+        if (candidate.taken[rows[j]]) { free = false; break; }
+      }
+      if (free) pool = candidate;
+    }
+    if (!pool) {
+      pool = {
+        x: new Float32Array(n).fill(NaN), y: new Float32Array(n).fill(NaN),
+        taken: new Uint8Array(n),
+        unit: { nx: new Float32Array(n), ny: new Float32Array(n) }
+      };
+      pools.list.push(pool);
+    }
+    for (var k = 0; k < rows.length; k++) pool.taken[rows[k]] = 1;
+    return pool;
+  }
   function hydrateSpatialScenes(extra) {
     linkedSpatialScenes(extra).forEach(function (scene) {
       var rows = scene.rows;
@@ -10626,11 +13549,13 @@
       var dense = null;
       var expand = function () {
         if (!dense) {
-          dense = {x: new Float32Array(n).fill(NaN), y: new Float32Array(n).fill(NaN)};
+          var pool = scenePool(rows, n);
+          dense = {x: pool.x, y: pool.y};
           for (var j = 0; j < rows.length; j++) {
             dense.x[rows[j]] = xs[j];
             dense.y[rows[j]] = ys[j];
           }
+          scene._unitArrays = pool.unit;
           rows = xs = ys = null;
         }
         return dense;
@@ -10715,13 +13640,6 @@
       if (focusPanel) {
         panel.pane.classList.add('cv-focus-context');
         panel.pane.style.order = '1';
-        var role = panel.pane.querySelector('.cv-role-badge');
-        if (role) {
-          role.style.display = '';
-          role.textContent = 'CONTEXT';
-          role.classList.remove('is-focus');
-          role.classList.add('is-context');
-        }
       }
       if (reappearing) fadeInPane(panel.pane);
     }
@@ -11133,7 +14051,10 @@
           traceMask[maskAt] = traceMode != null && traceMode !== 'skip' ? 1 : 0;
         }
       }
-      singleSpaceIds.forEach(function (spaceId) {
+      // Hidden sections of a grid take the columns too, for when they show.
+      singleSpaceIds.concat(singleGridSpaces.filter(function (spaceId) {
+        return singleSpaceIds.indexOf(spaceId) < 0;
+      })).forEach(function (spaceId) {
         var space = spaceById[spaceId];
         if (!space) return;
         space._hover = ArrayBuffer.isView(canonicalGroups)
@@ -11151,7 +14072,9 @@
         space._hoverEnabled = enabled;
         space._hoverMask = traceMask;
       });
-      if (singleSpaceIds.length && view.meta && view.meta.space_label) {
+      // Panels hold some of the frame's cells each (activateSingle()).
+      if (singleSpaceIds.length && view.meta && view.meta.space_label &&
+          !Array.isArray(view.data && view.data.panels)) {
         cacheSharedProjection(
           String(view.meta.space_label),
           spaceById[singleSpaceIds[0]],
@@ -11268,6 +14191,7 @@
         return sample.is_roi_overview !== true;
       }).map(function (sample) { return sample.name; });
     }
+    trimSelectionToCap();
     var activeName = !dataChanged && selectedSpatial.indexOf(previousActiveName) >= 0
       ? previousActiveName : selectedSpatial[0];
     activeSpatialId = activeName ? spatialId(activeName) : null;
@@ -11295,6 +14219,7 @@
       var authorDisplay = D.display_defaults || {};
       labelsOn = authorDisplay.group_labels === true;
       bordersOn = authorDisplay.draw_border === true;
+      pictureOutlineOn = authorDisplay.spatial_picture_outline !== false;
       keepPlotsSquare = authorDisplay.keep_square === true;
       colorClip = [0, 0.01, 0.02, 0.05].indexOf(authorDisplay.color_clip) >= 0
         ? authorDisplay.color_clip : 0.01;
@@ -11305,6 +14230,8 @@
       if (labelsControl) labelsControl.checked = labelsOn;
       var bordersControl = $('cv-borders');
       if (bordersControl) bordersControl.checked = bordersOn;
+      var outlineEl = $('cv-picture-outline');
+      if (outlineEl) outlineEl.checked = pictureOutlineOn;
       var squareControl = $('cv-square-plots');
       if (squareControl) squareControl.checked = keepPlotsSquare;
       var configuredOpacity = Number(D.default_point_opacity);
@@ -11312,7 +14239,7 @@
         ? Math.max(0, Math.min(1, configuredOpacity)) : 0.8;
       var configuredPointSize = Number(D.default_point_size);
       ps = D.default_point_size != null && isFinite(configuredPointSize)
-        ? Math.max(1, Math.min(20, configuredPointSize)) : 5;
+        ? Math.max(1, Math.min(20, configuredPointSize)) : DEFAULT_POINT_SIZE;
       pointSizeEdited = false;
       pointOpacityEdited = false;
       psSeeded = true;
@@ -11323,6 +14250,7 @@
       pctShow = D.default_percentage_cells_to_show != null &&
         isFinite(configuredPercentage)
         ? Math.max(10, Math.min(100, configuredPercentage)) : 100;
+      pctEdited = false;
       rebuildPctMask();
       setLinkedSliderValue('cv-pct', pctShow, 10);
     }
@@ -11369,6 +14297,7 @@
     fillColorPicker();
     fillProjPicker();
     fillSpatialPicker();
+    fillBackgroundPicker();
     renderGroupFilters();
     activateSpatial(activeSpatialId);
     // hide the gene/RGB pickers on a fresh dataset (starts in a categorical mode)
@@ -11802,13 +14731,17 @@
     ps = finiteNumber(display.point_size, ps, 0, 20);
     pointOpacity = finiteNumber(display.point_opacity, pointOpacity, 0, 1);
     pctShow = finiteNumber(display.percentage_cells, pctShow, 5, 100);
+    pctEdited = isFinite(Number(display.percentage_cells)) &&
+      Number(display.percentage_cells) < 100;
     psSeeded = true;
     var overrides = workspacePointOverrides(config);
     pointSizeEdited = overrides.size;
     pointOpacityEdited = overrides.opacity;
     labelsOn = display.group_labels === true;
     bordersOn = !!display.cell_borders;
-    linkedBackgroundsOn = display.background_images !== false;
+    // The pictures are the Background images field's: a workspace saved with
+    // them hidden (the old switch) shows them again.
+    linkedBackgroundsOn = true;
     syncLinkedBackgroundsDefault(false);
     keepPlotsSquare = !!display.keep_square;
     selectMode = display.selection_mode;
@@ -11872,6 +14805,22 @@
     return { selected_cells: restoredSelection.size };
   }
 
+  // What each shown panel draws with: its point size and opacity and how many
+  // cells it shows, so a check can see that a setting reaches every panel.
+  function panelAppearance() {
+    if (!D) return [];
+    return panels.filter(function (p) {
+      return p.spaceId && p.pane && !p.pane.classList.contains('cv-hidden');
+    }).map(function (p) {
+      var space = spaceById[p.spaceId];
+      return {
+        panel: space ? (space._gridSection != null ? space._gridSection : space.label) : p.spaceId,
+        pointSize: pointSizeOf(p),
+        pointOpacity: pointOpacityOf(p),
+        shown: shownState(p).count
+      };
+    });
+  }
   function workspaceSummary() {
     var ownsWorkspace = !singleActive && D && D === linkedBundle && datasetMessageFresh(D);
     var primaryPanel = ownsWorkspace && panels.filter(function (panel) {
@@ -11899,6 +14848,7 @@
       selectedCells: sel ? sel.size : 0,
       selectedCellBarcodes: selectedCellIds(),
       colourMode: colorBy,
+      panels: ownsWorkspace ? panelAppearance() : [],
       projections: selectedProjections.slice(),
       spatialSections: selectedSpatial.slice(),
       activeSpatial: D && activeSpatial() ? activeSpatial()._sampleName || null : null,
@@ -12086,6 +15036,11 @@
     });
     Shiny.addCustomMessageHandler('cerebro_scatter_defaults', function (message) {
       if (!message || !sameDatasetContext(message.dataset_context, currentDatasetContext())) return;
+      // While a slider is dragged, the server echoes each step it was sent,
+      // late. Applying an echo set the dragged slider and the drawing back to
+      // an older step mid-drag; this page already holds the latest values.
+      if ((sliderHeld || Date.now() - lastScatterEdit < 1500) &&
+          sameDatasetContext(message.dataset_context, lastScatterEditContext)) return;
       sharedScatter = message;
       Object.keys(scatterControlFields).forEach(function (id) {
         setLinkedSliderValue(id, message.values[scatterControlFields[id]]);
@@ -12123,10 +15078,10 @@
       } else if (field === 'point_opacity') {
         pointOpacity = Math.max(0, Math.min(1, value)); pointOpacityEdited = true;
       } else if (field === 'percentage_cells_to_show' && singleClientPercentage()) {
-        pctShow = Math.max(10, Math.min(100, value)); rebuildPctMask(); applyActiveChange();
+        pctShow = Math.max(10, Math.min(100, value)); applyPctSoon();
         return;
       } else return;
-      drawAll();
+      drawAllSoon();
     });
     // Display toggles of the single views patch the drawn view at once; R's
     // cell_view_appearance patch then carries the values already drawn.
@@ -12148,6 +15103,7 @@
       applySingleAppearance({ id: id, dataset_context: view.dataset_context, values: values,
         dataset_fingerprint: (view.datasetIdentity || {}).cell_fingerprint });
     });
+    wireSectionGrid();
     window.jQuery(document).on('shiny:inputchanged.cerebroScatter', function (event) {
       var edit = scatterUserEdit, field = scatterControlFields[event.name];
       if (!edit || !field || event.name.indexOf('cv-') === 0 || edit.id !== event.name ||
@@ -12207,6 +15163,7 @@
       recolorSingle(window.CBViewWire.unpack(buffer));
     });
     Shiny.addCustomMessageHandler('cell_view_aux_binary', onSingleAuxBinary);
+    Shiny.addCustomMessageHandler('cell_view_grid_rows', onGridRows);
     Shiny.addCustomMessageHandler(
       'cell_view_resource_catalog',
       function (message) {
@@ -12247,15 +15204,7 @@
       if (!datasetMessageFresh(patch)) return;
       if (!applyColorPatch(patch)) pendingColorPatch = patch;
     });
-    Shiny.addCustomMessageHandler('cell_view_background', function (message) {
-      updateSingleBackground(message);
-    });
-    // Spatial background controls: draw the snapshot the page sends R at once.
-    window.jQuery(document).on('shiny:inputchanged.cerebroBackground', function (event) {
-      if (event.name === 'spatial_projection_background_controls' && event.value) {
-        updateSingleBackground(Object.assign({ id: 'spatial_projection' }, event.value));
-      }
-    });
+    Shiny.addCustomMessageHandler('cerebro_background_preset_code', showPresetCode);
     // Overlay data (region outlines) for the drawn frame: replaced in place,
     // without touching the frame's cells or their GPU data.
     Shiny.addCustomMessageHandler('cell_view_extra', function (message) {
@@ -12316,7 +15265,7 @@
       }
       if (singleActive !== message.id) return;
       if (reordered) drawAll();
-      var drawn = [ps, pointOpacity, labelsOn, bordersOn, keepPlotsSquare].join('|');
+      var drawn = [ps, pointOpacity, labelsOn, bordersOn, pictureOutlineOn, keepPlotsSquare].join('|');
       if (Number.isFinite(message.values.point_size)) {
         ps = Math.max(1, Math.min(20, message.values.point_size)); pointSizeEdited = true;
       }
@@ -12329,12 +15278,15 @@
       if (Object.prototype.hasOwnProperty.call(message.values, 'draw_border')) {
         bordersOn = !!message.values.draw_border;
       }
+      if (Object.prototype.hasOwnProperty.call(message.values, 'picture_outline')) {
+        pictureOutlineOn = message.values.picture_outline !== false;
+      }
       if (Object.prototype.hasOwnProperty.call(message.values, 'keep_square')) {
         keepPlotsSquare = !!message.values.keep_square;
       }
       // Controls binding with the values already drawn change nothing: lay
       // out only if the panels' size changed meanwhile.
-      if ([ps, pointOpacity, labelsOn, bordersOn, keepPlotsSquare].join('|') === drawn) {
+      if ([ps, pointOpacity, labelsOn, bordersOn, pictureOutlineOn, keepPlotsSquare].join('|') === drawn) {
         resizeAll(true);
       } else {
         // A layout change draws in resizeAll(); draw here only when it did not.
@@ -12420,7 +15372,7 @@
           var space = spaceById[panel.spaceId];
           panel.colorBy = space && space._panelColorMode || null;
           var title = $('cv-title-' + panel.key.toLowerCase());
-          if (title) title.textContent = space ? space.label : panel.spaceId;
+          setPaneTitle(title, space, panel.spaceId);
         });
       }
       renderLegend(); if (!resizeAll()) drawAll();
@@ -12654,7 +15606,8 @@
       // The pinned tooltip's two actions. Checked before anything else, because
       // the tooltip sits over a panel and the handlers below would otherwise
       // read the click as one on the workspace underneath.
-      if (t.id === 'cv-img-reset') { resetImgToPreset(); return; }
+      if (t.id === imgId('reset')) { resetImgToPreset(); return; }
+      if (t.id === imgId('copy')) { requestPresetCode(); return; }
       if (t.closest('.cv-tip-details')) {
         if (pinnedTip.panel && pinnedTip.cell != null) {
           openCard(pinnedTip.panel, pinnedTip.cell);
@@ -12706,6 +15659,7 @@
             if (pp.view) { pp.view = null; project(pp); }
             pp.focusFrom = null; syncFocusButtons();
             drawPanel(pp);
+            syncGridView(pp);
           }
         }
         return;
@@ -12765,14 +15719,15 @@
         psSeeded = true;
         pointSizeEdited = true;
         ps = value;
-        drawAll();
+        drawAllSoon();
       } else if (id === 'cv-opacity') {
         pointOpacityEdited = true;
         pointOpacity = value;
-        drawAll();
+        drawAllSoon();
       } else if (id === 'cv-pct') {
         pctShow = value;
-        rebuildPctMask(); applyActiveChange();
+        pctEdited = true;
+        applyPctSoon();
       } else if (id === 'cv-dissolve') {
         dissolvePct = value;
         rebuildDissolve(); applyActiveChange();
@@ -12806,6 +15761,13 @@
         var nextBorders = !!target.checked;
         if (bordersOn === nextBorders) return true;
         bordersOn = nextBorders;
+        drawAll();
+        return true;
+      }
+      if (id === 'cv-picture-outline') {
+        var nextOutline = !!target.checked;
+        if (pictureOutlineOn === nextOutline) return true;
+        pictureOutlineOn = nextOutline;
         drawAll();
         return true;
       }
@@ -12847,7 +15809,7 @@
     // valid value applies; on commit an invalid one snaps back to the slider.
     function imgNumberEdited(target, commit) {
       var id = target && target.id;
-      if (!id || id.slice(-7) !== '-number' || id.indexOf('cv-img-') !== 0) return false;
+      if (!id || id.slice(-7) !== '-number' || !IMG_ID_PATTERN.test(id)) return false;
       var range = $(id.slice(0, -7));
       var valid = syncImgRangeValue(range, target.value);
       if (!valid && commit) syncImgRangeValue(range, range && range.value);
@@ -12858,7 +15820,7 @@
       var id = e.target && e.target.id;
       if (updateLinkedToggle(e.target)) return;
       if (imgNumberEdited(e.target, false)) return;
-      if (id && id.indexOf('cv-img-') === 0) {
+      if (id && IMG_ID_PATTERN.test(id)) {
         if (e.target.type === 'range') syncImgRangeValue(e.target, e.target.value);
         syncImgControls(id); drawAll();
       }
@@ -12866,7 +15828,7 @@
     document.addEventListener('change', function (e) {
       var id = e.target && e.target.id;
       if (imgNumberEdited(e.target, true)) return;
-      if (id && id.indexOf('cv-img-') === 0) { syncImgControls(id); drawAll(); return; }
+      if (id && IMG_ID_PATTERN.test(id)) { syncImgControls(id); drawAll(); return; }
       // The gene picker is read by the server directly, so without this the
       // client would not know a request was in flight and would keep drawing the
       // previous gene under the new gene's name until the reply landed.

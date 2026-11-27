@@ -10,13 +10,21 @@ viewerPackCellOrderFingerprint <- function(cells) {
   if (anyNA(cells) || any(!nzchar(cells)) || anyDuplicated(cells)) {
     return(NA_character_)
   }
-  path <- tempfile("viewer-pack-cell-order-")
-  on.exit(unlink(path), add = TRUE)
-  writeBin(
-    charToRaw(paste0(nchar(cells, type = "bytes"), ":", cells, collapse = "")),
-    path
-  )
-  paste0("md5-cell-order-v1:", unname(tools::md5sum(path)))
+  raw_bytes <- charToRaw(paste0(
+    nchar(cells, type = "bytes"),
+    ":",
+    cells,
+    collapse = ""
+  ))
+  digest <- if ("bytes" %in% names(formals(tools::md5sum))) {
+    unname(tools::md5sum(bytes = raw_bytes))
+  } else {
+    path <- tempfile("viewer-pack-cell-order-")
+    on.exit(unlink(path), add = TRUE)
+    writeBin(raw_bytes, path)
+    unname(tools::md5sum(path))
+  }
+  paste0("md5-cell-order-v1:", digest)
 }
 
 viewerPackOpen <- function(file) {
@@ -163,86 +171,19 @@ viewerPackOpenCached <- function(file, cache) {
     return(unname(tools::md5sum(file)))
   }
   key <- .viewerFileVersionKey(normalizePath(file, winslash = "/"), info)
-  version_line <- paste(
-    normalizePath(file, winslash = "/"),
-    info$size,
-    format(as.numeric(info$mtime), digits = 17),
-    format(as.numeric(info$ctime), digits = 17),
-    sep = "\t"
-  )
   cached <- .viewer_file_md5_cache[[key]]
   if (!is.null(cached)) {
     return(cached)
   }
-  store <- tryCatch(
-    file.path(
-      tools::R_user_dir("CerebroNexus", "cache"),
-      "crb-md5",
-      paste0(.viewerCrbMd5Key(key), ".txt")
-    ),
-    error = function(error) NULL
-  )
-  sample <- NULL
-  value <- if (!is.null(store) && file.exists(store)) {
-    stored <- tryCatch(
-      readLines(store, n = 3L, warn = FALSE),
-      error = function(error) character()
-    )
-    ## The file version, the hash of its first and last MiB, its md5.
-    if (
-      length(stored) == 3L &&
-        identical(stored[[1L]], version_line) &&
-        grepl("^[0-9a-f]{32}$", stored[[3L]])
-    ) {
-      sample <- .viewerCrbSample(file, info$size)
-      if (identical(stored[[2L]], sample)) stored[[3L]]
-    }
-  }
-  if (is.null(value)) {
-    value <- unname(tools::md5sum(file))
-    if (!is.na(value) && !is.null(store)) {
-      tryCatch(
-        {
-          dir.create(dirname(store), recursive = TRUE, showWarnings = FALSE)
-          temporary <- paste0(store, ".", Sys.getpid(), ".tmp")
-          if (is.null(sample)) {
-            sample <- .viewerCrbSample(file, info$size)
-          }
-          writeLines(
-            c(version_line, sample, value),
-            temporary,
-            useBytes = TRUE
-          )
-          file.rename(temporary, store)
-        },
-        error = function(error) NULL
-      )
-    }
+  value <- if (requireNamespace("CerebroNexus", quietly = TRUE)) {
+    CerebroNexus:::.viewerPackCrbMd5(file)
+  } else {
+    unname(tools::md5sum(file))
   }
   if (!is.na(value)) {
     assign(key, value, envir = .viewer_file_md5_cache)
   }
   value
-}
-## The hash of the first and last MiB of a file of `size` bytes (the whole of
-## a smaller one): a replaced CRB differs there (its header, its payload's
-## last block), and reading them takes milliseconds.
-.viewerCrbSample <- function(file, size, bytes = 2^20) {
-  connection <- file(file, open = "rb")
-  on.exit(close(connection), add = TRUE)
-  head <- readBin(connection, "raw", n = min(size, bytes))
-  tail <- if (size > bytes) {
-    seek(connection, max(bytes, size - bytes))
-    readBin(connection, "raw", n = bytes)
-  }
-  rlang::hash(c(head, tail))
-}
-## A file name for a file version key (its md5, of the key's bytes).
-.viewerCrbMd5Key <- function(key) {
-  path <- tempfile("crb-md5-key-")
-  on.exit(unlink(path), add = TRUE)
-  writeBin(charToRaw(enc2utf8(key)), path)
-  unname(tools::md5sum(path))
 }
 ## Viewer Pack assets are verified against their manifest checksum before a
 ## session exposes them. Hash each file version once per process, not once per
@@ -324,7 +265,15 @@ viewerPackReadAsset <- function(pack, path) {
   if (is.null(asset)) {
     return(NULL)
   }
-  value <- tryCatch(qs2::qs_read(asset$file), error = function(error) NULL)
+  nthreads <- if (requireNamespace("CerebroNexus", quietly = TRUE)) {
+    CerebroNexus:::.cerebroReadThreads()
+  } else {
+    1L
+  }
+  value <- tryCatch(
+    qs2::qs_read(asset$file, nthreads = nthreads),
+    error = function(error) NULL
+  )
   if (!is.null(value)) {
     assign(path, value, envir = pack$cache)
   }
@@ -623,6 +572,37 @@ viewerPackSpatialFrame <- function(pack, name) {
     !is.na(frame$geometry_path) &&
     nzchar(frame$geometry_path)
   if (!isTRUE(valid)) NULL else frame
+}
+
+## The point size the Pack's builder recommended for a section in a panel of
+## 300 x 250 pixels (.viewerPackSpatialPointSize() in R/viewer_pack.R). A data
+## set without a Pack (under 100,000 cells by default), or with a Pack older
+## than the suggestion, gets the same rule from the section's `coordinates`
+## (or a function returning them), counted once per section. NULL when
+## neither gives a size.
+.viewer_spatial_point_size_cache <- new.env(parent = emptyenv())
+viewerPackSpatialPointSize <- function(pack, name, coordinates = NULL) {
+  frame <- viewerPackSpatialFrame(pack, name)
+  size <- suppressWarnings(as.numeric(frame$point_size))
+  if (length(size) == 1L && is.finite(size) && size >= 1 && size <= 20) {
+    return(size)
+  }
+  if (is.function(coordinates)) {
+    coordinates <- tryCatch(coordinates(), error = function(error) NULL)
+  }
+  if (NROW(coordinates) < 1L || NCOL(coordinates) < 2L) {
+    return(NULL)
+  }
+  key <- paste(name, NROW(coordinates))
+  cache <- .viewer_spatial_point_size_cache
+  if (!exists(key, envir = cache, inherits = FALSE)) {
+    size <- tryCatch(
+      CerebroNexus:::.viewerPackSpatialPointSize(coordinates),
+      error = function(error) NA_real_
+    )
+    assign(key, if (length(size) == 1L && is.finite(size)) size, envir = cache)
+  }
+  get(key, envir = cache, inherits = FALSE)
 }
 
 viewerPackGroupMetric <- function(pack, group, metric) {

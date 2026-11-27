@@ -105,3 +105,34 @@ test_that("WebGL2 fallback submits a million points in one GPU draw", {
     "assert.strictEqual(renderer.stats().contextLost,true);"
   ))
 })
+
+test_that("WebGPU caches unchanged frames, reuses buffers in place and releases cleanly", {
+  expect_node_fixture(
+    "webgpu-renderer-opt.js",
+    viewer_test_path("www", "cell_points_gpu.js"),
+    viewer_test_path("www", "cell_views.js"),
+    pass = "PASS viewer lazy attachGpu, uniform alpha opacity/selection, and post-upload scratch release"
+  )
+})
+
+test_that("the outline of a point fades with the point in both shaders", {
+  source <- paste(
+    readLines(viewer_test_path("www", "cell_points_gpu.js"), warn = FALSE),
+    collapse = "\n"
+  )
+  ## WGSL and GLSL: the outline's alpha is scaled by the fill's, so a low point
+  ## opacity or a point the lasso left out has no ring of white left.
+  expect_match(source, "edge.a = edge.a * baseColor.a;", fixed = TRUE)
+  expect_match(source, "edge.a *= baseColor.a;", fixed = TRUE)
+  expect_match(source, "mix(baseColor, edge, borderMix)", fixed = TRUE)
+  expect_false(grepl(
+    "mix(baseColor, uniforms.border, borderMix)",
+    source,
+    fixed = TRUE
+  ))
+  expect_false(grepl(
+    "mix(baseColor, borderColor, borderMix)",
+    source,
+    fixed = TRUE
+  ))
+})

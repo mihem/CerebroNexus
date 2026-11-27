@@ -135,6 +135,8 @@ output[["extra_material_table"]] <- viewerLazyRender(function() {
     )
   })
 })
+outputOptions(output, "extra_material_content_UI", priority = 10)
+outputOptions(output, "extra_material_table", suspendWhenHidden = FALSE)
 
 ##----------------------------------------------------------------------------##
 ## Plot.
@@ -145,6 +147,7 @@ output[["extra_material_table"]] <- viewerLazyRender(function() {
 ## switch status
 ##----------------------------------------------------------------------------##
 output[["extra_material_plot_UI"]] <- renderUI({
+  req(identical(extra_material_category(), "plots"))
   req(!is.null(extra_material_plot_interactive()))
   if (extra_material_plot_interactive() == TRUE) {
     plotly::plotlyOutput(

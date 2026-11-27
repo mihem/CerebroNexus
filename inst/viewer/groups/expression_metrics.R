@@ -64,6 +64,7 @@ output[["groups_expression_metrics_UI"]] <- renderUI({
   }
   content
 })
+outputOptions(output, "groups_expression_metrics_UI", priority = 10)
 
 ## One violin plot per metric; each renders only while its tab is shown, or
 ## while the browser prefetches the hidden tabs (below).

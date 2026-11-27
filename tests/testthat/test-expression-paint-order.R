@@ -1,16 +1,16 @@
-test_that("new viewer defaults match unsorted, unlabelled Seurat plots", {
+test_that("new viewer defaults draw the highest expression on top, unlabelled", {
   sys.source(
     viewer_test_path("core", "viewer_content_contract.R"),
     environment()
   )
   defaults <- builderViewerDisplayDefaults()
-  expect_identical(defaults$gene_plotting_order, "Input order")
+  expect_identical(defaults$gene_plotting_order, "Highest expression on top")
   expect_true(all(!unlist(defaults[grepl("group_labels$", names(defaults))])))
   expect_identical(
     builderViewerDisplayDefaults(list(
-      gene_plotting_order = "Highest expression on top"
+      gene_plotting_order = "Input order"
     ))$gene_plotting_order,
-    "Highest expression on top"
+    "Input order"
   )
   expect_error(
     builderViewerDisplayDefaults(list(gene_plotting_order = "Random")),

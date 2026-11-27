@@ -1877,3 +1877,198 @@ test_that("a CRB is read on the threads the user allows, within the limits", {
   ## a missing value (the qopt is not set) falls back to the default
   expect_identical(.cerebroReadThreads(NA, NA, ""), 8L)
 })
+
+## ---------------------------------------------------------------------------
+## Spatial expression references
+## ---------------------------------------------------------------------------
+
+spatial_section <- function(object, cells, expression = NULL) {
+  list(
+    coordinates = data.frame(
+      x = as.double(seq_along(cells)),
+      y = as.double(rev(seq_along(cells))),
+      row.names = cells
+    ),
+    expression = expression %||% object$expression[, cells, drop = FALSE],
+    histology_images = list()
+  )
+}
+
+test_that("a saved CRB keeps a section's expression as a reference", {
+  skip_if_not_installed("Matrix")
+  skip_if_not_installed("qs2")
+  object <- make_embedded_cerebro()
+  cells <- object$getCellNames()
+  ## the section's cells, in the order of its coordinates
+  object$addSpatialData("a", spatial_section(object, cells[c(3L, 1L)]))
+  ## columns in another order than the coordinates, and fewer genes
+  object$addSpatialData(
+    "b",
+    spatial_section(
+      object,
+      cells[c(2L, 4L)],
+      object$expression[c(3L, 1L), cells[c(4L, 2L)], drop = FALSE]
+    )
+  )
+  ## values of its own (another layer): kept as they are
+  own <- object$expression[, cells[c(2L, 4L)], drop = FALSE] * 2
+  object$addSpatialData("c", spatial_section(object, cells[c(2L, 4L)], own))
+  expected <- lapply(c(a = "a", b = "b"), function(name) {
+    object$getSpatialData(name)$expression
+  })
+  path <- file.path(withr::local_tempdir(), "sections.crb")
+  saveCerebro(object, path)
+
+  ## The object that was saved still has its matrices.
+  expect_identical(object$spatial$a$expression, expected$a)
+
+  read <- readCerebro(path)
+  expect_s3_class(read$spatial$a$expression, "CerebroSpatialExpressionRef")
+  expect_null(read$spatial$a$expression$cells)
+  expect_null(read$spatial$a$expression$genes)
+  expect_identical(read$spatial$b$expression$cells, cells[c(4L, 2L)])
+  expect_identical(read$spatial$b$expression$genes, rownames(expected$b))
+  expect_false(inherits(
+    read$spatial$c$expression,
+    "CerebroSpatialExpressionRef"
+  ))
+
+  for (name in names(expected)) {
+    expect_identical(read$getSpatialData(name)$expression, expected[[name]])
+  }
+  expect_equal(read$getSpatialData("c")$expression, own)
+  ## the stored reference is left in place by the getter
+  expect_s3_class(read$spatial$a$expression, "CerebroSpatialExpressionRef")
+  expect_s3_class(
+    read$getSpatialData("a", hydrate_expression = FALSE)$expression,
+    "CerebroSpatialExpressionRef"
+  )
+  expect_error(
+    read$getSpatialData("a", hydrate_expression = NA),
+    "`hydrate_expression` must be TRUE or FALSE"
+  )
+
+  ## Saved again, the references stay references.
+  again <- file.path(dirname(path), "again.crb")
+  saveCerebro(read, again)
+  expect_identical(
+    readCerebro(again)$getSpatialData("b")$expression,
+    expected$b
+  )
+})
+
+test_that("a section reference that does not match the matrix is reported", {
+  skip_if_not_installed("Matrix")
+  object <- make_embedded_cerebro()
+  section <- spatial_section(object, object$getCellNames()[1:2])
+  section$expression <- .spatialExpressionRef(cells = c("cell-1", "elsewhere"))
+  object$addSpatialData("a", section)
+  expect_error(
+    object$getSpatialData("a"),
+    "refers to cells or genes the expression matrix does not have"
+  )
+  expect_s3_class(
+    object$getSpatialData("a", hydrate_expression = FALSE)$expression,
+    "CerebroSpatialExpressionRef"
+  )
+})
+
+test_that("an H5-backed CRB keeps section references too", {
+  skip_if_no_h5()
+  root <- withr::local_tempdir()
+  fixture <- make_h5_cerebro(root)
+  cells <- fixture$cells[c(4L, 2L)]
+  section <- methods::as(
+    methods::as(
+      methods::as(fixture$counts[, cells, drop = FALSE], "dMatrix"),
+      "generalMatrix"
+    ),
+    "CsparseMatrix"
+  )
+  ## The object holds no matrix: the H5 file is the matrix.
+  fixture$object$addSpatialData(
+    "slice",
+    spatial_section(fixture$object, cells, section)
+  )
+  path <- file.path(root, "spatial.crb")
+  saveCerebro(fixture$object, path)
+  expect_s3_class(
+    .readCerebroPayload(path)$spatial$slice$expression,
+    "CerebroSpatialExpressionRef"
+  )
+  read <- readCerebro(path)
+  expect_equal(
+    as.matrix(read$getSpatialData("slice")$expression),
+    fixture$counts[, cells, drop = FALSE]
+  )
+})
+
+test_that("a qs2 without TBB falls back to one thread", {
+  state <- .cerebroQs2State
+  old <- state$no_tbb
+  on.exit(state$no_tbb <- old, add = TRUE)
+  state$no_tbb <- NULL
+  seen <- integer()
+  read <- function(file, nthreads) {
+    seen <<- c(seen, nthreads)
+    if (nthreads > 1L) {
+      stop("nthreads > 1 requires TBB", call. = FALSE)
+    }
+    "payload"
+  }
+  expect_identical(.cerebroQs2Read("x", read, threads = 8L), "payload")
+  expect_identical(seen, c(8L, 1L))
+  ## remembered: the next read goes straight to one thread
+  expect_identical(.cerebroQs2Read("x", read, threads = 8L), "payload")
+  expect_identical(seen, c(8L, 1L, 1L))
+  ## other errors are not swallowed
+  state$no_tbb <- NULL
+  expect_error(
+    .cerebroQs2Read("x", function(file, nthreads) stop("corrupt"), 8L),
+    "corrupt"
+  )
+})
+
+test_that("a qs2 that only warns about TBB is read once and stays quiet", {
+  state <- .cerebroQs2State
+  old <- state$no_tbb
+  on.exit(state$no_tbb <- old, add = TRUE)
+  state$no_tbb <- NULL
+  seen <- integer()
+  ## qs2 0.1.6 and later: warns, then reads on one thread itself
+  read <- function(file, nthreads) {
+    seen <<- c(seen, nthreads)
+    if (nthreads > 1L) {
+      warning(
+        "nthreads > 1 requested but TBB not available; using nthreads = 1",
+        call. = FALSE
+      )
+    }
+    "payload"
+  }
+  expect_no_warning(
+    expect_identical(.cerebroQs2Read("x", read, threads = 8L), "payload")
+  )
+  expect_identical(seen, 8L)
+  expect_true(state$no_tbb)
+  ## remembered: the next read goes straight to one thread
+  expect_no_warning(.cerebroQs2Read("x", read, threads = 8L))
+  expect_identical(seen, c(8L, 1L))
+  ## other warnings are not swallowed
+  state$no_tbb <- NULL
+  expect_warning(
+    expect_identical(
+      .cerebroQs2Read(
+        "x",
+        function(file, nthreads) {
+          warning("something else", call. = FALSE)
+          "payload"
+        },
+        8L
+      ),
+      "payload"
+    ),
+    "something else"
+  )
+  expect_false(isTRUE(state$no_tbb))
+})

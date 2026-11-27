@@ -21,9 +21,10 @@ test_that("trajectory metadata columns preserve exact values, order and row name
   env$trajectory_data_reactive <- function() list(meta = cells)
   env$trajectory_row_index_reactive <- function() index
   env$viewerProjectionFirstFrameMetadata <- function() metadata
-  env$viewerPackCurrent <- function() NULL
-  env$viewerPackCellBarcodes <- function(...) NULL
-  env$getMetaData <- function() metadata
+  env$viewerCellBarcodesAt <- function(rows) {
+    as.character(metadata$cell_barcode[rows])
+  }
+  env$getMetaData <- function() stop("the metadata must not be hydrated")
   eval(expr, env)
   expected <- cbind(cells, metadata[index, c("group", "value"), drop = FALSE])
   expected$cell_index <- index

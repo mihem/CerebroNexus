@@ -13,7 +13,7 @@ test_that("All ROIs keeps the background selector for multiple images", {
   server <- function(input, output, session) {
     data_set <- shiny::reactiveVal(TRUE)
     availableSpatial <- function() c("fov", "empty")
-    getSpatialData <- function(name) spatial
+    getSpatialData <- function(name, name_cells = TRUE) spatial
     getMetaData <- function() {
       data.frame(
         cell_barcode = c("cell-1", "cell-2"),
@@ -116,7 +116,7 @@ test_that("Separate ROIs defaults to one matching embedded image per ROI", {
   server <- function(input, output, session) {
     data_set <- shiny::reactiveVal(TRUE)
     availableSpatial <- function() "section"
-    getSpatialData <- function(name) {
+    getSpatialData <- function(name, name_cells = TRUE) {
       list(
         coordinates = data.frame(
           x = 1:3,

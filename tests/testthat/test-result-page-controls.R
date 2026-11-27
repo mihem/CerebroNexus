@@ -378,3 +378,34 @@ test_that("stored-result controls open on the values page code starts with", {
     defaults$color_highlighting
   )
 })
+
+test_that("result page outputs map to their owning tabs and ramp JS is vectorized", {
+  scope <- viewer_runtime_env()
+  expect_identical(
+    scope$viewerOutputTab(c(
+      "marker_genes_table",
+      "enriched_pathways_table",
+      "most_expressed_genes_table",
+      "extra_material_table",
+      "gene_info",
+      "color_assignments_UI"
+    )),
+    c(
+      "markerGenes",
+      "enrichedPathways",
+      "mostExpressedGenes",
+      "extra_material",
+      "geneIdConversion",
+      "color_management"
+    )
+  )
+  js <- scope$.prettifyStyleInterval(
+    c(0, 0.5, 1),
+    c('"#ffffff"', '"#ffd0b0"', '"#ffa060"', '"#f97316"')
+  )
+  expect_s3_class(js, "JS_EVAL")
+  expect_identical(
+    as.character(js),
+    "isNaN(parseFloat(value)) ? '' : value <= 0 ? \"#ffffff\" : value <= 0.5 ? \"#ffd0b0\" : value <= 1 ? \"#ffa060\" : \"#f97316\""
+  )
+})

@@ -25,6 +25,7 @@
       finished = true;
       cleanup();
       document.documentElement.classList.remove('cerebro-starting');
+      cover.style.pointerEvents = 'none';
       // Cross a paint boundary after removing the shield on the actual layout.
       requestAnimationFrame(function () {
         cover.style.opacity = '0';

@@ -43,7 +43,7 @@ spatial_flow_server <- function(input, output, session) {
       metadata
     }
   }
-  viewerSpatialFirstFrameData <- function(name) {
+  viewerSpatialFirstFrameData <- function(name, name_cells = TRUE) {
     bounds <- c(xmin = 0, xmax = 10, ymin = 0, ymax = 10)
     if (isTRUE(input$list_bounds)) {
       bounds <- as.list(bounds)
@@ -169,7 +169,7 @@ spatial_flow_server <- function(input, output, session) {
     scope
   )
   sys.source(
-    viewer_test_path("spatial", "obj_projection_background_controls.R"),
+    viewer_test_path("spatial", "obj_projection_background_copy.R"),
     scope
   )
   observe({
@@ -322,129 +322,59 @@ test_that("a section of several draws from the Viewer Pack with its own legend",
   })
 })
 
-test_that("Spatial background changes reject stale images and dataset generations", {
+test_that("The client-owned background editor copies the alignment it holds as a preset", {
   shiny::testServer(spatial_flow_server, {
     session$setInputs(
       spatial_projection_render_request = 1,
       spatial_projection_to_display = "slice",
       background = TRUE
     )
-    ## A background identity only exists for a selected image.
     session$setInputs(spatial_projection_background_image = "embedded::tissue")
     identity <- spatial_projection_parameters_plot()$background_identity
-    request <- list(
-      dataset_context = viewer_loaded_dataset_context(),
-      background_identity = identity,
-      values = list(
-        opacity = .4,
-        scaleX = 2,
-        scaleY = 3,
-        flipY = TRUE,
-        offsetX = Inf
-      )
-    )
-    before <- length(scope$sent)
-    wrong <- request
-    wrong$dataset_context$generation <- 0L
-    session$setInputs(spatial_projection_background_controls = wrong)
-    expect_length(scope$sent, before)
-    wrong <- request
-    wrong$background_identity$spatial_name <- "other"
-    session$setInputs(spatial_projection_background_controls = wrong)
-    expect_length(scope$sent, before)
-    frames <- scope$frames
-    session$setInputs(spatial_projection_background_controls = request)
-    expect_identical(scope$frames, frames)
-    expect_length(scope$sent, before + 1L)
-    message <- tail(scope$sent, 1)[[1]]$message
-    expect_equal(message$values$opacity, .4)
-    expect_equal(message$values$scaleX, 2)
-    expect_equal(message$values$scaleY, 3)
-    expect_true(message$values$flipY)
-    expect_null(message$values$offsetX)
-    expect_equal(message$dataset_context, request$dataset_context)
-    expect_identical(message$background_identity, identity)
-  })
-})
-
-test_that("Spatial image controls seed and reset presets, synchronize values and copy current alignment", {
-  shiny::testServer(spatial_flow_server, {
-    session$setInputs(
-      spatial_projection_render_request = 1,
-      spatial_projection_to_display = "slice",
-      background = TRUE,
-      spatial_projection_background_image = "embedded::tissue",
-      spatial_projection_more_render_request = 1,
-      nonfinite = TRUE
-    )
-    doc <- xml2::read_html(
-      output$spatial_projection_background_parameters_UI$html
-    )
-    expected <- c(
-      offset_x = 25,
-      offset_y = -15,
-      scale = 1.5,
-      scale_x = 1.5,
-      scale_y = 2,
-      rotate = 90,
-      ## This preset sets no image_opacity, so the Viewer default applies.
-      opacity = 1
-    )
-    for (field in names(expected)) {
-      control <- xml2::xml_find_first(
-        doc,
-        paste0(".//*[@id='spatial_projection_background_", field, "_num']")
-      )
-      expect_equal(
-        as.numeric(xml2::xml_attr(control, "value")),
-        expected[[field]],
-        info = field
-      )
-    }
-    offset <- xml2::xml_find_first(
-      doc,
-      ".//*[@id='spatial_projection_background_offset_x']"
-    )
-    expect_equal(as.numeric(xml2::xml_attr(offset, "data-max")), 200)
-    session$setInputs(spatial_projection_background_reset = 1)
-    for (field in names(expected)) {
-      expect_equal(
-        as.numeric(
-          scope$updates[[paste0("spatial_projection_background_", field)]]$value
-        ),
-        expected[[field]],
-        info = field
-      )
-    }
-    expect_true(scope$updates$spatial_projection_background_flip_x$value)
-    expect_false(scope$updates$spatial_projection_background_flip_y$value)
-    session$setInputs(spatial_projection_background_scale_x_num = 3)
-    expect_equal(
-      as.numeric(scope$updates$spatial_projection_background_scale_x$value),
-      3
-    )
-    session$setInputs(spatial_projection_background_scale_x = 2.5)
-    expect_equal(
-      as.numeric(scope$updates$spatial_projection_background_scale_x_num$value),
-      2.5
+    state <- list(
+      opacity = .6,
+      offsetX = 12,
+      offsetY = -3,
+      scaleX = 2,
+      scaleY = 2,
+      flipX = FALSE,
+      flipY = TRUE,
+      rotate = 15
     )
     session$setInputs(
-      spatial_projection_background_scale_lock = TRUE,
-      spatial_projection_background_scale = 4,
-      spatial_projection_background_copy_preset = 1
+      spatial_projection_background_copy = list(
+        identity = identity,
+        state = state,
+        nonce = 1
+      )
     )
-    code <- output$spatial_projection_background_preset_code
-    leaf <- eval(parse(text = code))$tiny$slice$tissue
-    expect_equal(leaf$scale_x, 4)
-    expect_equal(leaf$scale_y, 4)
-    copied <- Filter(function(x) x$type == "spatial_copy_preset", scope$sent)
+    copied <- Filter(
+      function(x) x$type == "cerebro_background_preset_code",
+      scope$sent
+    )
     expect_length(copied, 1L)
-    expect_identical(copied[[1]]$message$text, code)
+    leaf <- eval(parse(text = copied[[1]]$message$text))$tiny$slice$tissue
+    expect_equal(leaf$scale_x, 2)
+    expect_equal(leaf$offset_x, 12)
+    expect_true(leaf$flip_y)
+    expect_equal(leaf$rotation, 15)
+    ## An alignment made for another data set is not turned into code.
+    other <- identity
+    other$dataset <- "another"
     session$setInputs(
-      spatial_projection_background_image = "none",
-      spatial_projection_background_copy_preset = 2
+      spatial_projection_background_copy = list(
+        identity = other,
+        state = state,
+        nonce = 2
+      )
     )
-    expect_null(spatial_preset_code())
+    expect_length(
+      Filter(
+        function(x) x$type == "cerebro_background_preset_code",
+        scope$sent
+      ),
+      1L
+    )
   })
 })
 
@@ -500,6 +430,8 @@ test_that("a Spatial frame draws the current region-outline switch", {
       drawn[[length(drawn) + 1L]] <<- data$plot_parameters
       .cerebro_cell_view_render_serial <<- .cerebro_cell_view_render_serial + 1L
     }
+    ## The frame is sent in its own turn of the event loop; here at once.
+    spatial_projection_defer <- function(task) task()
     sys.source(
       viewer_test_path("spatial", "event_projection_update_plot.R"),
       envir = environment()
@@ -522,6 +454,99 @@ test_that("a Spatial frame draws the current region-outline switch", {
     state <- session$userData$state()
     expect_length(state$drawn, 1L)
     expect_true(state$drawn[[1]]$show_region_outlines)
+  })
+})
+
+test_that("a Spatial frame is sent in a turn of its own, and a newer one replaces it", {
+  server <- function(input, output, session) {
+    context <- list(epoch = "test", dataset_key = "A", generation = 1L)
+    current_context <- reactiveVal(context)
+    viewer_loaded_dataset_context <- function() current_context()
+    viewerDatasetContextEqual <- function(a, b) identical(a, b)
+    viewerDatasetContextToken <- function(context) context$generation
+    cerebroFeedbackControls <- function(id, input) list()
+    cerebroSendViewFeedback <- function(...) invisible(NULL)
+    spatial_projection_group_filters <- function() list()
+    spatial_projection_region_outlines <- reactiveVal(FALSE)
+    colour <- reactiveVal("a")
+    spatial_projection_data_to_plot_raw <- reactive(
+      list(
+        dataset_context = current_context(),
+        plot_parameters = list(colour = colour())
+      )
+    )
+    spatial_projection_data_to_plot <- spatial_projection_data_to_plot_raw
+    spatial_projection_controls <- function() list()
+    .cerebro_cell_view_render_serial <- 0L
+    drawn <- list()
+    spatial_projection_update_plot <- function(data) {
+      drawn[[length(drawn) + 1L]] <<- list(
+        colour = data$plot_parameters$colour,
+        whole = data$fresh_render
+      )
+      .cerebro_cell_view_render_serial <<- .cerebro_cell_view_render_serial + 1L
+    }
+    ## Tasks wait for the test to give them their turn.
+    waiting <- list()
+    spatial_projection_defer <- function(task) {
+      waiting[[length(waiting) + 1L]] <<- task
+    }
+    sys.source(
+      viewer_test_path("spatial", "event_projection_update_plot.R"),
+      envir = environment()
+    )
+    session$userData$state <- function() {
+      list(drawn = drawn, waiting = length(waiting))
+    }
+    session$userData$turn <- function() {
+      tasks <- waiting
+      waiting <<- list()
+      for (task in tasks) {
+        task()
+      }
+    }
+    session$userData$colour <- colour
+    session$userData$context <- current_context
+  }
+  shiny::testServer(server, {
+    request <- function(nonce, generation = 1L) {
+      list(
+        nonce = nonce,
+        dataset_context = list(
+          epoch = "test",
+          dataset_key = "A",
+          generation = generation
+        )
+      )
+    }
+    session$setInputs(sidebar = "spatial")
+    session$setInputs(spatial_projection_render_request = request(1))
+    ## Nothing is sent in the flush that asked for it.
+    expect_length(session$userData$state()$drawn, 0L)
+    expect_identical(session$userData$state()$waiting, 1L)
+    ## A frame that comes before its turn is whole as well, and replaces it.
+    session$userData$colour("b")
+    session$flushReact()
+    expect_identical(session$userData$state()$waiting, 2L)
+    session$userData$turn()
+    drawn <- session$userData$state()$drawn
+    expect_length(drawn, 1L)
+    expect_identical(drawn[[1]]$colour, "b")
+    expect_true(drawn[[1]]$whole)
+    ## Once sent, a new colouring is a frame of its own, sent at once.
+    session$userData$colour("c")
+    session$flushReact()
+    expect_length(session$userData$state()$drawn, 2L)
+    expect_identical(session$userData$state()$drawn[[2]]$colour, "c")
+    expect_false(session$userData$state()$drawn[[2]]$whole)
+    ## A data set that has gone by its turn is not drawn, and is drawn anew.
+    session$setInputs(spatial_projection_render_request = request(2))
+    expect_identical(session$userData$state()$waiting, 1L)
+    session$userData$context(
+      list(epoch = "test", dataset_key = "B", generation = 2L)
+    )
+    session$userData$turn()
+    expect_length(session$userData$state()$drawn, 2L)
   })
 })
 

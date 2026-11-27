@@ -115,11 +115,7 @@ trajectory_cells_reactive <- function(columns = character(), barcodes = FALSE) {
   }
   cells[["cell_index"]] <- cell_index
   if (isTRUE(barcodes)) {
-    cell_barcodes <- viewerPackCellBarcodes(viewerPackCurrent(), cell_index)
-    if (is.null(cell_barcodes)) {
-      cell_barcodes <- getMetaData()[["cell_barcode"]][cell_index]
-    }
-    cells[["cell_barcode"]] <- cell_barcodes
+    cells[["cell_barcode"]] <- viewerCellBarcodesAt(cell_index)
   }
   if (anyNA(cells$pseudotime)) {
     cells <- cells[!is.na(cells$pseudotime), , drop = FALSE]

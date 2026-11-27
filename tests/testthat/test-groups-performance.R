@@ -245,7 +245,7 @@ test_that("Groups composition starts with the values its controls bind with", {
       ## Before the controls reach the browser: what they will bind with.
       expect_identical(groups_selected_group(), "sample")
       expect_identical(groups_by_other_group_second_group(), "condition")
-      expect_false(groups_by_other_group_show_as_percent())
+      expect_identical(groups_by_other_group_show_as_percent(), "FALSE")
       html <- output$groups_controls_UI$html
       expect_match(html, '<option value="sample" selected>', fixed = TRUE)
       expect_match(html, '<option value="condition" selected>', fixed = TRUE)
@@ -255,7 +255,7 @@ test_that("Groups composition starts with the values its controls bind with", {
       session$setInputs(
         groups_selected_group = "sample",
         groups_by_other_group_second_group = "condition",
-        groups_by_other_group_show_as_percent = FALSE
+        groups_by_other_group_show_as_percent = "FALSE"
       )
       expect_identical(scope$runs, runs_before)
       session$setInputs(groups_by_other_group_second_group = "cluster")

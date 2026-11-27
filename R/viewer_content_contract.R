@@ -148,13 +148,19 @@ builderViewerDisplayDefaults <- function(value = NULL) {
     projection_keep_square = FALSE,
     gene_draw_border = FALSE,
     gene_keep_square = FALSE,
-    gene_plotting_order = "Input order",
+    gene_plotting_order = "Highest expression on top",
     gene_show_trend_line = TRUE,
     gene_trend_line_width = 2,
     spatial_group_labels = FALSE,
     spatial_draw_border = FALSE,
     spatial_keep_square = FALSE,
     spatial_region_outlines = FALSE,
+    ## Points get a light outline over a dark picture (a fluorescence image),
+    ## where they would be lost; readers can switch it off.
+    spatial_picture_outline = TRUE,
+    ## A data set with several spatial entries opens Spatial as the grid of
+    ## all of them, or as one section; one entry always opens as one section.
+    spatial_layout = "grid",
     trajectory_group_labels = FALSE,
     trajectory_draw_border = TRUE,
     trajectory_keep_square = FALSE,
@@ -190,7 +196,7 @@ builderViewerDisplayDefaults <- function(value = NULL) {
     typeof(x) %in% type && !is.object(x) && length(x) == 1L && !is.na(x)
   }
   flags <- grep(
-    "(^|_)(group_labels|draw_border|keep_square|region_outlines|show_trend_line)$",
+    "(^|_)(group_labels|draw_border|keep_square|region_outlines|picture_outline|show_trend_line)$",
     names(defaults),
     value = TRUE
   )
@@ -207,6 +213,7 @@ builderViewerDisplayDefaults <- function(value = NULL) {
     gene_panel_mode = c("shared", "distinct"),
     gene_panel_palette = c("default", "soft"),
     gene_plotting_order = c("Input order", "Highest expression on top"),
+    spatial_layout = c("single", "grid"),
     hla_legend_mode = c("auto", "always", "never")
   )
   ranges <- list(

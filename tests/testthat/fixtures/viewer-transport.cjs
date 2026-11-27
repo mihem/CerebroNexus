@@ -101,7 +101,6 @@ const scenarios={
       t.binary('cell_view_binary',stale);
       t.binary('cell_view_aux_binary',{...stale,selection_key:['wrong']});
       t.binary('cell_view_recolor_binary',{...stale,data:{color:[99]}});
-      t.send('cell_view_background',{...stale,background_identity:'old',values:{opacity:0}});
     }
     await t.settle();assert(!t.summary().ready);
     await t.deliver(t.frame());assert(t.summary().ready);assert.equal(t.summary().datasetKey,'B');

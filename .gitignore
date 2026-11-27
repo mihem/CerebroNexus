@@ -47,3 +47,6 @@ tests/testthat/_artifacts/
 data-raw/builder_fixtures/
 viewer-auth.env
 **/private-data/auth/
+
+# Pictures of the Visium demos run-demo.R adds to the source Viewer
+inst/spatial-assets/

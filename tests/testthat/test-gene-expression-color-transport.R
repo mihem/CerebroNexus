@@ -3,7 +3,8 @@ gene_expression_test_function <- function(file, name) {
     viewer_test_path("gene_expression", file),
     name
   )
-  scope <- new.env(parent = globalenv())
+  ## The Viewer's shared helpers (cerebroSparseColorPacket()) are its parent.
+  scope <- new.env(parent = viewer_runtime_env())
   eval(assignment, envir = scope)
   scope[[name]]
 }
@@ -78,7 +79,7 @@ test_that("short JSON colour payload also retains double precision", {
 })
 
 test_that("single-gene primary frames choose sparse colour transport", {
-  runtime <- new.env(parent = globalenv())
+  runtime <- new.env(parent = viewer_runtime_env())
   runtime$`%||%` <- function(x, y) if (is.null(x)) y else x
   runtime$expressionColorScale <- function(...) "scale"
   runtime$expressionReverseColorScale <- function(...) FALSE
@@ -145,7 +146,7 @@ test_that("single-gene primary frames choose sparse colour transport", {
 })
 
 test_that("RGB and separate panels use one packed colour map", {
-  runtime <- new.env(parent = globalenv())
+  runtime <- new.env(parent = viewer_runtime_env())
   runtime$`%||%` <- function(x, y) if (is.null(x)) y else x
   runtime$expressionColorScale <- function(...) "scale"
   runtime$expressionReverseColorScale <- function(...) FALSE
@@ -262,6 +263,8 @@ test_that("gene primary colours do not materialize metadata", {
       expression_projection_parameters_plot <- function() {
         list(is_trajectory = FALSE)
       }
+      ## No Viewer Pack file: the coordinates travel with the frame.
+      viewerProjectionAsset <- function(...) NULL
       expression_projection_expression_levels <- function() c(0, 2)
       expression_selected_genes <- function() {
         list(genes_to_display_present = input$genes)
@@ -435,7 +438,7 @@ test_that("secondary expression summaries wait for the painted primary frame", {
 })
 
 test_that("H5 rows build the same sparse colour packet from their entries", {
-  scope <- new.env(parent = globalenv())
+  scope <- new.env(parent = viewer_runtime_env())
   scope$reactiveVal <- shiny::reactiveVal
   scope$reactive <- shiny::reactive
   scope$observeEvent <- function(...) NULL

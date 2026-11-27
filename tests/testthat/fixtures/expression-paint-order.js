@@ -31,6 +31,13 @@ for(const n of [33,100,5000,60000]){
   cases.push(Array.from({length:n},(_,i)=>i===n>>1?1e6:(rnd()<0.1?null:1+Math.floor(rnd()*400)*1e-12)));
   cases.push(Float64Array.from({length:n},(_,i)=>i%7===0?Infinity:(i%11===0?-Infinity:rnd()-0.5)));
   cases.push(Float64Array.from({length:n},()=>5e-324*Math.floor(rnd()*100)));
+  // Float32Arrays of 4096 cells or more take the radix sort: negatives, -0,
+  // infinities, NaN, equal values, a single value, and a view that does not
+  // start at the buffer's first byte.
+  cases.push(Float32Array.from({length:n},(_,i)=>i%13===0?-0:(i%17===0?Infinity:(i%19===0?-Infinity:(rnd()<0.1?NaN:(rnd()-0.4)*8)))));
+  cases.push(Float32Array.from({length:n},()=>rnd()<0.97?0:Math.fround(rnd()*1e-3)));
+  cases.push(Float32Array.from({length:n},()=>2.5));
+  cases.push(new Float32Array(Float32Array.from({length:n+3},()=>Math.round(rnd()*6)/2).buffer,12,n));
 }
 for(const raw of cases){
   _ordD=null;field.raw=raw;field.v=raw;field.paintOrder=true;

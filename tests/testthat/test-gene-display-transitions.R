@@ -85,6 +85,9 @@ test_that("RGB layout changes reuse expression rows while producing a new paint 
       expression_projection_coordinates <- function() {
         data.frame(x = 1:3, y = 3:1)
       }
+      expression_projection_parameters_plot <- function() {
+        list(n_dimensions = 2L)
+      }
       expression_selected_genes <- function() {
         list(
           genes_to_display_present = c("A", "B"),
@@ -129,10 +132,8 @@ test_that("unsupported separate layouts explicitly identify the mean-expression 
         genes_to_display_present = seq_len(input$count),
         genes_to_display_missing = character()
       ))
-      expression_projection_coordinates <- reactive(matrix(
-        0,
-        nrow = 3,
-        ncol = input$dimensions
+      expression_projection_parameters_plot <- reactive(list(
+        n_dimensions = input$dimensions
       ))
       sys.source(
         viewer_test_path("gene_expression", "out_genes_displayed.R"),

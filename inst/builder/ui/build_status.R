@@ -46,7 +46,7 @@ builder_build_options <- function(
   make_app = FALSE,
   welcome_message = "Welcome to CerebroNexus!",
   initial_page = "data_info",
-  point_size = 5,
+  point_size = 4,
   variable_to_compare = FALSE,
   host = "127.0.0.1",
   port = 8080L,
@@ -212,7 +212,11 @@ builder_build_options_ui <- function(
         p(
           id = "build_output_crb_reason",
           class = "hint builder-app-required-reason",
-          "Spatial images or ROI settings require CRB files + Viewer App output."
+          paste(
+            "Spatial images kept as separate files, Trekker images or ROI",
+            "settings require CRB files + Viewer App output. To build CRB",
+            "files only, store the Spatial images inside the CRB."
+          )
         )
       },
       if (!isTRUE(app_available)) {

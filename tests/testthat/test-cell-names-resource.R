@@ -126,6 +126,10 @@ cell_names_scope <- function() {
       "viewerCellNamesKept",
       "viewerCellNamesFile",
       "viewerCellNamesRead",
+      "viewerCellNamesEntry",
+      "viewerCellNamesLayout",
+      "viewerCellNamesSpan",
+      "viewerCellNamesWarm",
       "viewerCellNamesPending"
     )
   )
@@ -169,7 +173,26 @@ test_that("the cell-name file is kept for the next process of the same cells", {
     cells[c(3L, 1L, 2L)]
   )
   expect_identical(second$viewerCellNamesRead(pack, 2L), cells[2L])
+  ## Past a quarter of the cells asked for, every name was read once and is
+  ## kept (a grid asks for every section in turn).
+  expect_identical(get("cell names", envir = pack$cache), cells)
+  expect_identical(Encoding(second$viewerCellNamesRead(pack, 2L)), "UTF-8")
   expect_null(second$viewerCellNamesRead(pack, c(1L, 4L)))
+  ## Read while idle, a step at a time: every name, in order.
+  warm <- list(
+    manifest = pack$manifest,
+    canonical_order = TRUE,
+    cells = cells,
+    cell_count = 3L,
+    cache = new.env(parent = emptyenv())
+  )
+  expect_true(second$viewerCellNamesWarm(warm, step = 2L, delay = 0))
+  for (i in 1:20) {
+    later::run_now(0.05)
+  }
+  expect_identical(get("cell names", envir = warm$cache), cells)
+  expect_false(get("cell names warming", envir = warm$cache))
+  expect_false(second$viewerCellNamesWarm(warm))
   ## and through the Pack's reader, which has not read the cell order for it
   pack$cache <- new.env(parent = emptyenv())
   expect_identical(

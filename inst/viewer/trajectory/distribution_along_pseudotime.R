@@ -82,6 +82,11 @@ output[["trajectory_distribution_along_pseudotime_UI"]] <- renderUI({
     )
   )
 })
+outputOptions(
+  output,
+  "trajectory_distribution_along_pseudotime_UI",
+  priority = 10
+)
 
 ##----------------------------------------------------------------------------##
 ## Plot.
@@ -128,10 +133,7 @@ output[[
     color_variable <- input[[
       "trajectory_distribution_along_pseudotime_select_variable"
     ]]
-    cells_df <- trajectory_cells_reactive(
-      c(color_variable, "nUMI", "nGene"),
-      barcodes = TRUE
-    )
+    cells_df <- trajectory_cells_reactive(c(color_variable, "nUMI", "nGene"))
 
     ## ... cells are colored by a categorical variable; the Y axis will show the
     ##     density of the group along pseudotime
@@ -186,8 +188,10 @@ output[[
       ## Per-cell names only for small trajectories: the points themselves
       ## travel as binary columns, the names would not.
       hover <- list()
-      if ("cell_barcode" %in% colnames(cells_df) && nrow(cells_df) <= 50000L) {
-        hover[["Cell"]] <- as.character(cells_df[["cell_barcode"]])
+      if (nrow(cells_df) <= 50000L) {
+        hover[["Cell"]] <- as.character(
+          viewerCellBarcodesAt(cells_df[["cell_index"]])
+        )
       }
       if ("nUMI" %in% colnames(cells_df)) {
         hover[["Transcripts"]] <- cells_df[["nUMI"]]

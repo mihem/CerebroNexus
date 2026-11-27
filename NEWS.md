@@ -1,3 +1,165 @@
+# CerebroNexus 8.5.3
+
+- **The Builder no longer stops with "nthreads > 1 requires TBB".** A CRB is
+  read on up to eight threads, but a qs2 built without TBB only reads on one,
+  so the Builder could not reopen the CRB it had just staged. The read now
+  repeats on one thread after that error (and remembers it for the session);
+  other read errors are reported as before. qs2 0.1.6 and later only warn
+  about the missing TBB; that warning no longer appears on every CRB read.
+
+# CerebroNexus 8.5.2
+
+- **Faster Viewer Pack builds and opens (#294).** A Viewer Pack now stores a
+  content digest for each section and item and the package version that built
+  it, so a rebuild (`buildViewerPack(overwrite = TRUE)`) keeps the files of the
+  items that did not change instead of writing them again. `buildViewerPack()`
+  shares the Viewer's on-disk cache of CRB checksums, cell names are hashed in
+  memory when possible, and Pack files are read and written with several
+  threads. A pack written by another package version is built anew, which also
+  gives older packs the point size of each spatial section (format revision 3).
+
+# CerebroNexus 8.5.1
+
+- **Faster page loads and tables (#293).** The Viewer defers its remaining
+  scripts and mounts result tables lazily, flushes tables in the first
+  round trip and builds the colour ramps of `prettifyTable()` in one
+  vectorised step, with cut points to 15 significant digits as
+  `DT::styleInterval()` has them. Gene expression no longer debounces twice
+  and reads the mean of several H5 genes without a dense row per gene.
+  Hidden pages stop leaking outputs across tabs, `fill_height` batches its
+  DOM reads, and subsetting and copying of projection tables avoid needless
+  copies. Moran's I, ROI rotation and group hulls are defined once per
+  process.
+- **Sessions on one file share what they compute.** The sorted gene list,
+  a section's ROI scope, the trajectory's cells and the clonal UMAP points
+  are kept once per R process for each data set file (path, size and
+  modification time), so a second visitor on the same file gets them
+  without computing them again. Each kind holds a few entries, and all are
+  dropped when the last session ends.
+- **Options for large data.** `cerebro.crb_cache_slots`,
+  `cerebro.idle_initial_delay`, `cerebro.idle_delay` and
+  `cerebro.dev_reload` are described in the large-data article.
+
+# CerebroNexus 8.5.0
+
+- **Spatial shows all sections side by side.** A data set with several spatial
+  entries (tissue sections, FOVs, capture areas) opens Spatial as a grid with
+  one panel per section; the Builder's *Open Spatial with* chooses the first
+  section instead. *Sections* takes one section or several, with *All* and
+  *One*; *Columns* fixes the number of columns; *Sync zoom* moves the panels
+  together; *Embedding* adds a UMAP whose selection highlights the cells in
+  every section; *Panel shape* is *Fit tissue* or *Square*. All sections share
+  their colours and one colour scale for a gene, RGB co-expression works in
+  the grid, and a panel's title shows only its section. ROIs and region
+  outlines stay single-section views.
+- **The grid chooses each section's picture.** *Background images* lists the
+  pictures grouped by section; every section starts with its first picture, a
+  chosen picture is a removable chip, *All* gives every section its first
+  picture and *None* takes them all away, and a section keeps its choice while
+  other sections come and go. Linked views has the same field in its toolbar,
+  in place of the *Background images* switch, when its sections have pictures.
+- **Spatial aligns its pictures like Linked views.** *Background image* in the
+  Spatial settings is the editor Linked views has, one piece of code for both:
+  *Adjust background* picks the section on screen (one per panel in a grid or
+  ROI view), each section keeps its own opacity, position, scale, rotation and
+  flips, and moving a slider redraws the picture at once, with no round trip
+  to R. *Copy alignment as preset* writes the `spatial_image_settings` code
+  for the section chosen.
+- **Points over a dark picture get a light outline.** Over a picture darker
+  than a mean brightness of 0.35 (a fluorescence image such as the Kukanja
+  DAPI sections) points are drawn with a light outline. It is on by default;
+  *Outline points on dark pictures* in the settings of Spatial and Linked
+  views, and in the Builder's Spatial display settings, turns it off.
+- **Points start at size 4, smaller where cells crowd.** The Viewer,
+  `launchCerebro()`, `createShinyApp()` and the Builder default to 4. The
+  Viewer Pack, written with the CRB (so by the Builder and `saveCerebro()`),
+  records for every section the size that suits its cells in a small panel:
+  the spacing of the points on screen, from the tissue's area over its number
+  of cells, from 1 to 4. The grid and Linked views scale that size with the
+  panel they draw it in, so 66,000 cells in a small panel get 1 to 1.5, a
+  sparse section keeps 3 to 4, and an enlarged panel grows back. The Viewer
+  itself decides nothing about the data: a Pack written before has no size
+  (4), and a size an author or a reader sets is used as it is. The fixed rules
+  are gone: size 1 above 100,000 cells (and its option
+  `large_data_point_size_cells`), and smaller, lighter points in small grid
+  panels.
+- **Enlarge reads like a photo viewer.** In Linked views, the Spatial grid and
+  Gene expression's separate panels, Enlarge shows one panel large and the
+  others as a strip of thumbnails beside or below it, scrolled by its arrows
+  or the arrow keys; a click on a thumbnail enlarges it. Enlarge and Restore
+  move each panel smoothly, and thumbnails off the strip are drawn only when
+  the strip shows them (on the 59 Allen sections Enlarge stalls the page for
+  about 60 ms instead of 130 to 180 ms).
+- **Every page lays out and names things the same way.** Panels are at least
+  250 pixels a side and the page scrolls below that; Linked views has a
+  *Columns* field and fills the window; toolbars pack tighter; fields read in
+  one order (data, *Display mode* or *Colour by*, genes, options) with the same
+  names (*Panel shape*, *Sections*, *Gene*); a multi-select shows its first
+  item and a count such as "12+"; the composition plots pick *Plot type* and
+  *Bars show* in fields; *Square* keeps the panel's canvas.
+- **Sliders and Preferences.** Point size, opacity and % of cells reach every
+  panel of Linked views once the reader moves a slider, and dragging them no
+  longer stalls. *Highest expression on top* is in the sidebar's Preferences,
+  the same setting as in Gene expression's settings, and is on by default.
+- **A grid of many sections opens in seconds.** On the Allen atlas (3.9
+  million cells in 59 sections; Windows, Chrome) every section is drawn after
+  about 3 s instead of 31 s: the sections arrive in batches and draw as they
+  come, their positions are read from the Viewer Pack, recolouring updates the
+  panels in place (a gene few cells express sends those cells only), and a
+  panel keeps its maps over its own cells, so a tab of its own with all 59
+  sections holds 0.75 GB of JavaScript heap instead of 1.9 to 2.1 GB. A grid
+  of many sections shows a turning ring while it loads.
+  Without WebGPU (no adapter, Firefox, Safari) the panels take turns at the
+  page's WebGL2 contexts, which Chrome limits to about 16: the panels near the
+  window hold them, a lost one is made again, and a grid of 59 sections no
+  longer falls back to Canvas2D (0 of the 12 panels in sight on the GPU and
+  43 contexts lost before, 12 of 12 and none lost now; longest stall 0.7 s
+  instead of 1.7 to 1.9 s). A browser with no GPU behind WebGPU or WebGL
+  (software rendering, or Canvas only) draws every point on the CPU, so
+  Spatial and Linked views show 2 panels at a time there, with the Columns
+  field fixed at 2; the *Show all panels* preference lifts it.
+- **Linked views and gene colouring are faster on large data.** Linked views
+  builds the sections of a data set without ROIs from the Viewer Pack's rows
+  and makes cell names only for the cells that need them, and draws its
+  sections first: opened by its tab after loading, it is ready after about 1.6 s
+  instead of 5 to 10 s on the Allen atlas (the Viewer builds its sections while
+  idle after loading), and a tab of its own with all 59 sections holds 0.45 GB
+  of JavaScript heap instead of 5.2 GB. With WebGPU the
+  GPU draws a gene's points through the paint order (1.2 s instead of 2.4 s on
+  the first gene of Gene expression, 0.65 s instead of 1.05 s on the next), the order is found by a radix sort, Moran's I
+  finds neighbours through buckets (1.6 ms a section instead of 26 ms), and
+  Colour management writes its pickers at once (1.0 to 1.8 s instead of 3.5 to
+  4.1 s with 1,640 groups).
+- **Background pictures cost less.** A picture that arrives redraws only its
+  own panels, Linked views fetches pictures kept in files over HTTP instead of
+  as base64 through the websocket (the 52 Kukanja EAE pictures: 0.13 s of
+  script instead of 1.7 s of long frames), and the Viewer keeps decoded
+  pictures, so returning to a data set shows them with its cells.
+- **The Builder stores Spatial images and layout.** The Spatial alignment panel
+  stores images as files beside the Viewer App (a smaller CRB, the default) or
+  inside the CRB; the Viewer display settings choose how Spatial opens and
+  whether points get the dark-picture outline. A CRB stores each section's
+  expression as a reference to the object's matrix instead of a second copy
+  (the Visium demos' CRBs are half as large and read in a quarter to a third
+  of the time); CRBs written before read as before.
+- **Demo data sets with many sections.** `Rscript run-demo.R
+  --data=allen,eae,ms` prepares the Allen MERFISH atlas (59 sections, 3.9
+  million cells) and the Kukanja et al. 2024 spinal cord data (EAE, 44
+  sections; MS, 6), the last two with the authors' DAPI picture of every
+  section, aligned to the cells. `--data=dlpfc,mouse_brain,breast,prostate`
+  prepares four public Visium data sets with their H&E pictures for the
+  Builder. Sources and licences are in `data-raw/large-demo/`.
+- **Fixes.** A data set with a group of a thousand levels or more (the Allen
+  atlas's 1,201 supertypes) no longer ends the session when it opens; a
+  colouring by more than 24 groups shows three rows of its legend and a *Show
+  all* button.
+- **Dense sections on a dark picture.** The light outline of the points no
+  longer whitens a section of a hundred thousand cells (the Xenium MS demo):
+  it fades in with the point size, and in the WebGPU and WebGL2 renderers it
+  fades with the point opacity, as the Canvas one does. The EAE demo leaves
+  out the 8 brain sections of the authors' file and keeps the 44 spinal cord
+  sections.
+
 # CerebroNexus 8.4.12
 
 - **Restructured guides (#267).** The documentation starts with a new
@@ -40,6 +202,7 @@
   demo has no Pack and was not affected). The frame now carries
   the canonical rows and the file, and the browser resolves a range of rows.
 
+
 # CerebroNexus 8.4.9
 
 - **Numbered groups in natural order (#284).** Group levels such as
@@ -59,6 +222,7 @@
   column's levels (natural order for text), with missing values last,
   instead of the order in which their first cells occur. A saved ROI order
   still comes first.
+
 
 # CerebroNexus 8.4.8
 

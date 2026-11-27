@@ -57,7 +57,7 @@ function session() {
   vm.createContext(c);
   vm.runInContext(['leaveSingle', 'activateLinked', 'holdSupplement', 'mergeSupplementAttrs',
     'linkedSupplementFresh', 'applyHydratedSupplement', 'onBinarySupplement', 'fallbackCurrent',
-    'linkedSpatialScenes', 'hydrateSpatialScenes']
+    'linkedSpatialScenes', 'scenePool', 'hydrateSpatialScenes']
     .map(fn).join('\n') + visibility, c);
   c.go = page => {c.page = page; c.reportVisibility();};
   c.extra = overrides => Object.assign({dataset_id: 'ds1', dataset_context: 'generation-1',
@@ -144,7 +144,7 @@ for (const via of ['direct', 'groups', 'loadData']) {
     panels:[{spaceId:'umap',canvas:{dataset:{pointCount:7}}}],
     datasetMessageFresh:x=>x.dataset_context==='current',configFingerprint:()=> 'fp',
     sel:null,selectedCellIds:()=>[],colorBy:'group',selectedProjections:['umap'],
-    selectedSpatial:[],activeSpatial:()=>null,transportMetrics:{}};
+    selectedSpatial:[],activeSpatial:()=>null,transportMetrics:{},panelAppearance:()=>[]};
   vm.createContext(c); vm.runInContext(fn('workspaceSummary'),c);
   assert(c.workspaceSummary().primaryReady); assert(!c.workspaceSummary().complete);
   c.D.progressive = false; assert(c.workspaceSummary().complete);
@@ -218,21 +218,30 @@ for (const via of ['direct', 'groups', 'loadData']) {
   assert.strictEqual(c.pendingSavedState, null);
 }
 
-// Compact spatial scenes expand to arrays over every cell, NaN elsewhere.
+// Compact spatial scenes expand to arrays over every cell, NaN where no scene
+// of their pool has a cell. Scenes of different cells share one pair of arrays
+// and of unit positions; a scene that shares a cell with them gets its own.
 {
   const s = session();
   s.D = {n: 6};
   const sample = {rows: [0], x: [7], y: [8]};
+  const roi = {rows: [5], x: [9], y: [9]};
   const space = {id: 'spatial', rows: new Int32Array([2, 5]), x: [1, 2], y: [3, 4],
-    samples: [sample, {name: 'dense', x: [0, 0, 0, 0, 0, 0], y: [0, 0, 0, 0, 0, 0]}]};
+    samples: [sample, roi, {name: 'dense', x: [0, 0, 0, 0, 0, 0], y: [0, 0, 0, 0, 0, 0]}]};
   s.hydrateSpatialScenes({spaces: [space, {id: 'umap', rows: [1]}]});
   assert.strictEqual(space.x.length, 6);
   assert.deepStrictEqual([space.x[2], space.x[5], space.y[5]], [1, 2, 4]);
-  assert(Number.isNaN(space.x[0]) && Number.isNaN(space.y[3]));
+  assert(Number.isNaN(space.x[1]) && Number.isNaN(space.y[3]));
   assert.strictEqual(space.rows, undefined);
   assert.deepStrictEqual([sample.x[0], sample.y[0]], [7, 8]);
   assert(Number.isNaN(sample.x[1]));
-  assert.strictEqual(space.samples[1].x.length, 6, 'a dense scene is left alone');
+  assert.strictEqual(sample.x, space.x, 'scenes of different cells share their arrays');
+  assert.strictEqual(sample._unitArrays, space._unitArrays);
+  assert.strictEqual(space._unitArrays.nx.length, 6);
+  assert.strictEqual(roi.x[5], 9, 'a scene sharing a cell keeps its own position');
+  assert.strictEqual(space.x[5], 2);
+  assert.notStrictEqual(roi._unitArrays, space._unitArrays);
+  assert.strictEqual(space.samples[2].x.length, 6, 'a dense scene is left alone');
   assert.throws(() => s.hydrateSpatialScenes({spaces: [{id: 'spatial', rows: [6], x: [1], y: [1]}]}));
   assert.throws(() => s.hydrateSpatialScenes({spaces: [{id: 'spatial', rows: [0, 1], x: [1], y: [1]}]}));
 }

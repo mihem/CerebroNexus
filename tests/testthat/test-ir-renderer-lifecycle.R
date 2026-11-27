@@ -297,6 +297,8 @@ clonal_projection_server <- function(names_resource = NULL) {
     ## The renderer reads the tab through viewerControlValue() (tabs.R).
     ir_tab <- function() input[["ir_tabs"]]
     viewerDatasetIdentity <- function() list(fingerprint = "A")
+    ## A data set without a file: the clonal points stay with the session.
+    data_set <- function() list()
     builds <- barcode_reads <- 0L
     viewerCellNamesResource <- function() names_resource
     ir_clonal_umap_data <- function(projection, receptor, clone_call, ...) {

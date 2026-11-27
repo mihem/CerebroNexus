@@ -42,7 +42,7 @@ output[["trajectory_primary_controls_UI"]] <- renderUI({
   tagList(
     selectInput(
       "trajectory_selected_method",
-      label = "Choose a method",
+      label = "Method",
       choices = stats::setNames(
         available_methods,
         unname(method_labels[available_methods])
@@ -52,7 +52,7 @@ output[["trajectory_primary_controls_UI"]] <- renderUI({
     ),
     selectInput(
       "trajectory_selected_name",
-      label = "Choose a trajectory",
+      label = "Trajectory",
       choices = available_names,
       selected = selected_name,
       width = "100%"

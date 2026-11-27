@@ -888,3 +888,56 @@ observeEvent(
   },
   priority = 100
 )
+
+## -- Spatial image storage ------------------------------------------------
+## One choice per dataset, shown once the dataset has an image: separate files
+## beside the Viewer App (default) or inside the CRB.
+output[["enhance-has_any_image"]] <- reactive({
+  id <- current()
+  entry <- if (builder_has_text(id)) entry_of(id) else NULL
+  length(entry$settings$images %||% list()) > 0L
+})
+outputOptions(output, "enhance-has_any_image", suspendWhenHidden = FALSE)
+
+observeEvent(
+  input[["enhance-image_storage"]],
+  {
+    value <- input[["enhance-image_storage"]]
+    id <- current()
+    req(id, value %in% c("external", "embedded"))
+    entry <- entry_of(id)
+    req(entry)
+    stored <- if (identical(entry$settings$spatial_image_storage, "embedded")) {
+      "embedded"
+    } else {
+      "external"
+    }
+    if (identical(stored, value)) {
+      return()
+    }
+    entry$settings$spatial_image_storage <- value
+    if (!isTRUE(replace_entry(entry))) {
+      updateRadioButtons(session, "enhance-image_storage", selected = stored)
+    }
+  },
+  ignoreInit = TRUE
+)
+
+## The control is drawn once; keep it on the stored choice of whichever
+## dataset is open.
+observeEvent(
+  list(current(), sets()),
+  {
+    id <- current()
+    entry <- if (builder_has_text(id)) entry_of(id) else NULL
+    req(entry)
+    stored <- if (identical(entry$settings$spatial_image_storage, "embedded")) {
+      "embedded"
+    } else {
+      "external"
+    }
+    if (!identical(isolate(input[["enhance-image_storage"]]), stored)) {
+      updateRadioButtons(session, "enhance-image_storage", selected = stored)
+    }
+  }
+)

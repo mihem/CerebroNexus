@@ -4,23 +4,6 @@
 ## inputs when RGB mode opens is prohibitively expensive for large gene lists.
 ##----------------------------------------------------------------------------##
 output[["expression_projection_input_type_UI"]] <- renderUI({
-  channel_input <- function(channel, label) {
-    selectizeInput(
-      paste0("expression_rgb_gene_", channel),
-      label = label,
-      choices = NULL,
-      selected = "",
-      multiple = FALSE,
-      options = list(
-        maxOptions = 1000,
-        create = FALSE,
-        allowEmptyOption = TRUE,
-        placeholder = paste(tolower(label), "gene..."),
-        loadThrottle = 300
-      )
-    )
-  }
-
   tagList(
     conditionalPanel(
       paste0(
@@ -45,20 +28,10 @@ output[["expression_projection_input_type_UI"]] <- renderUI({
         "input.expression_analysis_mode == 'Gene(s)' && ",
         "input.expression_projection_genes_in_separate_panels == 'rgb'"
       ),
-      div(
-        class = "cerebro-gene-rgb-row cerebro-control-enter",
-        div(
-          class = "cerebro-gene-rgb-channel",
-          channel_input("r", "Red channel")
-        ),
-        div(
-          class = "cerebro-gene-rgb-channel",
-          channel_input("g", "Green channel")
-        ),
-        div(
-          class = "cerebro-gene-rgb-channel",
-          channel_input("b", "Blue channel")
-        )
+      cerebroRgbGeneFields(
+        paste0("expression_rgb_gene_", c("r", "g", "b")),
+        selected = "",
+        options = list(allowEmptyOption = TRUE)
       ),
       tags$small(
         "RGB starts with the first three available genes; your full gene list is kept. ",

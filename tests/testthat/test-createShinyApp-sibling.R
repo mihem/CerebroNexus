@@ -494,11 +494,11 @@ test_that("Viewer resolves scatter defaults for the selected dataset", {
   )
   expect_identical(
     runtime$viewerScatterDefaults(list(), "Xenium"),
-    list(point_size = 5, point_opacity = 1, percentage_cells_to_show = 100)
+    list(point_size = 4, point_opacity = 1, percentage_cells_to_show = 100)
   )
   expect_identical(
     runtime$viewerScatterDefaults(options, "Missing"),
-    list(point_size = 5, point_opacity = 1, percentage_cells_to_show = 100)
+    list(point_size = 4, point_opacity = 1, percentage_cells_to_show = 100)
   )
   ## Ordinary projection views share one author configuration.
   expect_identical(
@@ -507,7 +507,7 @@ test_that("Viewer resolves scatter defaults for the selected dataset", {
   )
   expect_identical(
     runtime$viewerScatterDefaults(options, "Missing", "expression"),
-    list(point_size = 5, point_opacity = 1, percentage_cells_to_show = 100)
+    list(point_size = 4, point_opacity = 1, percentage_cells_to_show = 100)
   )
 })
 

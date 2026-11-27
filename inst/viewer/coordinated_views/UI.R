@@ -182,15 +182,11 @@ tab_coordinated_views <- tabItem(
       meta_id = "cv-meta"
     ),
     ## ---- horizontal control bar (the layout fix) ------------------------ ##
+    cerebroPanelCapNote(),
     div(
       class = "cv-topbar",
       div(
         class = "cv-filters",
-        div(
-          class = "cv-ctl",
-          tags$label("Colour by", `for` = "cv-pick-color"),
-          tags$select(id = "cv-pick-color")
-        ),
         ## Projections are a multi-select. Every selected embedding receives its
         ## own linked card in the same responsive grid as Spatial, Trekker and TCR.
         ## All coordinates already travel in the bundle, so this stays client-side.
@@ -207,8 +203,31 @@ tab_coordinated_views <- tabItem(
           class = "cv-ctl cv-multiselect-ctl",
           id = "cv-spatial-ctl",
           style = "display:none",
-          tags$label("Spatial data"),
+          tags$label("Sections"),
           tags$select(id = "cv-pick-spatial", multiple = "multiple")
+        ),
+        ## How many panels a row holds, as on Spatial's grid.
+        div(
+          class = "cv-ctl",
+          id = "cv-columns-ctl",
+          tags$label("Columns", `for` = "coordviews_columns"),
+          cerebroColumnsInput("coordviews_columns", label = NULL)
+        ),
+        ## Data, then what colours it: the order of every page's toolbar.
+        div(
+          class = "cv-ctl",
+          tags$label("Colour by", `for` = "cv-pick-color"),
+          tags$select(id = "cv-pick-color")
+        ),
+        ## The picture behind each shown section, one item per section as on
+        ## Spatial's grid; shown when a section has pictures. None takes them all
+        ## away.
+        div(
+          class = "cv-ctl cv-multiselect-ctl",
+          id = "cv-bg-pick-ctl",
+          style = "display:none",
+          tags$label("Background images"),
+          tags$select(id = "cv-pick-bg", multiple = "multiple")
         ),
         ## Mean/per-gene expression picker. Per-gene mode expands the linked
         ## spaces into a gene x space grid; the client enforces a 12-panel cap.
@@ -248,28 +267,7 @@ tab_coordinated_views <- tabItem(
           class = "cv-ctl cv-rgb-ctl",
           id = "cv-rgb-ctl",
           style = "display:none",
-          tags$label("Co-expression (R / G / B)"),
-          div(
-            class = "cv-rgb-row",
-            Map(
-              function(channel, colour) {
-                selectizeInput(
-                  paste0("coordviews_gene_", channel),
-                  label = NULL,
-                  choices = NULL,
-                  options = list(
-                    maxOptions = 1000,
-                    placeholder = paste0(colour, " gene..."),
-                    create = FALSE,
-                    loadThrottle = 300
-                  )
-                )
-              },
-              c("r", "g", "b"),
-              c("red", "green", "blue"),
-              USE.NAMES = FALSE
-            )
-          )
+          cerebroRgbGeneFields(paste0("coordviews_gene_", c("r", "g", "b")))
         ),
         ## Clonal-panel layout switch. Shown only when the data set carries an
         ## immune axis (a "clone" space). The clone panel's X/Y are abstract, so
@@ -314,20 +312,6 @@ tab_coordinated_views <- tabItem(
             inline = TRUE
           )
         ),
-        div(
-          class = "cv-linked-hover",
-          title = paste(
-            "Show or hide backgrounds in linked views.",
-            "Each view uses the first image matched to its FOV or ROI."
-          ),
-          shinyWidgets::materialSwitch(
-            inputId = "cv-backgrounds",
-            label = "Background images",
-            value = TRUE,
-            status = "primary",
-            inline = TRUE
-          )
-        ),
         ## Share and Settings stay together as the right-aligned action group.
         cerebroToolbarActions(
           cerebroSettingsButton(
@@ -362,13 +346,16 @@ tab_coordinated_views <- tabItem(
           cerebroSettingsSection(
             "Appearance",
             tagList(
-              sliderInput(
-                "cv-ps",
-                label = "Point size",
-                min = 1,
-                max = 20,
-                step = 1,
-                value = 5
+              viewerPointSizeWithAuto(
+                sliderInput(
+                  "cv-ps",
+                  label = "Point size",
+                  min = 1,
+                  max = 20,
+                  step = 1,
+                  value = 5
+                ),
+                "cv-ps-auto"
               ),
               sliderInput(
                 "cv-opacity",
@@ -387,6 +374,11 @@ tab_coordinated_views <- tabItem(
                 "cv-borders",
                 "Draw border around cells",
                 value = FALSE
+              ),
+              checkboxInput(
+                "cv-picture-outline",
+                "Outline points on dark pictures",
+                value = TRUE
               ),
               checkboxInput(
                 "cv-square-plots",
@@ -427,33 +419,7 @@ tab_coordinated_views <- tabItem(
           shiny::tagAppendAttributes(
             cerebroSettingsSection(
               "Background image",
-              div(
-                class = "cv-ctl cv-bg-ctl cerebro-settings-full",
-                id = "cv-img-pick-ctl",
-                style = "display:none",
-                div(class = "cv-bg-space-tabs", id = "cv-bg-space-tabs"),
-                div(
-                  class = "cv-bg-settings",
-                  div(
-                    class = "cv-bg-display",
-                    tags$label(
-                      class = "cv-bg-display-title",
-                      `for` = "cv-bg-image-select",
-                      "Image"
-                    ),
-                    tags$select(
-                      id = "cv-bg-image-select",
-                      class = "form-control"
-                    )
-                  ),
-                  uiOutput("coordviews_image_ui"),
-                  tags$p(
-                    id = "cv-bg-session-note",
-                    class = "cv-bg-session-note",
-                    "Changes apply only to this session."
-                  )
-                )
-              )
+              viewerBackgroundImageEditor("cv", uiOutput("coordviews_image_ui"))
             ),
             style = "display:none"
           ),

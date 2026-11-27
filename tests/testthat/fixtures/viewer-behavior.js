@@ -109,10 +109,12 @@ window.viewerScenarios = {
       t.equal(panes.length, layout === 'separate' ? 3 : 1);
       t.check(t.events.some(e => e.painted && e.renderToken === frame.render_token), 'Layout paint completes');
       if (layout === 'separate') {
-        t.equal(panes.map(p => p.querySelector('.cv-ptitle').textContent), ['R · A', 'G · B', 'B · A']);
+        // A channel's panel is titled by its gene and marked by the channel's dot.
+        t.equal(panes.map(p => p.querySelector('.cv-ptitle').textContent), ['A', 'B', 'A']);
+        t.equal(panes.map(p => !!p.querySelector('.cv-ptitle .cv-title-dot')), [true, true, true]);
         channels.forEach((channel, i) => t.equal(pixels('cv-cv-' + String.fromCharCode(97 + i)),
           reference[channel], 'Split channel uses composite intensities and colours'));
-        t.check(document.getElementById('cv-legend').textContent.includes('G · B: 0–20.0'),
+        t.check(document.getElementById('cv-legend').textContent.includes('B 0–20.0'),
           'Separate channels publish their own numeric ranges');
       }
     }
@@ -120,7 +122,7 @@ window.viewerScenarios = {
       {color_type: 'rgb', rgb_layout: 'separate'}, 'expression_projection');
     t.equal(Array.from(document.querySelectorAll(
       '#expression_projection_cell_view_host .cv-pane:not(.cv-hidden) .cv-ptitle')).map(p => p.textContent),
-      ['R · A', 'B · A'], 'Empty channels omitted, repeated genes retain channel identity');
+      ['A', 'A'], 'Empty channels omitted, repeated genes retain channel identity');
     return true;
   },
   async geometry() {
@@ -306,8 +308,8 @@ window.viewerScenarios = {
     t.equal(t.choices('cv-bg-image-select').map(o=>o.text),['First','Second','None']);
     t.equal(picker.value,'one','Background choice retained after download');
     t.resetPaint();t.change('cv-bg-image-select',none);await t.settle();
-    t.check(!t.paints.some(p=>p.method==='drawImage'&&p.args[0] instanceof HTMLImageElement),'None removes background');
-    const drawn=canvas=>t.paints.findLast(p=>p.method==='drawImage'&&p.args[0] instanceof HTMLImageElement&&(!canvas||p.canvas===canvas));
+    t.check(!t.paints.some(p=>p.method==='drawImage'&&p.args[0] instanceof HTMLImageElement&&!p.canvas.hasAttribute('data-cv-probe')),'None removes background');
+    const drawn=canvas=>t.paints.findLast(p=>p.method==='drawImage'&&p.args[0] instanceof HTMLImageElement&&!p.canvas.hasAttribute('data-cv-probe')&&(!canvas||p.canvas===canvas));
     t.change('cv-bg-image-select','two');await t.settle();
     const plain=drawn();
     t.change('cv-bg-image-select','one');await t.settle();
@@ -324,9 +326,9 @@ window.viewerScenarios = {
       t.dataset(key,generation);t.resetPaint();t.linked({spaces:[space()]});await t.settle();
       t.equal(requests().length,generation,'New generation requests its own image');
       sendAsset(a,uri);await t.settle();
-      t.check(!t.paints.some(p=>p.method==='drawImage'&&p.args[0] instanceof HTMLImageElement),'Retired image cannot paint');
+      t.check(!t.paints.some(p=>p.method==='drawImage'&&p.args[0] instanceof HTMLImageElement&&!p.canvas.hasAttribute('data-cv-probe')),'Retired image cannot paint');
       sendAsset({...t.context},uri);await t.settle();
-      t.check(t.paints.some(p=>p.method==='drawImage'&&p.args[0] instanceof HTMLImageElement),'Fresh image paints');
+      t.check(t.paints.some(p=>p.method==='drawImage'&&p.args[0] instanceof HTMLImageElement&&!p.canvas.hasAttribute('data-cv-probe')),'Fresh image paints');
     }
     const config=cerebroLinkedViewsState.capture();
     const rgbMode=t.choices('cv-pick-color').find(o=>o.text.includes('RGB')).value;
@@ -341,14 +343,8 @@ window.viewerScenarios = {
     const identity={image:'slice'},id='spatial_projection';
     await t.render({}, {is_spatial:true,background_image:image.toDataURL(),image_bounds:{xmin:0,xmax:20,ymin:0,ymax:10},
       background_identity:identity,background_opacity:.4},id,{background_identity:identity});
-    const draw=()=>t.paints.findLast(p=>p.method==='drawImage'&&p.args[0] instanceof HTMLImageElement);
+    const draw=()=>t.paints.findLast(p=>p.method==='drawImage'&&p.args[0] instanceof HTMLImageElement&&!p.canvas.hasAttribute('data-cv-probe'));
     t.check(draw(),'Background decoded and painted');t.equal(draw().alpha,.4);
-    for(const patch of [{dataset_context:{...t.context,generation:0}},{background_identity:{image:'other'}}]) {
-      t.send('cell_view_background',{id,dataset_context:{...t.context},background_identity:identity,values:{opacity:.1},...patch});
-      await t.settle();t.equal(draw().alpha,.4,'Stale background adjustment ignored');
-    }
-    t.send('cell_view_background',{id,dataset_context:{...t.context},background_identity:identity,values:{opacity:.7}});
-    await t.settle();t.equal(draw().alpha,.7,'Matching background adjustment paints');
     t.dataset('B',2);t.check(!cerebroCellViews.summary(id).ready,'Dataset switch invalidates specialist');
     return true;
   },
@@ -799,11 +795,33 @@ window.viewerScenarios = {
         channels.map((v,j)=>Math.round(grey[j]+(v/max*255-grey[j])*max/255));
       t.equal(byIndex.get(i),expected,'RGB blend '+channels);
     }
+    // A channel with no gene yet has no values: it counts as 0, and drawing goes on.
+    t.resetPaint();await t.render({n,selection_key:Array.from({length:n},(_,i)=>'c'+i),x,y,rgb:{r:rgb.r,g:null,b:null}},
+      {color_type:'rgb',color_variable:'RGB'});
+    const partial=t.uploads.at(-1);t.check(partial,'One channel alone reaches the GPU');
+    const partialByIndex=new Map();for(let j=0;j<partial.count;j++)partialByIndex.set(Math.round(partial.positions[j*2]*(n-1)),partial.colors.slice(j*4,j*4+3));
+    for(let i=0;i<combinations;i+=7) {
+      const max=rgb.r[i],grey=[217,219,222];
+      const expected=max<=28?grey:[max,0,0].map((v,j)=>Math.round(grey[j]+(v/max*255-grey[j])*max/255));
+      t.equal(partialByIndex.get(i),expected,'Red alone '+max);
+    }
     const color=Array(n).fill(0);[2,null,1,2,NaN,0,1].forEach((v,i)=>color[i]=v);
     t.resetPaint();await t.render({n,selection_key:Array.from({length:n},(_,i)=>'c'+i),x,y,color,paint_order:'highest'});
     const ordered=t.uploads.at(-1),indices=[];
     for(let i=0;i<ordered.count;i++){const index=Math.round(ordered.positions[i*2]*(n-1));if(index<7)indices.push(index);}
     t.equal(indices,[1,4,5,2,6,0,3],'Missing values first, followed by stable ascending values');
+    t.check(ordered.drawOrder===null,'A renderer without a draw order gets its points in paint order');
+    // A renderer that draws through an order keeps the points in cell order
+    // and is handed the same paint order as indices.
+    t.gpuOrder=true;t.resetPaint();await t.render({n,selection_key:Array.from({length:n},(_,i)=>'c'+i),x,y,color,paint_order:'highest'});
+    const viaGpu=t.uploads.at(-1),drawn=[];
+    t.check(viaGpu.drawOrder&&viaGpu.drawOrder.length===viaGpu.count,'The paint order reaches the renderer');
+    for(let j=0;j<viaGpu.count;j++)t.check(Math.round(viaGpu.positions[j*2]*(n-1))===j,'Points stay in cell order');
+    for(const vertex of viaGpu.drawOrder){const index=Math.round(viaGpu.positions[vertex*2]*(n-1));if(index<7)drawn.push(index);}
+    t.equal(drawn,[1,4,5,2,6,0,3],'The renderer draws the same order');
+    const colourOf=(upload,cell)=>{for(let j=0;j<upload.count;j++)if(Math.round(upload.positions[j*2]*(n-1))===cell)return upload.colors.slice(j*4,j*4+4);};
+    for(let cell=0;cell<7;cell++)t.equal(colourOf(viaGpu,cell),colourOf(ordered,cell),'Cell '+cell+' keeps its colour');
+    t.gpuOrder=false;
     t.failGpu=true;t.resetPaint();await t.render({n,selection_key:null,x:Float32Array.from(x,(v,i)=>i===13?NaN:v),y,color});
     t.equal(t.arcs().length,n-1,'GPU failure falls back to valid CPU points');
     return true;

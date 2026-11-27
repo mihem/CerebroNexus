@@ -21,16 +21,7 @@ expressionSparseColor <- function(values, max_density = 0.5, entries = NULL) {
       ))
     }
   }
-  present <- which(is.na(values) | !is.finite(values) | values != 0)
-  if (length(present) >= length(values) * max_density) {
-    return(NULL)
-  }
-  list(
-    protocol = "sparse-f64-v1",
-    length = length(values),
-    index = as.integer(present - 1L),
-    color = unname(values[present])
-  )
+  cerebroSparseColorPacket(values, max_density)
 }
 
 ## The entries the row cache kept for `gene`'s full row, when `values` is it.
@@ -150,8 +141,8 @@ expression_projection_update_plot <- function(input) {
   )
   ## define output_data
   output_data <- list(
-    x = coordinates[[1]],
-    y = coordinates[[2]],
+    x = if (length(coordinates) >= 1L) coordinates[[1]] else NULL,
+    y = if (length(coordinates) >= 2L) coordinates[[2]] else NULL,
     color = expression_levels,
     selection_key = seq_len(n_cells),
     point_size = plot_parameters[["point_size"]],

@@ -289,6 +289,54 @@ coordviews_primary_bundle <- reactive({
   cv_build_bundle_safe(primary_only = TRUE)
 })
 
+## The Spatial space of the supplement, kept for the session: it depends on the
+## data set only. Emptied when another data set is loaded; filled while the
+## session is idle after a large one loads (below), so that opening Linked views
+## does not wait for the sections to be built.
+cv_spatial_cache <- new.env(parent = emptyenv())
+cv_prewarm_spatial <- function(context, tries = 6L) {
+  later::later(
+    function() {
+      shiny::withReactiveDomain(session, {
+        shiny::isolate(
+          tryCatch(
+            {
+              if (!identical(context, viewer_loaded_dataset_context())) {
+                return(invisible(NULL))
+              }
+              crb <- data_set()
+              first_frame <- viewerProjectionFirstFrameCache()
+              pack <- attr(crb, "cerebro_viewer_pack", exact = TRUE)
+              if (!is.data.frame(first_frame$meta_data) || !is.list(pack)) {
+                if (tries > 0L) {
+                  cv_prewarm_spatial(context, tries - 1L)
+                }
+                return(invisible(NULL))
+              }
+              if (
+                nrow(first_frame$meta_data) >= 2e5 &&
+                  length(crb$availableSpatial()) > 0L
+              ) {
+                cv_compact_spatial(crb, first_frame, cv_spatial_cache)
+              }
+            },
+            error = function(error) NULL
+          )
+        )
+      })
+    },
+    delay = 1.5
+  )
+}
+observeEvent(
+  viewer_loaded_dataset_context(),
+  {
+    rm(list = ls(cv_spatial_cache, all.names = TRUE), envir = cv_spatial_cache)
+    cv_prewarm_spatial(viewer_loaded_dataset_context())
+  },
+  ignoreNULL = TRUE
+)
+
 cv_prepare_progressive_supplement <- function(primary, primary_n, modalities) {
   started <- proc.time()[["elapsed"]]
   wants_clone <- "all" %in% modalities || "clone" %in% modalities
@@ -314,7 +362,8 @@ cv_prepare_progressive_supplement <- function(primary, primary_n, modalities) {
         primary,
         viewerProjectionFirstFrameCache(),
         include_clone = wants_clone && is.null(clone_spec),
-        projection_resources = projection_resources
+        projection_resources = projection_resources,
+        spatial_cache = cv_spatial_cache
       )
       if (is.null(value)) {
         value <- cv_build_progressive_supplement(
@@ -1176,7 +1225,17 @@ observeEvent(
       ),
       !is.null(assets[[key]])
     )
-    uri <- cv_asset_data_uri(assets[[key]])
+    ## A picture kept in a file goes to the browser as the Viewer's image URL
+    ## (fetched over HTTP, cached by its MD5), not as a base64 string through
+    ## the websocket: 1.3 MB of JSON per Kukanja DAPI picture, 52 of them for
+    ## Linked views.
+    uri <- if (is.list(assets[[key]])) {
+      tryCatch(
+        viewerPrivateImageUrl(assets[[key]]$path, session),
+        error = function(error) NULL
+      )
+    }
+    uri <- uri %||% cv_asset_data_uri(assets[[key]])
     req(!is.null(uri))
     if (!is.character(assets[[key]])) {
       assets[[key]] <- uri
@@ -1770,102 +1829,8 @@ output[["coordviews_image_ui"]] <- renderUI({
   ## controls exist for the client to re-seed on the first switch.
   img <- seed %||% img
   ## Seed the controls from the alignment preset so an external image (Visium
-  ## H&E) opens PRE-ALIGNED, exactly as the Spatial tab does. Move sliders are in
-  ## DATA units, ranged to the coordinate span so the nudge is meaningful.
-  pr <- img$preset
-  span <- img$coord_span
-  if (is.null(span) || length(span) < 2) {
-    span <- c(400, 400)
-  }
-  ## One labelled range + number pair; `label` names it for assistive tech.
-  ctl <- function(id, heading, label, mn, mx, val) {
-    number_id <- paste0(id, "-number")
-    div(
-      class = "cv-img-ctl",
-      tags$label(`for` = number_id, heading),
-      div(
-        class = "cv-img-range",
-        tags$input(
-          type = "range",
-          id = id,
-          `aria-label` = label,
-          min = mn,
-          max = mx,
-          value = val,
-          step = "any"
-        ),
-        tags$input(
-          type = "number",
-          id = number_id,
-          class = "cv-img-number",
-          min = mn,
-          max = mx,
-          value = val,
-          step = "any",
-          `aria-label` = paste(label, "value")
-        )
-      )
-    )
-  }
-  chk <- function(id, label, on) {
-    tags$label(
-      class = "cv-chk",
-      tags$input(
-        type = "checkbox",
-        id = id,
-        checked = if (isTRUE(on)) "checked"
-      ),
-      label
-    )
-  }
-  ## The range has to CONTAIN the value it is being asked to show. A preset is a
-  ## calibration someone measured; a slider ranged on the coordinate span alone
-  ## clamps anything outside it, and because the whole bar is read back together
-  ## the clamped number is then written into the state by an unrelated nudge --
-  ## the alignment silently becoming one nobody chose.
-  sx <- signif(max(span[1] * 1.2, abs(pr$offsetX %||% 0) * 1.1), 3)
-  sy <- signif(max(span[2] * 1.2, abs(pr$offsetY %||% 0) * 1.1), 3)
-  scale_x <- pr$scaleX %||% 1
-  scale_y <- pr$scaleY %||% scale_x
-  scale_lo <- min(0.3, scale_x * 0.9, scale_y * 0.9)
-  scale_hi <- max(3, scale_x * 1.1, scale_y * 1.1)
-  div(
-    class = "cv-imgbar",
-    div(
-      class = "cv-imgbar-heading",
-      tags$span(class = "cv-imgbar-title", "Alignment")
-    ),
-    ctl("cv-img-opacity", "Opacity", "Opacity", 0, 1, pr$opacity %||% 1),
-    ctl("cv-img-offx", "Horizontal", "Move X", -sx, sx, pr$offsetX %||% 0),
-    ctl("cv-img-offy", "Vertical", "Move Y", -sy, sy, pr$offsetY %||% 0),
-    ## Two scales, not one. A preset can carry scaleX != scaleY -- a calibration
-    ## that is genuinely non-uniform -- and a single slider had to pick a number
-    ## for both, so touching ANY control in this bar silently squared the image
-    ## up and threw that calibration away. Locked together by default, since a
-    ## uniform scale is the common case and two sliders to drag is a worse one.
-    ctl("cv-img-scalex", "Scale X", "Scale X", scale_lo, scale_hi, scale_x),
-    ctl("cv-img-scaley", "Scale Y", "Scale Y", scale_lo, scale_hi, scale_y),
-    ctl("cv-img-rotate", "Rotation", "Rotate", -180, 180, pr$rotation %||% 0),
-    div(
-      class = "cv-img-checks",
-      chk("cv-img-show", "Show this image", TRUE),
-      chk(
-        "cv-img-lock",
-        "Lock aspect ratio",
-        isTRUE(is.null(pr$scaleY) || identical(pr$scaleY, pr$scaleX))
-      ),
-      chk("cv-img-flipx", "Flip horizontally", isTRUE(pr$flipX)),
-      chk("cv-img-flipy", "Flip vertically", isTRUE(pr$flipY))
-    ),
-    ## Alignment is fiddly and easy to lose; the preset is the state the data set
-    ## shipped with, so there has to be a way back to it that is not "reload".
-    tags$button(
-      type = "button",
-      id = "cv-img-reset",
-      class = "cv-imgbar-reset",
-      "Reset to preset"
-    )
-  )
+  ## H&E) opens PRE-ALIGNED, exactly as the Spatial tab does.
+  viewerBackgroundImageBar("cv", img$preset, img$coord_span)
 })
 outputOptions(output, "coordviews_image_ui", suspendWhenHidden = FALSE)
 

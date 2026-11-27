@@ -4599,7 +4599,13 @@ builder_project_restore_spatial_assets <- function(
 builder_project_checkpoint_entries <- function(entries) {
   lapply(entries, function(entry) {
     if (length(entry$settings$images %||% list())) {
-      entry$settings$spatial_image_storage <- "external"
+      entry$settings$spatial_image_storage <- if (
+        identical(entry$settings$spatial_image_storage, "embedded")
+      ) {
+        "embedded"
+      } else {
+        "external"
+      }
     }
     entry
   })

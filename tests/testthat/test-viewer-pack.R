@@ -385,6 +385,11 @@ test_that("Viewer Pack stores canonical spatial row indexes", {
     runtime$viewerPackSpatialIndex(descriptor, "slice"),
     c(3L, 1L)
   )
+  ## The Pack's builder recorded the size that suits the section; the Viewer
+  ## reads it back when the section has coordinates to size from.
+  frames <- descriptor$manifest$spatial_frames
+  expect_true("point_size" %in% names(frames))
+  expect_true(is.numeric(frames$point_size))
 
   ## A thin CRB that stores the cells of the section as metadata rows: the
   ## Pack names them, and the object's getter has nothing left to restore.
@@ -1141,4 +1146,300 @@ test_that("a CRB replaced with the same size and mtime does not keep its md5", {
   )
   expect_identical(runtime$.viewerCrbMd5(file), unname(tools::md5sum(file)))
   expect_false(identical(runtime$.viewerCrbMd5(file), first))
+})
+
+test_that("Viewer Pack reuses unchanged assets incrementally", {
+  root <- tempfile("pack-incremental-")
+  dir.create(root)
+  on.exit(unlink(root, recursive = TRUE), add = TRUE)
+  crb <- viewer_pack_fixture(
+    file.path(root, "data.crb"),
+    n = 6L,
+    spatial = TRUE,
+    groups = TRUE
+  )
+  pack <- buildViewerPack(crb, viewer_binary = "always")
+  expect_true(validateViewerPack(crb, pack, full = TRUE)$valid)
+
+  runtime <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("core", "viewer_pack.R"), envir = runtime)
+  opened <- runtime$viewerPackOpen(crb)
+  expect_false(is.null(opened))
+
+  ## Cell-order fingerprint matches legacy byte stream exactly.
+  cells <- sprintf("cell-%03d", 1:6)
+  expect_identical(
+    runtime$viewerPackCellOrderFingerprint(cells),
+    .viewerPackCellOrderFingerprint(cells)
+  )
+
+  ## 1) Non-Pack CRB edit (adding an extra material table): full asset reuse!
+  proj_file <- file.path(pack, "projections", "001.bin")
+  spatial_file <- file.path(pack, "spatial", "001.geometry.bin")
+  old_mtime <- as.POSIXct("2025-06-01 00:00:00", tz = "UTC")
+  Sys.setFileTime(c(proj_file, spatial_file), old_mtime)
+  old_fp <- opened$manifest$dataset_fingerprint
+
+  obj <- readCerebro(crb)
+  obj$addExtraMaterial("tables", "summary", data.frame(a = 1:2))
+  saveCerebro(obj, crb, codec = "rds")
+  ## Stale pack is rejected until rebuilt/rebound.
+  expect_null(runtime$viewerPackOpen(crb))
+
+  rebuilt <- buildViewerPack(crb, viewer_binary = "always", overwrite = TRUE)
+  expect_true(validateViewerPack(crb, rebuilt, full = TRUE)$valid)
+  opened2 <- runtime$viewerPackOpen(crb)
+  expect_false(identical(opened2$manifest$dataset_fingerprint, old_fp))
+  ## Unchanged asset files were reused in place (mtime preserved via hard link).
+  expect_equal(
+    as.numeric(file.info(proj_file)$mtime),
+    as.numeric(old_mtime),
+    tolerance = 2
+  )
+  expect_equal(
+    as.numeric(file.info(spatial_file)$mtime),
+    as.numeric(old_mtime),
+    tolerance = 2
+  )
+
+  ## 2) Partial CRB edit (new metadata column only): projections, trajectory,
+  ##    spatial, immune, and common are reused while metadata rebuilds!
+  full_crb <- viewer_pack_fixture(
+    file.path(root, "full.crb"),
+    n = 6L,
+    immune = TRUE,
+    trajectory = TRUE,
+    spatial = TRUE,
+    groups = TRUE
+  )
+  full_pack <- buildViewerPack(full_crb, viewer_binary = "always")
+  expect_true(validateViewerPack(full_crb, full_pack, full = TRUE)$valid)
+  f_proj <- file.path(full_pack, "projections", "001.bin")
+  f_meta <- file.path(full_pack, "metadata", "001.codes.bin")
+  f_grp <- file.path(full_pack, "groups", "001.qs2")
+  f_traj <- file.path(full_pack, "trajectory", "cell_index.qs2")
+  f_spat <- file.path(full_pack, "spatial", "001.geometry.bin")
+  f_imm <- file.path(full_pack, "immune", "encoded.qs2")
+  f_hla <- file.path(full_pack, "hla_tcr", "TRB.qs2")
+  tracked <- c(f_proj, f_meta, f_grp, f_traj, f_spat, f_imm)
+  if (file.exists(f_hla)) {
+    tracked <- c(tracked, f_hla)
+  }
+  Sys.setFileTime(tracked, old_mtime)
+
+  ## 2a) Add a metadata column -> metadata rebuilds; projections, trajectory,
+  ##     spatial, immune keep their original mtime (reused).
+  fobj <- readCerebro(full_crb)
+  fobj$meta_data$new_score <- seq_len(nrow(fobj$meta_data)) * 2
+  saveCerebro(fobj, full_crb, codec = "rds")
+  buildViewerPack(full_crb, viewer_binary = "always", overwrite = TRUE)
+  expect_true(validateViewerPack(full_crb, full_pack, full = TRUE)$valid)
+  opened_m <- runtime$viewerPackOpen(full_crb)
+  expect_true("new_score" %in% opened_m$manifest$metadata_names)
+  for (p in c(f_proj, f_traj, f_spat, f_imm)) {
+    expect_equal(
+      as.numeric(file.info(p)$mtime),
+      as.numeric(old_mtime),
+      tolerance = 2,
+      info = basename(p)
+    )
+  }
+
+  ## 2b) Add a new projection -> projections rebuild; metadata, groups, spatial,
+  ##     immune, and hla_tcr keep their original mtime (reused).
+  Sys.setFileTime(tracked, old_mtime)
+  fobj$addProjection(
+    "tsne",
+    data.frame(
+      tSNE_1 = seq_len(nrow(fobj$meta_data)),
+      tSNE_2 = rev(seq_len(nrow(fobj$meta_data))),
+      row.names = fobj$meta_data$cell_barcode
+    )
+  )
+  saveCerebro(fobj, full_crb, codec = "rds")
+  buildViewerPack(full_crb, viewer_binary = "always", overwrite = TRUE)
+  expect_true(validateViewerPack(full_crb, full_pack, full = TRUE)$valid)
+  opened_p <- runtime$viewerPackOpen(full_crb)
+  expect_true("tsne" %in% opened_p$manifest$projection_names)
+  reused_after_proj <- c(f_meta, f_grp, f_spat, f_imm)
+  if (file.exists(f_hla)) {
+    reused_after_proj <- c(reused_after_proj, f_hla)
+  }
+  for (p in reused_after_proj) {
+    expect_equal(
+      as.numeric(file.info(p)$mtime),
+      as.numeric(old_mtime),
+      tolerance = 2,
+      info = basename(p)
+    )
+  }
+})
+
+test_that("Viewer Pack reuses unchanged sub-items and rebuilds when package version changes", {
+  root <- tempfile("viewer-pack-granular-")
+  dir.create(root)
+  on.exit(unlink(root, recursive = TRUE), add = TRUE)
+  crb <- viewer_pack_fixture(
+    file.path(root, "granular.crb"),
+    n = 6L,
+    immune = TRUE,
+    trajectory = TRUE,
+    spatial = TRUE,
+    groups = TRUE
+  )
+  ## Add a second spatial section so per-section reuse can be verified
+  obj <- readCerebro(crb)
+  slice2 <- obj$getSpatialData("slice")
+  slice2$coordinates[, 1] <- slice2$coordinates[, 1] + 100
+  obj$addSpatialData("slice2", slice2)
+  saveCerebro(obj, crb, codec = "rds")
+
+  pack <- buildViewerPack(crb, viewer_binary = "always")
+  runtime <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("core", "viewer_pack.R"), envir = runtime)
+  opened <- runtime$viewerPackOpen(crb)
+  expect_false(is.null(opened))
+
+  ## 1) Sub-domain granular reuse: adding 1 metadata col reuses existing
+  ##    metadata columns AND existing group metric violins!
+  old_mtime <- Sys.time() - 3600
+  f_proj1 <- file.path(pack, "projections", "001.bin")
+  f_meta1 <- file.path(pack, "metadata", "001.codes.bin")
+  f_grp1 <- file.path(pack, "groups", "001.qs2")
+  f_spat1 <- file.path(pack, "spatial", "001.geometry.bin")
+  f_spat2 <- file.path(pack, "spatial", "002.geometry.bin")
+  Sys.setFileTime(c(f_proj1, f_meta1, f_grp1, f_spat1, f_spat2), old_mtime)
+
+  obj$meta_data$extra_numeric <- seq_len(nrow(obj$meta_data)) * 3.5
+  saveCerebro(obj, crb, codec = "rds")
+  buildViewerPack(crb, viewer_binary = "always", overwrite = TRUE)
+  expect_true(validateViewerPack(crb, pack, full = TRUE)$valid)
+  expect_equal(
+    as.numeric(file.info(f_meta1)$mtime),
+    as.numeric(old_mtime),
+    tolerance = 2
+  )
+  expect_equal(
+    as.numeric(file.info(f_grp1)$mtime),
+    as.numeric(old_mtime),
+    tolerance = 2
+  )
+
+  ## 2b) Adding a second projection reuses unchanged projection 001.bin
+  Sys.setFileTime(c(f_proj1, f_meta1, f_grp1, f_spat1, f_spat2), old_mtime)
+  obj$addProjection(
+    "pca",
+    data.frame(
+      PC_1 = seq_len(nrow(obj$meta_data)) * 0.5,
+      PC_2 = seq_len(nrow(obj$meta_data)) * -0.5,
+      row.names = obj$meta_data$cell_barcode
+    )
+  )
+  saveCerebro(obj, crb, codec = "rds")
+  buildViewerPack(crb, viewer_binary = "always", overwrite = TRUE)
+  expect_true(validateViewerPack(crb, pack, full = TRUE)$valid)
+  expect_equal(
+    as.numeric(file.info(f_proj1)$mtime),
+    as.numeric(old_mtime),
+    tolerance = 2
+  )
+
+  ## 2c) Editing slice2 reuses unchanged slice (001.geometry.bin)
+  Sys.setFileTime(c(f_spat1, f_spat2), old_mtime)
+  slice2$coordinates[, 2] <- slice2$coordinates[, 2] + 50
+  obj$addSpatialData("slice2", slice2)
+  saveCerebro(obj, crb, codec = "rds")
+  buildViewerPack(crb, viewer_binary = "always", overwrite = TRUE)
+  expect_true(validateViewerPack(crb, pack, full = TRUE)$valid)
+  expect_equal(
+    as.numeric(file.info(f_spat1)$mtime),
+    as.numeric(old_mtime),
+    tolerance = 2
+  )
+  expect_gt(as.numeric(file.info(f_spat2)$mtime), as.numeric(old_mtime) + 10)
+  ## The reused section keeps its point size, the rebuilt one gets its own.
+  spatial_frames <- jsonlite::read_json(
+    file.path(pack, "manifest.json"),
+    simplifyVector = TRUE
+  )$spatial_frames
+  expect_setequal(spatial_frames$name, c("slice", "slice2"))
+  expect_true(all(is.finite(spatial_frames$point_size)))
+
+  ## 3) A Pack built by a different package version is rebuilt from scratch
+  ##    instead of reusing old assets.
+  manifest_path <- file.path(pack, "manifest.json")
+  manifest <- jsonlite::read_json(manifest_path, simplifyVector = FALSE)
+  manifest$package_version <- "0.0.0"
+  jsonlite::write_json(
+    manifest,
+    manifest_path,
+    auto_unbox = TRUE,
+    pretty = TRUE
+  )
+  Sys.setFileTime(c(f_proj1, f_grp1), old_mtime)
+  buildViewerPack(crb, viewer_binary = "always", overwrite = TRUE)
+  expect_true(validateViewerPack(crb, pack, full = TRUE)$valid)
+  expect_gt(as.numeric(file.info(f_proj1)$mtime), as.numeric(old_mtime) + 10)
+  expect_gt(as.numeric(file.info(f_grp1)$mtime), as.numeric(old_mtime) + 10)
+  rebuilt_manifest <- jsonlite::read_json(manifest_path, simplifyVector = TRUE)
+  expect_identical(
+    as.character(rebuilt_manifest$package_version),
+    as.character(utils::packageVersion("CerebroNexus"))
+  )
+})
+
+test_that("the Pack records the point size that suits each section", {
+  grid <- function(n_side, step = 1) {
+    cells <- expand.grid(x = seq_len(n_side) * step, y = seq_len(n_side) * step)
+    as.matrix(cells)
+  }
+  size <- function(m, ...) .viewerPackSpatialPointSize(m, ...)
+
+  # Dense cells in a small panel get a small size, sparse ones the full 4.
+  dense <- grid(300)
+  sparse <- grid(10)
+  expect_lte(size(dense), 1.5)
+  expect_gte(size(dense), 1)
+  expect_identical(size(sparse), 4)
+
+  # A bigger panel, or fewer cells in the same panel, grow it.
+  expect_gt(
+    size(dense, panel = c(1200, 1000)),
+    size(dense, panel = c(300, 250))
+  )
+  expect_gt(size(grid(100)), size(grid(300)))
+
+  # The number is the same however the coordinates are scaled.
+  expect_identical(size(dense * 1000), size(dense))
+
+  # Always from 1 to 4; NA without usable coordinates.
+  expect_true(size(grid(2)) <= 4 && size(grid(2)) >= 1)
+  expect_true(is.na(size(matrix(numeric(), ncol = 2L))))
+  expect_true(is.na(size(cbind(c(1, 1, 1), c(2, 3, 4)))))
+  expect_true(is.na(size(cbind(c(NA, NaN), c(1, 2)))))
+})
+
+test_that("the Viewer reads a section's recommended point size from the Pack", {
+  scope <- viewer_runtime_env()
+  sys.source(viewer_test_path("core", "viewer_pack.R"), scope)
+  pack <- function(frames) list(manifest = list(spatial_frames = frames))
+  frames <- data.frame(
+    name = c("a", "b", "c"),
+    cells = c(3L, 3L, 3L),
+    dimensions = 2L,
+    geometry_path = "spatial/001.geometry.bin",
+    point_size = c(1.6, NA, 40),
+    stringsAsFactors = FALSE
+  )
+  expect_identical(scope$viewerPackSpatialPointSize(pack(frames), "a"), 1.6)
+  # Not a number, or out of range, or an unknown section: none.
+  expect_null(scope$viewerPackSpatialPointSize(pack(frames), "b"))
+  expect_null(scope$viewerPackSpatialPointSize(pack(frames), "c"))
+  expect_null(scope$viewerPackSpatialPointSize(pack(frames), "z"))
+  # A Pack written before the column existed has none.
+  expect_null(scope$viewerPackSpatialPointSize(
+    pack(frames[setdiff(names(frames), "point_size")]),
+    "a"
+  ))
+  expect_null(scope$viewerPackSpatialPointSize(NULL, "a"))
 })

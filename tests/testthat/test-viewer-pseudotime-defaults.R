@@ -28,8 +28,9 @@ test_that("pseudotime controls consume author defaults and hiding the trend stil
       pseudotime = 1:6,
       score = c(2, 4, 3, 6, 5, 8),
       state = factor(rep("A", 6)),
-      cell_barcode = paste0("c", 1:6)
+      cell_index = 1:6
     )
+    viewerCellBarcodesAt <- function(rows) paste0("c", rows)
     trajectory_data_reactive <- function() list(meta = cells)
     trajectory_cells_reactive <- function(...) cells
     ## The trajectory's control values (trajectory/server.R), read as bound.

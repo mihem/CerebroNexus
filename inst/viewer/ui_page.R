@@ -227,9 +227,14 @@ ui <- dashboardPage(
       cerebro_js("fill_height.js", defer = TRUE),
       cerebro_js("cv-geom.js", defer = TRUE),
       cerebro_js("cell_views_state.js", defer = TRUE),
-      cerebro_js("dataset-context.js"),
-      cerebro_js("cell_points_gpu.js"),
-      cerebro_js("cell_views_wire.js"),
+      cerebro_js("dataset-context.js", defer = TRUE),
+      ## CEREBRO_PANEL_CAP=off: no limit of 2 panels in a browser without a GPU
+      ## (cell_points_gpu.js); the tests' headless Chrome draws in software.
+      if (identical(tolower(Sys.getenv("CEREBRO_PANEL_CAP")), "off")) {
+        tags$script("window.CerebroPanelCapOff = true;")
+      },
+      cerebro_js("cell_points_gpu.js", defer = TRUE),
+      cerebro_js("cell_views_wire.js", defer = TRUE),
       cerebro_js("hla_motifs.js", defer = TRUE),
       cerebro_js("coordviews-config.js", defer = TRUE),
       cerebro_js("viewer-shell.js", defer = TRUE),
@@ -239,8 +244,8 @@ ui <- dashboardPage(
       cerebro_js("selection-table.js", defer = TRUE),
       cerebro_js("multiselect.js", defer = TRUE),
       cerebro_js("gene-selector.js", defer = TRUE),
-      cerebro_js("background-model.js"),
-      cerebro_js("cell_views.js"),
+      cerebro_js("background-model.js", defer = TRUE),
+      cerebro_js("cell_views.js", defer = TRUE),
       cerebro_js("settings_drawer.js", defer = TRUE),
       cerebro_js("specialist-view-state.js", defer = TRUE)
     ),
