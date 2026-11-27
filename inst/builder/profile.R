@@ -988,13 +988,55 @@ BUILDER_METADATA_FULL_COUNT_MAX <- 100L
   ) {
     return(.builder_profile_frequent_level_counts(values))
   }
-  text <- if (is.factor(values) || is.atomic(values)) {
-    as.character(values)
+  if (is.factor(values)) {
+    levs <- levels(values)
+    tab <- tabulate(values, nbins = length(levs))
+    missing <- sum(is.na(values))
+    keep <- tab > 0L
+    raw_names <- levs[keep]
+    raw_counts <- tab[keep]
+    if (missing > 0L) {
+      na_idx <- match("N/A", raw_names, nomatch = 0L)
+      if (na_idx > 0L) {
+        raw_counts[[na_idx]] <- raw_counts[[na_idx]] + missing
+      } else {
+        raw_names <- c(raw_names, "N/A")
+        raw_counts <- c(raw_counts, missing)
+      }
+    }
+    if (anyDuplicated(raw_names)) {
+      agg <- tapply(raw_counts, raw_names, sum)
+      raw_names <- names(agg)
+      raw_counts <- as.integer(agg)
+    }
+    keys <- raw_names
+    counts_vec <- as.integer(raw_counts)
   } else {
-    rep(NA_character_, length(values))
+    text <- if (is.atomic(values)) {
+      as.character(values)
+    } else {
+      rep(NA_character_, length(values))
+    }
+    text[is.na(text)] <- "N/A"
+    ## table() would build a factor first (a second pass over every value);
+    ## counting the matches of the distinct values gives the same table. Like
+    ## table(useNA = "no"), whose factor excludes NaN, "NaN" is not counted.
+    keys <- unique(text)
+    counts_vec <- tabulate(match(text, keys), nbins = length(keys))
+    counted <- keys != "NaN"
+    keys <- keys[counted]
+    counts_vec <- counts_vec[counted]
   }
-  text[is.na(text)] <- "N/A"
-  full_counts <- sort(table(text, useNA = "no"), decreasing = TRUE)
+  ## Build the table table(text) would build (names in collation order) and
+  ## sort it the same way, so every edge case matches the character route.
+  alphabetical <- order(keys)
+  full_counts <- array(
+    counts_vec[alphabetical],
+    dim = length(alphabetical),
+    dimnames = list(text = keys[alphabetical])
+  )
+  class(full_counts) <- "table"
+  full_counts <- sort(full_counts, decreasing = TRUE)
   display_names <- names(full_counts)
   display_names[!nzchar(display_names)] <- "(blank)"
   counts <- stats::setNames(as.numeric(full_counts), display_names)

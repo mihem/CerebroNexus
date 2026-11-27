@@ -115,41 +115,76 @@ builder_group_colors_ui <- function(id, model) {
     },
     div(
       class = "group-color-grid viewer-group-distribution-list",
-      lapply(model$items, function(item) {
-        input_id <- ns(paste0("group_color_", item$index))
-        width <- max(3, 100 * item$count / largest)
-        div(
-          class = "group-color-item viewer-group-distribution-row",
-          `data-search` = tolower(item$label),
-          tags$input(
-            id = input_id,
-            type = "color",
-            class = "group-color-input",
-            value = item$color,
-            `data-input-id` = ns("group_color"),
-            `data-group` = model$group,
-            `data-level` = item$key,
-            `aria-label` = paste("Color for", model$group, item$label)
-          ),
-          tags$label(
-            class = "group-color-name",
-            `for` = input_id,
-            title = item$label,
-            item$label
-          ),
-          span(
-            class = "viewer-group-bar-track",
-            span(
-              class = "viewer-group-bar",
-              style = paste0("width:", round(width, 2L), "%")
-            )
-          ),
-          span(
-            class = "viewer-group-count",
-            format(item$count, big.mark = ",")
+      if (length(model$items)) {
+        esc_attr <- function(x) {
+          htmltools::htmlEscape(as.character(x), attribute = TRUE)
+        }
+        esc_text <- function(x) {
+          htmltools::htmlEscape(as.character(x), attribute = FALSE)
+        }
+        ## Coerce each field so a double index or a missing label from a
+        ## caller cannot break the vectorized row building.
+        field <- function(name, cast, empty) {
+          vapply(
+            model$items,
+            function(item) {
+              value <- cast(item[[name]] %||% empty)
+              if (length(value) == 1L && !is.na(value)) value else empty
+            },
+            empty
           )
+        }
+        indices <- field("index", as.integer, NA_integer_)
+        labels <- field("label", as.character, "")
+        keys <- field("key", as.character, "")
+        colors <- field("color", as.character, "")
+        counts <- vapply(
+          model$items,
+          function(x) as.numeric(x$count),
+          numeric(1)
         )
-      })
+        input_ids <- esc_attr(vapply(
+          paste0("group_color_", indices),
+          ns,
+          character(1)
+        ))
+        data_input_id <- esc_attr(ns("group_color"))
+        group_attr <- esc_attr(model$group)
+        widths <- round(pmax(3, 100 * counts / largest), 2L)
+        count_text <- esc_text(trimws(format(
+          counts,
+          big.mark = ",",
+          scientific = FALSE
+        )))
+        shiny::HTML(paste0(
+          '<div class="group-color-item viewer-group-distribution-row" data-search="',
+          esc_attr(tolower(labels)),
+          '"><input id="',
+          input_ids,
+          '" type="color" class="group-color-input" value="',
+          esc_attr(colors),
+          '" data-input-id="',
+          data_input_id,
+          '" data-group="',
+          group_attr,
+          '" data-level="',
+          esc_attr(keys),
+          '" aria-label="',
+          esc_attr(paste("Color for", model$group, labels)),
+          '"/><label class="group-color-name" for="',
+          input_ids,
+          '" title="',
+          esc_attr(labels),
+          '">',
+          esc_text(labels),
+          '</label><span class="viewer-group-bar-track"><span class="viewer-group-bar" style="width:',
+          widths,
+          '%"></span></span><span class="viewer-group-count">',
+          count_text,
+          "</span></div>",
+          collapse = ""
+        ))
+      }
     ),
     div(
       class = "visually-hidden group-color-status",

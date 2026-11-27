@@ -42,6 +42,7 @@
     observedCanvas: null,
     viewportSignature: null,
     viewportGeometry: null,
+    pendingViewportPayload: null,
   };
   window.__builderSpatialCanvasMetrics = window.__builderSpatialCanvasMetrics || {
     sceneMessages: 0, renders: 0, latestCoordinateRotation: 0,
@@ -171,6 +172,8 @@
       }
     }
     if (viewChanged) {
+      // A drag on the previous view must not publish its viewports later.
+      state.pendingViewportPayload = null;
       state.controlsHeld = false;
       state.dragging = false;
       state.interacting = false;
@@ -209,6 +212,7 @@
     state.hoverNode = null;
     state.viewportSignature = null;
     state.viewportGeometry = null;
+    state.pendingViewportPayload = null;
     evictDecodedImages({});
     if (state.hoverFrame) window.cancelAnimationFrame(state.hoverFrame);
     state.hoverFrame = 0;
@@ -463,10 +467,24 @@
       viewports: viewports,
       imageFitViewports: imageFitViewports,
     };
+    if (state.dragging || state.interacting) {
+      state.pendingViewportPayload = payload;
+      return;
+    }
+    state.pendingViewportPayload = null;
+    sendViewportPayload(payload);
+  }
+  function sendViewportPayload(payload) {
+    if (!payload || !window.Shiny || typeof Shiny.setInputValue !== "function") return;
     var signature = JSON.stringify(payload);
     if (signature === state.viewportSignature) return;
     state.viewportSignature = signature;
     Shiny.setInputValue("builder_spatial_viewports", payload, {priority: "event"});
+  }
+  function flushViewportPublish() {
+    var payload = state.pendingViewportPayload;
+    state.pendingViewportPayload = null;
+    sendViewportPayload(payload);
   }
   function drawViewerFrame(ctx, view, screen) {
     var topLeft = screen({x: view.xmin, y: view.ymax});
@@ -706,6 +724,9 @@
       var cy = (bounds.ymin + bounds.ymax) / 2;
       var radians = angle * Math.PI / 180;
       var cosine = Math.cos(radians), sine = Math.sin(radians);
+      // One fill per point: measured faster than one path per colour for the
+      // at most 5,000 points of a panel, and overlapping points keep their
+      // individual opacity.
       indices.forEach(function (index) {
         if (!pointIncluded(index, controls)) return;
         var x = p.x[index] - cx, y = p.y[index] - cy;
@@ -1172,6 +1193,7 @@
     var id = state.activeControlId;
     state.activeControlId = null;
     flushControlCommit();
+    flushViewportPublish();
     sendInteractionState(false);
     applyPendingAuthoritativeControls();
     if (!id || !window.Shiny || typeof Shiny.setInputValue !== "function") return;

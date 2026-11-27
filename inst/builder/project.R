@@ -8672,6 +8672,11 @@ builder_project_write <- function(
   target <- builder_project_manifest_path(root)
   write_lock <- builder_project_acquire_manifest_lock(root)
   on.exit(builder_project_release_manifest_lock(write_lock), add = TRUE)
+  ## The bytes the current manifest is checked from below; once that file has
+  ## been moved to the backup, the same bytes need no second check.
+  disk_bytes <- if (file.exists(target)) {
+    readBin(target, "raw", n = file.size(target))
+  }
   disk <- if (file.exists(target)) builder_project_read(target) else NULL
   disk_revision <- if (is.null(disk)) 0L else disk$project$revision
   if (
@@ -8914,19 +8919,29 @@ builder_project_write <- function(
       error = identity
     )
     backup_valid <- !inherits(backup_manifest, "condition") &&
-      isTRUE(tryCatch(
-        {
-          builder_project_assert_manifest_integrity(
-            backup_manifest,
-            root,
-            verification_cache = verification_cache,
-            failed_source_ids = failed_source_ids,
-            dropped_ids = dropped_ids
-          )
-          TRUE
-        },
-        error = function(error) FALSE
-      ))
+      ## Same bytes as the manifest checked at the start, under the same write
+      ## lock, with the same failed and dropped datasets: that check stands.
+      (!is.null(disk_bytes) &&
+        identical(
+          tryCatch(
+            readBin(backup, "raw", n = file.size(backup)),
+            error = function(error) NULL
+          ),
+          disk_bytes
+        ) ||
+        isTRUE(tryCatch(
+          {
+            builder_project_assert_manifest_integrity(
+              backup_manifest,
+              root,
+              verification_cache = verification_cache,
+              failed_source_ids = failed_source_ids,
+              dropped_ids = dropped_ids
+            )
+            TRUE
+          },
+          error = function(error) FALSE
+        )))
     if (!backup_valid) {
       if (!restore_previous()) {
         stop(

@@ -1256,6 +1256,64 @@ test_that("external Spatial images materialize without entering CRB payloads", {
   )
 })
 
+test_that("an external image with its recorded MD5 is not decoded again", {
+  skip_if_not_installed("png")
+  root <- withr::local_tempdir()
+  source_path <- file.path(root, "source.png")
+  png::writePNG(matrix(seq(0, 1, length.out = 24L), nrow = 4L), source_path)
+  inspected <- builder_read_image(source_path)
+  item_with <- function(md5) {
+    record <- builder_alignment_record(
+      source = list(name = "H&E.png", type = "image/png"),
+      base_bounds = list(xmin = 0, xmax = 10, ymin = 0, ymax = 8),
+      section = list(id = "slice-a", kind = "spatial"),
+      source_path = inspected$source_path
+    )
+    record$source_content_md5 <- md5
+    list(
+      id = "dataset-a",
+      name = "Dataset A",
+      images = list(`slice-a` = list(`H&E` = record))
+    )
+  }
+  runtime <- environment(.builder_build_materialize_spatial_images)
+  read_image <- runtime$builder_read_image
+  withr::defer(runtime$builder_read_image <- read_image)
+  decoded <- 0L
+  runtime$builder_read_image <- function(...) {
+    decoded <<- decoded + 1L
+    read_image(...)
+  }
+
+  same <- .builder_build_materialize_spatial_images(
+    item_with(inspected$source_content_md5),
+    file.path(root, "same")
+  )
+  expect_identical(decoded, 0L)
+  path <- same$images[["dataset-a"]][["slice-a"]][["H&E"]]$path
+  expect_match(basename(path), "[.]png$")
+  expect_identical(
+    unname(as.character(tools::md5sum(path))),
+    inspected$source_content_md5
+  )
+
+  ## Without a recorded MD5 the image is decoded and checked as before.
+  .builder_build_materialize_spatial_images(
+    item_with(NULL),
+    file.path(root, "none")
+  )
+  expect_identical(decoded, 1L)
+  ## A recorded MD5 the file no longer has is decoded and refused.
+  expect_error(
+    .builder_build_materialize_spatial_images(
+      item_with(strrep("0", 32L)),
+      file.path(root, "changed")
+    ),
+    "failed its integrity check"
+  )
+  expect_identical(decoded, 2L)
+})
+
 test_that("external Spatial paths cannot collide after normalization", {
   skip_if_not_installed("png")
   root <- withr::local_tempdir()
@@ -1718,6 +1776,84 @@ test_that("a reused CRB already read back in this session is not reopened", {
   expect_identical(result$verifications$ds1$source, "deep")
 })
 
+builder_deferred_h5ad_fixture <- function(scope = parent.frame()) {
+  h5ad_file <- withr::local_tempfile(fileext = ".h5ad", .local_envir = scope)
+  file.copy(anndata_test_fixture("small_csr.h5ad"), h5ad_file)
+  info <- file.info(h5ad_file)
+  object <- SeuratObject::pbmc_small
+  object@reductions <- object@reductions["pca"]
+  object@misc$.cerebro_deferred_h5ad <- list(
+    file = h5ad_file,
+    n_cells = 120,
+    n_genes = 60,
+    source = list(
+      size = as.double(info$size),
+      modified = as.double(info$mtime)
+    ),
+    layer_sources = list(counts = "layers/counts", data = NULL)
+  )
+  item <- list(
+    name = "Deferred",
+    layer = "counts",
+    expression_backend = "h5",
+    analyses = list()
+  )
+  list(object = object, item = item, file = h5ad_file)
+}
+
+test_that("only the expression file of a shell is streamed from the h5ad", {
+  fixture <- builder_deferred_h5ad_fixture()
+  object <- fixture$object
+  item <- fixture$item
+  stream <- .builder_build_deferred_h5ad_stream(object, item)
+  expect_identical(stream$path, "layers/counts")
+  expect_identical(stream$n_obs, 120)
+
+  with_spatial <- object
+  with_spatial@reductions$spatial <- with_spatial@reductions$pca
+  changed <- function(field, value) {
+    item[[field]] <- value
+    item
+  }
+  refused <- list(
+    embedded_backend = list(object, changed("expression_backend", "embedded")),
+    analyses = list(
+      object,
+      changed("analyses", list(list(id = "marker_genes")))
+    ),
+    layer_without_source = list(object, changed("layer", "data")),
+    spatial_reduction = list(with_spatial, item),
+    not_a_shell = list(SeuratObject::pbmc_small, item)
+  )
+  for (case in names(refused)) {
+    expect_null(
+      .builder_build_deferred_h5ad_stream(
+        refused[[case]][[1L]],
+        refused[[case]][[2L]]
+      ),
+      info = case
+    )
+  }
+  withr::with_options(list(cerebro.builder.h5ad_streaming = FALSE), {
+    expect_null(.builder_build_deferred_h5ad_stream(object, item))
+  })
+  Sys.setFileTime(fixture$file, Sys.time() + 3600)
+  expect_null(.builder_build_deferred_h5ad_stream(object, item))
+})
+
+test_that("a shell that cannot be streamed is never exported from its placeholders", {
+  fixture <- builder_deferred_h5ad_fixture()
+  item <- utils::modifyList(fixture$item, list(expression_backend = "embedded"))
+  expect_error(
+    .builder_build_export(fixture$object, item, tempfile(fileext = ".crb")),
+    "opened without its expression matrix"
+  )
+  ## Preparing reads such a shell in full; this one's file is not what the
+  ## shell recorded, so that stops before analyses run.
+  Sys.setFileTime(fixture$file, Sys.time() + 3600)
+  expect_error(.builder_build_prepare(fixture$object, item), "changed or moved")
+})
+
 test_that("the worker seeds copied App data from request identities", {
   app_dir <- withr::local_tempdir()
   private <- file.path(app_dir, "private-data")
@@ -1776,6 +1912,61 @@ test_that("the worker seeds copied App data from request identities", {
     .builder_app_tree_summary(wrong),
     .builder_app_tree_summary(full)
   ))
+})
+
+test_that("the worker seeds copied Spatial images from request identities", {
+  app_dir <- withr::local_tempdir()
+  record <- list(path = "/source/images/H&E.png")
+  target <- .builder_app_spatial_target("ds1", "fov", "H&E", record$path)
+  dir.create(dirname(file.path(app_dir, target)), recursive = TRUE)
+  writeBin(as.raw(0:255), file.path(app_dir, target))
+  identity <- list(
+    type = "file",
+    size = as.double(file.size(file.path(app_dir, target))),
+    md5 = unname(toupper(tools::md5sum(file.path(app_dir, target))))
+  )
+  request <- list(
+    spatial_images = list(ds1 = list(fov = list(`H&E` = record))),
+    spatial_image_identities = list(ds1 = list(fov = list(`H&E` = identity)))
+  )
+  hashed <- character()
+  counting <- function(path) {
+    hashed <<- c(hashed, basename(path))
+    tools::md5sum(path)
+  }
+
+  seed <- .builder_build_app_tree_seed(app_dir, request)
+  expect_identical(names(seed$entries), target)
+  expect_identical(seed$entries[[target]]$md5, tolower(identity$md5))
+  seeded <- .builder_app_tree_identity(
+    app_dir,
+    .digest_file = counting,
+    .previous = seed
+  )
+  expect_false(basename(target) %in% hashed)
+  expect_identical(
+    .builder_app_tree_summary(seeded),
+    .builder_app_tree_summary(.builder_app_tree_identity(app_dir))
+  )
+
+  # A size that differs from the identity is not trusted.
+  request$spatial_image_identities$ds1$fov$`H&E`$size <- identity$size + 1
+  expect_length(.builder_build_app_tree_seed(app_dir, request)$entries, 0L)
+})
+
+test_that("in-memory path digests match the temporary-file digests", {
+  skip_if_not_installed("digest")
+  path <- withr::local_tempfile()
+  for (bytes in list(
+    raw(),
+    charToRaw("cerebro-spatial-image-v1:"),
+    as.raw(0:255)
+  )) {
+    writeBin(bytes, path)
+    expected <- unname(as.character(tools::md5sum(path)))
+    expect_identical(.builder_app_spatial_path_digest(bytes), expected)
+    expect_identical(.bundlePathDigest(bytes), expected)
+  }
 })
 
 test_that("read-back rejects a Viewer page-gate mismatch", {

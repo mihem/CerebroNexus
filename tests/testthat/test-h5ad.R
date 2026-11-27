@@ -218,3 +218,240 @@ test_that("convertSCEToCerebro accepts an .h5ad path directly", {
   )))
   expect_identical(basename(path), "cerebro_small_csc.crb")
 })
+
+test_that("a metadata-only read keeps every axis and annotation but no values", {
+  full <- read_fixture("small_csr.h5ad")
+  shell <- read_fixture("small_csr.h5ad", .metadata_only = TRUE)
+
+  expect_identical(dim(shell), dim(full))
+  expect_identical(dimnames(shell), dimnames(full))
+  expect_identical(
+    SummarizedExperiment::assayNames(shell),
+    SummarizedExperiment::assayNames(full)
+  )
+  expect_identical(
+    as.data.frame(SummarizedExperiment::colData(shell)),
+    as.data.frame(SummarizedExperiment::colData(full))
+  )
+  expect_identical(
+    SingleCellExperiment::reducedDimNames(shell),
+    SingleCellExperiment::reducedDimNames(full)
+  )
+  for (name in SummarizedExperiment::assayNames(shell)) {
+    placeholder <- assay_x(shell, name)
+    expect_s4_class(placeholder, "dgCMatrix")
+    expect_identical(length(placeholder@x), 0L)
+  }
+  deferred <- S4Vectors::metadata(shell)$.cerebro_deferred_h5ad
+  expect_identical(
+    deferred$file,
+    normalizePath(fixture("small_csr.h5ad"), winslash = "/")
+  )
+  expect_identical(deferred$assays, SummarizedExperiment::assayNames(full))
+  expect_identical(c(deferred$n_genes, deferred$n_cells), dim(full))
+  expect_null(S4Vectors::metadata(full)$.cerebro_deferred_h5ad)
+})
+
+## Variants of small_csr.h5ad: X alone (log-normalised), or the integer counts
+## moved into X with no layers.
+h5ad_variant <- function(kind) {
+  path <- withr::local_tempfile(
+    fileext = ".h5ad",
+    .local_envir = parent.frame()
+  )
+  file.copy(fixture("small_csr.h5ad"), path)
+  handle <- rhdf5::H5Fopen(path)
+  on.exit(rhdf5::H5Fclose(handle), add = TRUE)
+  if (identical(kind, "x_counts")) {
+    rhdf5::H5Ldelete(handle, "X")
+    rhdf5::H5Lmove(handle, "layers/counts", handle, "X")
+  } else {
+    rhdf5::H5Ldelete(handle, "layers/counts")
+  }
+  path
+}
+
+test_that("a converted metadata-only read matches the full conversion", {
+  paths <- list(
+    with_counts = fixture("small_csr.h5ad"),
+    ## a CSC X does not matter while the counts layer is CSR
+    csc_x = fixture("small_csc.h5ad"),
+    x_only = h5ad_variant("x_only"),
+    x_counts = h5ad_variant("x_counts")
+  )
+  for (case in names(paths)) {
+    full <- suppressMessages(convertSCEToSeurat(read_h5ad(paths[[case]])))
+    shell <- suppressMessages(convertSCEToSeurat(
+      read_h5ad(paths[[case]], .metadata_only = TRUE)
+    ))
+    assay <- SeuratObject::DefaultAssay(full)
+    expect_identical(SeuratObject::DefaultAssay(shell), assay, info = case)
+    expect_identical(dimnames(shell), dimnames(full), info = case)
+    expect_identical(
+      sort(SeuratObject::Layers(shell[[assay]])),
+      sort(SeuratObject::Layers(full[[assay]])),
+      info = case
+    )
+    expect_identical(
+      colnames(shell@meta.data),
+      colnames(full@meta.data),
+      info = case
+    )
+    for (column in grep(
+      "^n(Count|Feature)_",
+      colnames(full@meta.data),
+      value = TRUE
+    )) {
+      expect_equal(
+        shell@meta.data[[column]],
+        full@meta.data[[column]],
+        tolerance = 1e-10,
+        info = paste(case, column)
+      )
+    }
+    expect_identical(
+      names(shell@reductions),
+      names(full@reductions),
+      info = case
+    )
+    deferred <- shell@misc$.cerebro_deferred_h5ad
+    expect_null(deferred$cell_totals)
+    expect_true(all(deferred$stored_values > 0))
+  }
+  ## X alone is classified like the full read samples it.
+  x_counts <- read_h5ad(paths$x_counts, .metadata_only = TRUE)
+  expect_true(S4Vectors::metadata(x_counts)$.cerebro_deferred_h5ad$x_is_counts)
+  x_only <- read_h5ad(paths$x_only, .metadata_only = TRUE)
+  expect_false(S4Vectors::metadata(x_only)$.cerebro_deferred_h5ad$x_is_counts)
+})
+
+test_that("layouts a metadata-only read cannot stand in for are refused", {
+  expect_error(
+    read_h5ad(fixture("small_dense.h5ad"), .metadata_only = TRUE),
+    class = "cerebro_h5ad_metadata_ineligible"
+  )
+  ## An h5ad with no assays is ineligible rather than failing with a subscript error.
+  ctx <- .h5adContext(fixture("small_csr.h5ad"))
+  expect_error(
+    .h5adDeferredFacts(ctx, "X", character(), data.frame(), 1L, 1L),
+    class = "cerebro_h5ad_metadata_ineligible"
+  )
+  ## A non-CSR layer (e.g. dense X with obs totals) is never recorded as a
+  ## streamable CSR layer_source, so the Builder hydrates it in full instead.
+  dense_ctx <- .h5adContext(fixture("small_dense.h5ad"))
+  obs_with_totals <- data.frame(
+    total_counts = c(10, 20),
+    n_genes_by_counts = c(2, 3)
+  )
+  facts <- .h5adDeferredFacts(
+    dense_ctx,
+    "X",
+    "logcounts",
+    obs_with_totals,
+    2L,
+    2L
+  )
+  expect_null(facts$layer_sources$data)
+})
+
+test_that("streamed cell totals equal the column sums of the matrix", {
+  ctx <- .h5adContext(fixture("small_csr.h5ad"))
+  sce <- read_h5ad(fixture("small_csr.h5ad"))
+  counts <- assay_x(sce, "counts")
+  source <- .h5adStreamSource(
+    ctx$file,
+    "layers/counts",
+    ncol(counts),
+    nrow(counts)
+  )
+  withr::local_options(cerebro.h5ad_stream_block = 97)
+  totals <- .h5adCellTotals(source, nrow(counts))
+  expect_equal(totals$count, unname(Matrix::colSums(counts)))
+  expect_equal(totals$features, unname(Matrix::colSums(counts > 0)))
+})
+
+test_that("streamed cell totals add up repeated and unsorted genes first", {
+  path <- withr::local_tempfile(fileext = ".h5")
+  rhdf5::h5createFile(path)
+  rhdf5::h5createGroup(path, "X")
+  ## cell 1: gene 2 twice (+3, -3) and gene 0; cell 2: empty; cell 3: unsorted
+  indptr <- c(0L, 3L, 3L, 6L)
+  indices <- c(2L, 0L, 2L, 4L, 1L, 3L)
+  data <- c(3, 1, -3, 2, 5, 0)
+  rhdf5::h5write(indptr, path, "X/indptr")
+  rhdf5::h5write(indices, path, "X/indices")
+  rhdf5::h5write(data, path, "X/data")
+  source <- .h5adStreamSource(path, "X", n_obs = 3, n_vars = 5)
+  expected <- Matrix::sparseMatrix(
+    i = indices + 1L,
+    j = rep.int(1:3, diff(indptr)),
+    x = data,
+    dims = c(5L, 3L)
+  )
+  for (block in c(1, 100)) {
+    withr::local_options(cerebro.h5ad_stream_block = block)
+    totals <- .h5adCellTotals(source, 5L)
+    expect_equal(totals$count, unname(Matrix::colSums(expected)))
+    expect_equal(totals$features, unname(Matrix::colSums(expected > 0)))
+  }
+})
+
+test_that("convertSCEToSeurat matches CreateSeuratObject identities and metadata", {
+  skip_if_not_installed("SingleCellExperiment")
+  skip_if_not_installed("SeuratObject")
+  ## Case 1: <=100 unique prefixes -> orig.ident uses the prefix before "_"
+  cells_small <- c("s1_1", "s1_2", "s2_1", "s2_2")
+  mat_small <- Matrix::Matrix(
+    c(1, 0, 2, 3, 0, 1, 0, 4),
+    nrow = 2L,
+    ncol = 4L,
+    sparse = TRUE,
+    dimnames = list(c("G1", "G2"), cells_small)
+  )
+  sce_small <- SingleCellExperiment::SingleCellExperiment(
+    assays = list(counts = mat_small),
+    colData = S4Vectors::DataFrame(
+      group = c("A", "A", "B", "B"),
+      row.names = cells_small
+    )
+  )
+  seu_small <- suppressMessages(convertSCEToSeurat(sce_small))
+  ref_small <- suppressWarnings(SeuratObject::CreateSeuratObject(
+    counts = SeuratObject::CreateAssay5Object(counts = mat_small),
+    meta.data = data.frame(
+      group = c("A", "A", "B", "B"),
+      row.names = cells_small
+    )
+  ))
+  expect_true(methods::validObject(seu_small))
+  expect_identical(seu_small$orig.ident, ref_small$orig.ident)
+  expect_identical(
+    SeuratObject::Idents(seu_small),
+    SeuratObject::Idents(ref_small)
+  )
+  expect_identical(seu_small@meta.data, ref_small@meta.data)
+
+  ## Case 2: >100 unique prefixes -> orig.ident falls back to "SeuratProject"
+  cells_many <- paste0("p", seq_len(105L), "_1")
+  mat_many <- Matrix::Matrix(
+    1,
+    nrow = 2L,
+    ncol = 105L,
+    sparse = TRUE,
+    dimnames = list(c("G1", "G2"), cells_many)
+  )
+  sce_many <- SingleCellExperiment::SingleCellExperiment(
+    assays = list(counts = mat_many),
+    colData = S4Vectors::DataFrame(
+      group = rep("A", 105L),
+      row.names = cells_many
+    )
+  )
+  seu_many <- suppressMessages(convertSCEToSeurat(sce_many))
+  expect_true(methods::validObject(seu_many))
+  expect_identical(levels(seu_many$orig.ident), "SeuratProject")
+  expect_identical(
+    unname(as.character(seu_many$orig.ident)),
+    rep("SeuratProject", 105L)
+  )
+})

@@ -570,3 +570,135 @@ test_that("section names, picture keys and library ids agree after conversion", 
     "`library_id` is missing for 1 of 8 cells"
   )
 })
+
+test_that("a metadata-only import builds the same CRB as a full import", {
+  skip_if_not_installed("qs2")
+  build_with <- function(bytes, id) {
+    withr::with_options(
+      list(cerebro.builder.h5ad_metadata_only_bytes = bytes),
+      build_through_builder(fixture("small_csr.h5ad"), id)
+    )
+  }
+  shell <- build_with(0, "h5ad_deferred")
+  full <- build_with(Inf, "h5ad_full")
+  ## The shell's snapshot holds no matrix values; the Build read the file.
+  expect_false(is.null(
+    quiet(builder_read_object(
+      fixture("small_csr.h5ad"),
+      metadata_only = TRUE
+    ))$object@misc$.cerebro_deferred_h5ad
+  ))
+  expect_identical(shell$entry$settings$layer, full$entry$settings$layer)
+  expect_identical(shell$crb$getCellNames(), full$crb$getCellNames())
+  expect_identical(shell$crb$getGroups(), full$crb$getGroups())
+  expect_identical(shell$crb$getMetaData(), full$crb$getMetaData())
+  expect_identical(
+    shell$crb$availableProjections(),
+    full$crb$availableProjections()
+  )
+  for (projection in full$crb$availableProjections()) {
+    expect_identical(
+      shell$crb$getProjection(projection),
+      full$crb$getProjection(projection)
+    )
+  }
+  expect_identical(
+    shell$crb$getExpressionMatrix(),
+    full$crb$getExpressionMatrix()
+  )
+})
+
+test_that("a streamed expression file builds the same CRB as a full import", {
+  skip_if_not_installed("qs2")
+  skip_if_not_installed("HDF5Array")
+  h5_backend <- function(entry) {
+    entry$settings$expression_backend <- "h5"
+    entry
+  }
+  seen <- new.env()
+  seen$paths <- character()
+  build_with <- function(bytes, id) {
+    built <- withr::with_options(
+      list(cerebro.builder.h5ad_metadata_only_bytes = bytes),
+      build_through_builder(
+        fixture("small_csr.h5ad"),
+        id,
+        configure = h5_backend
+      )
+    )
+    ## Read everything compared while the build folder still exists.
+    crb <- readCerebro(built$result$built[[1L]])
+    list(
+      backend = crb$getExpressionBackend()$type,
+      cells = crb$getCellNames(),
+      groups = crb$getGroups(),
+      metadata = crb$getMetaData(),
+      projections = stats::setNames(
+        lapply(crb$availableProjections(), crb$getProjection),
+        crb$availableProjections()
+      ),
+      expression = as.matrix(crb$getExpressionMatrix())
+    )
+  }
+  trace(
+    ".h5adStreamWriteTENx",
+    where = asNamespace("CerebroNexus"),
+    tracer = bquote(assign(
+      "paths",
+      c(get("paths", envir = .(seen)), source$path),
+      envir = .(seen)
+    )),
+    print = FALSE
+  )
+  withr::defer(untrace(
+    ".h5adStreamWriteTENx",
+    where = asNamespace("CerebroNexus")
+  ))
+  shell <- build_with(0, "h5ad_streamed")
+  ## The shell's expression file was written from the h5ad's counts layer.
+  expect_identical(seen$paths, "layers/counts")
+  full <- build_with(Inf, "h5ad_full_h5")
+  expect_identical(seen$paths, "layers/counts")
+
+  expect_identical(shell$backend, "h5")
+  expect_identical(full$backend, "h5")
+  for (part in c("cells", "groups", "metadata", "projections", "expression")) {
+    expect_identical(shell[[part]], full[[part]], info = part)
+  }
+  expect_gt(sum(full$expression), 0)
+})
+
+test_that("the Build verifies its Viewer Pack once, not twice", {
+  skip_if_not_installed("qs2")
+  options_before <- get(".builder_viewer_pack_options", envir = globalenv())
+  assign(
+    ".builder_viewer_pack_options",
+    list(mode = "always", threshold = 0L),
+    envir = globalenv()
+  )
+  withr::defer(assign(
+    ".builder_viewer_pack_options",
+    options_before,
+    envir = globalenv()
+  ))
+  seen <- new.env()
+  seen$reused <- logical()
+  trace(
+    ".viewerPackValidatedBefore",
+    where = asNamespace("CerebroNexus"),
+    exit = bquote(assign(
+      "reused",
+      c(get("reused", envir = .(seen)), !is.null(returnValue())),
+      envir = .(seen)
+    )),
+    print = FALSE
+  )
+  withr::defer(untrace(
+    ".viewerPackValidatedBefore",
+    where = asNamespace("CerebroNexus")
+  ))
+  built <- build_through_builder(fixture("small_csr.h5ad"), "h5ad_pack")
+  expect_true(dir.exists(sub("[.]crb$", ".viewer", built$result$built[[1L]])))
+  ## The export validated the pack in full; the Build's check reused it.
+  expect_identical(seen$reused, TRUE)
+})

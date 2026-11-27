@@ -15,7 +15,8 @@ readH5adAsSCE(
   extra_modalities = NULL,
   verbose = FALSE,
   .root = NULL,
-  .stream_x = FALSE
+  .stream_x = FALSE,
+  .metadata_only = FALSE
 )
 }
 \arguments{
@@ -67,6 +68,12 @@ modalities inside a MuData file). Leave \code{NULL}.}
 
 \item{.stream_x}{Internal: do not read an X with more than 2^31 - 1
 non-zero values, describe it for streaming (see \code{\link{convertH5adToCerebro}}).}
+
+\item{.metadata_only}{Internal: read cells, genes, metadata and embeddings
+but no matrix values; empty matrices stand in for them and what
+\code{convertSCEToSeurat} needs from them is recorded in
+\code{metadata(sce)$.cerebro_deferred_h5ad} (used by the Builder for large
+files). Leave \code{FALSE}.}
 }
 \value{
 A \code{SingleCellExperiment} with genes in rows and cells in

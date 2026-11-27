@@ -682,6 +682,18 @@ builder_freeze_plan <- function(
             alignments$spatial
           )
         saved$spatial_roi_settings <- settings$spatial_roi_settings %||% list()
+        saved$colors <- builder_resolve_colors(
+          settings,
+          entry$levels %||% list()
+        )
+        saved$group_color_overrides <- .builder_plan_selected_color_overrides(
+          settings,
+          saved$included_groups %||% character(),
+          entry$levels %||% list()
+        )
+        saved$color_custom_count <- as.integer(sum(lengths(
+          saved$group_color_overrides
+        )))
         saved$reused_artifact <- list(
           path = artifact$resolved_path,
           fingerprint = artifact$fingerprint %||% list(),
@@ -742,28 +754,12 @@ builder_freeze_plan <- function(
         if (!is.null(alignments$trekker)) "trekker" else character()
       ))
       default_group <- settings$default_group %||% settings$groups[[1L]]
-      all_color_overrides <- builder_settings_color_overrides(settings)
-      selected_color_overrides <- lapply(
+      selected_color_overrides <- .builder_plan_selected_color_overrides(
+        settings,
         included_groups[[index]],
-        function(group) {
-          group_levels <- entry$levels[[group]] %||% character()
-          values <- all_color_overrides[[group]] %||% character()
-          kept <- intersect(group_levels, names(values))
-          kept <- kept[vapply(
-            values[kept],
-            function(value) !is.null(builder_normalize_hex_color(value)),
-            logical(1)
-          )]
-          values[kept]
-        }
+        entry$levels %||% list()
       )
-      names(selected_color_overrides) <- included_groups[[index]]
-      selected_color_overrides <- Filter(length, selected_color_overrides)
-      custom_color_count <- sum(vapply(
-        selected_color_overrides,
-        length,
-        integer(1)
-      ))
+      custom_color_count <- sum(lengths(selected_color_overrides))
       runtime_costs <- c(
         percent_mt_ribo = "seconds",
         most_expressed = "seconds",
@@ -843,6 +839,7 @@ builder_freeze_plan <- function(
         images = alignments$spatial,
         spatial_image_storage = builder_spatial_image_storage(settings),
         trekker_alignment = alignments$trekker,
+        has_trekker = isTRUE(has_trekker),
         colors = builder_resolve_colors(settings, entry$levels %||% list()),
         group_color_overrides = selected_color_overrides,
         color_custom_count = as.integer(custom_color_count),
@@ -1158,6 +1155,26 @@ builder_make_plan <- function(
 
 .builder_plan_reuse_limit <- 64L
 
+## The valid custom colours of the included groups, limited to their levels.
+## Both a fresh item and a reused Project artifact record them the same way.
+.builder_plan_selected_color_overrides <- function(settings, groups, levels) {
+  all_color_overrides <- builder_settings_color_overrides(settings)
+  groups <- as.character(groups %||% character())
+  selected <- lapply(groups, function(group) {
+    group_levels <- levels[[group]] %||% character()
+    values <- all_color_overrides[[group]] %||% character()
+    kept <- intersect(group_levels, names(values))
+    kept <- kept[vapply(
+      values[kept],
+      function(value) !is.null(builder_normalize_hex_color(value)),
+      logical(1)
+    )]
+    values[kept]
+  })
+  names(selected) <- groups
+  Filter(length, selected)
+}
+
 builder_plan_reuse_key <- function(item) {
   if (!is.list(item) || !builder_has_text(item$id %||% "")) {
     return(NULL)
@@ -1172,13 +1189,26 @@ builder_plan_reuse_key <- function(item) {
     return(NULL)
   }
   value <- item
-  value[c(
+  drop_fields <- c(
     .builder_plan_reuse_viewer_fields,
     "reused_artifact",
     "source_snapshot_identity",
     "estimated_runtime",
     "estimated_disk_bytes"
-  )] <- NULL
+  )
+  ## Colours only reach the CRB through Trekker (`.builder_build_prepare_trekker()`
+  ## writes the default group's colours), so they leave the key only for an item
+  ## frozen as Trekker-free; an item without the flag keeps them.
+  if (isFALSE(item$has_trekker) && is.null(item$trekker_alignment)) {
+    drop_fields <- c(
+      drop_fields,
+      "colors",
+      "palette",
+      "group_color_overrides",
+      "color_custom_count"
+    )
+  }
+  value[drop_fields] <- NULL
   value$images <- lapply(value$images %||% list(), function(section) {
     lapply(section, function(record) {
       if (is.list(record)) {

@@ -444,6 +444,16 @@ Sessions on the same data set file also share what they compute (the sorted
 gene list, ROI scopes, the trajectory's cells, clonal UMAP points). Each kind
 keeps a few entries, and all are dropped when the last session ends.
 
+## Builder options for large data
+
+Set these with `options()` before `launchCerebroBuilder()`, or in `.Rprofile`.
+
+| Option | Default | What it does |
+|---|---|---|
+| `cerebro.builder.h5ad_metadata_only_bytes` | `2^30` (1 GiB) | Minimum `.h5ad` file size at which the Builder opens metadata, embeddings and per-cell totals without loading expression matrices into memory. Set to `Inf` to always read `.h5ad` files in full. |
+| `cerebro.builder.h5ad_streaming` | `TRUE` | When `TRUE`, eligible metadata-only `.h5ad` datasets stream their CSR expression matrix directly into the `.h5` file during Build instead of reading the full matrix into memory. Set to `FALSE` to force a full read before export. |
+| `cerebro.builder.precompile` | `TRUE` | Uses the Builder's install-time byte-compiled server scripts when available. Set to `FALSE` to parse and compile the Builder server scripts from source on launch. |
+
 # Troubleshooting
 
 - **Missing sidecar:** restore the recorded sibling `.h5` (or
