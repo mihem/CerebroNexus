@@ -321,12 +321,13 @@ cv_viewport_bounds <- function(value) {
 ## Convert one public per-image settings leaf to the JavaScript transform
 ## contract. The same helper is used for embedded and external backgrounds:
 ## createShinyApp() intentionally allows a setting to target either kind.
-cv_image_preset <- function(spatial_name, image_label) {
+cv_image_preset <- function(spatial_name, image_label, alignment = NULL) {
   spatialImagePreset(
     if (exists("Cerebro.options")) Cerebro.options else NULL,
     cv_selected_dataset_name(),
     spatial_name,
-    image_label
+    image_label,
+    alignment
   )
 }
 
@@ -1192,13 +1193,12 @@ cv_spatial_one <- function(
         paste("Embedded histology", embedded_index)
       }
     }
-    preset <- cv_image_preset(nm, entry_name)
     entry_alignment <- if (is.list(entry)) {
       entry$histology_alignment %||% entry$alignment
     } else {
       NULL
     }
-    preset <- spatialEmbeddedImagePreset(preset, entry_alignment)
+    preset <- cv_image_preset(nm, entry_name, entry_alignment)
     ## A section-level alignment names the image it was saved for.
     alignment_source <- if (is.list(alignment)) {
       as.character(alignment$source %||% character())

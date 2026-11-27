@@ -1891,6 +1891,8 @@ builder_verify_crb <- function(
     viewer_binary = .builder_viewer_pack_options$mode,
     viewer_binary_threshold = .builder_viewer_pack_options$threshold,
     spatial_coordinate_transforms = coordinate_transforms,
+    ## The Builder places its pictures itself (item$images below).
+    spatial_images = FALSE,
     .on_progress = on_progress,
     .finalize_export = if (length(item$images %||% list())) {
       function(export) {

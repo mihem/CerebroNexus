@@ -15,6 +15,7 @@
   "viewerPublishChanged",
   "spatialImagePreset",
   "spatialImageSettingPreset",
+  "spatialEmbeddedImagePreset",
   "spatialPlotRotation",
   "rotateSpatialCoordinates",
   "viewerOutputTab",

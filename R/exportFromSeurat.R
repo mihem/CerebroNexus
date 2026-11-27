@@ -788,7 +788,13 @@
 #' @param spatial_images Optional named list mapping Seurat image names to named
 #'   image paths or descriptors of the form \code{list(path = ..., bounds = ...)}.
 #'   Supported file extensions are png, jpg, jpeg, and svg. Missing bounds are
-#'   derived from the exported x/y coordinate range. An object whose
+#'   derived from the exported x/y coordinate range. A Visium section
+#'   (\code{VisiumV2}) without a declared picture brings the tissue picture
+#'   Seurat keeps in the object, placed by its scale factor and oriented
+#'   to match the spot coordinates. If both scale factors fit,
+#'   set \code{attr(object[["slice1"]]@image, "cerebro_image_label")} to
+#'   \code{"lowres"} or \code{"hires"} for the corresponding section.
+#'   \code{FALSE} leaves the stored pictures out. An object whose
 #'   \code{@images} hold a Seurat v4 \code{VisiumV1} image is rejected;
 #'   rebuild it as \code{VisiumV2} with \code{Seurat::Load10X_Spatial()}.
 #' @param verbose Set this to \code{TRUE} if you want additional log messages;
@@ -1128,6 +1134,11 @@ exportFromSeurat <- function(
     object@misc$cerebro_spatial_images,
     spatial_names
   )
+  ## FALSE leaves out the pictures Seurat keeps in the object itself.
+  object_spatial_images <- !isFALSE(spatial_images)
+  if (isFALSE(spatial_images)) {
+    spatial_images <- NULL
+  }
   path_spatial_images <- .normalizeSpatialImagePaths(
     spatial_images,
     spatial_names,
@@ -1314,6 +1325,20 @@ exportFromSeurat <- function(
         setNames(list(spatial_data$coordinates), image_name)
       )
       spatial_data$histology_images <- merged_images[[image_name]]
+      ## Without a declared picture, a Visium section brings its own, placed
+      ## by its scale factor. A coordinate transform moves the spots away from
+      ## the picture's pixels, so it is left out then.
+      if (
+        !length(spatial_data$histology_images) &&
+          object_spatial_images &&
+          image_name %in% image_names &&
+          is.null(spatial_coordinate_transform_specs[[image_name]])
+      ) {
+        spatial_data$histology_images <- .seuratVisiumImage(
+          object@images[[image_name]],
+          spatial_data$coordinates
+        )
+      }
 
       export$addSpatialData(image_name, spatial_data)
 

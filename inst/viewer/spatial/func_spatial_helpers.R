@@ -320,11 +320,12 @@ spatial_background_preset <- function(
   } else {
     descriptor$key %||% descriptor$label
   }
-  preset <- spatialImagePreset(options, dataset, spatial_name, image_key)
-  if (!is.null(descriptor) && identical(descriptor$source, "embedded")) {
-    preset <- spatialEmbeddedImagePreset(preset, descriptor$alignment)
+  alignment <- if (identical(descriptor$source, "embedded")) {
+    descriptor$alignment
+  } else {
+    NULL
   }
-  preset
+  spatialImagePreset(options, dataset, spatial_name, image_key, alignment)
 }
 
 ## The browser must distinguish a logical image from its encoded bytes. Two

@@ -101,6 +101,9 @@ test_that("pictures are placed in the shape coordinates of their section", {
     images$sec2$hires$histology_image_bounds,
     c(xmin = 0, xmax = 320, ymin = 0, ymax = 360)
   )
+  ## row 0 lands at y = 0 of the section, so the picture opens flipped
+  expect_true(images$sec1$hires$histology_alignment$viewer_setting$flip_y)
+  expect_false(images$sec1$hires$histology_alignment$viewer_setting$flip_x)
   array <- png::readPNG(base64enc::base64decode(sub(
     "^data:image/png;base64,",
     "",
@@ -129,10 +132,22 @@ test_that("cell coordinates come from the shapes the table annotates, matched by
 })
 
 test_that("a SpatialData store converts to a .crb with one section per region and its picture", {
-  skip_if_not_installed("arrow")
   skip_if_not_installed("png")
+  input <- withr::local_tempdir()
+  file.copy(fixture("small_sd_visium.zarr"), input, recursive = TRUE)
+  input <- file.path(input, "small_sd_visium.zarr")
+  image_meta <- file.path(input, "images", "sec1_hires_image", "zarr.json")
+  meta <- jsonlite::read_json(image_meta)
+  meta$attributes$ome$multiscales[[1L]]$datasets[[
+    1L
+  ]]$coordinateTransformations <-
+    list(
+      list(type = "scale", scale = c(1, 2, 1.5)),
+      list(type = "translation", translation = c(0, -2, -1))
+    )
+  jsonlite::write_json(meta, image_meta, auto_unbox = TRUE)
   path <- quiet(convertSpatialDataToCerebro(
-    fixture("small_sd_visium.zarr"),
+    input,
     withr::local_tempdir(),
     groups = c("cell_type", "library_id"),
     viewer_binary = "never",
@@ -148,7 +163,21 @@ test_that("a SpatialData store converts to a .crb with one section per region an
     names(crb$getSpatialData("spatial [sec2]", FALSE)$histology_images),
     "hires"
   )
+  section <- crb$getSpatialData("spatial [sec1]", FALSE)
+  origin <- c(-10, -20)
+  pixel_size <- c(15, 20)
+  spot <- c(section$coordinates$x[[1L]], section$coordinates$y[[1L]])
+  pixel <- floor((spot - origin) / pixel_size) + 1
+  expect_viewer_image_pixel(
+    section$histology_images$hires,
+    row = pixel[[2L]],
+    column = pixel[[1L]],
+    expected = origin + (pixel - 0.5) * pixel_size
+  )
+})
 
+test_that("a SpatialData store converts cell coordinates from shapes to a CRB", {
+  skip_if_not_installed("arrow")
   cells <- readCerebro(quiet(convertSpatialDataToCerebro(
     fixture("small_sd_cells.zarr"),
     withr::local_tempdir(),

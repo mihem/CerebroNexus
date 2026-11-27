@@ -43,8 +43,10 @@ column, copied to \code{colData$library_id}.
 
 Pictures with three channels are attached to the section whose coordinate
 system they are placed in, as \code{metadata(sce)$spatial_images}, with their
-extent worked out from the transformations. Points, labels, other shapes and
-single-channel images are not read.
+extent worked out from the transformations; a picture whose rows count
+downwards in that system opens flipped vertically in the Viewer, so it lies
+under its cells. Points, labels, other shapes and single-channel images are
+not read.
 
 Zarr v2 and v3 stores are read (including sharded arrays) with zstd, gzip,
 Blosc (lz4, zstd or zlib) or no compression; any other codec stops with its

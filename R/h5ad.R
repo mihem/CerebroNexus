@@ -726,8 +726,9 @@
 #'     space: spot coordinates (\code{obsm["spatial"]}) are full-resolution
 #'     pixels and an image is the full-resolution picture scaled by its
 #'     \code{tissue_*_scalef}, so it covers \code{[0, width/scale]} by
-#'     \code{[0, height/scale]}. The image keeps its own orientation (row 0 on
-#'     top); flip it for display in the Spatial tab, as for Seurat objects.
+#'     \code{[0, height/scale]}. The image keeps its own pixels (row 0 on
+#'     top) and opens flipped vertically in the Viewer, because spot rows
+#'     count downwards.
 #' }
 #' Sparse \code{X} (CSR or CSC) and dense \code{X} are supported. A CSR matrix
 #' is used as it is, because the CSR of cells x genes is the CSC of genes x

@@ -150,7 +150,13 @@ for large datasets, \code{"always"}, or \code{"never"}.}
 \item{spatial_images}{Optional named list mapping Seurat image names to named
 image paths or descriptors of the form \code{list(path = ..., bounds = ...)}.
 Supported file extensions are png, jpg, jpeg, and svg. Missing bounds are
-derived from the exported x/y coordinate range. An object whose
+derived from the exported x/y coordinate range. A Visium section
+(\code{VisiumV2}) without a declared picture brings the tissue picture
+Seurat keeps in the object, placed by its scale factor and oriented
+to match the spot coordinates. If both scale factors fit,
+set \code{attr(object[["slice1"]]@image, "cerebro_image_label")} to
+\code{"lowres"} or \code{"hires"} for the corresponding section.
+\code{FALSE} leaves the stored pictures out. An object whose
 \code{@images} hold a Seurat v4 \code{VisiumV1} image is rejected;
 rebuild it as \code{VisiumV2} with \code{Seurat::Load10X_Spatial()}.}
 

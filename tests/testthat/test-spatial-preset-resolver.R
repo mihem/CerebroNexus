@@ -531,3 +531,32 @@ test_that("configured image opacity sets the initial opacity of every image", {
   options$spatial_image_settings$Atlas$sliceA$`H&E`$image_opacity <- 1.5
   expect_equal(spatialImagePreset(options, "Atlas", "sliceA", "H&E")$opacity, 1)
 })
+
+test_that("explicit Viewer fields override imported image placement defaults", {
+  alignment <- .spatialImageScaled(80, 60, 0.05)$histology_alignment
+  options <- list(
+    spatial_image_settings = list(
+      data = list(
+        fov = list(
+          image = list(offset_x = 25, image_opacity = 0.4, flip_x = TRUE)
+        )
+      )
+    )
+  )
+  preset <- spatialImagePreset(options, "data", "fov", "image", alignment)
+  expect_equal(preset$offsetX, 25)
+  expect_equal(preset$opacity, 0.4)
+  expect_true(preset$flipX)
+  expect_true(preset$flipY)
+
+  options$spatial_image_settings$data$fov$image$flip_y <- FALSE
+  expect_false(
+    spatialImagePreset(
+      options,
+      "data",
+      "fov",
+      "image",
+      alignment
+    )$flipY
+  )
+})
