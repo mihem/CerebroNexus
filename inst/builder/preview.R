@@ -250,6 +250,14 @@ builder_alignment_sections_cached <- function(id, object) {
     cache <- new.env(parent = emptyenv())
     assign(".builder_alignment_sections_cache", cache, envir = globalenv())
   }
+  ## Drop entries for datasets that have left the worker's snapshot table.
+  stale <- setdiff(
+    ls(cache, all.names = TRUE),
+    ls(snapshots, all.names = TRUE)
+  )
+  if (length(stale)) {
+    rm(list = stale, envir = cache)
+  }
   hit <- get0(id, envir = cache, inherits = FALSE)
   if (is.list(hit) && identical(hit$identity, identity)) {
     return(hit$sections)

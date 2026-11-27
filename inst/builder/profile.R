@@ -1009,16 +1009,8 @@ BUILDER_METADATA_FULL_COUNT_MAX <- 100L
       raw_names <- names(agg)
       raw_counts <- as.integer(agg)
     }
-    ## Build the table table(text) would build (names in collation order) and
-    ## sort it the same way, so every edge case matches the character route.
-    alphabetical <- order(raw_names)
-    full_counts <- array(
-      as.integer(raw_counts[alphabetical]),
-      dim = length(alphabetical),
-      dimnames = list(text = raw_names[alphabetical])
-    )
-    class(full_counts) <- "table"
-    full_counts <- sort(full_counts, decreasing = TRUE)
+    keys <- raw_names
+    counts_vec <- as.integer(raw_counts)
   } else {
     text <- if (is.atomic(values)) {
       as.character(values)
@@ -1030,19 +1022,21 @@ BUILDER_METADATA_FULL_COUNT_MAX <- 100L
     ## counting the matches of the distinct values gives the same table. Like
     ## table(useNA = "no"), whose factor excludes NaN, "NaN" is not counted.
     keys <- unique(text)
-    counts <- tabulate(match(text, keys), nbins = length(keys))
+    counts_vec <- tabulate(match(text, keys), nbins = length(keys))
     counted <- keys != "NaN"
     keys <- keys[counted]
-    counts <- counts[counted]
-    alphabetical <- order(keys)
-    full_counts <- array(
-      counts[alphabetical],
-      dim = length(alphabetical),
-      dimnames = list(text = keys[alphabetical])
-    )
-    class(full_counts) <- "table"
-    full_counts <- sort(full_counts, decreasing = TRUE)
+    counts_vec <- counts_vec[counted]
   }
+  ## Build the table table(text) would build (names in collation order) and
+  ## sort it the same way, so every edge case matches the character route.
+  alphabetical <- order(keys)
+  full_counts <- array(
+    counts_vec[alphabetical],
+    dim = length(alphabetical),
+    dimnames = list(text = keys[alphabetical])
+  )
+  class(full_counts) <- "table"
+  full_counts <- sort(full_counts, decreasing = TRUE)
   display_names <- names(full_counts)
   display_names[!nzchar(display_names)] <- "(blank)"
   counts <- stats::setNames(as.numeric(full_counts), display_names)

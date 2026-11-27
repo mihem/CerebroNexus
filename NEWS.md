@@ -12,12 +12,12 @@
   are not decoded again (44 EAE images: 2.5 s to 0.4 s), a Project save no
   longer walks an unchanged backup manifest, and a Build reuses the export's
   full Viewer Pack check.
-- **CRBs and Viewer Packs are written on up to eight threads**, with the same
-  one-thread fallback as reading when qs2 is built without TBB.
+- **CRBs are written on up to eight threads**, and both CRB and Viewer Pack
+  writes share the one-thread fallback when qs2 is built without TBB.
 - **The colour picker and alignment legend render faster** with many groups,
   and whole counts are no longer shown as "1e+05".
-- Release enumeration checks every entry's fingerprint as strictly as before
-  while fingerprinting them all at once.
+- **Faster release verification.** Checking a release directory fingerprints
+  its entries in one batch while keeping the same safety checks.
 
 # CerebroNexus 8.5.3
 

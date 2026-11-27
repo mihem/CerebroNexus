@@ -2287,14 +2287,32 @@ validateViewerPack <- function(
   )
 }
 
+.viewerPackValidatedLimit <- 16L
+
 .viewerPackRememberValidated <- function(pack, check) {
   key <- normalizePath(pack, winslash = "/", mustWork = TRUE)
+  existing <- ls(.viewerPackValidated, all.names = TRUE)
+  if (!key %in% existing && length(existing) >= .viewerPackValidatedLimit) {
+    stamps <- vapply(
+      existing,
+      function(k) {
+        rec <- get0(k, envir = .viewerPackValidated, inherits = FALSE)
+        if (is.list(rec) && is.numeric(rec$recorded_at)) rec$recorded_at else 0
+      },
+      numeric(1)
+    )
+    drop <- existing[order(stamps)][seq_len(
+      length(existing) - .viewerPackValidatedLimit + 1L
+    )]
+    rm(list = drop, envir = .viewerPackValidated)
+  }
   assign(
     key,
     list(
       crb_md5 = check$crb_md5,
       state = .viewerPackTreeState(pack),
-      check = check
+      check = check,
+      recorded_at = as.numeric(Sys.time())
     ),
     envir = .viewerPackValidated
   )

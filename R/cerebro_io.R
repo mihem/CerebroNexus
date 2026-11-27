@@ -1025,8 +1025,9 @@
 }
 
 ## Writing uses the threads of reading and the same fallback: a qs2 built
-## without TBB refuses `nthreads > 1` for qs_save() as for qs_read().
-## .cerebroQs2Read() only hands the file and the thread count to its reader.
+## without TBB stops (0.1.1-0.1.5) or warns (0.1.6+) on `nthreads > 1` for
+## qs_save() as for qs_read(). .cerebroQs2Read() only hands the file and the
+## thread count to its callback.
 .cerebroQs2Save <- function(
   object,
   file,

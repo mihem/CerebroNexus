@@ -2100,6 +2100,24 @@ test_that("a qs2 without TBB also writes on one thread", {
     .cerebroQs2Save("payload", "z.qs2", function(...) stop("disk full"), 8L),
     "disk full"
   )
+  ## qs2 0.1.6 and later: warns, then writes on one thread itself
+  state$no_tbb <- NULL
+  seen <- integer()
+  warn_save <- function(object, file, nthreads) {
+    seen <<- c(seen, nthreads)
+    if (nthreads > 1L) {
+      warning(
+        "nthreads > 1 requested but TBB not available; using nthreads = 1",
+        call. = FALSE
+      )
+    }
+    invisible(NULL)
+  }
+  expect_no_warning(.cerebroQs2Save("payload", "w1.qs2", warn_save, 8L))
+  expect_identical(seen, 8L)
+  expect_true(state$no_tbb)
+  expect_no_warning(.cerebroQs2Save("payload", "w2.qs2", warn_save, 8L))
+  expect_identical(seen, c(8L, 1L))
 })
 
 test_that("a qs2 CRB payload round-trips through the threaded writer", {

@@ -296,46 +296,7 @@ builder_release_control_path <- function(target) {
   if (is.null(info) || nrow(info) != 1L) {
     stop("A release entry could not be fingerprinted safely.", call. = FALSE)
   }
-  fingerprint <- list(
-    type = as.character(info$type),
-    size = as.double(info$size),
-    permissions = as.character(info$permissions),
-    device_id = as.double(info$device_id),
-    inode = as.double(info$inode),
-    hard_links = as.double(info$hard_links),
-    modification_time = as.double(info$modification_time),
-    change_time = as.double(info$change_time)
-  )
-  scalar <- vapply(fingerprint, length, integer(1)) == 1L
-  missing <- vapply(fingerprint, function(value) anyNA(value), logical(1))
-  numeric_fields <- c(
-    "size",
-    "device_id",
-    "inode",
-    "hard_links",
-    "modification_time",
-    "change_time"
-  )
-  finite <- vapply(
-    fingerprint[numeric_fields],
-    function(value) is.finite(value),
-    logical(1)
-  )
-  if (
-    !all(scalar) ||
-      any(missing) ||
-      !all(finite) ||
-      !nzchar(fingerprint$type) ||
-      !nzchar(fingerprint$permissions) ||
-      fingerprint$size < 0 ||
-      fingerprint$size != floor(fingerprint$size) ||
-      fingerprint$device_id < 0 ||
-      fingerprint$inode < 0 ||
-      fingerprint$hard_links < 1
-  ) {
-    stop("A release entry could not be fingerprinted safely.", call. = FALSE)
-  }
-  fingerprint
+  .builder_release_file_fingerprints(info)[[1L]]
 }
 
 .builder_release_normalized_paths <- function(paths) {

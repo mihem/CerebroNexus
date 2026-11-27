@@ -165,6 +165,35 @@ builder_spatial_scene_layers <- function(object, id, kind) {
   layers
 }
 
+.builder_spatial_sample_candidates <- c("sample", "sample_id", "orig.ident")
+.builder_spatial_roi_candidates <- c(
+  "sample_roi",
+  "roi",
+  "roi_id",
+  "region_of_interest"
+)
+
+.builder_spatial_meta_row_index <- function(meta, cells) {
+  candidates <- c(
+    .builder_spatial_sample_candidates,
+    .builder_spatial_roi_candidates
+  )
+  if (
+    !is.data.frame(meta) ||
+      !length(cells) ||
+      !ncol(meta) ||
+      !any(tolower(colnames(meta)) %in% candidates)
+  ) {
+    return(NULL)
+  }
+  keys <- if ("cell_barcode" %in% colnames(meta)) {
+    as.character(meta[["cell_barcode"]])
+  } else {
+    rownames(meta)
+  }
+  match(cells, keys)
+}
+
 .builder_spatial_scene <- function(
   object,
   id,
@@ -175,34 +204,22 @@ builder_spatial_scene_layers <- function(object, id, kind) {
   .row_index = NULL
 ) {
   meta <- object@meta.data
-  sample_candidates <- c("sample", "sample_id", "orig.ident")
-  roi_candidates <- c("sample_roi", "roi", "roi_id", "region_of_interest")
-  row_index <- .row_index
-  if (
-    is.null(row_index) &&
-      is.data.frame(meta) &&
-      length(cells) &&
-      ncol(meta) &&
-      any(tolower(colnames(meta)) %in% c(sample_candidates, roi_candidates))
-  ) {
-    keys <- if ("cell_barcode" %in% colnames(meta)) {
-      as.character(meta[["cell_barcode"]])
-    } else {
-      rownames(meta)
-    }
-    row_index <- match(cells, keys)
+  row_index <- if (is.null(.row_index)) {
+    .builder_spatial_meta_row_index(meta, cells)
+  } else {
+    .row_index
   }
   annotations <- list(
     sample = builder_viewer_spatial_annotation(
       meta,
       cells,
-      sample_candidates,
+      .builder_spatial_sample_candidates,
       .row_index = row_index
     ),
     roi = builder_viewer_spatial_annotation(
       meta,
       cells,
-      roi_candidates,
+      .builder_spatial_roi_candidates,
       .row_index = row_index
     )
   )
@@ -306,41 +323,20 @@ builder_spatial_alignment_sections <- function(object) {
   ## Hash metadata cell keys once across all sections instead of rebuilding the
   ## full hash table twice per section (e.g. 118x for 59 sections).
   row_indices <- vector("list", length(specs))
-  meta <- object@meta.data
-  ann_candidates <- c(
-    "sample",
-    "sample_id",
-    "orig.ident",
-    "sample_roi",
-    "roi",
-    "roi_id",
-    "region_of_interest"
-  )
-  if (
-    is.data.frame(meta) &&
-      ncol(meta) &&
-      any(tolower(colnames(meta)) %in% ann_candidates)
-  ) {
-    lengths <- vapply(specs, function(s) length(s$cells), integer(1))
-    total <- sum(lengths)
-    if (total > 0L) {
-      keys <- if ("cell_barcode" %in% colnames(meta)) {
-        as.character(meta[["cell_barcode"]])
-      } else {
-        rownames(meta)
-      }
-      all_cells <- unlist(
-        lapply(specs, `[[`, "cells"),
-        use.names = FALSE
-      )
-      all_matched <- match(all_cells, keys)
-      offset <- 0L
-      for (i in seq_along(specs)) {
-        n_i <- lengths[[i]]
-        if (n_i > 0L) {
-          row_indices[[i]] <- all_matched[(offset + 1L):(offset + n_i)]
-          offset <- offset + n_i
-        }
+  lengths <- vapply(specs, function(s) length(s$cells), integer(1))
+  all_cells <- if (sum(lengths) > 0L) {
+    unlist(lapply(specs, `[[`, "cells"), use.names = FALSE)
+  } else {
+    character()
+  }
+  all_matched <- .builder_spatial_meta_row_index(object@meta.data, all_cells)
+  if (!is.null(all_matched)) {
+    offset <- 0L
+    for (i in seq_along(specs)) {
+      n_i <- lengths[[i]]
+      if (n_i > 0L) {
+        row_indices[[i]] <- all_matched[(offset + 1L):(offset + n_i)]
+        offset <- offset + n_i
       }
     }
   }
