@@ -101,7 +101,9 @@ vector is path shorthand; a leaf may instead be
 \code{list(path = ..., bounds = c(xmin = ..., xmax = ..., ymin = ...,
 ymax = ...))}. Missing bounds are derived from the exported coordinates.
 Supplied images are embedded in the generated CRB; existing embedded images
-declared by the Seurat object are retained.}
+declared by the Seurat object are retained. A Visium section without a
+declared picture brings the one Seurat keeps in the object, placed by its
+scale factor; \code{FALSE} leaves those pictures out.}
 
 \item{verbose}{Logical indicating whether to print progress messages; default:
 \code{TRUE}.}

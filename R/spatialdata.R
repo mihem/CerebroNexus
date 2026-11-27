@@ -296,12 +296,7 @@
     }
     corners <- rbind(c(0, 0, 1), c(width, height, 1))
     mapped <- t(solve(shape_to_system) %*% placed %*% to_system %*% t(corners))
-    bounds <- c(
-      xmin = min(mapped[, 1L]),
-      xmax = max(mapped[, 1L]),
-      ymin = min(mapped[, 2L]),
-      ymax = max(mapped[, 2L])
-    )
+    placement <- .spatialImagePlacement(mapped[1L, 1:2], mapped[2L, 1:2])
     label <- if (grepl("hires", name, ignore.case = TRUE)) {
       "hires"
     } else if (grepl("lowres", name, ignore.case = TRUE)) {
@@ -309,10 +304,10 @@
     } else {
       name
     }
-    result[[region]][[label]] <- list(
-      histology_image = .h5adImageDataUri(pixels),
-      histology_image_bounds = bounds,
-      image_label = label
+    result[[region]][[label]] <- c(
+      list(histology_image = .h5adImageDataUri(pixels)),
+      placement,
+      list(image_label = label)
     )
     if (verbose) {
       message("[INFO] Picture `", name, "` placed for `", region, "`.")
@@ -407,8 +402,10 @@
 #'
 #' Pictures with three channels are attached to the section whose coordinate
 #' system they are placed in, as \code{metadata(sce)$spatial_images}, with their
-#' extent worked out from the transformations. Points, labels, other shapes and
-#' single-channel images are not read.
+#' extent worked out from the transformations; a picture whose rows count
+#' downwards in that system opens flipped vertically in the Viewer, so it lies
+#' under its cells. Points, labels, other shapes and single-channel images are
+#' not read.
 #'
 #' Zarr v2 and v3 stores are read (including sharded arrays) with zstd, gzip,
 #' Blosc (lz4, zstd or zlib) or no compression; any other codec stops with its

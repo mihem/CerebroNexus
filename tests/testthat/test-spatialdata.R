@@ -101,6 +101,9 @@ test_that("pictures are placed in the shape coordinates of their section", {
     images$sec2$hires$histology_image_bounds,
     c(xmin = 0, xmax = 320, ymin = 0, ymax = 360)
   )
+  ## row 0 lands at y = 0 of the section, so the picture opens flipped
+  expect_true(images$sec1$hires$histology_alignment$viewer_setting$flip_y)
+  expect_false(images$sec1$hires$histology_alignment$viewer_setting$flip_x)
   array <- png::readPNG(base64enc::base64decode(sub(
     "^data:image/png;base64,",
     "",

@@ -191,6 +191,14 @@ test_that("Visium images are embedded per library with their extent in spot spac
     tolerance = 1e-3
   )
   expect_identical(hires$image_label, "hires")
+  ## spot rows count downwards, so the picture opens flipped vertically
+  expect_identical(
+    hires$histology_alignment,
+    list(
+      geometry = "live",
+      viewer_setting = list(flip_x = FALSE, flip_y = TRUE)
+    )
+  )
 
   ## a real PNG of the stored size, in its own orientation
   array <- decode_png(hires$histology_image)

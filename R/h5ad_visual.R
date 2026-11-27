@@ -105,13 +105,13 @@
 #' is the full-resolution picture scaled by its scale factor. In coordinate
 #' space it therefore covers [0, width / scale] x [0, height / scale], and that
 #' is what is recorded as its bounds. The picture is stored in its own
-#' orientation (row 0 on top); flipping it for display is the Spatial tab's
-#' setting, as for Seurat objects.
+#' orientation (row 0 on top) and opens flipped vertically, as spot rows count
+#' downwards (`.spatialImageScaled()`).
 #'
 #' @param which "auto" (hires when present, otherwise lowres), a character
 #'   vector of image labels (hires, lowres, fullres), or FALSE for none.
 #' @return list(library_id -> list(label -> list(histology_image,
-#'   histology_image_bounds, image_label))).
+#'   histology_image_bounds, histology_alignment, image_label))).
 #' @keywords internal
 #' @noRd
 .h5adReadSpatialImages <- function(ctx, which = "auto", verbose = FALSE) {
@@ -175,15 +175,10 @@
       }
       height <- dim(array)[[1L]]
       width <- dim(array)[[2L]]
-      result[[library]][[label]] <- list(
-        histology_image = .h5adImageDataUri(array),
-        histology_image_bounds = c(
-          xmin = 0,
-          xmax = width / scale,
-          ymin = 0,
-          ymax = height / scale
-        ),
-        image_label = label
+      result[[library]][[label]] <- c(
+        list(histology_image = .h5adImageDataUri(array)),
+        .spatialImageScaled(width, height, scale),
+        list(image_label = label)
       )
     }
   }

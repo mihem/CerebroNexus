@@ -358,7 +358,9 @@
 #'   \code{list(path = ..., bounds = c(xmin = ..., xmax = ..., ymin = ...,
 #'   ymax = ...))}. Missing bounds are derived from the exported coordinates.
 #'   Supplied images are embedded in the generated CRB; existing embedded images
-#'   declared by the Seurat object are retained.
+#'   declared by the Seurat object are retained. A Visium section without a
+#'   declared picture brings the one Seurat keeps in the object, placed by its
+#'   scale factor; \code{FALSE} leaves those pictures out.
 #' @param h5_compression_level,immune_sidecar,immune_sidecar_threshold Passed to
 #'   \code{\link{exportFromSeurat}}: the gzip level of the H5 file (default 1;
 #'   0 is uncompressed), and whether and from which size the immune repertoire is
