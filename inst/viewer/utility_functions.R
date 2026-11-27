@@ -425,9 +425,13 @@ spatialImagePreset <- function(
   keys <- list(dataset, spatial_name, image_label)
   setting <- if (
     is.list(options) &&
-      all(vapply(keys, function(key) {
-        length(key) == 1L && !is.na(key) && nzchar(key)
-      }, logical(1L)))
+      all(vapply(
+        keys,
+        function(key) {
+          length(key) == 1L && !is.na(key) && nzchar(key)
+        },
+        logical(1L)
+      ))
   ) {
     options[["spatial_image_settings"]][[dataset]][[spatial_name]][[
       image_label

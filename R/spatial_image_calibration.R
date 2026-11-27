@@ -123,17 +123,28 @@
     # A standard Space Ranger lowres image has at most 600 pixels per side.
     labels <- "hires"
   }
-  scales <- vapply(labels, function(label) {
-    scale <- factors[[label]]
-    if (is.numeric(scale) && length(scale) == 1L) scale else NA_real_
-  }, numeric(1L), USE.NAMES = TRUE)
+  scales <- vapply(
+    labels,
+    function(label) {
+      scale <- factors[[label]]
+      if (is.numeric(scale) && length(scale) == 1L) scale else NA_real_
+    },
+    numeric(1L),
+    USE.NAMES = TRUE
+  )
   scales <- scales[is.finite(scales) & scales > 0]
-  fits <- vapply(scales, function(scale) {
-    isTRUE(all(
-      coordinates$x >= 0 & coordinates$x <= width / scale &
-        coordinates$y >= 0 & coordinates$y <= height / scale
-    ))
-  }, logical(1L))
+  fits <- vapply(
+    scales,
+    function(scale) {
+      isTRUE(all(
+        coordinates$x >= 0 &
+          coordinates$x <= width / scale &
+          coordinates$y >= 0 &
+          coordinates$y <= height / scale
+      ))
+    },
+    logical(1L)
+  )
   scales <- scales[fits]
   if (!length(scales)) {
     message(

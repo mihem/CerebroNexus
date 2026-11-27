@@ -143,17 +143,27 @@ expect_viewer_image_pixel <- function(image, row, column, expected) {
   viewer <- new.env()
   sys.source(viewer_test_path("utility_functions.R"), viewer)
   preset <- viewer$spatialImagePreset(
-    NULL, NULL, NULL, NULL, image$histology_alignment
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    image$histology_alignment
   )
   pixels <- png::readPNG(jsonlite::base64_dec(sub(
-    "^data:image/png;base64,", "", image$histology_image
+    "^data:image/png;base64,",
+    "",
+    image$histology_image
   )))
-  payload <- jsonlite::toJSON(list(
-    preset = preset,
-    bounds = as.list(image$histology_image_bounds),
-    u = (column - 0.5) / ncol(pixels),
-    v = (row - 0.5) / nrow(pixels)
-  ), auto_unbox = TRUE, digits = NA)
+  payload <- jsonlite::toJSON(
+    list(
+      preset = preset,
+      bounds = as.list(image$histology_image_bounds),
+      u = (column - 0.5) / ncol(pixels),
+      v = (row - 0.5) / nrow(pixels)
+    ),
+    auto_unbox = TRUE,
+    digits = NA
+  )
   output <- run_node_script(c(
     "const fs = require('fs'); global.window = {};",
     js_eval_file(viewer_test_path("www", "background-model.js")),

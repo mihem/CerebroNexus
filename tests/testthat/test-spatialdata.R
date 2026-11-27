@@ -138,7 +138,9 @@ test_that("a SpatialData store converts to a .crb with one section per region an
   input <- file.path(input, "small_sd_visium.zarr")
   image_meta <- file.path(input, "images", "sec1_hires_image", "zarr.json")
   meta <- jsonlite::read_json(image_meta)
-  meta$attributes$ome$multiscales[[1L]]$datasets[[1L]]$coordinateTransformations <-
+  meta$attributes$ome$multiscales[[1L]]$datasets[[
+    1L
+  ]]$coordinateTransformations <-
     list(
       list(type = "scale", scale = c(1, 2, 1.5)),
       list(type = "translation", translation = c(0, -2, -1))
@@ -167,7 +169,9 @@ test_that("a SpatialData store converts to a .crb with one section per region an
   spot <- c(section$coordinates$x[[1L]], section$coordinates$y[[1L]])
   pixel <- floor((spot - origin) / pixel_size) + 1
   expect_viewer_image_pixel(
-    section$histology_images$hires, row = pixel[[2L]], column = pixel[[1L]],
+    section$histology_images$hires,
+    row = pixel[[2L]],
+    column = pixel[[1L]],
     expected = origin + (pixel - 0.5) * pixel_size
   )
 })

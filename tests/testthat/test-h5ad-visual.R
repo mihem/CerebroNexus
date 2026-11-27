@@ -295,7 +295,9 @@ test_that("several libraries convert to one section each, with their own image",
   column <- floor(s1$coordinates$x[[1L]] * scale) + 1
   row <- floor(s1$coordinates$y[[1L]] * scale) + 1
   expect_viewer_image_pixel(
-    s1$histology_images$hires, row, column,
+    s1$histology_images$hires,
+    row,
+    column,
     (c(column, row) - 0.5) / scale
   )
 })

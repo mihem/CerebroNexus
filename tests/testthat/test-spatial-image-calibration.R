@@ -121,10 +121,12 @@ test_that("a Seurat Visium section brings its own picture, placed by its scale f
   )
   horizontal <- identical(orientation, "horizontal")
   expect_equal(
-    range(spatial$coordinates$x), c(100, if (horizontal) 1500 else 1100)
+    range(spatial$coordinates$x),
+    c(100, if (horizontal) 1500 else 1100)
   )
   expect_equal(
-    range(spatial$coordinates$y), c(100, if (horizontal) 1100 else 1500)
+    range(spatial$coordinates$y),
+    c(100, if (horizontal) 1100 else 1500)
   )
 
   expect_identical(names(spatial$histology_images), "lowres")
@@ -132,8 +134,10 @@ test_that("a Seurat Visium section brings its own picture, placed by its scale f
   expect_equal(
     picture$histology_image_bounds,
     c(
-      xmin = 0, xmax = if (horizontal) 1600 else 1200,
-      ymin = 0, ymax = if (horizontal) 1200 else 1600
+      xmin = 0,
+      xmax = if (horizontal) 1600 else 1200,
+      ymin = 0,
+      ymax = if (horizontal) 1200 else 1600
     )
   )
   expect_true(picture$histology_alignment$viewer_setting$flip_y)
@@ -143,7 +147,8 @@ test_that("a Seurat Visium section brings its own picture, placed by its scale f
     picture$histology_image
   )))
   expect_identical(
-    dim(pixels)[1:2], if (horizontal) c(60L, 80L) else c(80L, 60L)
+    dim(pixels)[1:2],
+    if (horizontal) c(60L, 80L) else c(80L, 60L)
   )
   expect_equal(
     if (horizontal) pixels[1L, 80L, ] else pixels[80L, 1L, ],
@@ -202,7 +207,8 @@ test_that("a hires picture uses the hires factor, and a picture that misses the 
   placed <- .seuratVisiumImage(image, SeuratObject::GetTissueCoordinates(image))
   expect_identical(names(placed), "hires")
   orientation <- tryCatch(
-    image@coords_x_orientation, error = function(e) NULL
+    image@coords_x_orientation,
+    error = function(e) NULL
   )
   expect_equal(
     placed$hires$histology_image_bounds,
@@ -239,7 +245,9 @@ test_that("a small hires PNG needs a label when both scales fit", {
   bounds <- picture$histology_image_bounds
   expect_equal(sort(unname(bounds[c("xmax", "ymax")])), c(2000, 2500))
   pixels <- png::readPNG(jsonlite::base64_dec(sub(
-    "^data:image/png;base64,", "", picture$histology_image
+    "^data:image/png;base64,",
+    "",
+    picture$histology_image
   )))
   expect_equal(sort(dim(pixels)), c(400L, 500L))
 })
@@ -250,16 +258,20 @@ test_that("an older Visium image keeps its pixel rows on the stored x axis", {
   object <- make_visium_seurat(withr::local_tempdir())
   image <- object[["slice1"]]
   orientation <- tryCatch(
-    image@coords_x_orientation, error = function(e) NULL
+    image@coords_x_orientation,
+    error = function(e) NULL
   )
   if (identical(orientation, "horizontal")) {
     coordinates <- SeuratObject::GetTissueCoordinates(image)
     fov <- SeuratObject::CreateFOV(
       data.frame(
-        x = coordinates$y, y = coordinates$x, row.names = rownames(coordinates)
+        x = coordinates$y,
+        y = coordinates$x,
+        row.names = rownames(coordinates)
       ),
       type = "centroids",
-      assay = "Spatial", key = SeuratObject::Key(image)
+      assay = "Spatial",
+      key = SeuratObject::Key(image)
     )
     image@boundaries <- fov@boundaries
     image@coords_x_orientation <- character()
@@ -271,7 +283,9 @@ test_that("an older Visium image keeps its pixel rows on the stored x axis", {
   spot <- section$coordinates["S02-1", ]
   expect_equal(c(spot$x, spot$y), c(190, 1370))
   expect_viewer_image_pixel(
-    section$histology_images$lowres, row = 69L, column = 10L,
+    section$histology_images$lowres,
+    row = 69L,
+    column = 10L,
     expected = c(spot$x, spot$y)
   )
 })
