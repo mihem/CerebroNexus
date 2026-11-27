@@ -72,6 +72,131 @@ test_that("a release folder is zipped with the folder at the top", {
   )
 })
 
+test_that("the examples-only session limits are read strictly", {
+  limits <- access_env$builder_examples_only_limits
+  withr::with_options(
+    list(
+      CerebroNexus.builder.examples_only_max_sessions = NULL,
+      CerebroNexus.builder.examples_only_idle_minutes = NULL
+    ),
+    expect_identical(limits(), list(max_sessions = 4, idle_seconds = 900))
+  )
+  expect_identical(
+    limits(Inf, Inf),
+    list(max_sessions = Inf, idle_seconds = Inf)
+  )
+  expect_identical(limits(2L, 1.5)$idle_seconds, 90)
+  for (value in list(0, 1.5, -1, NA, "4", c(1, 2), numeric())) {
+    expect_error(limits(value, 15), "max_sessions must be", fixed = TRUE)
+  }
+  for (value in list(0.5, 0, -5, NA, "15", c(1, 2), numeric())) {
+    expect_error(limits(4, value), "idle_minutes must be", fixed = TRUE)
+  }
+})
+
+test_that("examples-only seats are counted and each is given back once", {
+  seats <- access_env$builder_examples_only_seats()
+  enter <- access_env$builder_examples_only_enter
+  first <- enter(seats, 2)
+  second <- enter(seats, 2)
+  expect_true(is.function(first) && is.function(second))
+  expect_null(enter(seats, 2))
+  expect_identical(seats$count, 2L)
+  first()
+  first()
+  expect_identical(seats$count, 1L)
+  third <- enter(seats, 2)
+  expect_true(is.function(third))
+  expect_null(enter(seats, 2))
+  second()
+  third()
+  expect_identical(seats$count, 0L)
+  expect_true(is.function(enter(seats, Inf)))
+})
+
+test_that("a closed examples-only session is told why before it closes", {
+  sent <- list()
+  flushed <- list()
+  closed <- FALSE
+  session <- list(
+    sendCustomMessage = function(type, message) {
+      sent[[length(sent) + 1L]] <<- list(type = type, message = message)
+    },
+    onFlushed = function(fun, once = FALSE) {
+      expect_true(once)
+      flushed[[length(flushed) + 1L]] <<- fun
+    },
+    close = function() closed <<- TRUE
+  )
+  access_env$builder_examples_only_close(session, "Busy.")
+  expect_false(closed)
+  expect_identical(sent[[1L]]$type, "builder_examples_only_closed")
+  expect_identical(sent[[1L]]$message$text, "Busy.")
+  flushed[[1L]]()
+  expect_true(closed)
+  expect_match(
+    access_env$builder_examples_only_idle_message(900),
+    "after 15 minutes without activity",
+    fixed = TRUE
+  )
+})
+
+test_that("an idle examples-only session is closed unless it is busy", {
+  skip_if_not_installed("shiny")
+  clock <- new.env(parent = emptyenv())
+  clock$now <- as.POSIXct("2026-01-01 00:00:00", tz = "UTC")
+  clock$busy <- FALSE
+  closes <- 0L
+  watch_env <- new.env(parent = access_env)
+  watch_env$builder_examples_only_close <- function(session, text) {
+    closes <<- closes + 1L
+    expect_match(text, "after 1 minutes", fixed = TRUE)
+    session$close()
+  }
+  watch <- access_env$builder_examples_only_watch_idle
+  environment(watch) <- watch_env
+  at <- function(seconds) {
+    clock$now <- as.POSIXct("2026-01-01 00:00:00", tz = "UTC") + seconds
+  }
+  shiny::testServer(
+    function(input, output, session) {
+      watch(
+        session,
+        input,
+        idle_seconds = 60,
+        busy = function() clock$busy,
+        now = function() clock$now
+      )
+    },
+    {
+      session$elapse(30000)
+      at(59)
+      session$elapse(30000)
+      expect_false(session$isClosed())
+      ## A click restarts the count.
+      session$setInputs(builder_examples_only_activity = 1)
+      at(110)
+      session$elapse(30000)
+      expect_false(session$isClosed())
+      ## A running build or import keeps the session open.
+      clock$busy <- TRUE
+      at(600)
+      session$elapse(30000)
+      expect_false(session$isClosed())
+      clock$busy <- FALSE
+      at(659)
+      session$elapse(30000)
+      expect_false(session$isClosed())
+      at(660)
+      session$elapse(30000)
+      expect_true(session$isClosed())
+      expect_identical(closes, 1L)
+    }
+  )
+  ## Inf turns the watch off.
+  expect_null(access_env$builder_examples_only_watch_idle(NULL, NULL, Inf))
+})
+
 ## Slow from here: these source the whole app. CI only.
 skip_on_cran()
 
@@ -359,24 +484,95 @@ test_that("every file, table, image and picker request is refused on the server"
       ),
       info = "builder_client_import_dispatch"
     )
-    expect_true(
-      refused(`enhance-table_files` = uploaded("t.csv")),
-      info = "enhance-table_files"
-    )
-    expect_true(
-      refused(`enhance-marker_import_files` = uploaded("m.csv")),
-      info = "enhance-marker_import_files"
-    )
-    expect_true(
-      refused(`enhance-tissue_image_file` = uploaded("i.png")),
-      info = "enhance-tissue_image_file"
-    )
+    for (upload_input in c(
+      "enhance-table_files",
+      "enhance-marker_import_files",
+      "enhance-tissue_image_file"
+    )) {
+      saveRDS(list(), upload)
+      value <- stats::setNames(list(uploaded("x.csv")), upload_input)
+      expect_true(do.call(refused, value), info = upload_input)
+      expect_false(file.exists(upload), info = upload_input)
+    }
     expect_true(
       refused(builder_choose_dataset_files = 1),
       info = "builder_choose_dataset_files"
     )
     expect_identical(length(imports()$entries), before)
   })
+})
+
+## Record why the server closes a session instead of sending the message.
+builder_examples_only_capture_close <- function(app_env) {
+  closed <- new.env(parent = emptyenv())
+  closed$text <- NULL
+  app_env$builder_examples_only_close <- function(session, text) {
+    closed$text <- text
+    session$close()
+  }
+  closed
+}
+
+test_that("a full examples-only server loads nothing for one more visitor", {
+  skip_if_not_installed("shiny")
+  withr::local_options(CerebroNexus.builder.examples_only_max_sessions = 1)
+  app_env <- builder_examples_only_app()
+  seats <- app_env$.builder_examples_only_seats
+  closed <- builder_examples_only_capture_close(app_env)
+
+  ## Another visitor holds the only seat.
+  leave_other <- app_env$builder_examples_only_enter(seats, 1)
+  shiny::testServer(app_env$server, {
+    expect_true(session$isClosed())
+    expect_false(exists("build_flow"))
+  })
+  expect_identical(closed$text, app_env$builder_examples_only_busy_message)
+  expect_identical(seats$count, 1L)
+
+  ## Once that visitor leaves, the next one gets the seat, and gives it back.
+  leave_other()
+  closed$text <- NULL
+  shiny::testServer(app_env$server, {
+    expect_false(session$isClosed())
+    expect_true(exists("build_flow"))
+    expect_identical(seats$count, 1L)
+  })
+  expect_null(closed$text)
+  expect_identical(seats$count, 0L)
+})
+
+test_that("the examples-only server closes a session left idle, not one building", {
+  skip_if_not_installed("shiny")
+  app_env <- builder_examples_only_app()
+  closed <- builder_examples_only_capture_close(app_env)
+  clock <- new.env(parent = emptyenv())
+  start <- as.POSIXct("2026-01-01 00:00:00", tz = "UTC")
+  clock$now <- start
+  watch <- app_env$builder_examples_only_watch_idle
+  app_env$builder_examples_only_watch_idle <- function(...) {
+    watch(..., now = function() clock$now)
+  }
+  at <- function(seconds) clock$now <- start + seconds
+
+  shiny::testServer(app_env$server, {
+    at(899)
+    session$elapse(30000)
+    expect_false(session$isClosed())
+    ## A running build counts as activity (the default limit is 15 minutes).
+    build_flow(list(stage = "building", plan = NULL))
+    at(2000)
+    session$elapse(30000)
+    expect_false(session$isClosed())
+    build_flow(list(stage = "idle", plan = NULL))
+    at(2899)
+    session$elapse(30000)
+    expect_false(session$isClosed())
+    at(2900)
+    session$elapse(30000)
+    expect_true(session$isClosed())
+  })
+  expect_match(closed$text, "after 15 minutes without activity", fixed = TRUE)
+  expect_identical(app_env$.builder_examples_only_seats$count, 0L)
 })
 
 ## In a real browser: no file control, a dropped file is ignored, and the

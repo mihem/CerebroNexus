@@ -53,7 +53,7 @@ options(CerebroNexus.builder.examples_only = TRUE)
 shiny::shinyAppDir(system.file("builder", package = "CerebroNexus"))
 ```
 
-Run this way, the Builder has no access token, so anyone who reaches the address can use it. Every session starts background R processes, so limit the number of sessions and the request size in the server or proxy in front of it.
+Run this way, the Builder has no access token, so anyone who reaches the address can use it. Every session starts background R processes and loads its own copy of the example. The Builder therefore serves at most 4 sessions at a time and tells further visitors to come back later, and it closes a session after 15 minutes without a click, key press or scroll (unless a build or import is running). Change these limits with the options `CerebroNexus.builder.examples_only_max_sessions` and `CerebroNexus.builder.examples_only_idle_minutes` (at least 1 minute; `Inf` turns a limit off). The limit applies to each R process, so a server that runs several processes for the app allows more. Limit the request size in the server or proxy in front of it as well.
 
 ## Dependencies
 

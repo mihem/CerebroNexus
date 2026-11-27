@@ -2,10 +2,15 @@
 
 ## An examples-only Builder (see access.R) refuses every request that would
 ## bring a file in or reach a server folder, whatever the page sends. TRUE
-## when the request was refused; the visitor is told why.
-builder_examples_only_refused <- function(target = NULL) {
+## when the request was refused; the visitor is told why. Shiny lets files of
+## at most one byte through (app.R); a refused `upload` (a fileInput value) is
+## deleted rather than left in Shiny's upload folder.
+builder_examples_only_refused <- function(target = NULL, upload = NULL) {
   if (!builder_examples_only()) {
     return(FALSE)
+  }
+  if (is.data.frame(upload) && "datapath" %in% names(upload)) {
+    unlink(upload$datapath, force = TRUE)
   }
   builder_notify(
     "info",

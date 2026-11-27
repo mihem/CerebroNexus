@@ -659,13 +659,7 @@ observeEvent(input$builder_client_import_dispatch, {
 })
 
 observeEvent(input$dataset_files, {
-  ## Shiny lets only files of at most one byte through in an examples-only
-  ## Builder (app.R); drop even those.
-  if (builder_examples_only_refused()) {
-    files <- input$dataset_files
-    if (is.data.frame(files) && "datapath" %in% names(files)) {
-      unlink(files$datapath, force = TRUE)
-    }
+  if (builder_examples_only_refused(upload = input$dataset_files)) {
     return()
   }
   token <- isolate(pending_client_upload_sequence()) + 1L

@@ -1401,6 +1401,37 @@
     var meta = document.querySelector('meta[name="cerebro-builder-mode"]');
     return Boolean(meta && meta.getAttribute("content") === "examples-only");
   })();
+  // Why the server ended an examples-only session (busy or idle); shown in
+  // place of the generic disconnected notice.
+  var examplesOnlyClosedText = null;
+
+  // An examples-only server closes idle sessions (access.R). Report clicks,
+  // key presses and scrolls, at most every 30 seconds, and learn why a session
+  // was closed.
+  function setupExamplesOnlySession() {
+    if (!builderExamplesOnly) return;
+    if (window.Shiny) {
+      window.Shiny.addCustomMessageHandler(
+        "builder_examples_only_closed",
+        function (message) {
+          examplesOnlyClosedText = (message && message.text) || null;
+        }
+      );
+    }
+    // send() reports nothing until Shiny is there; the next action retries.
+    var lastReport = 0;
+    function reportActivity() {
+      var now = Date.now();
+      if (now - lastReport < 30000) return;
+      if (send("builder_examples_only_activity", now)) lastReport = now;
+    }
+    ["pointerdown", "keydown", "wheel", "touchstart"].forEach(function (type) {
+      document.addEventListener(type, reportActivity, {
+        capture: true,
+        passive: true,
+      });
+    });
+  }
 
   function activityCapability(name) {
     var importSensitive = [
@@ -6246,7 +6277,8 @@
     showGlobalNotice({
       id: "builder-disconnected",
       type: "error",
-      text: "The Builder lost its connection to R. Reload the page to " +
+      text: examplesOnlyClosedText ||
+        "The Builder lost its connection to R. Reload the page to " +
         "continue; if it does not load, start the Builder again in R.",
       action: {
         label: "Reload",
@@ -6273,6 +6305,7 @@
     registerClientImportHandlers();
     observeClientUploadProgress();
     setupWindowFileDrop();
+    setupExamplesOnlySession();
     setupUploadSizeProbe();
     registerViewerGroupHandler();
     registerViewerContentHandlers();

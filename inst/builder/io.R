@@ -224,13 +224,6 @@ builder_server_path_roots <- function(
     path.expand("~")
   )
 ) {
-  ## An examples-only Builder reaches no server folder (see access.R).
-  if (
-    exists("builder_examples_only", mode = "function") &&
-      isTRUE(builder_examples_only())
-  ) {
-    stop("Server folders are turned off in this demonstration.", call. = FALSE)
-  }
   if (!is.character(roots) || !length(roots)) {
     stop("No allowed server folders are configured.", call. = FALSE)
   }

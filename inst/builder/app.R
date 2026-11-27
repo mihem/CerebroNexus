@@ -275,8 +275,19 @@ source("access.R", local = TRUE)
 ## Read once: the page and every session are checked against this token.
 .builder_access_token <- builder_access_token()
 .builder_examples_only <- builder_examples_only_mode()
+if (.builder_examples_only) {
+  .builder_examples_only_limits <- builder_examples_only_limits()
+  .builder_examples_only_seats <- builder_examples_only_seats()
+}
 source("notify.R", local = TRUE)
 source("io.R", local = TRUE)
+## An examples-only Builder reaches no server folder (see access.R): every
+## typed or browsed server path is resolved against these roots.
+if (.builder_examples_only) {
+  builder_server_path_roots <- function(...) {
+    stop("Server folders are turned off in this demonstration.", call. = FALSE)
+  }
+}
 source("project.R", local = TRUE)
 source(
   file.path(
@@ -894,11 +905,35 @@ server <- function(input, output, session) {
     session$close()
     return(invisible(NULL))
   }
+  ## A full examples-only server loads nothing for one more visitor (see
+  ## access.R).
+  if (builder_examples_only()) {
+    leave_seat <- builder_examples_only_enter(
+      .builder_examples_only_seats,
+      .builder_examples_only_limits$max_sessions
+    )
+    if (is.null(leave_seat)) {
+      builder_examples_only_close(session, builder_examples_only_busy_message)
+      return(invisible(NULL))
+    }
+    session$onSessionEnded(leave_seat)
+  }
   server_environment <- environment()
   for (program in .builder_server_programs) {
     eval(program, envir = server_environment)
   }
   rm(server_environment, program)
+  if (builder_examples_only()) {
+    builder_examples_only_watch_idle(
+      session,
+      input,
+      .builder_examples_only_limits$idle_seconds,
+      busy = function() {
+        builder_build_controls_locked(build_flow()) ||
+          length(builder_import_active_ids(imports())) > 0L
+      }
+    )
+  }
 }
 
 shinyApp(ui, server, onStart = builder_app_start)

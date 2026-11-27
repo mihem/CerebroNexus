@@ -195,9 +195,12 @@ builder_spatial_alignment_server <- function(
   commit_images,
   alignment_preview,
   spatial_previews = shiny::reactiveVal(list()),
-  spatial_coords
+  spatial_coords,
+  ## TRUE when an uploaded image must not be used (an examples-only Builder,
+  ## see access.R); it then tells the visitor and deletes the upload.
+  refuse_upload = function(upload) FALSE
 ) {
-  stopifnot(is.function(spatial_previews))
+  stopifnot(is.function(spatial_previews), is.function(refuse_upload))
   session_image_dir <- tempfile("cerebro-builder-images-")
   dir.create(
     session_image_dir,
@@ -2559,17 +2562,7 @@ builder_spatial_alignment_server <- function(
 
   shiny::observeEvent(input[["enhance-tissue_image_file"]], {
     upload <- input[["enhance-tissue_image_file"]]
-    ## An examples-only Builder takes no uploaded image (see access.R).
-    if (
-      exists("builder_examples_only", mode = "function") &&
-        isTRUE(builder_examples_only())
-    ) {
-      builder_notify(
-        "info",
-        builder_examples_only_message,
-        id = "builder-examples-only",
-        duration = 6
-      )
+    if (isTRUE(refuse_upload(upload))) {
       return()
     }
     if (

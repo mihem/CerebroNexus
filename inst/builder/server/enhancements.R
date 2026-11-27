@@ -173,7 +173,11 @@ builder_marker_existing_methods <- function(entry) {
 }
 
 observeEvent(input[["enhance-marker_import_files"]], {
-  if (builder_examples_only_refused()) {
+  if (
+    builder_examples_only_refused(
+      upload = input[["enhance-marker_import_files"]]
+    )
+  ) {
     return()
   }
   id <- current()
@@ -539,7 +543,7 @@ schedule_enhance_table_files <- function(
 }
 
 observeEvent(input[["enhance-table_files"]], {
-  if (builder_examples_only_refused()) {
+  if (builder_examples_only_refused(upload = input[["enhance-table_files"]])) {
     return()
   }
   schedule_enhance_table_files(
@@ -740,7 +744,10 @@ alignment_server <- builder_spatial_alignment_server(
   },
   alignment_preview = alignment_preview,
   spatial_previews = spatial_previews,
-  spatial_coords = spatial_coords
+  spatial_coords = spatial_coords,
+  refuse_upload = function(upload) {
+    builder_examples_only_refused(upload = upload)
+  }
 )
 active_slice <- alignment_server$active_section
 
