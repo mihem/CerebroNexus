@@ -790,9 +790,11 @@
 #'   Supported file extensions are png, jpg, jpeg, and svg. Missing bounds are
 #'   derived from the exported x/y coordinate range. A Visium section
 #'   (\code{VisiumV2}) without a declared picture brings the tissue picture
-#'   Seurat keeps in the object, placed by its scale factor and opened flipped
-#'   vertically so it lies under the spots; \code{FALSE} leaves those pictures
-#'   out. An object whose
+#'   Seurat keeps in the object, placed by its scale factor and oriented
+#'   to match the spot coordinates. If both scale factors fit,
+#'   set \code{attr(object[["slice1"]]@image, "cerebro_image_label")} to
+#'   \code{"lowres"} or \code{"hires"} for the corresponding section.
+#'   \code{FALSE} leaves the stored pictures out. An object whose
 #'   \code{@images} hold a Seurat v4 \code{VisiumV1} image is rejected;
 #'   rebuild it as \code{VisiumV2} with \code{Seurat::Load10X_Spatial()}.
 #' @param verbose Set this to \code{TRUE} if you want additional log messages;

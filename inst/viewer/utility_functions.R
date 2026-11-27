@@ -415,34 +415,39 @@ viewerScatterDefaults <- function(options, dataset = NULL, page = NULL) {
   )
 }
 
-spatialImagePreset <- function(options, dataset, spatial_name, image_label) {
-  defaults <- list(
-    offsetX = 0,
-    offsetY = 0,
-    scaleX = 1,
-    scaleY = 1,
-    flipX = FALSE,
-    flipY = FALSE,
-    rotation = 0,
-    opacity = 1
-  )
+spatialImagePreset <- function(
+  options,
+  dataset,
+  spatial_name,
+  image_label,
+  alignment = NULL
+) {
   keys <- list(dataset, spatial_name, image_label)
-  if (
-    !is.list(options) ||
-      any(vapply(
-        keys,
-        function(key) {
-          length(key) != 1L || is.na(key) || !nzchar(key)
-        },
-        logical(1)
-      ))
+  setting <- if (
+    is.list(options) &&
+      all(vapply(keys, function(key) {
+        length(key) == 1L && !is.na(key) && nzchar(key)
+      }, logical(1L)))
   ) {
-    return(defaults)
+    options[["spatial_image_settings"]][[dataset]][[spatial_name]][[
+      image_label
+    ]]
+  } else {
+    NULL
   }
-  setting <- options[["spatial_image_settings"]][[dataset]][[spatial_name]][[
-    image_label
-  ]]
-  spatialImageSettingPreset(setting)
+  if (
+    is.list(alignment) &&
+      identical(alignment[["geometry"]], "live") &&
+      isTRUE(alignment[["use_as_defaults"]]) &&
+      is.list(alignment[["viewer_setting"]])
+  ) {
+    setting <- utils::modifyList(
+      alignment[["viewer_setting"]],
+      if (is.list(setting)) setting else list()
+    )
+    return(spatialImageSettingPreset(setting))
+  }
+  spatialEmbeddedImagePreset(spatialImageSettingPreset(setting), alignment)
 }
 
 ## The drawing preset of one per-image setting (offset_x ... image_opacity).

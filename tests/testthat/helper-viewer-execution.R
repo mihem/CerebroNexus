@@ -137,3 +137,35 @@ viewer_browser_test <- function(scenario) {
   ))
   expect_true(isTRUE(result), info = scenario)
 }
+
+## Place an encoded CRB image pixel through the same geometry used by the Viewer.
+expect_viewer_image_pixel <- function(image, row, column, expected) {
+  viewer <- new.env()
+  sys.source(viewer_test_path("utility_functions.R"), viewer)
+  preset <- viewer$spatialImagePreset(
+    NULL, NULL, NULL, NULL, image$histology_alignment
+  )
+  pixels <- png::readPNG(jsonlite::base64_dec(sub(
+    "^data:image/png;base64,", "", image$histology_image
+  )))
+  payload <- jsonlite::toJSON(list(
+    preset = preset,
+    bounds = as.list(image$histology_image_bounds),
+    u = (column - 0.5) / ncol(pixels),
+    v = (row - 0.5) / nrow(pixels)
+  ), auto_unbox = TRUE, digits = NA)
+  output <- run_node_script(c(
+    "const fs = require('fs'); global.window = {};",
+    js_eval_file(viewer_test_path("www", "background-model.js")),
+    paste0("const image = ", payload, ";"),
+    "const model = window.CerebroBackgroundModel;",
+    "const state = model.renderState(image, model.presetState(image));",
+    "const [tl, tr, bl] = model.corners(image.bounds, state);",
+    paste0(
+      "console.log(JSON.stringify(tl.map((x, i) => x + ",
+      "image.u * (tr[i] - x) + image.v * (bl[i] - x))));"
+    )
+  ))
+  expect_node_output(output)
+  expect_equal(jsonlite::fromJSON(output), unname(expected))
+}

@@ -72,13 +72,10 @@
 #' Category colours (\code{uns["<column>_colors"]}) are kept as the groups' default
 #' colours in the Viewer. Visium tissue images are embedded and drawn behind the
 #' spots; when a file has the images of several libraries (\code{obs["library_id"]})
-#' each library becomes one section with its own image. The Viewer's Spatial plot
-#' has the y axis pointing up, so a Visium image, stored with row 0 on top, needs
-#' the vertical flip to line up with the spots: build the app with
-#' \code{createShinyApp(..., spatial_image_settings = list(<dataset label> =
-#' list(spatial = list(hires = list(flip_y = TRUE)))))}. As for Seurat Visium
-#' objects, the coordinates are the file's, so the whole picture is then the
-#' mirror image (top to bottom) of the slide as drawn by scanpy.
+#' each library becomes one section with its own image. The Viewer applies
+#' the vertical flip automatically to align image rows with the spot
+#' coordinates. Explicit \code{spatial_image_settings} supplied to
+#' \code{createShinyApp()} can override the opening alignment.
 #'
 #' scanpy's \code{rank_genes_groups} results, if present, are exported as
 #' marker genes. Embeddings in \code{obsm} (\code{X_umap}, \code{X_tsne},

@@ -196,6 +196,7 @@ test_that("Visium images are embedded per library with their extent in spot spac
     hires$histology_alignment,
     list(
       geometry = "live",
+      use_as_defaults = TRUE,
       viewer_setting = list(flip_x = FALSE, flip_y = TRUE)
     )
   )
@@ -288,6 +289,14 @@ test_that("several libraries convert to one section each, with their own image",
   expect_equal(
     sort(s1$coordinates$x),
     sort(unname(spatial[source$library_id == "section1", 1]))
+  )
+  ## Compare the Viewer position to the full-resolution cell grid in the file.
+  scale <- 0.051033426 / 4 * 2
+  column <- floor(s1$coordinates$x[[1L]] * scale) + 1
+  row <- floor(s1$coordinates$y[[1L]] * scale) + 1
+  expect_viewer_image_pixel(
+    s1$histology_images$hires, row, column,
+    (c(column, row) - 0.5) / scale
   )
 })
 

@@ -42,6 +42,7 @@
     ),
     histology_alignment = list(
       geometry = "live",
+      use_as_defaults = TRUE,
       viewer_setting = list(
         flip_x = first[[1L]] > last[[1L]],
         flip_y = first[[2L]] < last[[2L]]
@@ -70,12 +71,9 @@
 
 #' The tissue picture Seurat keeps in a Visium image, placed by its scale factor
 #'
-#' Seurat keeps the spots of a `VisiumV2` image in full-resolution pixels (x
-#' the column, y the row) and one picture with the scale factors of both 10x
-#' pictures, without saying which picture it holds. Space Ranger writes the
-#' lowres picture 600 pixels on its long side and the hires one larger, so a
-#' longer picture is the hires one. A picture whose extent does not hold the
-#' spots is left out rather than placed wrongly.
+#' Seurat stores full-resolution spot coordinates and the scale factors for
+#' both Space Ranger pictures. A `cerebro_image_label` attribute on the stored
+#' pixels identifies which factor to use when the extent is ambiguous.
 #'
 #' @param image A Seurat spatial image.
 #' @param coordinates Exported coordinates of the image's spots (x, y).
@@ -89,9 +87,9 @@
   pixels <- tryCatch(image@image, error = function(e) NULL)
   factors <- tryCatch(unclass(image@scale.factors), error = function(e) NULL)
   if (
-    !is.array(pixels) ||
-      length(dim(pixels)) != 3L ||
-      !dim(pixels)[[3L]] %in% c(3L, 4L) ||
+    !is.numeric(pixels) ||
+      !(is.matrix(pixels) ||
+        (length(dim(pixels)) == 3L && dim(pixels)[[3L]] %in% 2:4)) ||
       !is.list(factors) ||
       !is.data.frame(coordinates) ||
       !nrow(coordinates)
@@ -105,29 +103,55 @@
     )
     return(NULL)
   }
+  label <- attr(pixels, "cerebro_image_label", exact = TRUE)
+  orientation <- tryCatch(image@coords_x_orientation, error = function(e) NULL)
+  # Seurat before 5.4 stored the pixel row as x and had no orientation slot.
+  if (!identical(orientation, "horizontal")) {
+    axes <- seq_along(dim(pixels))
+    axes[1:2] <- c(2L, 1L)
+    pixels <- aperm(pixels, axes)
+  }
   height <- dim(pixels)[[1L]]
   width <- dim(pixels)[[2L]]
-  label <- if (max(height, width) > 600L) "hires" else "lowres"
-  scale <- suppressWarnings(as.numeric(factors[[label]]))
-  if (length(scale) != 1L || !is.finite(scale) || scale <= 0) {
-    return(NULL)
+  labels <- c("lowres", "hires")
+  if (!is.null(label)) {
+    if (length(label) != 1L || !label %in% labels) {
+      stop("'cerebro_image_label' must be 'lowres' or 'hires'.", call. = FALSE)
+    }
+    labels <- label
+  } else if (max(height, width) > 600L) {
+    # A standard Space Ranger lowres image has at most 600 pixels per side.
+    labels <- "hires"
   }
-  placement <- .spatialImageScaled(width, height, scale)
-  bounds <- placement$histology_image_bounds
-  holds_spots <- all(
-    coordinates$x >= bounds[["xmin"]] &
-      coordinates$x <= bounds[["xmax"]] &
-      coordinates$y >= bounds[["ymin"]] &
-      coordinates$y <= bounds[["ymax"]]
-  )
-  if (!isTRUE(holds_spots)) {
+  scales <- vapply(labels, function(label) {
+    scale <- factors[[label]]
+    if (is.numeric(scale) && length(scale) == 1L) scale else NA_real_
+  }, numeric(1L), USE.NAMES = TRUE)
+  scales <- scales[is.finite(scales) & scales > 0]
+  fits <- vapply(scales, function(scale) {
+    isTRUE(all(
+      coordinates$x >= 0 & coordinates$x <= width / scale &
+        coordinates$y >= 0 & coordinates$y <= height / scale
+    ))
+  }, logical(1L))
+  scales <- scales[fits]
+  if (!length(scales)) {
     message(
-      "[INFO] The Visium tissue picture does not cover the spots at its ",
-      label,
-      " scale factor; it was left out."
+      "[INFO] The Visium tissue picture does not cover the spots at any ",
+      "applicable scale factor; it was left out."
     )
     return(NULL)
   }
+  if (length(unique(scales)) > 1L) {
+    message(
+      "[INFO] The Visium tissue picture has an ambiguous scale and was left ",
+      "out. Set the 'cerebro_image_label' attribute on the stored image ",
+      "pixels to 'lowres' or 'hires'."
+    )
+    return(NULL)
+  }
+  label <- names(scales)[[1L]]
+  placement <- .spatialImageScaled(width, height, scales[[1L]])
   pixels[pixels < 0] <- 0
   pixels[pixels > 1] <- 1
   stats::setNames(
