@@ -1239,30 +1239,50 @@ readH5adAsSCE <- function(
   for (k in seq_along(blocks$from)) {
     c0 <- blocks$from[[k]]
     c1 <- blocks$to[[k]]
+    n_block <- as.integer(c1 - c0)
     block <- .h5adStreamReadBlock(source, c0, c1)
-    cell <- rep.int(seq_len(c1 - c0), diff(block$p))
     gene <- block$gene
     value <- block$value
-    ## A gene named twice in a row adds up before "positive" is judged.
-    later <- seq_along(gene)[-1L]
-    if (
-      length(later) &&
-        any(gene[later] <= gene[later - 1L] & cell[later] == cell[later - 1L])
-    ) {
+    idx <- c0 + seq_len(n_block)
+    if (!length(value)) {
+      next
+    }
+    ## Detect a gene named twice or out of order within one cell (rare in CSR).
+    ## Checking `diff(gene) <= 0L` first skips building `cell` for sorted blocks
+    ## except at cell boundaries where `gene` resets.
+    has_dup <- FALSE
+    drops <- which(diff(gene) <= 0L)
+    if (length(drops)) {
+      ## A drop at position `d` is inside the same cell iff `d` is not a cell
+      ## boundary in `block$p`.
+      bounds <- block$p[-c(1L, length(block$p))]
+      has_dup <- any(!(drops %in% bounds))
+    }
+    if (has_dup) {
+      cell <- rep.int(seq_len(n_block), diff(block$p))
       key <- (cell - 1) * n_genes + gene
       value <- as.numeric(rowsum(value, key, reorder = TRUE))
       first <- !duplicated(key)
       cell <- cell[first][order(key[first])]
-    }
-    ## rowsum() returns the cells that have entries; the others stay 0.
-    if (length(value)) {
       sums <- rowsum(value, cell)
       count[c0 + as.integer(rownames(sums))] <- sums[, 1L]
+      features[idx] <- tabulate(cell[value > 0], nbins = n_block)
+    } else {
+      ## A sorted CSR block is already a valid genes x cells dgCMatrix; C-level
+      ## colSums() matches Matrix::colSums() exactly without R-level rowsum().
+      mat <- methods::new("dgCMatrix")
+      mat@Dim <- c(as.integer(n_genes), n_block)
+      mat@p <- block$p
+      mat@i <- gene
+      mat@x <- value
+      count[idx] <- Matrix::colSums(mat)
+      if (!anyNA(value) && all(value > 0)) {
+        features[idx] <- as.numeric(diff(block$p))
+      } else {
+        mat@x <- as.numeric(!is.na(value) & value > 0)
+        features[idx] <- Matrix::colSums(mat)
+      }
     }
-    features[c0 + seq_len(c1 - c0)] <- tabulate(
-      cell[value > 0],
-      nbins = c1 - c0
-    )
   }
   list(count = count, features = features)
 }

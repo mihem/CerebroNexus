@@ -395,3 +395,63 @@ test_that("streamed cell totals add up repeated and unsorted genes first", {
     expect_equal(totals$features, unname(Matrix::colSums(expected > 0)))
   }
 })
+
+test_that("convertSCEToSeurat matches CreateSeuratObject identities and metadata", {
+  skip_if_not_installed("SingleCellExperiment")
+  skip_if_not_installed("SeuratObject")
+  ## Case 1: <=100 unique prefixes -> orig.ident uses the prefix before "_"
+  cells_small <- c("s1_1", "s1_2", "s2_1", "s2_2")
+  mat_small <- Matrix::Matrix(
+    c(1, 0, 2, 3, 0, 1, 0, 4),
+    nrow = 2L,
+    ncol = 4L,
+    sparse = TRUE,
+    dimnames = list(c("G1", "G2"), cells_small)
+  )
+  sce_small <- SingleCellExperiment::SingleCellExperiment(
+    assays = list(counts = mat_small),
+    colData = S4Vectors::DataFrame(
+      group = c("A", "A", "B", "B"),
+      row.names = cells_small
+    )
+  )
+  seu_small <- suppressMessages(convertSCEToSeurat(sce_small))
+  ref_small <- suppressWarnings(SeuratObject::CreateSeuratObject(
+    counts = SeuratObject::CreateAssay5Object(counts = mat_small),
+    meta.data = data.frame(
+      group = c("A", "A", "B", "B"),
+      row.names = cells_small
+    )
+  ))
+  expect_true(methods::validObject(seu_small))
+  expect_identical(seu_small$orig.ident, ref_small$orig.ident)
+  expect_identical(
+    SeuratObject::Idents(seu_small),
+    SeuratObject::Idents(ref_small)
+  )
+  expect_identical(seu_small@meta.data, ref_small@meta.data)
+
+  ## Case 2: >100 unique prefixes -> orig.ident falls back to "SeuratProject"
+  cells_many <- paste0("p", seq_len(105L), "_1")
+  mat_many <- Matrix::Matrix(
+    1,
+    nrow = 2L,
+    ncol = 105L,
+    sparse = TRUE,
+    dimnames = list(c("G1", "G2"), cells_many)
+  )
+  sce_many <- SingleCellExperiment::SingleCellExperiment(
+    assays = list(counts = mat_many),
+    colData = S4Vectors::DataFrame(
+      group = rep("A", 105L),
+      row.names = cells_many
+    )
+  )
+  seu_many <- suppressMessages(convertSCEToSeurat(sce_many))
+  expect_true(methods::validObject(seu_many))
+  expect_identical(levels(seu_many$orig.ident), "SeuratProject")
+  expect_identical(
+    unname(as.character(seu_many$orig.ident)),
+    rep("SeuratProject", 105L)
+  )
+})

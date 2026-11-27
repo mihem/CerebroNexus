@@ -144,6 +144,19 @@ convertSCEToSeurat <- function(
     SeuratObject::CreateAssay5Object(counts = counts, data = data)
   }
 
+  if (!isTRUE(nzchar(SeuratObject::Key(assay_object)))) {
+    SeuratObject::Key(assay_object) <- SeuratObject::Key(
+      tolower(main_assay),
+      quiet = TRUE
+    )
+  }
+  ## Seurat's constructors write "_" in a gene name as "-", but accept it once
+  ## the assay exists. Put the file's own names back so a gene keeps the name it
+  ## has in the source.
+  if (!identical(rownames(assay_object), feature_names)) {
+    rownames(assay_object) <- feature_names
+  }
+
   cell_data <- as.data.frame(SummarizedExperiment::colData(object))
   keep <- vapply(
     cell_data,
@@ -151,23 +164,68 @@ convertSCEToSeurat <- function(
     logical(1)
   )
   cell_data <- cell_data[, keep, drop = FALSE]
-  rownames(cell_data) <- colnames(object)
+  cells <- colnames(assay_object)
+  rownames(cell_data) <- cells
 
-  result <- suppressWarnings(SeuratObject::CreateSeuratObject(
-    counts = assay_object,
-    assay = main_assay,
-    meta.data = cell_data
-  ))
-
-  ## Seurat's constructors write "_" in a gene name as "-", but accept it once
-  ## the assay exists. Put the file's own names back so a gene keeps the name it
-  ## has in the source.
-  seurat_features <- rownames(result)
-  if (!identical(seurat_features, feature_names)) {
-    restored <- result[[main_assay]]
-    rownames(restored) <- feature_names
-    result[[main_assay]] <- restored
+  ## Build the Seurat object directly instead of CreateSeuratObject(), whose
+  ## lapply(colnames, ExtractField) and AddMetaData() row-matching take ~155 s
+  ## on 4.3M cells while producing the same validated object.
+  first_field <- sub("_.*", "", cells)
+  unique_fields <- unique(first_field)
+  idents <- if (
+    anyNA(first_field) ||
+      length(unique_fields) > 100L ||
+      !length(unique_fields) ||
+      length(unique_fields) == length(cells)
+  ) {
+    factor(rep_len("SeuratProject", length(cells)))
+  } else {
+    factor(first_field)
   }
+  names(idents) <- cells
+  meta <- data.frame(
+    orig.ident = idents,
+    row.names = cells,
+    check.names = FALSE
+  )
+  if (!is.null(counts)) {
+    ## Seurat sums a counts layer itself; for a metadata-only read the layer is
+    ## empty, so write the sums the file was read for.
+    meta[[paste0("nCount_", main_assay)]] <- if (
+      isTRUE(deferred$totals_from_counts)
+    ) {
+      as.numeric(deferred$cell_totals$count)
+    } else {
+      unname(Matrix::colSums(counts))
+    }
+    meta[[paste0("nFeature_", main_assay)]] <- if (
+      isTRUE(deferred$totals_from_counts)
+    ) {
+      as.numeric(deferred$cell_totals$features)
+    } else {
+      unname(Matrix::colSums(counts > 0))
+    }
+  }
+  for (col in colnames(cell_data)) {
+    meta[[col]] <- cell_data[[col]]
+  }
+  result <- suppressWarnings(methods::new(
+    Class = "Seurat",
+    assays = stats::setNames(list(assay_object), main_assay),
+    meta.data = meta,
+    active.assay = main_assay,
+    active.ident = idents,
+    graphs = list(),
+    neighbors = list(),
+    reductions = list(),
+    images = list(),
+    project.name = "SeuratProject",
+    misc = list(),
+    version = utils::packageVersion("SeuratObject"),
+    commands = list(),
+    tools = list()
+  ))
+  methods::validObject(result)
 
   ## The Builder and the export need a per-cell count and gene count. Seurat
   ## derives them from the counts layer, which a normalised-only file lacks, so
@@ -177,12 +235,6 @@ convertSCEToSeurat <- function(
     counts[seq_len(n_genes), , drop = FALSE]
   } else {
     data[seq_len(n_genes), , drop = FALSE]
-  }
-  ## Seurat sums a counts layer itself; for a metadata-only read the layer is
-  ## empty, so write the sums the file was read for.
-  if (!is.null(counts) && isTRUE(deferred$totals_from_counts)) {
-    result[[paste0("nCount_", main_assay)]] <- deferred$cell_totals$count
-    result[[paste0("nFeature_", main_assay)]] <- deferred$cell_totals$features
   }
   fill <- function(target, candidates, from_matrix) {
     present <- result@meta.data[[target]]
@@ -196,7 +248,7 @@ convertSCEToSeurat <- function(
       logical(1)
     )]
     values <- if (length(found)) cell_data[[found[[1L]]]] else from_matrix()
-    result[[target]] <<- as.numeric(values)
+    result@meta.data[[target]] <<- as.numeric(values)
   }
   fill(
     paste0("nCount_", main_assay),
