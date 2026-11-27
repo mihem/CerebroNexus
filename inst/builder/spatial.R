@@ -621,6 +621,31 @@ builder_spatial_contract <- function(
 
 BUILDER_REGION_MAX_POLYGONS <- 32L
 BUILDER_REGION_MAX_VERTICES <- 2000L
+BUILDER_REGION_CLEARED_CONTENT <- c(
+  "most_expressed_genes",
+  "marker_genes",
+  "enriched_pathways",
+  "mean_expression",
+  "trees"
+)
+
+builder_region_section_supported <- function(kind) {
+  is.character(kind) &&
+    length(kind) == 1L &&
+    kind %in% c("spatial", "spatial_reduction", "trekker")
+}
+
+builder_region_has_immune <- function(manifest) {
+  is.list(manifest) &&
+    any(vapply(
+      c("immune_repertoire", "hla_tcr_motifs"),
+      function(key) {
+        (manifest[[key]]$disposition %||% "") %in%
+          c("preserved", "converted", "attached")
+      },
+      logical(1)
+    ))
+}
 
 .builder_region_plain_names <- function(value) {
   is.list(value) &&
@@ -991,13 +1016,7 @@ builder_region_subset_apply <- function(
   ## Drop precomputed whole-slide summaries so they are never exported out of
   ## step with the kept cells; any analyses selected in the Builder run fresh
   ## on the kept cells after this cut.
-  for (slot in c(
-    "marker_genes",
-    "most_expressed_genes",
-    "enriched_pathways",
-    "mean_expression",
-    "trees"
-  )) {
+  for (slot in BUILDER_REGION_CLEARED_CONTENT) {
     object@misc[[slot]] <- NULL
   }
   if (is.list(trekker) && length(trekker$barcodes %||% character())) {

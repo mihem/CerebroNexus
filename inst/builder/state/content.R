@@ -29,29 +29,17 @@
   profile
 }
 
-.builder_state_region_cleared_content <- c(
-  "most_expressed_genes",
-  "marker_genes",
-  "enriched_pathways",
-  "mean_expression",
-  "trees"
-)
-
 .builder_state_has_region_subset <- function(entry) {
   settings <- .subset2(entry, "settings")
-  subset <- if (is.list(settings)) {
-    .subset2(settings, "spatial_region_subset")
-  } else {
-    NULL
-  }
-  sections <- if (is.list(subset)) .subset2(subset, "sections") else NULL
+  subset <- if (is.list(settings)) .subset2(settings, "spatial_region_subset")
+  sections <- if (is.list(subset)) .subset2(subset, "sections")
   is.list(sections) && length(sections) > 0L
 }
 
 .builder_state_content_available <- function(entry, id) {
   if (
     .builder_state_has_region_subset(entry) &&
-      id %in% .builder_state_region_cleared_content
+      id %in% BUILDER_REGION_CLEARED_CONTENT
   ) {
     return(FALSE)
   }
@@ -630,7 +618,7 @@
   ## Precomputed whole-slide analysis tables do not match a kept region; the
   ## build clears them before running any selected analyses on the kept cells.
   region_clears_preserved <- .builder_state_has_region_subset(entry) &&
-    id %in% .builder_state_region_cleared_content
+    id %in% BUILDER_REGION_CLEARED_CONTENT
   if (region_clears_preserved) {
     evidence$detected <- FALSE
     evidence$valid <- FALSE

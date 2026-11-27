@@ -603,10 +603,13 @@
       1
     );
     var scale = layout.scale, screen = layout.screen;
+    var radians = angle * Math.PI / 180;
     state.regionView = {
       layout: layout,
-      bounds: scene.bounds,
-      angle: angle,
+      cx: (scene.bounds.xmin + scene.bounds.xmax) / 2,
+      cy: (scene.bounds.ymin + scene.bounds.ymax) / 2,
+      cos: Math.cos(radians),
+      sin: Math.sin(radians),
       pointScale: pointScale,
     };
     window.__builderSpatialCanvasMetrics.latestViewport = {
@@ -623,7 +626,7 @@
     drawGrid(ctx, cssWidth, cssHeight, pad);
     var imageGeometry = drawImage(ctx, scene, screen);
     drawPoints(ctx, scene, screen);
-    drawRegions(ctx, scene, screen);
+    drawRegions(ctx, scene);
     if (imageGeometry) {
       drawImageFrame(ctx, imageGeometry, state.activeTransform === "image");
     }
@@ -642,29 +645,23 @@
   // scale the points get, so a shape drawn on rotated points is stored where
   // the cells really are.
   function regionToScreen(point) {
-    var view = state.regionView;
-    if (!view) return null;
-    var cx = (view.bounds.xmin + view.bounds.xmax) / 2;
-    var cy = (view.bounds.ymin + view.bounds.ymax) / 2;
-    var angle = view.angle * Math.PI / 180;
-    var x = point.x - cx, y = point.y - cy;
-    return view.layout.screen({
-      x: cx + view.pointScale * (x * Math.cos(angle) - y * Math.sin(angle)),
-      y: cy + view.pointScale * (x * Math.sin(angle) + y * Math.cos(angle)),
+    var v = state.regionView;
+    if (!v) return null;
+    var x = point.x - v.cx, y = point.y - v.cy;
+    return v.layout.screen({
+      x: v.cx + v.pointScale * (x * v.cos - y * v.sin),
+      y: v.cy + v.pointScale * (x * v.sin + y * v.cos),
     });
   }
   function regionToRaw(at) {
-    var view = state.regionView;
-    if (!view) return null;
-    var cx = (view.bounds.xmin + view.bounds.xmax) / 2;
-    var cy = (view.bounds.ymin + view.bounds.ymax) / 2;
-    var angle = view.angle * Math.PI / 180;
-    var world = view.layout.unscreen(at);
-    var x = (world.x - cx) / view.pointScale;
-    var y = (world.y - cy) / view.pointScale;
+    var v = state.regionView;
+    if (!v) return null;
+    var world = v.layout.unscreen(at);
+    var x = (world.x - v.cx) / v.pointScale;
+    var y = (world.y - v.cy) / v.pointScale;
     return {
-      x: cx + x * Math.cos(angle) + y * Math.sin(angle),
-      y: cy - x * Math.sin(angle) + y * Math.cos(angle),
+      x: v.cx + x * v.cos + y * v.sin,
+      y: v.cy - x * v.sin + y * v.cos,
     };
   }
   function regionSceneDrawable(scene) {
@@ -673,14 +670,23 @@
     return !!scene && scene.available && scene.layout !== "separate" &&
       !scene.activeRoi;
   }
-  function tracePolygon(ctx, polygon, closed) {
+  function paintPolygon(ctx, polygon, style) {
+    ctx.beginPath();
     polygon.forEach(function (vertex, index) {
       var at = regionToScreen(vertex);
       if (!at) return;
       if (index) ctx.lineTo(at.x, at.y);
       else ctx.moveTo(at.x, at.y);
     });
-    if (closed) ctx.closePath();
+    if (style.closed) ctx.closePath();
+    if (style.fill) {
+      ctx.fillStyle = style.fill;
+      ctx.fill();
+    }
+    ctx.strokeStyle = style.stroke;
+    ctx.lineWidth = style.width;
+    ctx.setLineDash(style.dash);
+    ctx.stroke();
   }
   function savedRegions(scene) {
     return ((scene && scene.regions) || []).map(function (shape) {
@@ -698,32 +704,30 @@
     ctx.save();
     ctx.lineJoin = "round";
     saved.forEach(function (polygon) {
-      ctx.beginPath();
-      tracePolygon(ctx, polygon, true);
-      ctx.fillStyle = replacing ? "rgba(22,124,120,.05)" : "rgba(22,124,120,.12)";
-      ctx.fill();
-      ctx.strokeStyle = replacing ? "rgba(22,124,120,.45)" : "#167c78";
-      ctx.lineWidth = replacing ? 1.5 : 2;
-      ctx.setLineDash(replacing ? [4, 4] : []);
-      ctx.stroke();
+      paintPolygon(ctx, polygon, {
+        closed: true,
+        fill: replacing ? "rgba(22,124,120,.05)" : "rgba(22,124,120,.12)",
+        stroke: replacing ? "rgba(22,124,120,.45)" : "#167c78",
+        width: replacing ? 1.5 : 2,
+        dash: replacing ? [4, 4] : [],
+      });
     });
     drafts.forEach(function (polygon) {
-      ctx.beginPath();
-      tracePolygon(ctx, polygon, true);
-      ctx.fillStyle = "rgba(201,114,28,.14)";
-      ctx.fill();
-      ctx.strokeStyle = "#c9721c";
-      ctx.lineWidth = 2;
-      ctx.setLineDash([6, 4]);
-      ctx.stroke();
+      paintPolygon(ctx, polygon, {
+        closed: true,
+        fill: "rgba(201,114,28,.14)",
+        stroke: "#c9721c",
+        width: 2,
+        dash: [6, 4],
+      });
     });
     if (current.length) {
-      ctx.beginPath();
-      tracePolygon(ctx, current, false);
-      ctx.strokeStyle = "#c9721c";
-      ctx.lineWidth = 2;
-      ctx.setLineDash([]);
-      ctx.stroke();
+      paintPolygon(ctx, current, {
+        closed: false,
+        stroke: "#c9721c",
+        width: 2,
+        dash: [],
+      });
       if (state.region.drawing && state.region.cursor) {
         var last = regionToScreen(current[current.length - 1]);
         if (last) {
@@ -750,6 +754,9 @@
     }
     ctx.restore();
   }
+  function plural(count, word) {
+    return count + " " + word + (count === 1 ? "" : "s");
+  }
   function regionStatusText(scene) {
     var region = state.region;
     if (!scene || !scene.available) return "";
@@ -757,23 +764,21 @@
       return "Choose \"All ROIs\" to draw a region on this section.";
     }
     var hasStored = !!(scene.regions && scene.regions.length);
-    if (region.drawing) {
-      if (region.current.length) {
-        return region.current.length + " point" +
-          (region.current.length === 1 ? "" : "s") +
-          ". Double-click or click the first point to close the shape.";
-      }
-      return region.polygons.length
-        ? region.polygons.length + " shape" +
-          (region.polygons.length === 1 ? "" : "s") +
-          " drawn. Click to start another, or choose \"Keep cells inside\"" +
-          (hasStored ? " to replace the stored region." : ".")
-        : "Click on the canvas to place the first point.";
+    if (region.drawing && region.current.length) {
+      return plural(region.current.length, "point") +
+        ". Double-click or click the first point to close the shape.";
     }
     if (region.polygons.length) {
-      return region.polygons.length + " shape" + (region.polygons.length === 1 ? "" : "s") +
-        " drawn. Choose \"Keep cells inside\" to " +
+      var prefix = plural(region.polygons.length, "shape") + " drawn. ";
+      if (region.drawing) {
+        return prefix + "Click to start another, or choose \"Keep cells inside\"" +
+          (hasStored ? " to replace the stored region." : ".");
+      }
+      return prefix + "Choose \"Keep cells inside\" to " +
         (hasStored ? "replace the stored region." : "apply.");
+    }
+    if (region.drawing) {
+      return "Click on the canvas to place the first point.";
     }
     var summary = scene.regionSummary;
     if (summary) {

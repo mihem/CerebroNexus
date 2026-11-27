@@ -1803,17 +1803,9 @@ builder_verify_crb <- function(
   if (!length(region_subset$sections %||% list())) {
     return(object)
   }
-  immune_kept <- vapply(
-    c("immune_repertoire", "hla_tcr_motifs"),
-    function(key) {
-      (item$manifest[[key]]$disposition %||% "") %in%
-        c("preserved", "converted", "attached")
-    },
-    logical(1)
-  )
   if (
     length(unlist(item$included_trajectories, use.names = FALSE)) ||
-      any(immune_kept)
+      builder_region_has_immune(item$manifest)
   ) {
     stop(
       "A region subset cannot be combined with trajectories or immune ",
@@ -1825,10 +1817,9 @@ builder_verify_crb <- function(
   for (section in names(item$spatial_coordinate_transforms %||% list())) {
     frame <- builder_region_section_coordinates(object, section)
     if (!is.null(frame) && nrow(frame)) {
-      transform_pivots[[section]] <- c(
-        x = (min(frame$x) + max(frame$x)) / 2,
-        y = (min(frame$y) + max(frame$y)) / 2
-      )
+      transform_pivots[[section]] <- .spx_coordinate_transform_identity(
+        frame
+      )$pivot
     }
   }
   object <- builder_region_subset_apply(

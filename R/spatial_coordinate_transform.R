@@ -395,19 +395,10 @@
     "Spatial coordinate inverse transform",
     positive = TRUE
   )
-  pivot <- transform$pivot
-  if (
-    !is.numeric(pivot) ||
-      is.object(pivot) ||
-      length(pivot) != 2L ||
-      !identical(names(pivot), c("x", "y")) ||
-      any(!is.finite(pivot))
-  ) {
-    stop(
-      "Spatial coordinate inverse transform requires a finite x/y pivot.",
-      call. = FALSE
-    )
-  }
+  pivot <- .spx_coordinate_transform_pivot(
+    transform$pivot,
+    "Spatial coordinate inverse transform"
+  )
   angle <- rotation * pi / 180
   scaled_x <- (details$x - pivot[["x"]]) / scale
   scaled_y <- (details$y - pivot[["y"]]) / scale

@@ -602,8 +602,7 @@ builder_spatial_alignment_server <- function(
   })
   output[["enhance-has_region_frame"]] <- shiny::reactive({
     section <- active_section()
-    !is.null(section) &&
-      kind_for(section) %in% c("spatial", "spatial_reduction", "trekker")
+    !is.null(section) && builder_region_section_supported(kind_for(section))
   })
   output[["enhance-has_rois"]] <- shiny::reactive({
     length(active_roi_values()) > 0L
@@ -1133,9 +1132,7 @@ builder_spatial_alignment_server <- function(
       section <- contract$section
       sections <- entry$settings$spatial_region_subset$sections %||% list()
       if (identical(event$action, "apply")) {
-        if (
-          !kind_for(section) %in% c("spatial", "spatial_reduction", "trekker")
-        ) {
+        if (!builder_region_section_supported(kind_for(section))) {
           return()
         }
         polygons <- tryCatch(

@@ -328,27 +328,17 @@
       "region_subset_with_trajectories"
     ))
   }
-  if (is.list(manifest)) {
-    immune_kept <- vapply(
-      c("immune_repertoire", "hla_tcr_motifs"),
-      function(key) {
-        (manifest[[key]]$disposition %||% "") %in%
-          c("preserved", "converted", "attached")
-      },
-      logical(1)
-    )
-    if (any(immune_kept)) {
-      return(builder_plan_error(
-        paste0(
-          "Dataset “",
-          name,
-          "” keeps a region, which cannot be combined with immune repertoire ",
-          "tables yet. Exclude the immune repertoire content or clear the ",
-          "region."
-        ),
-        "region_subset_with_immune_repertoire"
-      ))
-    }
+  if (builder_region_has_immune(manifest)) {
+    return(builder_plan_error(
+      paste0(
+        "Dataset “",
+        name,
+        "” keeps a region, which cannot be combined with immune repertoire ",
+        "tables yet. Exclude the immune repertoire content or clear the ",
+        "region."
+      ),
+      "region_subset_with_immune_repertoire"
+    ))
   }
   NULL
 }
