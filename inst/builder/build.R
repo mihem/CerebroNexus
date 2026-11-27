@@ -2003,22 +2003,19 @@ builder_verify_crb <- function(
       ## EAE images against 0.06 s for their MD5): only the type, the size and
       ## the MD5 are used below.
       recorded_md5 <- record$source_content_md5
+      ext <- .builder_file_extension(image_name)
       inspected <- if (
         is.character(recorded_md5) &&
           length(recorded_md5) == 1L &&
           grepl("^[[:xdigit:]]{32}$", recorded_md5) &&
-          .builder_file_extension(image_name) %in% c("png", "jpg", "jpeg") &&
+          ext %in% c("png", "jpg", "jpeg") &&
           identical(
             unname(as.character(tools::md5sum(source_path))),
             recorded_md5
           )
       ) {
         list(
-          mime = if (identical(.builder_file_extension(image_name), "png")) {
-            "image/png"
-          } else {
-            "image/jpeg"
-          },
+          mime = if (identical(ext, "png")) "image/png" else "image/jpeg",
           bytes = unname(file.size(source_path)),
           source_content_md5 = recorded_md5
         )
@@ -2113,6 +2110,30 @@ builder_verify_crb <- function(
 ## bad copy still fails publication.
 .builder_build_app_tree_seed <- function(app_dir, request) {
   entries <- list()
+  record_entry <- function(target, size, md5) {
+    if (is.null(target)) {
+      return(invisible(NULL))
+    }
+    fingerprint <- tryCatch(
+      .builder_app_file_fingerprint(fs::file_info(
+        file.path(app_dir, target),
+        fail = TRUE,
+        follow = FALSE
+      )),
+      error = function(error) NULL
+    )
+    if (
+      is.list(fingerprint) &&
+        identical(fingerprint$type, "file") &&
+        identical(fingerprint$size, as.double(size))
+    ) {
+      entries[[target]] <<- c(
+        list(path = target),
+        fingerprint,
+        list(md5 = tolower(md5))
+      )
+    }
+  }
   for (content in request$content_identities %||% list()) {
     expected_files <- Filter(
       function(entry) is.list(entry) && identical(entry$type, "file"),
@@ -2125,26 +2146,7 @@ builder_verify_crb <- function(
       )
     )
     for (expected in expected_files) {
-      fingerprint <- tryCatch(
-        .builder_app_file_fingerprint(fs::file_info(
-          file.path(app_dir, expected$path),
-          fail = TRUE,
-          follow = FALSE
-        )),
-        error = function(error) NULL
-      )
-      if (
-        !is.list(fingerprint) ||
-          !identical(fingerprint$type, "file") ||
-          !identical(fingerprint$size, as.double(expected$size))
-      ) {
-        next
-      }
-      entries[[expected$path]] <- c(
-        list(path = expected$path),
-        fingerprint,
-        list(md5 = tolower(expected$md5))
-      )
+      record_entry(expected$path, expected$size, expected$md5)
     }
   }
   spatial_images <- request$spatial_images %||% list()
@@ -2160,39 +2162,16 @@ builder_verify_crb <- function(
           error = function(error) NULL
         )
         if (
-          !is.list(record) ||
-            !is.list(identity) ||
-            !identical(identity$type, "file")
+          is.list(record) &&
+            is.list(identity) &&
+            identical(identity$type, "file")
         ) {
-          next
+          target <- tryCatch(
+            .builder_app_spatial_target(dataset, section, label, record$path),
+            error = function(error) NULL
+          )
+          record_entry(target, identity$size, identity$md5)
         }
-        target <- tryCatch(
-          .builder_app_spatial_target(dataset, section, label, record$path),
-          error = function(error) NULL
-        )
-        if (is.null(target)) {
-          next
-        }
-        fingerprint <- tryCatch(
-          .builder_app_file_fingerprint(fs::file_info(
-            file.path(app_dir, target),
-            fail = TRUE,
-            follow = FALSE
-          )),
-          error = function(error) NULL
-        )
-        if (
-          !is.list(fingerprint) ||
-            !identical(fingerprint$type, "file") ||
-            !identical(fingerprint$size, as.double(identity$size))
-        ) {
-          next
-        }
-        entries[[target]] <- c(
-          list(path = target),
-          fingerprint,
-          list(md5 = tolower(identity$md5))
-        )
       }
     }
   }

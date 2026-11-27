@@ -156,33 +156,27 @@ builder_group_colors_ui <- function(id, model) {
           big.mark = ",",
           scientific = FALSE
         )))
-        search_attr <- esc_attr(tolower(labels))
-        label_attr <- esc_attr(labels)
-        label_text <- esc_text(labels)
-        key_attr <- esc_attr(keys)
-        color_attr <- esc_attr(colors)
-        aria_attr <- esc_attr(paste("Color for", model$group, labels))
         shiny::HTML(paste0(
           '<div class="group-color-item viewer-group-distribution-row" data-search="',
-          search_attr,
+          esc_attr(tolower(labels)),
           '"><input id="',
           input_ids,
           '" type="color" class="group-color-input" value="',
-          color_attr,
+          esc_attr(colors),
           '" data-input-id="',
           data_input_id,
           '" data-group="',
           group_attr,
           '" data-level="',
-          key_attr,
+          esc_attr(keys),
           '" aria-label="',
-          aria_attr,
+          esc_attr(paste("Color for", model$group, labels)),
           '"/><label class="group-color-name" for="',
           input_ids,
           '" title="',
-          label_attr,
+          esc_attr(labels),
           '">',
-          label_text,
+          esc_text(labels),
           '</label><span class="viewer-group-bar-track"><span class="viewer-group-bar" style="width:',
           widths,
           '%"></span></span><span class="viewer-group-count">',

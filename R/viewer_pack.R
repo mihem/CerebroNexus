@@ -1515,35 +1515,31 @@
   }
   modules <- "common"
   projections <- object$availableProjections()
-  load_projection_values <- function() {
-    values <- stats::setNames(
-      vector("list", length(projections)),
-      projections
-    )
-    for (i in seq_along(projections)) {
-      value <- as.matrix(object$getProjection(projections[[i]]))
-      if (!is.numeric(value) || nrow(value) != length(cells)) {
-        stop("Viewer Pack projection is not cell-aligned.", call. = FALSE)
-      }
-      ids <- rownames(value)
-      if (!identical(ids, cells)) {
-        if (
-          is.null(ids) ||
-            anyNA(ids) ||
-            any(!nzchar(ids)) ||
-            anyDuplicated(ids) ||
-            !setequal(ids, cells)
-        ) {
-          stop(
-            "Viewer Pack projection requires unique, matching cell identities.",
-            call. = FALSE
-          )
-        }
-        value <- value[match(cells, ids), , drop = FALSE]
-      }
-      values[[i]] <- value
+  load_one_projection <- function(nm) {
+    value <- as.matrix(object$getProjection(nm))
+    if (!is.numeric(value) || nrow(value) != length(cells)) {
+      stop("Viewer Pack projection is not cell-aligned.", call. = FALSE)
     }
-    values
+    ids <- rownames(value)
+    if (!identical(ids, cells)) {
+      if (
+        is.null(ids) ||
+          anyNA(ids) ||
+          any(!nzchar(ids)) ||
+          anyDuplicated(ids) ||
+          !setequal(ids, cells)
+      ) {
+        stop(
+          "Viewer Pack projection requires unique, matching cell identities.",
+          call. = FALSE
+        )
+      }
+      value <- value[match(cells, ids), , drop = FALSE]
+    }
+    value
+  }
+  load_projection_values <- function() {
+    stats::setNames(lapply(projections, load_one_projection), projections)
   }
   projection_values <- NULL
   reused_projections <- if (
@@ -1584,29 +1580,6 @@
       item_digests$projections
     } else {
       NULL
-    }
-    load_one_projection <- function(nm) {
-      value <- as.matrix(object$getProjection(nm))
-      if (!is.numeric(value) || nrow(value) != length(cells)) {
-        stop("Viewer Pack projection is not cell-aligned.", call. = FALSE)
-      }
-      ids <- rownames(value)
-      if (!identical(ids, cells)) {
-        if (
-          is.null(ids) ||
-            anyNA(ids) ||
-            any(!nzchar(ids)) ||
-            anyDuplicated(ids) ||
-            !setequal(ids, cells)
-        ) {
-          stop(
-            "Viewer Pack projection requires unique, matching cell identities.",
-            call. = FALSE
-          )
-        }
-        value <- value[match(cells, ids), , drop = FALSE]
-      }
-      value
     }
     for (i in seq_along(projections)) {
       nm <- projections[[i]]

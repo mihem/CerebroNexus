@@ -243,53 +243,37 @@ builder_release_control_path <- function(target) {
   if (!n) {
     return(list())
   }
-  types <- as.character(info$type)
-  sizes <- as.double(info$size)
-  perms <- as.character(info$permissions)
-  devs <- as.double(info$device_id)
-  inodes <- as.double(info$inode)
-  links <- as.double(info$hard_links)
-  mtimes <- as.double(info$modification_time)
-  ctimes <- as.double(info$change_time)
+  cols <- list(
+    type = as.character(info$type),
+    size = as.double(info$size),
+    permissions = as.character(info$permissions),
+    device_id = as.double(info$device_id),
+    inode = as.double(info$inode),
+    hard_links = as.double(info$hard_links),
+    modification_time = as.double(info$modification_time),
+    change_time = as.double(info$change_time)
+  )
+  num_cols <- c(
+    "size",
+    "device_id",
+    "inode",
+    "hard_links",
+    "modification_time",
+    "change_time"
+  )
   if (
-    length(types) != n ||
-      length(sizes) != n ||
-      length(perms) != n ||
-      length(devs) != n ||
-      length(inodes) != n ||
-      length(links) != n ||
-      length(mtimes) != n ||
-      length(ctimes) != n ||
-      anyNA(types) ||
-      anyNA(perms) ||
-      any(!is.finite(sizes)) ||
-      any(!is.finite(devs)) ||
-      any(!is.finite(inodes)) ||
-      any(!is.finite(links)) ||
-      any(!is.finite(mtimes)) ||
-      any(!is.finite(ctimes)) ||
-      any(!nzchar(types)) ||
-      any(!nzchar(perms)) ||
-      any(sizes < 0) ||
-      any(sizes != floor(sizes)) ||
-      any(devs < 0) ||
-      any(inodes < 0) ||
-      any(links < 1)
+    any(lengths(cols) != n) ||
+      anyNA(cols$type) ||
+      anyNA(cols$permissions) ||
+      any(!nzchar(cols$type)) ||
+      any(!nzchar(cols$permissions)) ||
+      any(vapply(cols[num_cols], function(v) any(!is.finite(v)), logical(1))) ||
+      any(cols$size < 0 | cols$size != floor(cols$size)) ||
+      any(cols$device_id < 0 | cols$inode < 0 | cols$hard_links < 1)
   ) {
     stop("A release entry could not be fingerprinted safely.", call. = FALSE)
   }
-  lapply(seq_len(n), function(i) {
-    list(
-      type = types[[i]],
-      size = sizes[[i]],
-      permissions = perms[[i]],
-      device_id = devs[[i]],
-      inode = inodes[[i]],
-      hard_links = links[[i]],
-      modification_time = mtimes[[i]],
-      change_time = ctimes[[i]]
-    )
-  })
+  lapply(seq_len(n), function(i) lapply(cols, `[[`, i))
 }
 
 .builder_release_file_fingerprint <- function(info) {

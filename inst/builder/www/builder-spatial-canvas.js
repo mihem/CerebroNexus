@@ -472,6 +472,10 @@
       return;
     }
     state.pendingViewportPayload = null;
+    sendViewportPayload(payload);
+  }
+  function sendViewportPayload(payload) {
+    if (!payload || !window.Shiny || typeof Shiny.setInputValue !== "function") return;
     var signature = JSON.stringify(payload);
     if (signature === state.viewportSignature) return;
     state.viewportSignature = signature;
@@ -480,11 +484,7 @@
   function flushViewportPublish() {
     var payload = state.pendingViewportPayload;
     state.pendingViewportPayload = null;
-    if (!payload || !window.Shiny || typeof Shiny.setInputValue !== "function") return;
-    var signature = JSON.stringify(payload);
-    if (signature === state.viewportSignature) return;
-    state.viewportSignature = signature;
-    Shiny.setInputValue("builder_spatial_viewports", payload, {priority: "event"});
+    sendViewportPayload(payload);
   }
   function drawViewerFrame(ctx, view, screen) {
     var topLeft = screen({x: view.xmin, y: view.ymax});

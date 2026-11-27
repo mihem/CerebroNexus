@@ -691,10 +691,8 @@ builder_freeze_plan <- function(
           saved$included_groups %||% character(),
           entry$levels %||% list()
         )
-        saved$color_custom_count <- as.integer(sum(vapply(
-          saved$group_color_overrides,
-          length,
-          integer(1)
+        saved$color_custom_count <- as.integer(sum(lengths(
+          saved$group_color_overrides
         )))
         saved$reused_artifact <- list(
           path = artifact$resolved_path,
@@ -761,11 +759,7 @@ builder_freeze_plan <- function(
         included_groups[[index]],
         entry$levels %||% list()
       )
-      custom_color_count <- sum(vapply(
-        selected_color_overrides,
-        length,
-        integer(1)
-      ))
+      custom_color_count <- sum(lengths(selected_color_overrides))
       runtime_costs <- c(
         percent_mt_ribo = "seconds",
         most_expressed = "seconds",
