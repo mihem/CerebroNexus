@@ -4081,6 +4081,8 @@
     var status = editor && editor.querySelector(".group-color-status");
     var label = item && item.querySelector(".group-color-name");
     if (hex) hex.textContent = normalized;
+    var undo = editor && editor.querySelector(".group-color-reset");
+    if (undo) undo.disabled = false;
     if (status) {
       status.textContent = "Color for " +
         (label ? label.textContent.trim() : input.dataset.level) +

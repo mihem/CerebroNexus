@@ -2,21 +2,28 @@
 
 - **Choose the group colours in the Builder.** Group colors has a Palette
   select for the dataset, so group colors can match the figures of a
-  manuscript: From the data set, Cerebro default, Seurat / ggplot2 default,
-  Okabe-Ito (colour-vision friendly) and Many distinct colours. A color picked
-  by hand keeps its value when the palette changes; "Reset colors" drops it.
+  manuscript: From the data set, Cerebro default, Many distinct colours,
+  Seurat / ggplot2 default and Okabe-Ito (colour-vision friendly), the same
+  short list for every Group. A color picked by hand keeps its value when the
+  palette changes; "Undo picked colours" drops the ones picked for the Group
+  on show and leaves the palette as it is (it is greyed out while there are
+  none).
 - **The Builder starts from the colours a data set brings.** The Group colours
   stored in a Seurat object (`@misc$group_colors`), a SingleCellExperiment
   (`metadata()$group_colors`) or an h5ad file (`uns[<column>_colors]`) used to
   be replaced by the Builder's own colours in the App it built. "From the data
   set" now takes them and is the default when there are some; a level without a
-  colour gets one from Cerebro default.
-- **More than 40 distinct colours.** "Many distinct colours" starts from
-  `pals::glasbey()` (32 colours, MIT) and adds the colour farthest from all the
-  chosen ones in CIELAB for every further level, so the closest pair stays
-  about 11 apart at 338 levels where stretching a palette with
-  `colorRampPalette()` leaves under 1. The list is ordered for the Group on
-  show, and each option says how many colours it has.
+  colour gets a generated one, kept apart from the colours the data set
+  brought.
+- **Palettes are extended, not stretched, past their colours, in the Viewer
+  and the Builder.** A Group with more levels than a palette has colours used
+  to get in-between shades from `colorRampPalette()`, which neighbouring levels
+  could not be told apart by (closest pair under 1 in CIELAB at 338 levels),
+  and every level's colour moved when a level was added. A palette now keeps
+  its own colours, and each further level gets the colour farthest from all the
+  chosen ones in CIELAB (closest pair about 11 at 338 levels). In the Viewer
+  this changes only the levels past the 40th of a Group without colours of its
+  own. "Many distinct colours" starts from `pals::cols25()` (25 colours, MIT).
 - **The Builder's default colours are the Viewer's.** "Cerebro default" was a
   separate set of 20 low-saturation colours, so an App built by the Builder
   drew a Group in different colours than the Viewer does for a data set

@@ -71,17 +71,11 @@ builder_group_colors_model <- function(
 }
 
 ## The palette applies to every Group of the dataset; a swatch picked by hand
-## keeps its colour when the palette changes ("Reset colors" drops them).
-## The choices are ordered for the number of levels of the Group on show: the
-## data set's own colours (when it brought some), palettes with enough colours,
-## the generated ones, then those that would have to interpolate.
-builder_palette_select_ui <- function(
-  ns,
-  selected,
-  n_levels = 1L,
-  has_dataset = FALSE
-) {
-  choices <- builder_palette_choices(n_levels, has_dataset = has_dataset)
+## keeps its colour when the palette changes ("Undo picked colours" drops them).
+## The choices are the same for every Group: every palette has a colour for any
+## number of levels, so none needs a warning.
+builder_palette_select_ui <- function(ns, selected, has_dataset = FALSE) {
+  choices <- builder_palette_choices(has_dataset = has_dataset)
   ids <- unlist(choices, use.names = FALSE)
   div(
     class = "builder-palette-select",
@@ -118,23 +112,30 @@ builder_group_colors_ui <- function(id, model) {
     ),
     1
   ))
+  ## Undoes only the colours picked by hand for this Group; the palette, shared
+  ## by every Group, stays. Disabled while there is nothing to undo; builder.js
+  ## enables it on the first pick, which does not render this again.
+  undo <- actionButton(
+    ns("reset_colors"),
+    "Undo picked colours",
+    class = "btn group-color-reset",
+    title = "Give the colours picked by hand in this Group back to the palette"
+  )
+  if (!isTRUE(model$custom_count > 0L)) {
+    undo <- tagAppendAttributes(undo, disabled = NA)
+  }
   div(
     class = "builder-group-colors",
     `data-group` = model$group,
     builder_palette_select_ui(
       ns,
       model$palette %||% "cerebro",
-      model$total,
       isTRUE(model$has_dataset_colors)
     ),
     div(
       class = "viewer-group-distribution-head",
       h5("Distribution"),
-      actionButton(
-        ns("reset_colors"),
-        "Reset colors",
-        class = "btn group-color-reset"
-      )
+      undo
     ),
     if (searchable) {
       tagList(
