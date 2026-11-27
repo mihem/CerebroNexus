@@ -203,6 +203,10 @@ builder_plan_requires_app <- function(entries) {
   }
 
   for (entry in entries) {
+    region_error <- .builder_plan_region_error(entry)
+    if (!is.null(region_error)) {
+      return(region_error)
+    }
     alignments <- tryCatch(
       .builder_plan_partition_alignments(entry$settings$images %||% list()),
       error = function(error) error
@@ -701,7 +705,7 @@ builder_plan_requires_app <- function(entries) {
           saved_identity
         } else {
           .builder_plan_artifact_identity(
-            entry,
+            .builder_plan_region_entry(entry),
             groups,
             projections,
             entry$settings$analyses %||% character(),

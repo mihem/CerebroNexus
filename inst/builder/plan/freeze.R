@@ -468,6 +468,15 @@ builder_freeze_plan <- function(
       "attention_capability"
     ))
   }
+  for (index in seq_along(entries)) {
+    region_error <- .builder_plan_region_error(
+      entries[[index]],
+      manifest = states[[index]]$manifest
+    )
+    if (!is.null(region_error)) {
+      return(region_error)
+    }
+  }
 
   labels <- preflight$labels
   included_groups <- preflight$included_groups
@@ -702,8 +711,9 @@ builder_freeze_plan <- function(
         analyses,
         has_marker_genes
       )
+      region_entry <- .builder_plan_region_entry(entry)
       artifact_identity <- .builder_plan_artifact_identity(
-        entry,
+        region_entry,
         included_groups[[index]],
         included_projections[[index]],
         analyses,
@@ -808,8 +818,9 @@ builder_freeze_plan <- function(
           alignments$spatial
         ),
         spatial_roi_settings = settings$spatial_roi_settings %||% list(),
+        spatial_region_subset = settings$spatial_region_subset %||% list(),
         cell_count = as.integer(
-          entry$profile$n_cells %||%
+          region_entry$profile$n_cells %||%
             artifact_identity$cells$count %||%
             0L
         ),

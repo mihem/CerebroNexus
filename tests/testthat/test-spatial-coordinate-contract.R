@@ -345,6 +345,27 @@ test_that("coordinate transform specs are coordinate-independent", {
     )),
     "schema_version"
   )
+  expect_identical(
+    .spx_coordinate_transform_spec_normalize(list(
+      rotation_degrees = 30,
+      scale = 1.5,
+      pivot = c(x = 10, y = 20)
+    )),
+    list(
+      schema_version = 1L,
+      rotation_degrees = 30,
+      scale = 1.5,
+      pivot = c(x = 10, y = 20)
+    )
+  )
+  expect_error(
+    .spx_coordinate_transform_spec_normalize(list(
+      rotation_degrees = 30,
+      scale = 1.5,
+      pivot = c(x = 10, y = NA_real_)
+    )),
+    "pivot"
+  )
 })
 
 test_that("coordinate transforms rotate and scale about the full bounds center", {

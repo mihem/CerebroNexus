@@ -1,3 +1,25 @@
+# CerebroNexus 8.5.5
+
+- **Keep one tissue of a spatial slide in the Builder.** In the Spatial
+  alignment card, "Keep a region" draws one or more shapes on the cells of
+  the section on screen (Slide-seq/Trekker slides with several tissues,
+  Visium, Xenium, ...). "Keep cells inside" stores the shapes with the
+  dataset, and the built CRB then contains only those cells: expression,
+  metadata, coordinates, projections, selected analyses and the Trekker
+  content follow the kept cells, pre-existing whole-slide analysis tables
+  are cleared so they are not exported out of step, and groups left without
+  a cell are no longer listed. Shapes are stored in the section's own
+  coordinates, so rotating or scaling the points afterwards does not move
+  them, and any section rotation, scale and aligned histology image keep
+  their pre-cut frame; "Clear section" and "Clear all" remove them again.
+  Other sections keep all their cells. The regions are saved with the
+  Project. A region cannot yet be combined with trajectories or immune
+  repertoire tables, and the Moran's I and per-type summaries of a Trekker
+  slide still describe the whole slide. The default share of cells the
+  overview and linked views draw follows the kept number of cells and
+  returns to the full-size default when the region is cleared; a value you
+  set yourself is left alone.
+
 # CerebroNexus 8.5.3
 
 - **The Builder no longer stops with "nthreads > 1 requires TBB".** A CRB is

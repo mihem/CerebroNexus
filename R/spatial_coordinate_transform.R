@@ -86,6 +86,26 @@
   value
 }
 
+.spx_coordinate_transform_pivot <- function(value, context) {
+  if (is.list(value) && !is.object(value)) {
+    value <- unlist(value, use.names = TRUE)
+  }
+  if (
+    !is.numeric(value) ||
+      is.object(value) ||
+      length(value) != 2L ||
+      !identical(names(value), c("x", "y")) ||
+      any(!is.finite(value))
+  ) {
+    stop(
+      context,
+      " pivot must be a finite numeric vector named x and y.",
+      call. = FALSE
+    )
+  }
+  c(x = as.numeric(value[["x"]]), y = as.numeric(value[["y"]]))
+}
+
 .spx_coordinate_transform_spec_normalize <- function(
   record,
   context = "Spatial coordinate transform"
@@ -119,8 +139,9 @@
   ## `schema_version` is emitted by this very normalizer so persisted Builder
   ## state can safely make a round trip through the same validator.  Callers
   ## may omit it; versions other than 1 are deliberately rejected rather than
-  ## guessed at.
-  allowed <- c("schema_version", "rotation_degrees", "scale")
+  ## guessed at. An optional `pivot` lets a region subset keep the pre-cut
+  ## section bounds center so rotation, scale and aligned images stay in place.
+  allowed <- c("schema_version", "rotation_degrees", "scale", "pivot")
   unknown <- setdiff(names_record, allowed)
   if (length(unknown)) {
     stop(
@@ -161,7 +182,7 @@
   if (identical(rotation, -0)) {
     rotation <- 0
   }
-  list(
+  result <- list(
     schema_version = 1L,
     rotation_degrees = rotation,
     scale = .spx_coordinate_transform_scalar(
@@ -171,6 +192,10 @@
       positive = TRUE
     )
   )
+  if ("pivot" %in% names_record && !is.null(record$pivot)) {
+    result$pivot <- .spx_coordinate_transform_pivot(record$pivot, context)
+  }
+  result
 }
 
 .spx_coordinate_transform_normalize <- function(
@@ -183,6 +208,9 @@
   normalized <- identity
   normalized$rotation_degrees <- spec$rotation_degrees
   normalized$scale <- spec$scale
+  if (!is.null(spec$pivot)) {
+    normalized$pivot <- spec$pivot
+  }
   normalized
 }
 
@@ -367,19 +395,10 @@
     "Spatial coordinate inverse transform",
     positive = TRUE
   )
-  pivot <- transform$pivot
-  if (
-    !is.numeric(pivot) ||
-      is.object(pivot) ||
-      length(pivot) != 2L ||
-      !identical(names(pivot), c("x", "y")) ||
-      any(!is.finite(pivot))
-  ) {
-    stop(
-      "Spatial coordinate inverse transform requires a finite x/y pivot.",
-      call. = FALSE
-    )
-  }
+  pivot <- .spx_coordinate_transform_pivot(
+    transform$pivot,
+    "Spatial coordinate inverse transform"
+  )
   angle <- rotation * pi / 180
   scaled_x <- (details$x - pivot[["x"]]) / scale
   scaled_y <- (details$y - pivot[["y"]]) / scale

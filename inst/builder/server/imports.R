@@ -1298,6 +1298,13 @@ dispatch_builder_worker_request <- function(dispatched, preparation = NULL) {
         nxt$scale,
         request
       ),
+      region_resolve = builder_session_region_resolve(
+        current_worker,
+        nxt$id,
+        nxt$sections,
+        nxt$levels,
+        request
+      ),
       build = builder_session_build(
         current_worker,
         nxt$plan,
@@ -3219,6 +3226,14 @@ observe({
       )
       builder_import_progress_remove(p$progress_path %||% "")
       add_error(NULL)
+    } else if (identical(p$kind, "region_resolve")) {
+      builder_notify(
+        "error",
+        paste0("The region could not be applied. ", completed$error),
+        target = list(
+          selector = ".builder-viewer-spatial-alignment .builder-viewer-card-body"
+        )
+      )
     } else if (!cancelled) {
       add_error(completed$error)
     }
@@ -3605,6 +3620,8 @@ observe({
     }
   } else if (identical(p$kind, "align_all")) {
     apply_section_bounds(p$id, value, p$picture)
+  } else if (identical(p$kind, "region_resolve")) {
+    commit_region_subset(p, value)
   } else if (identical(p$kind, "build")) {
     release <- isolate(active_release())
     if (
@@ -3756,6 +3773,86 @@ commit_enhance_images <- function(entry, images, internal = FALSE) {
   }
   update_enhance_histology_choices(entry)
   invisible(entry)
+}
+
+## Store the regions the worker has just cut, together with the identity of the
+## cells that remain; or clear them. A result for another copy of the data than
+## the one now open is dropped.
+commit_region_subset <- function(p, value) {
+  entry <- isolate(entry_of(p$id))
+  alignment_target <- list(
+    selector = ".builder-viewer-spatial-alignment .builder-viewer-card-body"
+  )
+  if (is.null(entry)) {
+    return(invisible(FALSE))
+  }
+  source_md5 <- tolower(as.character(entry$snapshot$object_md5 %||% ""))
+  if (!identical(source_md5, p$source_md5 %||% "")) {
+    return(invisible(FALSE))
+  }
+  next_subset <- tryCatch(
+    if (!length(p$sections %||% list())) {
+      list()
+    } else {
+      builder_region_subset_normalize(list(
+        sections = p$sections,
+        resolved = list(
+          source_md5 = source_md5,
+          cells = value$cells,
+          kept = value$kept,
+          total = value$total,
+          group_levels = value$group_levels,
+          sections = value$sections
+        )
+      ))
+    },
+    error = function(error) error
+  )
+  if (inherits(next_subset, "condition")) {
+    builder_notify(
+      "error",
+      conditionMessage(next_subset),
+      target = alignment_target
+    )
+    return(invisible(FALSE))
+  }
+  previous_share <- entry$settings$overview_percentage_cells_to_show
+  entry <- builder_region_subset_set(entry, next_subset)
+  changed <- replace_entry(entry)
+  if (
+    isTRUE(changed) &&
+      !identical(
+        previous_share,
+        entry$settings$overview_percentage_cells_to_show
+      ) &&
+      identical(isolate(current()), entry$id)
+  ) {
+    send_projection_state(entry)
+  }
+  if (length(next_subset)) {
+    kept <- next_subset$resolved$kept
+    total <- next_subset$resolved$total
+    builder_notify(
+      "info",
+      paste0(
+        "Keeping ",
+        format(kept, big.mark = ","),
+        " of ",
+        format(total, big.mark = ","),
+        " cells. The built CRB will contain only these cells."
+      ),
+      target = alignment_target,
+      duration = 6
+    )
+  } else {
+    builder_notify(
+      "info",
+      "All cells are kept again.",
+      target = alignment_target,
+      duration = 4
+    )
+  }
+  invisible(TRUE)
 }
 
 ## Take the per-section extents the worker computed and pair each with the

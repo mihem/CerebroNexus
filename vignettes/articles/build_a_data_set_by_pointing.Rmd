@@ -103,6 +103,8 @@ Valid existing marker tables, enrichment, `monocle2` trajectories, immune repert
 
 For spatial data, each FOV has its own coordinates; a tissue section can own several labelled images (for example H&E and DAPI). The alignment view overlays one selected PNG or JPEG on its FOV and records its own bounds and transform. Coordinates-only FOVs remain valid. TIFF and OME-TIFF require conversion before import.
 
+**Keep a region.** A slide can carry several tissues (a Trekker or Slide-seq slide, a Visium capture area with more than one section). In the same card, **Keep a region** lets you draw one or more shapes on the cells of the section on screen: choose **Draw region**, click the corners of a shape on the canvas, close it by double-clicking or by clicking its first corner, then choose **Keep cells inside**. The built CRB contains only the cells inside the shapes of that section; cells of other sections are not touched, and groups that no remaining cell has are not listed. Shapes belong to the section's own coordinates, so rotating or scaling the points afterwards does not move them, and they are saved with the Project. **Clear section** and **Clear all** bring the cells back. Drawing needs the **All ROIs** view. A region cannot yet be combined with trajectories or immune repertoire tables, and the Moran's I and per-type summaries of a Trekker slide still describe the whole slide.
+
 Selected analysis failures are never presented as successful partial work. The result becomes **Needs decision**: retry the failed item with its dependency closure, or remove it explicitly, return to Review, and freeze a new plan.
 
 When a dataset is configured, use **Finish Checking**. Check the remaining datasets before proceeding to Review.

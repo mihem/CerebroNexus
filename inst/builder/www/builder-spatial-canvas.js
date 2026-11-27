@@ -42,6 +42,17 @@
     observedCanvas: null,
     viewportSignature: null,
     viewportGeometry: null,
+    // Region drawing: polygons are kept in the section's raw coordinates, the
+    // space points are stored in, so rotating or scaling the points afterwards
+    // never moves a shape off its cells.
+    regionView: null,
+    region: {
+      drawing: false,
+      current: [],
+      polygons: [],
+      cursor: null,
+      savedSignature: "",
+    },
   };
   window.__builderSpatialCanvasMetrics = window.__builderSpatialCanvasMetrics || {
     sceneMessages: 0, renders: 0, latestCoordinateRotation: 0,
@@ -170,6 +181,13 @@
         controlsAdopted = true;
       }
     }
+    // Shapes not yet applied belong to the view they were drawn on; once the
+    // stored regions change (applied or cleared) they have become those.
+    var savedSignature = JSON.stringify(message.regions || []);
+    if (viewChanged || savedSignature !== state.region.savedSignature) {
+      resetRegionDraft();
+    }
+    state.region.savedSignature = savedSignature;
     if (viewChanged) {
       state.controlsHeld = false;
       state.dragging = false;
@@ -222,6 +240,10 @@
     state.pendingAuthoritativeControls = null;
     state.pendingControlDirty = false;
     state.activeTransform = "points";
+    state.regionView = null;
+    state.region.savedSignature = "";
+    resetRegionDraft();
+    updateRegionPanel();
     if (node) node.getContext("2d").clearRect(0, 0, node.width, node.height);
   }
   function imageKey(image) {
@@ -453,6 +475,12 @@
           y: offsetY + plotHeight - (point.y - view.ymin) * scale,
         };
       },
+      unscreen: function (at) {
+        return {
+          x: view.xmin + (at.x - offsetX) / scale,
+          y: view.ymin + (offsetY + plotHeight - at.y) / scale,
+        };
+      },
     };
   }
   function publishViewports(scene, viewports, imageFitViewports) {
@@ -504,6 +532,7 @@
     if (!node || !scene) return;
     observeCanvas(node);
     setupCanvasHover(node);
+    setupRegionDrawing(node);
     window.__builderSpatialCanvasMetrics.renders += 1;
     var now = performance.now();
     pushMetric("renderTimes", now);
@@ -532,8 +561,12 @@
     ctx.fillStyle = "#fafbfa"; ctx.fillRect(0, 0, cssWidth, cssHeight);
     state.screenPoints = [];
     state.visiblePointCount = 0;
+    state.regionView = null;
     window.__builderSpatialCanvasMetrics.viewerFrames = [];
-    if (!scene.available || !scene.bounds) return;
+    if (!scene.available || !scene.bounds) {
+      updateRegionPanel();
+      return;
+    }
     if (scene.layout === "separate") {
       drawSeparate(
         ctx,
@@ -544,6 +577,7 @@
         viewportHeight
       );
       updateSummary(node, scene, " across separate ROI panels.");
+      updateRegionPanel();
       return;
     }
     var pad = VIEWER_FRAME_PADDING;
@@ -569,6 +603,15 @@
       1
     );
     var scale = layout.scale, screen = layout.screen;
+    var radians = angle * Math.PI / 180;
+    state.regionView = {
+      layout: layout,
+      cx: (scene.bounds.xmin + scene.bounds.xmax) / 2,
+      cy: (scene.bounds.ymin + scene.bounds.ymax) / 2,
+      cos: Math.cos(radians),
+      sin: Math.sin(radians),
+      pointScale: pointScale,
+    };
     window.__builderSpatialCanvasMetrics.latestViewport = {
       centerX: layout.offsetX + (layout.view.xmax - layout.view.xmin) * scale / 2,
       centerY: layout.offsetY + (layout.view.ymax - layout.view.ymin) * scale / 2,
@@ -583,6 +626,7 @@
     drawGrid(ctx, cssWidth, cssHeight, pad);
     var imageGeometry = drawImage(ctx, scene, screen);
     drawPoints(ctx, scene, screen);
+    drawRegions(ctx, scene);
     if (imageGeometry) {
       drawImageFrame(ctx, imageGeometry, state.activeTransform === "image");
     }
@@ -593,7 +637,324 @@
       drawReference(ctx, scene.bounds, screen, angle, "Points", pointScale);
     }
     updateSummary(node, scene, ".");
+    updateRegionPanel();
   }
+
+  // ---- Region subset -------------------------------------------------------
+  // Raw section coordinates -> screen, and back, through the same rotation and
+  // scale the points get, so a shape drawn on rotated points is stored where
+  // the cells really are.
+  function regionToScreen(point) {
+    var v = state.regionView;
+    if (!v) return null;
+    var x = point.x - v.cx, y = point.y - v.cy;
+    return v.layout.screen({
+      x: v.cx + v.pointScale * (x * v.cos - y * v.sin),
+      y: v.cy + v.pointScale * (x * v.sin + y * v.cos),
+    });
+  }
+  function regionToRaw(at) {
+    var v = state.regionView;
+    if (!v) return null;
+    var world = v.layout.unscreen(at);
+    var x = (world.x - v.cx) / v.pointScale;
+    var y = (world.y - v.cy) / v.pointScale;
+    return {
+      x: v.cx + x * v.cos + y * v.sin,
+      y: v.cy - x * v.sin + y * v.cos,
+    };
+  }
+  function regionSceneDrawable(scene) {
+    // Only the overlay of one section has raw coordinates on screen; a single
+    // ROI or the separate panels show section-transformed points.
+    return !!scene && scene.available && scene.layout !== "separate" &&
+      !scene.activeRoi;
+  }
+  function paintPolygon(ctx, polygon, style) {
+    ctx.beginPath();
+    polygon.forEach(function (vertex, index) {
+      var at = regionToScreen(vertex);
+      if (!at) return;
+      if (index) ctx.lineTo(at.x, at.y);
+      else ctx.moveTo(at.x, at.y);
+    });
+    if (style.closed) ctx.closePath();
+    if (style.fill) {
+      ctx.fillStyle = style.fill;
+      ctx.fill();
+    }
+    ctx.strokeStyle = style.stroke;
+    ctx.lineWidth = style.width;
+    ctx.setLineDash(style.dash);
+    ctx.stroke();
+  }
+  function savedRegions(scene) {
+    return ((scene && scene.regions) || []).map(function (shape) {
+      return (shape.x || []).map(function (x, index) {
+        return {x: x, y: shape.y[index]};
+      });
+    });
+  }
+  function drawRegions(ctx, scene) {
+    var saved = savedRegions(scene);
+    var drafts = state.region.polygons;
+    var current = state.region.current;
+    if (!saved.length && !drafts.length && !current.length) return;
+    var replacing = drafts.length > 0 || current.length > 0;
+    ctx.save();
+    ctx.lineJoin = "round";
+    saved.forEach(function (polygon) {
+      paintPolygon(ctx, polygon, {
+        closed: true,
+        fill: replacing ? "rgba(22,124,120,.05)" : "rgba(22,124,120,.12)",
+        stroke: replacing ? "rgba(22,124,120,.45)" : "#167c78",
+        width: replacing ? 1.5 : 2,
+        dash: replacing ? [4, 4] : [],
+      });
+    });
+    drafts.forEach(function (polygon) {
+      paintPolygon(ctx, polygon, {
+        closed: true,
+        fill: "rgba(201,114,28,.14)",
+        stroke: "#c9721c",
+        width: 2,
+        dash: [6, 4],
+      });
+    });
+    if (current.length) {
+      paintPolygon(ctx, current, {
+        closed: false,
+        stroke: "#c9721c",
+        width: 2,
+        dash: [],
+      });
+      if (state.region.drawing && state.region.cursor) {
+        var last = regionToScreen(current[current.length - 1]);
+        if (last) {
+          ctx.beginPath();
+          ctx.moveTo(last.x, last.y);
+          ctx.lineTo(state.region.cursor.x, state.region.cursor.y);
+          ctx.strokeStyle = "rgba(201,114,28,.65)";
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([4, 4]);
+          ctx.stroke();
+        }
+      }
+      current.forEach(function (vertex, index) {
+        var at = regionToScreen(vertex);
+        if (!at) return;
+        ctx.beginPath();
+        ctx.arc(at.x, at.y, index === 0 ? 5 : 3, 0, Math.PI * 2);
+        ctx.fillStyle = index === 0 ? "#fff" : "#c9721c";
+        ctx.fill();
+        ctx.strokeStyle = "#c9721c";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      });
+    }
+    ctx.restore();
+  }
+  function plural(count, word) {
+    return count + " " + word + (count === 1 ? "" : "s");
+  }
+  function regionStatusText(scene) {
+    var region = state.region;
+    if (!scene || !scene.available) return "";
+    if (!regionSceneDrawable(scene)) {
+      return "Choose \"All ROIs\" to draw a region on this section.";
+    }
+    var hasStored = !!(scene.regions && scene.regions.length);
+    if (region.drawing && region.current.length) {
+      return plural(region.current.length, "point") +
+        ". Double-click or click the first point to close the shape.";
+    }
+    if (region.polygons.length) {
+      var prefix = plural(region.polygons.length, "shape") + " drawn. ";
+      if (region.drawing) {
+        return prefix + "Click to start another, or choose \"Keep cells inside\"" +
+          (hasStored ? " to replace the stored region." : ".");
+      }
+      return prefix + "Choose \"Keep cells inside\" to " +
+        (hasStored ? "replace the stored region." : "apply.");
+    }
+    if (region.drawing) {
+      return "Click on the canvas to place the first point.";
+    }
+    var summary = scene.regionSummary;
+    if (summary) {
+      var text = "Keeping " + summary.kept.toLocaleString() + " of " +
+        summary.total.toLocaleString() + " cells";
+      if (summary.sectionTotal) {
+        text += " (" + summary.sectionKept.toLocaleString() + " of " +
+          summary.sectionTotal.toLocaleString() + " in this section)";
+      }
+      return text + ".";
+    }
+    return "All cells are kept. Draw a shape around the cells to keep.";
+  }
+  function updateRegionPanel() {
+    var panel = document.getElementById("builder-region-panel");
+    if (!panel) return;
+    var scene = state.scene, region = state.region;
+    var drawable = regionSceneDrawable(scene);
+    var status = document.getElementById("builder-region-status");
+    if (status) status.textContent = regionStatusText(scene);
+    var enabled = {
+      draw: drawable,
+      undo: drawable && (region.current.length > 0 || region.polygons.length > 0),
+      apply: drawable && (region.polygons.length > 0 || region.current.length >= 3),
+      clear: !!(scene && scene.regions && scene.regions.length) ||
+        region.polygons.length > 0 || region.current.length > 0,
+      clear_all: !!(scene && scene.regionSummary),
+    };
+    panel.querySelectorAll("[data-region-action]").forEach(function (button) {
+      var action = button.getAttribute("data-region-action");
+      button.disabled = enabled[action] === false;
+      if (action === "draw") {
+        button.setAttribute("aria-pressed", region.drawing ? "true" : "false");
+        button.classList.toggle("is-active", region.drawing);
+      }
+    });
+    var node = canvas();
+    if (node) {
+      node.style.cursor = region.drawing && drawable ? "crosshair" : "";
+      if (region.drawing && drawable) {
+        var tip = document.getElementById(node.id + "-tooltip");
+        if (tip) tip.hidden = true;
+      }
+    }
+  }
+  function resetRegionDraft() {
+    state.region.drawing = false;
+    state.region.current = [];
+    state.region.polygons = [];
+    state.region.cursor = null;
+  }
+  function closeRegionShape() {
+    var region = state.region;
+    if (region.current.length >= 3) region.polygons.push(region.current);
+    region.current = [];
+    region.cursor = null;
+  }
+  function sendRegionEvent(action, polygons) {
+    var scene = state.scene;
+    if (!scene || !window.Shiny || typeof Shiny.setInputValue !== "function") return;
+    Shiny.setInputValue("builder_region_event", {
+      action: action,
+      polygons: polygons || [],
+      viewKey: scene.viewKey,
+      nonce: Date.now(),
+    }, {priority: "event"});
+  }
+  function handleRegionAction(action) {
+    var scene = state.scene, region = state.region;
+    if (action === "draw") {
+      if (!regionSceneDrawable(scene)) return;
+      if (region.drawing) closeRegionShape();
+      region.drawing = !region.drawing;
+      if (!region.drawing) region.cursor = null;
+    } else if (action === "undo") {
+      if (region.current.length) region.current.pop();
+      else if (region.polygons.length) region.current = region.polygons.pop();
+    } else if (action === "apply") {
+      closeRegionShape();
+      if (!region.polygons.length) return;
+      sendRegionEvent("apply", region.polygons.map(function (polygon) {
+        return {
+          x: polygon.map(function (vertex) { return vertex.x; }),
+          y: polygon.map(function (vertex) { return vertex.y; }),
+        };
+      }));
+      region.drawing = false;
+      region.cursor = null;
+    } else if (action === "clear") {
+      var hadDraft = region.current.length || region.polygons.length;
+      resetRegionDraft();
+      if (!hadDraft || (scene && scene.regions && scene.regions.length)) {
+        sendRegionEvent("clear");
+      }
+    } else if (action === "clear_all") {
+      resetRegionDraft();
+      sendRegionEvent("clear_all");
+    }
+    schedule();
+    updateRegionPanel();
+  }
+  function setupRegionDrawing(node) {
+    if (node.dataset.builderRegionDrawing === "true") return;
+    node.dataset.builderRegionDrawing = "true";
+    node.addEventListener("pointermove", function (event) {
+      var region = state.region;
+      if (!region.drawing || !region.current.length || !regionSceneDrawable(state.scene)) {
+        if (region.cursor) {
+          region.cursor = null;
+          schedule();
+        }
+        return;
+      }
+      var rect = node.getBoundingClientRect();
+      region.cursor = {x: event.clientX - rect.left, y: event.clientY - rect.top};
+      schedule();
+    });
+    node.addEventListener("pointerleave", function () {
+      if (!state.region.cursor) return;
+      state.region.cursor = null;
+      schedule();
+    });
+    node.addEventListener("click", function (event) {
+      var region = state.region;
+      if (!region.drawing || !regionSceneDrawable(state.scene)) return;
+      var rect = node.getBoundingClientRect();
+      var at = {x: event.clientX - rect.left, y: event.clientY - rect.top};
+      if (event.detail >= 2) {
+        closeRegionShape();
+      } else {
+        var first = region.current.length ? regionToScreen(region.current[0]) : null;
+        var last = region.current.length
+          ? regionToScreen(region.current[region.current.length - 1])
+          : null;
+        if (
+          first && region.current.length >= 3 &&
+          Math.hypot(first.x - at.x, first.y - at.y) <= 8
+        ) {
+          closeRegionShape();
+        } else if (last && Math.hypot(last.x - at.x, last.y - at.y) <= 2) {
+          // Ignore a duplicate click on the previous vertex (for example,
+          // the first click of a double-click that closes the shape).
+          return;
+        } else {
+          var raw = regionToRaw(at);
+          if (raw) region.current.push(raw);
+        }
+      }
+      schedule();
+      updateRegionPanel();
+    });
+  }
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest && event.target.closest("[data-region-action]");
+    if (!button || button.disabled) return;
+    handleRegionAction(button.getAttribute("data-region-action"));
+  });
+  document.addEventListener("keydown", function (event) {
+    if (!state.region.drawing && !state.region.polygons.length) return;
+    var tag = event.target && event.target.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+    if (event.key === "Escape") {
+      if (state.region.current.length) {
+        state.region.current = [];
+        state.region.cursor = null;
+      } else {
+        resetRegionDraft();
+      }
+    } else if (event.key === "Enter" && state.region.drawing) {
+      closeRegionShape();
+    } else {
+      return;
+    }
+    schedule();
+    updateRegionPanel();
+  });
   function updateSummary(node, scene, suffix) {
     window.__builderSpatialCanvasMetrics.visiblePoints = state.visiblePointCount;
     var summary = document.getElementById(node.id + "-summary");
@@ -1355,6 +1716,10 @@
     ) return;
     var tip = document.getElementById(node.id + "-tooltip");
     if (!tip) return;
+    if (state.region.drawing) {
+      tip.hidden = true;
+      return;
+    }
     var rect = node.getBoundingClientRect(), best = -1, bestDistance = 64;
     var pointerX = point.clientX - rect.left;
     var pointerY = point.clientY - rect.top;

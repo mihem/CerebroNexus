@@ -523,6 +523,29 @@ builder_spatial_canvas_cache_sources <- function(scene, known = character()) {
   list(scene = scene, known = known)
 }
 
+## The polygons stored for the section on screen, as the canvas draws them.
+.builder_canvas_regions <- function(region_subset, section) {
+  polygons <- region_subset$sections[[section %||% ""]]$polygons %||% list()
+  lapply(unname(polygons), function(polygon) {
+    list(x = I(polygon$x), y = I(polygon$y))
+  })
+}
+
+## What the stored regions keep: this section and the whole dataset.
+.builder_canvas_region_summary <- function(region_subset, section) {
+  if (!length(region_subset$sections %||% list())) {
+    return(NULL)
+  }
+  resolved <- region_subset$resolved
+  counts <- resolved$sections[[section %||% ""]]
+  list(
+    kept = resolved$kept,
+    total = resolved$total,
+    sectionKept = counts$kept %||% NULL,
+    sectionTotal = counts$total %||% NULL
+  )
+}
+
 builder_spatial_canvas_scene <- function(
   preview,
   colors,
@@ -540,7 +563,8 @@ builder_spatial_canvas_scene <- function(
   cell_percentage = 100,
   dataset = NULL,
   snapshot_identity = NULL,
-  section = NULL
+  section = NULL,
+  region_subset = list()
 ) {
   if (!isTRUE(preview$available)) {
     return(list(
@@ -590,6 +614,8 @@ builder_spatial_canvas_scene <- function(
     generation = generation,
     resetToken = reset_token,
     capped = isTRUE(preview$capped),
+    regions = .builder_canvas_regions(region_subset, section),
+    regionSummary = .builder_canvas_region_summary(region_subset, section),
     layout = layout,
     activeRoi = active_roi,
     roiBounds = preview$roi_bounds %||% list(),

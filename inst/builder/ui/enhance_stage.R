@@ -670,6 +670,50 @@ builder_spatial_image_storage_ui <- function(ns, selected = "external") {
   )
 }
 
+## "Keep a region": draw shapes on the cells of the section on screen; the
+## built CRB then contains only the cells inside. The buttons are plain HTML
+## handled by www/builder-spatial-canvas.js, which also writes the status line.
+builder_region_panel_ui <- function() {
+  action <- function(name, label, title) {
+    tags$button(
+      type = "button",
+      class = "btn",
+      `data-region-action` = name,
+      title = title,
+      label
+    )
+  }
+  tags$details(
+    id = "builder-region-panel",
+    class = "spatial-coordinate-settings spatial-region-settings",
+    open = "open",
+    tags$summary("Keep a region"),
+    div(
+      class = "spatial-coordinate-settings-body",
+      p(
+        class = "hint",
+        paste(
+          "Draw a shape around the cells to keep, for example one tissue",
+          "on a slide. Cells outside it are left out of the built CRB."
+        )
+      ),
+      div(
+        class = "builder-action-row",
+        action("draw", "Draw region", "Click points on the canvas"),
+        action("undo", "Undo", "Remove the last point or shape"),
+        action("apply", "Keep cells inside", "Keep only the cells inside"),
+        action("clear", "Clear section", "Remove the region of this section"),
+        action("clear_all", "Clear all", "Remove every region")
+      ),
+      p(
+        id = "builder-region-status",
+        class = "hint",
+        `aria-live` = "polite"
+      )
+    )
+  )
+}
+
 builder_spatial_alignment_ui <- function(id, model) {
   ns <- NS(id)
   sections <- as.character(model$sections %||% character())
@@ -823,6 +867,11 @@ builder_spatial_alignment_ui <- function(id, model) {
                     )
                   )
                 ),
+                ns = ns
+              ),
+              conditionalPanel(
+                condition = "output['has_region_frame']",
+                builder_region_panel_ui(),
                 ns = ns
               ),
               div(
