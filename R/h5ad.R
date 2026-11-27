@@ -1131,6 +1131,9 @@ readH5adAsSCE <- function(
     }
     .h5adStreamSource(ctx$file, path, n_cells, n_genes, prefix = ctx$prefix)
   }
+  if (!length(assay_names)) {
+    ineligible("The h5ad file has no expression matrix.")
+  }
   ## convertSCEToSeurat(): counts and logcounts by name, else the first assay
   ## is counts when its first 100,000 stored values are whole numbers.
   x_is_counts <- NULL
@@ -1142,12 +1145,8 @@ readH5adAsSCE <- function(
     if (x_is_counts) counts_assay <- first else data_assay <- first
   }
   reference <- if (is.null(counts_assay)) data_assay else counts_assay
-  candidates <- list(
-    count = c("total_counts", "n_counts", "nCount_RNA", "nUMI"),
-    features = c("n_genes_by_counts", "n_genes", "nFeature_RNA", "nGene")
-  )
   recorded <- vapply(
-    candidates,
+    .sceCellTotalCandidates,
     function(names) {
       any(vapply(
         intersect(names, colnames(col_data)),
@@ -1188,15 +1187,22 @@ readH5adAsSCE <- function(
     },
     numeric(1)
   )
+  csr_path <- function(assay) {
+    if (is.null(assay)) {
+      return(NULL)
+    }
+    path <- path_of(assay)
+    if (identical(.h5adEncoding(ctx, path), "csr_matrix")) path else NULL
+  }
   list(
     x_is_counts = x_is_counts,
     cell_totals = cell_totals,
     totals_from_counts = !is.null(counts_assay),
     stored_values = stored_values,
-    ## the file matrix behind each Seurat layer, for streaming its expression
+    ## the CSR file matrix behind each Seurat layer, for streaming its expression
     layer_sources = list(
-      counts = if (!is.null(counts_assay)) path_of(counts_assay),
-      data = if (!is.null(data_assay)) path_of(data_assay)
+      counts = csr_path(counts_assay),
+      data = csr_path(data_assay)
     )
   )
 }

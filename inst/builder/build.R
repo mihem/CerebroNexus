@@ -1834,6 +1834,8 @@ builder_verify_crb <- function(
       !identical(item$expression_backend, "h5") ||
       length(item$analyses %||% list()) ||
       length(object@images) ||
+      !is.null(tryCatch(object@misc$trekker, error = function(error) NULL)) ||
+      isTRUE(item$has_trekker) ||
       any(tolower(names(object@reductions)) == "spatial") ||
       !.builder_build_deferred_h5ad_unchanged(deferred)
   ) {

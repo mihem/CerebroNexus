@@ -330,6 +330,28 @@ test_that("layouts a metadata-only read cannot stand in for are refused", {
     read_h5ad(fixture("small_dense.h5ad"), .metadata_only = TRUE),
     class = "cerebro_h5ad_metadata_ineligible"
   )
+  ## An h5ad with no assays is ineligible rather than failing with a subscript error.
+  ctx <- .h5adContext(fixture("small_csr.h5ad"))
+  expect_error(
+    .h5adDeferredFacts(ctx, "X", character(), data.frame(), 1L, 1L),
+    class = "cerebro_h5ad_metadata_ineligible"
+  )
+  ## A non-CSR layer (e.g. dense X with obs totals) is never recorded as a
+  ## streamable CSR layer_source, so the Builder hydrates it in full instead.
+  dense_ctx <- .h5adContext(fixture("small_dense.h5ad"))
+  obs_with_totals <- data.frame(
+    total_counts = c(10, 20),
+    n_genes_by_counts = c(2, 3)
+  )
+  facts <- .h5adDeferredFacts(
+    dense_ctx,
+    "X",
+    "logcounts",
+    obs_with_totals,
+    2L,
+    2L
+  )
+  expect_null(facts$layer_sources$data)
 })
 
 test_that("streamed cell totals equal the column sums of the matrix", {

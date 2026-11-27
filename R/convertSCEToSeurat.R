@@ -1,3 +1,8 @@
+.sceCellTotalCandidates <- list(
+  count = c("total_counts", "n_counts", "nCount_RNA", "nUMI"),
+  features = c("n_genes_by_counts", "n_genes", "nFeature_RNA", "nGene")
+)
+
 #' Convert a SingleCellExperiment into a Seurat object
 #'
 #' Gives a SingleCellExperiment (read from an `.rds`/`.qs2` file, or an AnnData
@@ -195,14 +200,14 @@ convertSCEToSeurat <- function(
   }
   fill(
     paste0("nCount_", main_assay),
-    c("total_counts", "n_counts", "nCount_RNA", "nUMI"),
+    .sceCellTotalCandidates$count,
     function() {
       deferred$cell_totals$count %||% Matrix::colSums(reference)
     }
   )
   fill(
     paste0("nFeature_", main_assay),
-    c("n_genes_by_counts", "n_genes", "nFeature_RNA", "nGene"),
+    .sceCellTotalCandidates$features,
     function() {
       deferred$cell_totals$features %||% Matrix::colSums(reference > 0)
     }
