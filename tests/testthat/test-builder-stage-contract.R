@@ -829,3 +829,176 @@ test_that("the group colours show the cells of every level, not only the first 1
   expect_identical(builder_group_full_distribution(NULL, "cluster"), list())
   expect_identical(builder_group_full_distribution(profile, "other"), list())
 })
+
+palette_by_id <- function(id) {
+  Filter(function(p) identical(p$id, id), builder_palettes())[[1L]]
+}
+
+test_that("the palettes on offer are the five of the Builder", {
+  ids <- vapply(builder_palettes(), function(p) p$id, character(1))
+  expect_identical(
+    ids,
+    c("dataset", "cerebro", "distinct", "hue", "okabe_ito")
+  )
+  for (palette in builder_palettes()) {
+    for (n in c(1L, 5L, 14L, 60L)) {
+      colors <- palette$colors(n)
+      expect_length(colors, n)
+      expect_true(all(grepl("^#[0-9A-Fa-f]{6}$", colors)), info = palette$id)
+    }
+  }
+  ## Seurat's DimPlot colours for three groups
+  expect_identical(
+    toupper(palette_by_id("hue")$colors(3L)),
+    c("#F8766D", "#00BA38", "#619CFF")
+  )
+})
+
+test_that("the default palette is the Viewer's own default colour set", {
+  viewer <- new.env(parent = baseenv())
+  exprs <- parse(system.file("viewer/color_setup.R", package = "CerebroNexus"))
+  for (expr in exprs) {
+    is_set <- is.call(expr) &&
+      identical(expr[[1L]], as.name("<-")) &&
+      as.character(expr[[2L]]) %in%
+        c(
+          "colorset_dutch",
+          "colorset_spanish",
+          "default_colorset_base",
+          "cerebro_group_colors"
+        )
+    if (is_set) {
+      eval(expr, viewer)
+    }
+  }
+  expect_identical(
+    toupper(builder_viewer_colorset()),
+    toupper(viewer$default_colorset_base)
+  )
+  ## the same colours as the Viewer, below and above its 40
+  for (n in c(25L, 40L, 41L, 338L)) {
+    expect_identical(
+      builder_preview_palette(n),
+      toupper(viewer$cerebro_group_colors(n))
+    )
+    expect_identical(
+      palette_by_id("cerebro")$colors(n),
+      toupper(viewer$cerebro_group_colors(n))
+    )
+  }
+})
+
+test_that("a palette is extended past its colours, not stretched", {
+  lab_gap <- function(colors) {
+    lab <- CerebroNexus:::.cerebroSrgbToLab(t(grDevices::col2rgb(colors)))
+    distance <- as.matrix(stats::dist(lab))
+    diag(distance) <- Inf
+    min(distance)
+  }
+  cerebro <- palette_by_id("cerebro")
+  distinct <- palette_by_id("distinct")
+  okabe <- palette_by_id("okabe_ito")
+  ## a palette keeps its own colours, and a level added keeps the others
+  expect_identical(distinct$colors(10L), builder_distinct_seed()[1:10])
+  expect_identical(distinct$colors(60L)[1:25], builder_distinct_seed())
+  expect_identical(cerebro$colors(41L)[1:40], cerebro$colors(40L))
+  expect_identical(cerebro$colors(338L)[1:60], cerebro$colors(60L))
+  expect_identical(okabe$colors(12L)[1:8], okabe$colors(8L))
+  ## the same colours every time, every one of them different
+  expect_identical(distinct$colors(60L), distinct$colors(60L))
+  expect_false(anyDuplicated(distinct$colors(1201L)) > 0L)
+  expect_false(anyDuplicated(cerebro$colors(1201L)) > 0L)
+  ## the closest pair (CIELAB distance) stays apart; stretching with
+  ## colorRampPalette() squeezed Cerebro default to 0.7 at 338 levels
+  for (n in c(24L, 37L, 50L)) {
+    expect_gt(lab_gap(distinct$colors(n)), 15)
+  }
+  expect_gt(lab_gap(distinct$colors(338L)), 8)
+  added <- cerebro$colors(338L)[41:338]
+  expect_gt(lab_gap(added), 8)
+  expect_true(all(grepl("^#[0-9A-F]{6}$", distinct$colors(338L))))
+})
+
+test_that("the Palette select is the same short list for every Group", {
+  expect_identical(
+    builder_palette_choices(),
+    c(
+      "Cerebro default" = "cerebro",
+      "Many distinct colours" = "distinct",
+      "Seurat / ggplot2 default" = "hue",
+      "Okabe–Ito (colour-vision friendly)" = "okabe_ito"
+    )
+  )
+  ## the data set's own colours come first, and only when it has some
+  with_colors <- builder_palette_choices(has_dataset = TRUE)
+  expect_identical(
+    unname(with_colors),
+    c("dataset", "cerebro", "distinct", "hue", "okabe_ito")
+  )
+  expect_identical(names(with_colors)[[1L]], "From the data set")
+  html <- as.character(
+    builder_palette_select_ui(shiny::NS("core"), "distinct", TRUE)
+  )
+  expect_match(html, "core-palette")
+  expect_no_match(html, "optgroup")
+  expect_match(html, "<option value=\"distinct\" selected>", fixed = TRUE)
+})
+
+test_that("Undo picked colours is enabled only when the Group has picks", {
+  undo_tag <- function(overrides) {
+    model <- builder_group_colors_model(
+      "cluster",
+      c("A", "B"),
+      overrides = overrides
+    )
+    html <- as.character(builder_group_colors_ui("core", model))
+    regmatches(html, regexpr("<button[^>]*core-reset_colors[^>]*>", html))
+  }
+  none <- undo_tag(list())
+  expect_match(none, "disabled")
+  picked <- undo_tag(list(cluster = c(A = "#123456")))
+  expect_no_match(picked, "disabled")
+  ## a pick in another Group does not enable it here
+  expect_match(undo_tag(list(other = c(A = "#123456"))), "disabled")
+  model <- builder_group_colors_model("cluster", c("A", "B"))
+  expect_match(
+    as.character(builder_group_colors_ui("core", model)),
+    "Undo picked colours",
+    fixed = TRUE
+  )
+})
+
+test_that("From the data set keeps its colours and fills the others apart from them", {
+  levels <- c("A", "B", "C", "N/A")
+  brought <- c(A = "#111111", C = "#333333", ignored = "#999999")
+
+  colors <- builder_level_colors(levels, "dataset", NULL, brought)
+  expect_identical(colors[c("A", "C", "N/A")], c(A = "#111111", C = "#333333", "N/A" = "#898989"))
+  ## B gets a generated colour, not one the data set already uses
+  expect_identical(
+    colors[["B"]],
+    toupper(CerebroNexus:::.cerebroExtendPalette(c("#111111", "#333333"), 4L)[[3L]])
+  )
+  expect_false(colors[["B"]] %in% c("#111111", "#333333"))
+  ## a colour picked by hand wins over the data set's
+  picked <- builder_level_colors(
+    levels,
+    "dataset",
+    c(A = "#ABCDEF"),
+    brought
+  )
+  expect_identical(picked[["A"]], "#ABCDEF")
+  ## any other palette ignores them, and a Group without them is Cerebro default
+  expect_identical(
+    builder_level_colors(levels, "hue", NULL, brought)[["A"]],
+    builder_level_colors(levels, "hue")[["A"]]
+  )
+  expect_identical(
+    builder_level_colors(levels, "dataset"),
+    builder_level_colors(levels, "cerebro")
+  )
+  expect_identical(
+    builder_level_colors(levels, "dataset", NULL, c(other = "#111111")),
+    builder_level_colors(levels, "cerebro")
+  )
+})

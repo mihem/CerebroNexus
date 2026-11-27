@@ -843,7 +843,11 @@ builder_freeze_plan <- function(
         images = alignments$spatial,
         spatial_image_storage = builder_spatial_image_storage(settings),
         trekker_alignment = alignments$trekker,
-        colors = builder_resolve_colors(settings, entry$levels %||% list()),
+        colors = builder_resolve_colors(
+          settings,
+          entry$levels %||% list(),
+          entry$dataset_colors %||% list()
+        ),
         group_color_overrides = selected_color_overrides,
         color_custom_count = as.integer(custom_color_count),
         nUMI = builder_qc_field(settings, entry$profile, "nUMI"),

@@ -525,14 +525,11 @@
   ## uses them as the starting colours; only exported groups are kept.
   if (is.list(misc$group_colors) && length(misc$group_colors)) {
     kept <- Filter(
-      function(colors) {
-        is.character(colors) &&
-          !is.null(names(colors)) &&
-          length(colors) > 0L &&
-          !anyNA(colors) &&
-          all(grepl("^#[0-9A-Fa-f]{6}$", colors))
-      },
-      misc$group_colors[intersect(names(misc$group_colors), groups)]
+      Negate(is.null),
+      lapply(
+        misc$group_colors[intersect(names(misc$group_colors), groups)],
+        .cerebroValidGroupColors
+      )
     )
     if (length(kept)) {
       export$addTechnicalInfo("group_colors", kept)

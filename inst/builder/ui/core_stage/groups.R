@@ -17,7 +17,8 @@ builder_group_colors_model <- function(
   levels,
   palette = "cerebro",
   overrides = list(),
-  distribution = list()
+  distribution = list(),
+  dataset_colors = list()
 ) {
   valid_group <- builder_stage_has_text(group %||% "")
   levels <- unname(as.character(levels %||% character()))
@@ -26,7 +27,12 @@ builder_group_colors_model <- function(
     return(list(group = "", items = list(), total = 0L, custom_count = 0L))
   }
   group_overrides <- overrides[[group]] %||% character()
-  colors <- builder_level_colors(levels, palette, group_overrides)
+  colors <- builder_level_colors(
+    levels,
+    palette,
+    group_overrides,
+    dataset_colors[[group]]
+  )
   custom_levels <- intersect(levels, names(group_overrides))
   distribution_labels <- vapply(
     distribution,
@@ -58,7 +64,27 @@ builder_group_colors_model <- function(
     group = group,
     items = items,
     total = length(items),
-    custom_count = length(custom_levels)
+    custom_count = length(custom_levels),
+    palette = palette,
+    has_dataset_colors = length(dataset_colors) > 0L
+  )
+}
+
+## The palette applies to every Group of the dataset; a swatch picked by hand
+## keeps its colour when the palette changes ("Undo picked colours" drops them).
+## The choices are the same for every Group: every palette has a colour for any
+## number of levels, so none needs a warning.
+builder_palette_select_ui <- function(ns, selected, has_dataset = FALSE) {
+  choices <- builder_palette_choices(has_dataset = has_dataset)
+  ids <- unlist(choices, use.names = FALSE)
+  div(
+    class = "builder-palette-select",
+    selectInput(
+      ns("palette"),
+      "Palette",
+      choices = choices,
+      selected = if (selected %in% ids) selected else ids[[1L]]
+    )
   )
 }
 
@@ -86,17 +112,30 @@ builder_group_colors_ui <- function(id, model) {
     ),
     1
   ))
+  ## Undoes only the colours picked by hand for this Group; the palette, shared
+  ## by every Group, stays. Disabled while there is nothing to undo; builder.js
+  ## enables it on the first pick, which does not render this again.
+  undo <- actionButton(
+    ns("reset_colors"),
+    "Undo picked colours",
+    class = "btn group-color-reset",
+    title = "Give the colours picked by hand in this Group back to the palette"
+  )
+  if (!isTRUE(model$custom_count > 0L)) {
+    undo <- tagAppendAttributes(undo, disabled = NA)
+  }
   div(
     class = "builder-group-colors",
     `data-group` = model$group,
+    builder_palette_select_ui(
+      ns,
+      model$palette %||% "cerebro",
+      isTRUE(model$has_dataset_colors)
+    ),
     div(
       class = "viewer-group-distribution-head",
       h5("Distribution"),
-      actionButton(
-        ns("reset_colors"),
-        "Reset colors",
-        class = "btn group-color-reset"
-      )
+      undo
     ),
     if (searchable) {
       tagList(

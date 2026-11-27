@@ -4,8 +4,9 @@
 # Qualitative palette for categorical groups (clusters, samples, ...) when the
 # user has NOT picked colours in the Color management tab. These are the vibrant
 # flatuicolors sets (Dutch + Spanish), used so distinct clusters stay easy to
-# tell apart. cerebro_group_colors() below keeps the overflow-safe interpolation
-# so many-cluster data sets still get valid colours instead of NAs.
+# tell apart. Past their 40, cerebro_group_colors() below adds generated
+# colours, each well apart from the others, so a data set with many clusters
+# still gets a distinct colour for every level.
 #
 # Users can still override any group colour with the colour picker; this is only
 # the default fallback (see reactive_colors() below).
@@ -55,12 +56,11 @@ colorset_spanish <- c(
 )
 default_colorset_base <- c(colorset_dutch, colorset_spanish)
 
-## Build n visually distinct qualitative colours from the base palette. For
-## n <= length(base) we take the first n base hues (hand-tuned, best contrast).
-## For n > length(base) we interpolate across the whole base ring with
-## colorRampPalette so a data set with many clusters still gets n *valid*
-## colours instead of NAs — the old `default_colorset[seq_along(...)]` slicing
-## silently returned NA past 40 groups.
+## n qualitative colours: the first n of the base palette, and past its 40 the
+## base followed by generated colours, each as far as it can be from all the
+## others (the Builder's "Cerebro default" is the same, so an App it builds
+## draws a Group as the Viewer does). Stretching the base with colorRampPalette
+## squeezed in-between shades and moved every level's colour when one was added.
 cerebro_group_colors <- function(n) {
   n <- max(0L, as.integer(n))
   if (n == 0L) {
@@ -69,7 +69,7 @@ cerebro_group_colors <- function(n) {
   if (n <= length(default_colorset_base)) {
     return(default_colorset_base[seq_len(n)])
   }
-  grDevices::colorRampPalette(default_colorset_base)(n)
+  CerebroNexus:::.cerebroExtendPalette(default_colorset_base, n)
 }
 
 # Cell-cycle phases: the original vibrant four-colour set.

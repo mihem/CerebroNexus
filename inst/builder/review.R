@@ -300,7 +300,11 @@ builder_review_snapshot <- function(
   colors <- if (length(saved$colors %||% list())) {
     saved$colors
   } else if (exists("builder_resolve_colors", mode = "function")) {
-    builder_resolve_colors(settings, entry$levels %||% list())
+    builder_resolve_colors(
+      settings,
+      entry$levels %||% list(),
+      entry$dataset_colors %||% list()
+    )
   } else {
     list()
   }

@@ -876,36 +876,57 @@ builder_trajectory_preview_catalog <- function(
   previews
 }
 
-#' The viewer's own qualitative palette, so the preview is not a different
-#' picture from the one the data set will produce.
-builder_preview_palette <- function(n) {
-  base <- c(
-    "#4C78A8",
-    "#E07B39",
-    "#59A14F",
-    "#B279A2",
-    "#76B7B2",
-    "#E15759",
-    "#9C755F",
-    "#D6B84C",
-    "#6F6F78",
-    "#86A873",
-    "#5B8E9E",
-    "#C26D8A",
-    "#7A6FA8",
-    "#B88A44",
-    "#4F8A76",
-    "#A8644A",
-    "#7896C1",
-    "#8C7B6B",
-    "#6E9E9A",
-    "#A77B9D"
+#' The Viewer's own default qualitative palette (Flat UI Colors, Dutch then
+#' Spanish: `default_colorset_base` in `inst/viewer/color_setup.R`), so the
+#' preview and the colours baked into the built CRB are the ones the Viewer
+#' draws for a data set that carries none. A test keeps the two in step.
+builder_viewer_colorset <- function() {
+  c(
+    "#FFC312",
+    "#C4E538",
+    "#12CBC4",
+    "#FDA7DF",
+    "#ED4C67",
+    "#F79F1F",
+    "#A3CB38",
+    "#1289A7",
+    "#D980FA",
+    "#B53471",
+    "#EE5A24",
+    "#009432",
+    "#0652DD",
+    "#9980FA",
+    "#833471",
+    "#EA2027",
+    "#006266",
+    "#1B1464",
+    "#5758BB",
+    "#6F1E51",
+    "#40407A",
+    "#706FD3",
+    "#F7F1E3",
+    "#34ACE0",
+    "#33D9B2",
+    "#2C2C54",
+    "#474787",
+    "#AAA69D",
+    "#227093",
+    "#218C74",
+    "#FF5252",
+    "#FF793F",
+    "#D1CCC0",
+    "#FFB142",
+    "#FFDA79",
+    "#B33939",
+    "#CD6133",
+    "#84817A",
+    "#CC8E35",
+    "#CCAE62"
   )
-  n <- max(1L, as.integer(n))
-  if (n <= length(base)) {
-    return(base[seq_len(n)])
-  }
-  grDevices::colorRampPalette(base)(n)
+}
+
+builder_preview_palette <- function(n) {
+  toupper(CerebroNexus:::.cerebroExtendPalette(builder_viewer_colorset(), max(1L, n)))
 }
 
 
@@ -943,77 +964,142 @@ builder_alignment_legend_ui <- function(frame, colors = NULL) {
 ## Palettes
 ## ---------------------------------------------------------------------------
 
-#' The palettes on offer, as functions of the number of levels.
+#' A palette with fixed colours. Past them it is extended, not stretched: its
+#' own colours stay, and each further level gets a generated colour as far as
+#' it can be from all the others (`.cerebroExtendPalette()`, shared with the
+#' Viewer), so every palette has a colour for any number of levels.
+builder_palette <- function(id, label, base, note, cvd = FALSE) {
+  force(base)
+  list(
+    id = id,
+    label = label,
+    cvd = cvd,
+    note = note,
+    colors = function(n) {
+      toupper(CerebroNexus:::.cerebroExtendPalette(base, max(1L, n)))
+    }
+  )
+}
+
+#' The palettes on offer, in the order of the select.
 #'
-#' `cerebro` is the viewer's own, so "leave it alone" is the default and the
-#' preview matches what the app will draw. The rest exist because a lab usually
-#' has a convention to match, and because the viewer's palette is tuned for
-#' distinctness rather than for being readable by someone with a colour vision
-#' deficiency.
+#' `dataset` takes the colours the data set brought for a Group (see
+#' `builder_level_colors()`); it is on offer only for a data set that brought
+#' some, and is then the default. `cerebro` is the Viewer's own, so "leave it
+#' alone" is the default otherwise and the preview matches what the app will
+#' draw. `distinct` starts from cols25, which keeps more levels apart than
+#' Cerebro default. The rest exist because a lab usually has a convention to
+#' match, or needs colours readable with a colour vision deficiency.
 builder_palettes <- function() {
   list(
-    list(
-      id = "cerebro",
-      label = "Cerebro default",
-      note = "The viewer's built-in palette",
-      colors = function(n) builder_preview_palette(n)
+    c(
+      builder_palette(
+        "dataset",
+        "From the data set",
+        builder_viewer_colorset(),
+        "The colours the data set brought; generated ones for a level without one"
+      ),
+      list(dataset = TRUE)
+    ),
+    builder_palette(
+      "cerebro",
+      "Cerebro default",
+      builder_viewer_colorset(),
+      "The Viewer's built-in palette"
+    ),
+    builder_palette(
+      "distinct",
+      "Many distinct colours",
+      builder_distinct_seed(),
+      "Cols25, then generated colours kept well apart, for any number of levels"
     ),
     list(
-      id = "okabe_ito",
-      label = "Okabe–Ito (colour-vision friendly)",
-      note = "Eight colours designed for red–green colour-vision deficiency; interpolated beyond eight groups",
+      id = "hue",
+      label = "Seurat / ggplot2 default",
+      cvd = FALSE,
+      note = "Evenly spaced hues, as DimPlot() and ggplot2 draw a discrete colour scale",
       colors = function(n) {
-        base <- c(
-          "#E69F00",
-          "#56B4E9",
-          "#009E73",
-          "#F0E442",
-          "#0072B2",
-          "#D55E00",
-          "#CC79A7",
-          "#000000"
+        n <- max(1L, as.integer(n))
+        grDevices::hcl(
+          h = seq(15, 375, length.out = n + 1L)[seq_len(n)],
+          c = 100,
+          l = 65
         )
-        builder_ramp(base, n)
       }
     ),
-    list(
-      id = "tol_bright",
-      label = "Paul Tol Bright (colour-vision friendly)",
-      note = "Seven colours that remain distinct in print and projection",
-      colors = function(n) {
-        base <- c(
-          "#4477AA",
-          "#EE6677",
-          "#228833",
-          "#CCBB44",
-          "#66CCEE",
-          "#AA3377",
-          "#BBBBBB"
-        )
-        builder_ramp(base, n)
-      }
-    ),
-    list(
-      id = "grey",
-      label = "Greyscale",
-      note = "Emphasises density without a categorical colour rhythm",
-      colors = function(n) {
-        grDevices::colorRampPalette(c("#1c1c1e", "#c8c8cc"))(max(1L, n))
-      }
+    builder_palette(
+      "okabe_ito",
+      "Okabe–Ito",
+      c(
+        "#E69F00",
+        "#56B4E9",
+        "#009E73",
+        "#F0E442",
+        "#0072B2",
+        "#D55E00",
+        "#CC79A7",
+        "#000000"
+      ),
+      "Designed for red–green colour-vision deficiency; only its first 8 colours are",
+      cvd = TRUE
     )
   )
 }
 
-#' Take the first n of a base palette, interpolating only when it runs out.
-#'
-#' Interpolating a colour-blind-safe palette does not stay colour-blind-safe, so
-#' the interface says how many colours each one really has.
-builder_ramp <- function(base, n) {
-  n <- max(1L, as.integer(n))
-  if (n <= length(base)) {
-    return(base[seq_len(n)])
+#' `pals::cols25()` (pals 1.10, MIT), copied here so the Builder needs no extra
+#' package (checked identical to pals 1.10): the colours "Many distinct colours"
+#' starts from, so a Group of up to 25 levels gets a hand-tuned palette.
+builder_distinct_seed <- function() {
+  c(
+    "#1F78C8",
+    "#FF0000",
+    "#33A02C",
+    "#6A33C2",
+    "#FF7F00",
+    "#565656",
+    "#FFD700",
+    "#A6CEE3",
+    "#FB6496",
+    "#B2DF8A",
+    "#CAB2D6",
+    "#FDBF6F",
+    "#999999",
+    "#EEE685",
+    "#C8308C",
+    "#FF83FA",
+    "#C814FA",
+    "#0000FF",
+    "#36648B",
+    "#00E2E5",
+    "#00FF00",
+    "#778B00",
+    "#BEBE00",
+    "#8B3B00",
+    "#A52A3C"
+  )
+}
+
+#' The text of a palette in the select.
+builder_palette_option_label <- function(palette) {
+  if (isTRUE(palette$cvd)) {
+    return(sprintf("%s (colour-vision friendly)", palette$label))
   }
-  grDevices::colorRampPalette(base)(n)
+  palette$label
+}
+
+#' The choices of the Palette select: always the same list in the same order,
+#' with "From the data set" only for a data set that brought colours.
+builder_palette_choices <- function(
+  palettes = builder_palettes(),
+  has_dataset = FALSE
+) {
+  if (!isTRUE(has_dataset)) {
+    palettes <- Filter(function(p) !isTRUE(p$dataset), palettes)
+  }
+  stats::setNames(
+    vapply(palettes, function(p) p$id, character(1)),
+    vapply(palettes, builder_palette_option_label, character(1))
+  )
 }
 
 builder_normalize_hex_color <- function(value) {
@@ -1105,32 +1191,64 @@ builder_reset_color_overrides <- function(overrides, group) {
 #'
 #' `overrides` are the swatches the user has actually touched; everything else
 #' comes from the chosen palette, so switching palette does not throw away a
-#' hand-picked colour.
+#' hand-picked colour. With the `dataset` palette, a level that has a colour in
+#' `dataset_colors` (what the data set brought for this Group) takes it; the
+#' others get generated colours kept apart from those, or Cerebro default when
+#' the data set brought none for this Group. An unknown palette is Cerebro
+#' default.
 builder_level_colors <- function(
   levels,
   palette_id = "cerebro",
-  overrides = NULL
+  overrides = NULL,
+  dataset_colors = NULL
 ) {
   if (!length(levels)) {
     return(character())
   }
-  pal <- Filter(function(p) identical(p$id, palette_id), builder_palettes())
-  fn <- if (length(pal)) pal[[1]]$colors else builder_palettes()[[1]]$colors
-  out <- toupper(fn(length(levels)))
-  names(out) <- levels
-  ## The viewer forces N/A to grey; matching it keeps the preview honest.
-  if ("N/A" %in% levels) {
-    out[["N/A"]] <- "#898989"
+  palettes <- builder_palettes()
+  pal <- Filter(function(p) identical(p$id, palette_id), palettes)
+  if (!length(pal)) {
+    pal <- Filter(function(p) identical(p$id, "cerebro"), palettes)
   }
-  if (length(overrides)) {
-    shared <- intersect(levels, names(overrides))
+  out <- toupper(pal[[1L]]$colors(length(levels)))
+  names(out) <- levels
+  apply_colors <- function(out, colors) {
+    shared <- intersect(levels, names(colors))
     if (length(shared)) {
-      normalized <- lapply(overrides[shared], builder_normalize_hex_color)
+      normalized <- lapply(colors[shared], builder_normalize_hex_color)
       valid <- !vapply(normalized, is.null, logical(1))
       if (any(valid)) {
         out[shared[valid]] <- unlist(normalized[valid], use.names = FALSE)
       }
     }
+    out
+  }
+  if (isTRUE(pal[[1L]]$dataset) && length(dataset_colors)) {
+    given <- apply_colors(
+      stats::setNames(rep(NA_character_, length(levels)), levels),
+      dataset_colors
+    )
+    given <- given[!is.na(given)]
+    missing <- setdiff(levels, names(given))
+    if (length(given)) {
+      ## Levels the data set has no colour for get generated ones, kept apart
+      ## from the colours it brought rather than repeating one of them.
+      out[names(given)] <- given
+      if (length(missing)) {
+        extended <- CerebroNexus:::.cerebroExtendPalette(
+          unname(given),
+          length(given) + length(missing)
+        )
+        out[missing] <- toupper(extended[-seq_along(given)])
+      }
+    }
+  }
+  ## The viewer forces N/A to grey; matching it keeps the preview honest.
+  if ("N/A" %in% levels) {
+    out[["N/A"]] <- "#898989"
+  }
+  if (length(overrides)) {
+    out <- apply_colors(out, overrides)
   }
   out
 }

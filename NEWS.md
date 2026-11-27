@@ -1,3 +1,39 @@
+# CerebroNexus 8.5.4
+
+- **Choose the group colours in the Builder.** Group colors has a Palette
+  select for the dataset, so group colors can match the figures of a
+  manuscript: From the data set, Cerebro default, Many distinct colours,
+  Seurat / ggplot2 default and Okabe-Ito (colour-vision friendly), the same
+  short list for every Group. A color picked by hand keeps its value when the
+  palette changes; "Undo picked colours" drops the ones picked for the Group
+  on show and leaves the palette as it is (it is greyed out while there are
+  none).
+- **The Builder starts from the colours a data set brings.** The Group colours
+  stored in a Seurat object (`@misc$group_colors`), a SingleCellExperiment
+  (`metadata()$group_colors`) or an h5ad file (`uns[<column>_colors]`) used to
+  be replaced by the Builder's own colours in the App it built. "From the data
+  set" now takes them and is the default when there are some; a level without a
+  colour gets a generated one, kept apart from the colours the data set
+  brought.
+- **Palettes are extended, not stretched, past their colours, in the Viewer
+  and the Builder.** A Group with more levels than a palette has colours used
+  to get in-between shades from `colorRampPalette()`, which neighbouring levels
+  could not be told apart by (closest pair under 1 in CIELAB at 338 levels),
+  and every level's colour moved when a level was added. A palette now keeps
+  its own colours, and each further level gets the colour farthest from all the
+  chosen ones in CIELAB (closest pair about 11 at 338 levels). In the Viewer
+  this changes only the levels past the 40th of a Group without colours of its
+  own. "Many distinct colours" starts from `pals::cols25()` (25 colours, MIT).
+  Past 2,000 levels the colours repeat in a cycle instead of being searched
+  for (more colours do not help the eye there, and the first draw of such a
+  Group took over a second).
+- **The Builder's default colours are the Viewer's.** "Cerebro default" was a
+  separate set of 20 low-saturation colours, so an App built by the Builder
+  drew a Group in different colours than the Viewer does for a data set
+  without them. It is now the Viewer's own default (Flat UI Colors, Dutch then
+  Spanish, 40 colours). Apps that were built before keep their colours; a
+  project built again gets the new ones unless its colours were set by hand.
+
 # CerebroNexus 8.5.3
 
 - **The Builder no longer stops with "nthreads > 1 requires TBB".** A CRB is

@@ -3406,8 +3406,14 @@ observe({
       ## Level names per grouping variable, in the order the exporter will
       ## produce them -- the keys a configured palette has to match.
       levels = value$levels %||% list(),
+      ## The colours the data set brought, per grouping variable (level ->
+      ## "#RRGGBB"); the "From the data set" palette starts from them.
+      dataset_colors = value$dataset_colors %||% list(),
       settings = settings
     )
+    if (length(entry$dataset_colors)) {
+      entry$settings$palette <- "dataset"
+    }
     prepared <- try(
       {
         if (identical(p$source, "example")) {
